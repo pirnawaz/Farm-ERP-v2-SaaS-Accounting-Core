@@ -39,6 +39,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Settlements** — Project settlement preview and posting
 - **Inventory** — Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; stock on-hand and movements
 - **Labour** — Workers (Hari), work logs, wage accrual, wage payments
+- **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
 - **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
@@ -208,6 +209,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Sales**       | `apiResource('sales')`, `.../post`                                      |
 | **Inventory**   | Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; `.../post`, `.../reverse`; `stock/on-hand`, `stock/movements` |
 | **Labour**      | `v1/labour/workers`, `v1/labour/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/labour/payables/outstanding` |
+| **Crop Ops**    | `v1/crop-ops/activity-types` (CRUD); `v1/crop-ops/activities` (timeline, CRUD, `.../post`, `.../reverse`) |
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
 | **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing` |
 | **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
@@ -226,11 +228,12 @@ The web app includes pages (and routes) for:
 - **Land parcels**, **Land allocations**, **Crop cycles**, **Projects**, **Project rules**, **Settlement**
 - **Inventory:** items, stores, GRNs, issues, transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
+- **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
 - **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform:** tenants (platform admin)
 
-Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `inventory`, `labour`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
+Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `inventory`, `labour`, `crop_ops`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
 
 ---
 

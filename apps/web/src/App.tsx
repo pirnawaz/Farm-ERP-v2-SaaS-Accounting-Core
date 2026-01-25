@@ -49,6 +49,11 @@ import WorkLogsPage from './pages/labour/WorkLogsPage';
 import WorkLogFormPage from './pages/labour/WorkLogFormPage';
 import WorkLogDetailPage from './pages/labour/WorkLogDetailPage';
 import PayablesOutstandingPage from './pages/labour/PayablesOutstandingPage';
+import CropOpsDashboardPage from './pages/cropOps/CropOpsDashboardPage';
+import ActivityTypesPage from './pages/cropOps/ActivityTypesPage';
+import ActivitiesPage from './pages/cropOps/ActivitiesPage';
+import ActivityFormPage from './pages/cropOps/ActivityFormPage';
+import ActivityDetailPage from './pages/cropOps/ActivityDetailPage';
 import ReportsPage from './pages/ReportsPage';
 import ARAgeingPage from './pages/ARAgeingPage';
 import LocalisationSettingsPage from './pages/LocalisationSettingsPage';
@@ -138,6 +143,11 @@ function App() {
         <Route path="labour/work-logs/new" element={<ModuleProtectedRoute requiredModule="labour"><WorkLogFormPage /></ModuleProtectedRoute>} />
         <Route path="labour/work-logs/:id" element={<ModuleProtectedRoute requiredModule="labour"><WorkLogDetailPage /></ModuleProtectedRoute>} />
         <Route path="labour/payables" element={<ModuleProtectedRoute requiredModule="labour"><PayablesOutstandingPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops" element={<ModuleProtectedRoute requiredModule="crop_ops"><CropOpsDashboardPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/activity-types" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivityTypesPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/activities" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivitiesPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/activities/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivityFormPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/activities/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivityDetailPage /></ModuleProtectedRoute>} />
         <Route path="reports" element={<ModuleProtectedRoute requiredModule="reports"><ReportsPage /></ModuleProtectedRoute>} />
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />

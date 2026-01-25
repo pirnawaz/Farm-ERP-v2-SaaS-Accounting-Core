@@ -466,6 +466,112 @@ export interface ReverseLabWorkLogRequest {
   reason: string;
 }
 
+// Crop Ops / Activities
+export interface CropActivityType {
+  id: string;
+  tenant_id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateActivityTypePayload {
+  name: string;
+  is_active?: boolean;
+}
+
+export interface UpdateActivityTypePayload {
+  name?: string;
+  is_active?: boolean;
+}
+
+export interface CropActivityInput {
+  id: string;
+  activity_id: string;
+  store_id: string;
+  item_id: string;
+  qty: string;
+  unit_cost_snapshot?: string | null;
+  line_total?: string | null;
+  store?: InvStore;
+  item?: InvItem;
+}
+
+export interface CropActivityLabour {
+  id: string;
+  activity_id: string;
+  worker_id: string;
+  rate_basis?: string | null;
+  units: string;
+  rate: string;
+  amount?: string | null;
+  worker?: LabWorker;
+}
+
+export type CropActivityStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+
+export interface CropActivity {
+  id: string;
+  tenant_id: string;
+  doc_no: string;
+  activity_type_id: string;
+  activity_date: string;
+  crop_cycle_id: string;
+  project_id: string;
+  land_parcel_id?: string | null;
+  notes?: string | null;
+  status: CropActivityStatus;
+  posting_date?: string | null;
+  posting_group_id?: string | null;
+  posted_at?: string | null;
+  reversed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  type?: CropActivityType;
+  crop_cycle?: CropCycle;
+  project?: Project;
+  land_parcel?: LandParcel | null;
+  inputs?: CropActivityInput[];
+  labour?: CropActivityLabour[];
+  posting_group?: PostingGroup;
+}
+
+export interface CreateCropActivityPayload {
+  doc_no: string;
+  activity_type_id: string;
+  activity_date: string;
+  crop_cycle_id: string;
+  project_id: string;
+  land_parcel_id?: string | null;
+  notes?: string | null;
+  inputs?: { store_id: string; item_id: string; qty: number }[];
+  labour?: { worker_id: string; rate_basis?: string; units: number; rate: number }[];
+}
+
+export interface UpdateCropActivityPayload {
+  doc_no?: string;
+  activity_type_id?: string;
+  activity_date?: string;
+  crop_cycle_id?: string;
+  project_id?: string;
+  land_parcel_id?: string | null;
+  notes?: string | null;
+  inputs?: { store_id: string; item_id: string; qty: number }[];
+  labour?: { worker_id: string; rate_basis?: string; units: number; rate: number }[];
+}
+
+export interface PostCropActivityRequest {
+  posting_date: string;
+  idempotency_key?: string;
+}
+
+export interface ReverseCropActivityRequest {
+  posting_date: string;
+  reason?: string;
+  idempotency_key?: string;
+}
+
 export type AdvanceType = 'HARI_ADVANCE' | 'VENDOR_ADVANCE' | 'LOAN';
 export type AdvanceDirection = 'OUT' | 'IN';
 export type AdvanceStatus = 'DRAFT' | 'POSTED';

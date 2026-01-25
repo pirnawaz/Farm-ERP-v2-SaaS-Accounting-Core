@@ -35,6 +35,8 @@ use App\Http\Controllers\InvAdjustmentController;
 use App\Http\Controllers\LabWorkerController;
 use App\Http\Controllers\LabWorkLogController;
 use App\Http\Controllers\LabourReportController;
+use App\Http\Controllers\ActivityTypeController;
+use App\Http\Controllers\CropActivityController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -206,6 +208,23 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::post('work-logs/{id}/post', [LabWorkLogController::class, 'post'])->middleware('role:tenant_admin,accountant');
         Route::post('work-logs/{id}/reverse', [LabWorkLogController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
         Route::get('payables/outstanding', [LabourReportController::class, 'outstanding']);
+    });
+});
+
+// Crop Ops (tenant_admin, accountant, operator) — requires crop_ops module
+// Routes under /api/v1/crop-ops
+Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'require_module:crop_ops'])->group(function () {
+    Route::prefix('crop-ops')->group(function () {
+        Route::get('activity-types', [ActivityTypeController::class, 'index']);
+        Route::post('activity-types', [ActivityTypeController::class, 'store']);
+        Route::patch('activity-types/{id}', [ActivityTypeController::class, 'update']);
+        Route::get('activities/timeline', [CropActivityController::class, 'timeline']);
+        Route::get('activities', [CropActivityController::class, 'index']);
+        Route::post('activities', [CropActivityController::class, 'store']);
+        Route::get('activities/{id}', [CropActivityController::class, 'show']);
+        Route::patch('activities/{id}', [CropActivityController::class, 'update']);
+        Route::post('activities/{id}/post', [CropActivityController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('activities/{id}/reverse', [CropActivityController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
     });
 });
 
