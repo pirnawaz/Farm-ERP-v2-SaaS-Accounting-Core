@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStockMovements, useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { InvStockMovement } from '../../types';
 
@@ -32,7 +33,7 @@ export default function StockMovementsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Stock Movements</h1>
+      <PageHeader title="Stock Movements" backTo="/app/inventory" breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Stock Movements' }]} />
       <div className="flex flex-wrap gap-4 mb-4">
         <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All stores</option>

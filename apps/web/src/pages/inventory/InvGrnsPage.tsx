@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useGRNs, useInventoryStores } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { InvGrn } from '../../types';
 
@@ -12,6 +13,7 @@ export default function InvGrnsPage() {
   const { data: grns, isLoading } = useGRNs({ status: status || undefined, store_id: storeId || undefined });
   const { data: stores } = useInventoryStores();
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasRole } = useRole();
 
   const cols: Column<InvGrn>[] = [
@@ -30,12 +32,14 @@ export default function InvGrnsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">GRNs</h1>
-        {hasRole(['tenant_admin', 'accountant', 'operator']) && (
+      <PageHeader
+        title="GRNs"
+        backTo="/app/inventory"
+        breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'GRNs' }]}
+        right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => navigate('/app/inventory/grns/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New GRN</button>
-        )}
-      </div>
+        ) : undefined}
+      />
       <div className="flex gap-4 mb-4">
         <select value={status} onChange={e => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All statuses</option>
@@ -52,7 +56,7 @@ export default function InvGrnsPage() {
         <DataTable
           data={grns || []}
           columns={cols}
-          onRowClick={(r) => navigate(`/app/inventory/grns/${r.id}`)}
+          onRowClick={(r) => navigate(`/app/inventory/grns/${r.id}`, { state: { from: location.pathname + location.search } })}
           emptyMessage="No GRNs. Create one."
         />
       </div>

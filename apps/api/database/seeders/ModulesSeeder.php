@@ -21,7 +21,7 @@ class ModulesSeeder extends Seeder
             ['key' => 'ar_sales', 'name' => 'AR & Sales', 'description' => 'Sales, receivables, AR ageing', 'is_core' => false, 'sort_order' => 6],
             ['key' => 'settlements', 'name' => 'Settlements', 'description' => 'Project settlements and profit distribution', 'is_core' => false, 'sort_order' => 7],
             ['key' => 'reports', 'name' => 'Reports', 'description' => 'Trial balance, general ledger, P&L, cashbook, account balances', 'is_core' => false, 'sort_order' => 8],
-            ['key' => 'inventory', 'name' => 'Inventory', 'description' => 'Stock and inventory (future)', 'is_core' => false, 'sort_order' => 9],
+            ['key' => 'inventory', 'name' => 'Inventory', 'description' => 'Stock: GRNs, Issues, Transfers, Adjustments, Valuation', 'is_core' => false, 'sort_order' => 9],
             ['key' => 'machinery', 'name' => 'Machinery', 'description' => 'Machinery and equipment (future)', 'is_core' => false, 'sort_order' => 10],
             ['key' => 'loans', 'name' => 'Loans', 'description' => 'Loans and loan transactions (future)', 'is_core' => false, 'sort_order' => 11],
         ];

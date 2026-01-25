@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useCreateAdjustment, useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { CreateInvAdjustmentPayload, InvAdjustmentReason } from '../../types';
 
@@ -54,10 +55,15 @@ export default function InvAdjustmentFormPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/inventory/adjustments" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">← Back to Adjustments</Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">New Adjustment</h1>
-      </div>
+      <PageHeader
+        title="New Adjustment"
+        backTo="/app/inventory/adjustments"
+        breadcrumbs={[
+          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Adjustments', to: '/app/inventory/adjustments' },
+          { label: 'New Adjustment' },
+        ]}
+      />
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Doc No" required error={errors.doc_no}><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" /></FormField>
@@ -93,7 +99,7 @@ export default function InvAdjustmentFormPage() {
             </table>
           </div>
         </div>
-        {canEdit && <div className="flex justify-end gap-2 pt-4"><Link to="/app/inventory/adjustments" className="px-4 py-2 border rounded">Cancel</Link><button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">{createM.isPending ? 'Creating...' : 'Create'}</button></div>}
+        {canEdit && <div className="flex justify-end gap-2 pt-4"><button type="button" onClick={() => navigate('/app/inventory/adjustments')} className="px-4 py-2 border rounded">Cancel</button><button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">{createM.isPending ? 'Creating...' : 'Create'}</button></div>}
       </div>
     </div>
   );

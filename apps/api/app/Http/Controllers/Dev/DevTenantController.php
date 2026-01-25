@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Dev;
 
 use App\Http\Controllers\Controller;
+use App\Models\Farm;
 use App\Models\Tenant;
 use App\Models\Account;
 use Illuminate\Http\Request;
@@ -67,6 +68,11 @@ class DevTenantController extends Controller
         }
 
         $tenant = Tenant::create($tenantData);
+
+        Farm::firstOrCreate(
+            ['tenant_id' => $tenant->id],
+            ['farm_name' => $tenant->name]
+        );
 
         // Initialize system accounts for the new tenant
         $this->initializeSystemAccounts($tenant->id);

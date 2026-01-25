@@ -4,6 +4,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { InvItem } from '../../types';
 
@@ -50,12 +51,14 @@ export default function InvItemsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Items</h1>
-        {hasRole(['tenant_admin', 'accountant', 'operator']) && (
+      <PageHeader
+        title="Items"
+        backTo="/app/inventory"
+        breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Items' }]}
+        right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Item</button>
-        )}
-      </div>
+        ) : undefined}
+      />
       <div className="bg-white rounded-lg shadow">
         <DataTable data={items || []} columns={cols} emptyMessage="No items. Create one." />
       </div>

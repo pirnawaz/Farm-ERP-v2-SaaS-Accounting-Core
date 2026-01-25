@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useIssues, useInventoryStores } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { InvIssue } from '../../types';
 
@@ -12,6 +13,7 @@ export default function InvIssuesPage() {
   const { data: issues, isLoading } = useIssues({ status: status || undefined, store_id: storeId || undefined });
   const { data: stores } = useInventoryStores();
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasRole } = useRole();
 
   const cols: Column<InvIssue>[] = [
@@ -31,12 +33,14 @@ export default function InvIssuesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Issues</h1>
-        {hasRole(['tenant_admin', 'accountant', 'operator']) && (
+      <PageHeader
+        title="Issues"
+        backTo="/app/inventory"
+        breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Issues' }]}
+        right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => navigate('/app/inventory/issues/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Issue</button>
-        )}
-      </div>
+        ) : undefined}
+      />
       <div className="flex gap-4 mb-4">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All statuses</option>
@@ -53,7 +57,7 @@ export default function InvIssuesPage() {
         <DataTable
           data={issues || []}
           columns={cols}
-          onRowClick={(r) => navigate(`/app/inventory/issues/${r.id}`)}
+          onRowClick={(r) => navigate(`/app/inventory/issues/${r.id}`, { state: { from: location.pathname + location.search } })}
           emptyMessage="No issues. Create one."
         />
       </div>

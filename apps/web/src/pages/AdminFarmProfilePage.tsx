@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useFarmProfile, useUpdateFarmProfileMutation } from '../hooks/useFarmProfile';
+import { useFarmProfile, useCreateFarmProfileMutation, useUpdateFarmProfileMutation } from '../hooks/useFarmProfile';
 import { FormField } from '../components/FormField';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import type { UpdateFarmProfilePayload } from '../types';
 
 export default function AdminFarmProfilePage() {
-  const { data: farm, isLoading, error } = useFarmProfile();
+  const { data: res, isLoading, error, refetch } = useFarmProfile();
+  const createMutation = useCreateFarmProfileMutation();
   const updateMutation = useUpdateFarmProfileMutation();
   const [formData, setFormData] = useState<UpdateFarmProfilePayload>({
     farm_name: '',
@@ -18,6 +19,8 @@ export default function AdminFarmProfilePage() {
     postal_code: '',
     phone: '',
   });
+
+  const farm = res?.exists ? res.farm : null;
 
   useEffect(() => {
     if (farm) {
@@ -33,6 +36,16 @@ export default function AdminFarmProfilePage() {
       });
     }
   }, [farm]);
+
+  const handleCreate = async () => {
+    try {
+      await createMutation.mutateAsync(undefined);
+      toast.success('Farm profile created');
+      refetch();
+    } catch (e: unknown) {
+      toast.error((e as Error)?.message || 'Failed to create');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +69,28 @@ export default function AdminFarmProfilePage() {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-800">Error loading farm profile: {(error as Error).message}</p>
+      </div>
+    );
+  }
+
+  if (!res?.exists || !farm) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Farm Profile</h1>
+          <p className="text-sm text-gray-500 mt-1">Farm name, address, and contact details.</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <p className="text-gray-600 mb-4">No farm profile yet. Create one to get started.</p>
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={createMutation.isPending}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {createMutation.isPending ? 'Creating...' : 'Create Farm Profile'}
+          </button>
+        </div>
       </div>
     );
   }

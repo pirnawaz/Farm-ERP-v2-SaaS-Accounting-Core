@@ -24,7 +24,23 @@ class FarmProfileIsolationTest extends TestCase
         ])->getJson('/api/tenant/farm-profile');
 
         $response->assertStatus(200);
-        $this->assertEquals('Farm1', $response->json('farm_name'));
+        $this->assertTrue($response->json('exists'));
+        $this->assertEquals('Farm1', $response->json('farm.farm_name'));
+    }
+
+    public function test_get_farm_profile_returns_exists_false_when_no_farm(): void
+    {
+        $t = Tenant::create(['name' => 'T-NoFarm']);
+        // Do not create a Farm for this tenant.
+
+        $response = $this->withHeaders([
+            'X-Tenant-Id' => $t->id,
+            'X-User-Role' => 'tenant_admin',
+        ])->getJson('/api/tenant/farm-profile');
+
+        $response->assertStatus(200);
+        $this->assertFalse($response->json('exists'));
+        $this->assertNull($response->json('farm'));
     }
 
     public function test_update_farm_profile_affects_only_current_tenant(): void

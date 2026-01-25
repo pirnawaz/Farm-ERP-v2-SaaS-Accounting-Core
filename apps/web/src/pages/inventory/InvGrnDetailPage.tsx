@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import {
   useGRN,
   useUpdateGRN,
@@ -12,6 +12,7 @@ import { useParties } from '../../hooks/useParties';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,7 +22,10 @@ type Line = { item_id: string; qty: string; unit_cost: string };
 
 export default function InvGrnDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const { data: grn, isLoading } = useGRN(id || '');
+  const from = (location.state as { from?: string } | null)?.from;
+  const backTo = from ?? '/app/inventory/grns';
   const updateM = useUpdateGRN();
   const postM = usePostGRN();
   const reverseM = useReverseGRN();
@@ -110,10 +114,15 @@ export default function InvGrnDetailPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/inventory/grns" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">← Back to GRNs</Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">GRN {grn.doc_no}</h1>
-      </div>
+      <PageHeader
+        title={`GRN ${grn.doc_no}`}
+        backTo={backTo}
+        breadcrumbs={[
+          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'GRNs', to: '/app/inventory/grns' },
+          { label: grn.doc_no },
+        ]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">

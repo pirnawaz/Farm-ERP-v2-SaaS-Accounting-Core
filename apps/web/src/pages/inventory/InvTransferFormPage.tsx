@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useCreateTransfer, useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { CreateInvTransferPayload } from '../../types';
 
@@ -61,10 +62,15 @@ export default function InvTransferFormPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/inventory/transfers" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">← Back to Transfers</Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">New Transfer</h1>
-      </div>
+      <PageHeader
+        title="New Transfer"
+        backTo="/app/inventory/transfers"
+        breadcrumbs={[
+          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Transfers', to: '/app/inventory/transfers' },
+          { label: 'New Transfer' },
+        ]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -142,7 +148,7 @@ export default function InvTransferFormPage() {
 
         {canEdit && (
           <div className="flex justify-end gap-2 pt-4">
-            <Link to="/app/inventory/transfers" className="px-4 py-2 border rounded">Cancel</Link>
+            <button type="button" onClick={() => navigate('/app/inventory/transfers')} className="px-4 py-2 border rounded">Cancel</button>
             <button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
               {createM.isPending ? 'Creating...' : 'Create'}
             </button>

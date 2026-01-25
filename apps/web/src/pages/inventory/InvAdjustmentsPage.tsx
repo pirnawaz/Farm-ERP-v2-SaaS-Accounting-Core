@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdjustments, useInventoryStores } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { InvAdjustment, InvAdjustmentReason } from '../../types';
 
@@ -19,6 +20,7 @@ export default function InvAdjustmentsPage() {
   });
   const { data: stores } = useInventoryStores();
   const navigate = useNavigate();
+  const location = useLocation();
   const { hasRole } = useRole();
 
   const cols: Column<InvAdjustment>[] = [
@@ -38,12 +40,14 @@ export default function InvAdjustmentsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Adjustments</h1>
-        {hasRole(['tenant_admin', 'accountant', 'operator']) && (
+      <PageHeader
+        title="Adjustments"
+        backTo="/app/inventory"
+        breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Adjustments' }]}
+        right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => navigate('/app/inventory/adjustments/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Adjustment</button>
-        )}
-      </div>
+        ) : undefined}
+      />
       <div className="flex gap-4 mb-4">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All statuses</option>
@@ -61,7 +65,7 @@ export default function InvAdjustmentsPage() {
         </select>
       </div>
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={adjustments || []} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`)} emptyMessage="No adjustments. Create one." />
+        <DataTable data={adjustments || []} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No adjustments. Create one." />
       </div>
     </div>
   );

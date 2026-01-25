@@ -221,6 +221,7 @@ Route::middleware(['role:tenant_admin'])->group(function () {
     Route::get('tenant/modules', [TenantModuleController::class, 'index']);
     Route::put('tenant/modules', [TenantModuleController::class, 'update']);
     Route::get('tenant/farm-profile', [TenantFarmProfileController::class, 'show']);
+    Route::post('tenant/farm-profile', [TenantFarmProfileController::class, 'store']);
     Route::put('tenant/farm-profile', [TenantFarmProfileController::class, 'update']);
     Route::get('tenant/users', [TenantUserAdminController::class, 'index']);
     Route::post('tenant/users', [TenantUserAdminController::class, 'store']);

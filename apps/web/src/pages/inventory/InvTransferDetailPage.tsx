@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import {
   useTransfer,
   useUpdateTransfer,
@@ -12,6 +12,7 @@ import {
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,7 +22,10 @@ type Line = { item_id: string; qty: string };
 
 export default function InvTransferDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const { data: transfer, isLoading } = useTransfer(id || '');
+  const from = (location.state as { from?: string } | null)?.from;
+  const backTo = from ?? '/app/inventory/transfers';
   const updateM = useUpdateTransfer();
   const postM = usePostTransfer();
   const reverseM = useReverseTransfer();
@@ -97,10 +101,15 @@ export default function InvTransferDetailPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/inventory/transfers" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">← Back to Transfers</Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">Transfer {transfer.doc_no}</h1>
-      </div>
+      <PageHeader
+        title={`Transfer ${transfer.doc_no}`}
+        backTo={backTo}
+        breadcrumbs={[
+          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Transfers', to: '/app/inventory/transfers' },
+          { label: transfer.doc_no },
+        ]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">

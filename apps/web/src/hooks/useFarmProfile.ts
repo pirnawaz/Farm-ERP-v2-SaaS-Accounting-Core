@@ -9,6 +9,16 @@ export function useFarmProfile() {
   });
 }
 
+export function useCreateFarmProfileMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload?: UpdateFarmProfilePayload) => farmProfileApi.create(payload ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['farmProfile'] });
+    },
+  });
+}
+
 export function useUpdateFarmProfileMutation() {
   const queryClient = useQueryClient();
   return useMutation({

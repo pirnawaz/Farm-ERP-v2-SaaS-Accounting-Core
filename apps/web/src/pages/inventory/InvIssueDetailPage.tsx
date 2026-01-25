@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import {
   useIssue,
   useUpdateIssue,
@@ -14,6 +14,7 @@ import { useProjects } from '../../hooks/useProjects';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,7 +24,10 @@ type Line = { item_id: string; qty: string };
 
 export default function InvIssueDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const { data: issue, isLoading } = useIssue(id || '');
+  const from = (location.state as { from?: string } | null)?.from;
+  const backTo = from ?? '/app/inventory/issues';
   const updateM = useUpdateIssue();
   const postM = usePostIssue();
   const reverseM = useReverseIssue();
@@ -114,10 +118,15 @@ export default function InvIssueDetailPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/inventory/issues" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">← Back to Issues</Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">Issue {issue.doc_no}</h1>
-      </div>
+      <PageHeader
+        title={`Issue ${issue.doc_no}`}
+        backTo={backTo}
+        breadcrumbs={[
+          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Issues', to: '/app/inventory/issues' },
+          { label: issue.doc_no },
+        ]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -4,6 +4,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { InvStore } from '../../types';
 
@@ -31,12 +32,14 @@ export default function InvStoresPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Stores</h1>
-        {hasRole(['tenant_admin', 'accountant', 'operator']) && (
+      <PageHeader
+        title="Stores"
+        backTo="/app/inventory"
+        breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Stores' }]}
+        right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Store</button>
-        )}
-      </div>
+        ) : undefined}
+      />
       <div className="bg-white rounded-lg shadow">
         <DataTable data={stores || []} columns={cols} emptyMessage="No stores. Create one." />
       </div>
