@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\LabWorker;
+use App\Models\LabWorkerBalance;
 use App\Models\Payment;
 use App\Models\Party;
 use App\Models\PostingGroup;
@@ -133,19 +135,23 @@ class PaymentService
                 }
             }
 
-            // Determine payable account based on party types
+            // Determine payable/debit account for Payment OUT
             $payableAccount = null;
-            $partyTypes = $party->party_types ?? [];
-            
-            if (in_array('HARI', $partyTypes)) {
-                $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
-            } elseif (in_array('KAMDAR', $partyTypes)) {
-                $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_KAMDAR');
-            } elseif (in_array('LANDLORD', $partyTypes)) {
-                $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
+            $isWages = $payment->direction === 'OUT' && (string) ($payment->purpose ?? '') === 'WAGES';
+
+            if ($isWages) {
+                $payableAccount = $this->accountService->getByCode($tenantId, 'WAGES_PAYABLE');
             } else {
-                // Default to PAYABLE_LANDLORD
-                $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
+                $partyTypes = $party->party_types ?? [];
+                if (in_array('HARI', $partyTypes)) {
+                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
+                } elseif (in_array('KAMDAR', $partyTypes)) {
+                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_KAMDAR');
+                } elseif (in_array('LANDLORD', $partyTypes)) {
+                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
+                } else {
+                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
+                }
             }
 
             // Get CASH account
@@ -240,6 +246,24 @@ class PaymentService
                 'posting_group_id' => $postingGroup->id,
                 'posted_at' => now(),
             ]);
+
+            // For Payment OUT with purpose=WAGES: decrement lab_worker_balances
+            if ($isWages) {
+                $worker = LabWorker::where('party_id', $payment->party_id)->where('tenant_id', $tenantId)->first();
+                if (!$worker) {
+                    throw new \Exception('Party is not linked to a worker. Link the worker to a Party for wage payments.');
+                }
+                $balance = LabWorkerBalance::where('tenant_id', $tenantId)->where('worker_id', $worker->id)->first();
+                if (!$balance) {
+                    throw new \Exception('Worker has no balance record.');
+                }
+                $payableBalance = (float) $balance->payable_balance;
+                $amount = (float) $payment->amount;
+                if ($amount > $payableBalance) {
+                    throw new \Exception('Wage payment amount exceeds worker payable balance.');
+                }
+                $balance->decrement('payable_balance', $amount);
+            }
 
             // For Payment IN, allocate to sales
             if ($payment->direction === 'IN') {

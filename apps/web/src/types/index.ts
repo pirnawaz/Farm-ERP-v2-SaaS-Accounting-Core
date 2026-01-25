@@ -315,6 +315,7 @@ export interface Payment {
   posting_group_id?: string;
   settlement_id?: string;
   notes?: string;
+  purpose?: 'GENERAL' | 'WAGES';
   posted_at?: string;
   created_at: string;
   party?: Party;
@@ -331,6 +332,7 @@ export interface CreatePaymentPayload {
   reference?: string;
   settlement_id?: string;
   notes?: string;
+  purpose?: 'GENERAL' | 'WAGES';
 }
 
 export interface PostPaymentRequest {
@@ -342,6 +344,126 @@ export interface PostPaymentRequest {
     sale_id: string;
     amount: string;
   }>;
+}
+
+// Labour (Workers, Work Logs, Payables)
+export type LabWorkerType = 'HARI' | 'STAFF' | 'CONTRACT';
+export type LabRateBasis = 'DAILY' | 'HOURLY' | 'PIECE';
+export type LabWorkLogStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+
+export interface LabWorker {
+  id: string;
+  tenant_id: string;
+  worker_no?: string | null;
+  name: string;
+  worker_type: LabWorkerType;
+  rate_basis: LabRateBasis;
+  default_rate?: string | null;
+  phone?: string | null;
+  is_active: boolean;
+  party_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  party?: Party;
+  balance?: LabWorkerBalance;
+}
+
+export interface LabWorkerBalance {
+  id: string;
+  tenant_id: string;
+  worker_id: string;
+  payable_balance: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LabWorkLog {
+  id: string;
+  tenant_id: string;
+  doc_no: string;
+  worker_id: string;
+  work_date: string;
+  crop_cycle_id: string;
+  project_id: string;
+  activity_id?: string | null;
+  rate_basis: LabRateBasis;
+  units: string;
+  rate: string;
+  amount: string;
+  notes?: string | null;
+  status: LabWorkLogStatus;
+  posting_date?: string | null;
+  posting_group_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  worker?: LabWorker;
+  crop_cycle?: CropCycle;
+  project?: Project;
+  posting_group?: PostingGroup;
+}
+
+export interface PayablesOutstandingRow {
+  worker_id: string;
+  worker_name: string;
+  payable_balance: string;
+  party_id: string | null;
+}
+
+export interface CreateLabWorkerPayload {
+  name: string;
+  worker_no?: string;
+  worker_type?: LabWorkerType;
+  rate_basis?: LabRateBasis;
+  default_rate?: number;
+  phone?: string;
+  is_active?: boolean;
+  create_party?: boolean;
+}
+
+export interface UpdateLabWorkerPayload {
+  name?: string;
+  worker_no?: string;
+  worker_type?: LabWorkerType;
+  rate_basis?: LabRateBasis;
+  default_rate?: number;
+  phone?: string;
+  is_active?: boolean;
+}
+
+export interface CreateLabWorkLogPayload {
+  doc_no: string;
+  worker_id: string;
+  work_date: string;
+  crop_cycle_id: string;
+  project_id: string;
+  activity_id?: string;
+  rate_basis: LabRateBasis;
+  units: number;
+  rate: number;
+  notes?: string;
+}
+
+export interface UpdateLabWorkLogPayload {
+  doc_no?: string;
+  worker_id?: string;
+  work_date?: string;
+  crop_cycle_id?: string;
+  project_id?: string;
+  activity_id?: string | null;
+  rate_basis?: LabRateBasis;
+  units?: number;
+  rate?: number;
+  notes?: string | null;
+}
+
+export interface PostLabWorkLogRequest {
+  posting_date: string;
+  idempotency_key?: string;
+}
+
+export interface ReverseLabWorkLogRequest {
+  posting_date: string;
+  reason: string;
 }
 
 export type AdvanceType = 'HARI_ADVANCE' | 'VENDOR_ADVANCE' | 'LOAN';

@@ -16,3 +16,4 @@ export * from './useOperationalTransactions';
 export * from './useSettlement';
 export * from './useReports';
 export * from './useTenantSettings';
+export * from './useLabour';

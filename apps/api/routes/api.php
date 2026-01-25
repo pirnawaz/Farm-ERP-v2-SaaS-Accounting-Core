@@ -32,6 +32,9 @@ use App\Http\Controllers\InvIssueController;
 use App\Http\Controllers\InvStockController;
 use App\Http\Controllers\InvTransferController;
 use App\Http\Controllers\InvAdjustmentController;
+use App\Http\Controllers\LabWorkerController;
+use App\Http\Controllers\LabWorkLogController;
+use App\Http\Controllers\LabourReportController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -185,6 +188,24 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         // Stock reporting
         Route::get('stock/on-hand', [InvStockController::class, 'onHand']);
         Route::get('stock/movements', [InvStockController::class, 'movements']);
+    });
+});
+
+// Labour (tenant_admin, accountant, operator) — requires labour module
+// Routes under /api/v1/labour
+Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'require_module:labour'])->group(function () {
+    Route::prefix('labour')->group(function () {
+        Route::get('workers', [LabWorkerController::class, 'index']);
+        Route::post('workers', [LabWorkerController::class, 'store']);
+        Route::get('workers/{id}', [LabWorkerController::class, 'show']);
+        Route::patch('workers/{id}', [LabWorkerController::class, 'update']);
+        Route::get('work-logs', [LabWorkLogController::class, 'index']);
+        Route::post('work-logs', [LabWorkLogController::class, 'store']);
+        Route::get('work-logs/{id}', [LabWorkLogController::class, 'show']);
+        Route::patch('work-logs/{id}', [LabWorkLogController::class, 'update']);
+        Route::post('work-logs/{id}/post', [LabWorkLogController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('work-logs/{id}/reverse', [LabWorkLogController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        Route::get('payables/outstanding', [LabourReportController::class, 'outstanding']);
     });
 });
 

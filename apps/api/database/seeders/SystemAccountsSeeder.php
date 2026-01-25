@@ -64,6 +64,8 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'INVENTORY_INPUTS', 'name' => 'Inventory / Inputs Stock', 'type' => 'asset'],
             ['code' => 'INPUTS_EXPENSE', 'name' => 'Inputs Expense', 'type' => 'expense'],
             ['code' => 'STOCK_VARIANCE', 'name' => 'Stock Variance / Shrinkage', 'type' => 'expense'],
+            ['code' => 'LABOUR_EXPENSE', 'name' => 'Labour Expense', 'type' => 'expense'],
+            ['code' => 'WAGES_PAYABLE', 'name' => 'Wages Payable', 'type' => 'liability'],
         ];
     }
 }

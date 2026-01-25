@@ -23,25 +23,28 @@ export default function PaymentFormPage() {
   const { formatMoney } = useFormatting();
   
   // Get query params for prefill
-  const prefilledPartyId = searchParams.get('partyId');
+  const prefilledPartyId = searchParams.get('partyId') || searchParams.get('party_id');
   const prefilledDirection = searchParams.get('direction') as PaymentDirection | null;
+  const prefilledPurpose = (searchParams.get('purpose') as 'GENERAL' | 'WAGES') || 'GENERAL';
+  const prefilledAmount = searchParams.get('amount') || '';
 
   const [formData, setFormData] = useState<CreatePaymentPayload>({
     direction: prefilledDirection || 'OUT',
     party_id: prefilledPartyId || '',
-    amount: '',
+    amount: prefilledAmount,
     payment_date: new Date().toISOString().split('T')[0],
     method: 'CASH',
     reference: '',
     settlement_id: '',
     notes: '',
+    purpose: prefilledPurpose === 'WAGES' ? 'WAGES' : 'GENERAL',
   });
 
-  // Get balances for selected party (use formData.party_id if set, otherwise prefilledPartyId)
-  // Only fetch if direction is OUT (for payable validation)
+  // Get balances for selected party (for OUT payable validation; skip when purpose=WAGES — labour uses lab_worker_balances)
   const selectedPartyId = formData.party_id || prefilledPartyId || '';
+  const isWages = formData.direction === 'OUT' && formData.purpose === 'WAGES';
   const { data: balances } = usePartyBalanceSummary(
-    selectedPartyId,
+    isWages ? '' : selectedPartyId,
     undefined
   );
 
@@ -78,16 +81,18 @@ export default function PaymentFormPage() {
         reference: payment.reference || '',
         settlement_id: payment.settlement_id || '',
         notes: payment.notes || '',
+        purpose: ((payment as { purpose?: string }).purpose === 'WAGES' ? 'WAGES' : 'GENERAL') as 'GENERAL' | 'WAGES',
       });
-    } else if (!isEdit && (prefilledPartyId || prefilledDirection)) {
-      // Handle query params for new payment
+    } else if (!isEdit && (prefilledPartyId || prefilledDirection || prefilledPurpose || prefilledAmount)) {
       setFormData((prev) => ({
         ...prev,
         party_id: prefilledPartyId || prev.party_id,
         direction: prefilledDirection || prev.direction,
+        purpose: prefilledPurpose === 'WAGES' ? 'WAGES' : prev.purpose || 'GENERAL',
+        amount: prefilledAmount || prev.amount,
       }));
     }
-  }, [payment, isEdit, prefilledPartyId, prefilledDirection]);
+  }, [payment, isEdit, prefilledPartyId, prefilledDirection, prefilledPurpose, prefilledAmount]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -98,10 +103,10 @@ export default function PaymentFormPage() {
       newErrors.amount = 'Valid amount is required';
     }
 
-    // Validation: prevent overpayment, guide to create advance
+    // Validation: prevent overpayment (skip OUT when purpose=WAGES — API validates against lab_worker_balances)
     if (formData.amount && formData.party_id) {
       const amount = parseFloat(String(formData.amount));
-      if (formData.direction === 'OUT') {
+      if (formData.direction === 'OUT' && formData.purpose !== 'WAGES') {
         const outstandingPayable = parseFloat(balances?.outstanding_total || '0');
         if (amount > outstandingPayable) {
           newErrors.amount = `Amount exceeds outstanding payable (${formatMoney(outstandingPayable)}). Extra becomes an Advance (Phase 5). Create an Advance instead.`;
@@ -130,6 +135,7 @@ export default function PaymentFormPage() {
         settlement_id: formData.settlement_id || undefined,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
+        purpose: formData.purpose || 'GENERAL',
       };
 
       if (isEdit && id) {
@@ -210,6 +216,20 @@ export default function PaymentFormPage() {
               <option value="IN">IN</option>
             </select>
           </FormField>
+
+          {formData.direction === 'OUT' && (
+            <FormField label="Purpose">
+              <select
+                value={formData.purpose || 'GENERAL'}
+                onChange={(e) => setFormData({ ...formData, purpose: e.target.value as 'GENERAL' | 'WAGES' })}
+                disabled={!canEdit || isEdit}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="GENERAL">General (settlement/advance)</option>
+                <option value="WAGES">Wages</option>
+              </select>
+            </FormField>
+          )}
 
           {formData.direction === 'IN' && selectedPartyId && (
             <>
@@ -379,7 +399,7 @@ export default function PaymentFormPage() {
             </select>
           </FormField>
 
-          {formData.party_id && balances && formData.direction === 'OUT' && (
+          {formData.party_id && balances && formData.direction === 'OUT' && formData.purpose !== 'WAGES' && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-800">
                 <strong>Outstanding Payable:</strong> {formatMoney(balances.outstanding_total || '0')}
@@ -389,6 +409,11 @@ export default function PaymentFormPage() {
                   You can pay up to {formatMoney(balances.outstanding_total)}
                 </p>
               )}
+            </div>
+          )}
+          {formData.direction === 'OUT' && formData.purpose === 'WAGES' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">Wage payment. Party must be linked to a worker. Amount is validated on post.</p>
             </div>
           )}
 
@@ -411,25 +436,18 @@ export default function PaymentFormPage() {
               disabled={!canEdit}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             />
-            {formData.amount && formData.party_id && formData.direction === 'OUT' && (
-              (() => {
-                const amount = parseFloat(String(formData.amount));
-                const outstandingPayable = parseFloat(balances?.outstanding_total || '0');
-                if (amount > outstandingPayable) {
-                  return (
-                    <div className="mt-2">
-                      <Link
-                        to={`/app/advances/new?partyId=${formData.party_id}&type=HARI_ADVANCE&direction=OUT`}
-                        className="text-blue-600 hover:text-blue-900 underline text-sm"
-                      >
-                        Create Advance instead
-                      </Link>
-                    </div>
-                  );
-                }
-                return null;
-              })()
-            )}
+            {formData.amount && formData.party_id && formData.direction === 'OUT' && formData.purpose !== 'WAGES' && (() => {
+              const amount = parseFloat(String(formData.amount));
+              const outstandingPayable = parseFloat(balances?.outstanding_total || '0');
+              if (amount > outstandingPayable) {
+                return (
+                  <div className="mt-2">
+                    <Link to={`/app/advances/new?partyId=${formData.party_id}&type=HARI_ADVANCE&direction=OUT`} className="text-blue-600 hover:text-blue-900 underline text-sm">Create Advance instead</Link>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </FormField>
 
           <FormField label="Payment Date" required error={errors.payment_date}>

@@ -78,6 +78,7 @@ class PaymentController extends Controller
             'reference' => $request->reference,
             'settlement_id' => $request->settlement_id,
             'notes' => $request->notes,
+            'purpose' => $request->get('purpose', 'GENERAL'),
             'status' => 'DRAFT',
         ]);
 

@@ -38,8 +38,9 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **AR & Sales** — Sales documents, posting, AR ageing
 - **Settlements** — Project settlement preview and posting
 - **Inventory** — Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; stock on-hand and movements
+- **Labour** — Workers (Hari), work logs, wage accrual, wage payments
 - **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing
-- **Settings** — Tenant settings, farm profile, modules, users
+- **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
 ---
 
@@ -206,9 +207,10 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Advances**    | `apiResource('advances')`, `.../post`                                    |
 | **Sales**       | `apiResource('sales')`, `.../post`                                      |
 | **Inventory**   | Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; `.../post`, `.../reverse`; `stock/on-hand`, `stock/movements` |
+| **Labour**      | `v1/labour/workers`, `v1/labour/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/labour/payables/outstanding` |
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
 | **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing` |
-| **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`, `tenant/farm-profile`, `tenant/users` |
+| **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
 
 Exact routes, methods, and middleware are in `apps/api/routes/api.php`.
 
@@ -222,12 +224,13 @@ The web app includes pages (and routes) for:
 - **Daily book entries**, **Operational transactions**
 - **Parties**, **Sales**, **Payments**, **Advances**
 - **Land parcels**, **Land allocations**, **Crop cycles**, **Projects**, **Project rules**, **Settlement**
-- **Inventory:** items, stores, GRNs, issues, transfers, adjustments, stock on-hand, movements
+- **Inventory:** items, stores, GRNs, issues, transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
+- **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform:** tenants (platform admin)
 
-Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `inventory`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
+Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `inventory`, `labour`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
 
 ---
 

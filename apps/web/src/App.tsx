@@ -43,6 +43,12 @@ import InvAdjustmentFormPage from './pages/inventory/InvAdjustmentFormPage';
 import InvAdjustmentDetailPage from './pages/inventory/InvAdjustmentDetailPage';
 import StockOnHandPage from './pages/inventory/StockOnHandPage';
 import StockMovementsPage from './pages/inventory/StockMovementsPage';
+import LabourDashboardPage from './pages/labour/LabourDashboardPage';
+import WorkersPage from './pages/labour/WorkersPage';
+import WorkLogsPage from './pages/labour/WorkLogsPage';
+import WorkLogFormPage from './pages/labour/WorkLogFormPage';
+import WorkLogDetailPage from './pages/labour/WorkLogDetailPage';
+import PayablesOutstandingPage from './pages/labour/PayablesOutstandingPage';
 import ReportsPage from './pages/ReportsPage';
 import ARAgeingPage from './pages/ARAgeingPage';
 import LocalisationSettingsPage from './pages/LocalisationSettingsPage';
@@ -126,6 +132,12 @@ function App() {
         <Route path="inventory/adjustments/:id" element={<ModuleProtectedRoute requiredModule="inventory"><InvAdjustmentDetailPage /></ModuleProtectedRoute>} />
         <Route path="inventory/stock-on-hand" element={<ModuleProtectedRoute requiredModule="inventory"><StockOnHandPage /></ModuleProtectedRoute>} />
         <Route path="inventory/stock-movements" element={<ModuleProtectedRoute requiredModule="inventory"><StockMovementsPage /></ModuleProtectedRoute>} />
+        <Route path="labour" element={<ModuleProtectedRoute requiredModule="labour"><LabourDashboardPage /></ModuleProtectedRoute>} />
+        <Route path="labour/workers" element={<ModuleProtectedRoute requiredModule="labour"><WorkersPage /></ModuleProtectedRoute>} />
+        <Route path="labour/work-logs" element={<ModuleProtectedRoute requiredModule="labour"><WorkLogsPage /></ModuleProtectedRoute>} />
+        <Route path="labour/work-logs/new" element={<ModuleProtectedRoute requiredModule="labour"><WorkLogFormPage /></ModuleProtectedRoute>} />
+        <Route path="labour/work-logs/:id" element={<ModuleProtectedRoute requiredModule="labour"><WorkLogDetailPage /></ModuleProtectedRoute>} />
+        <Route path="labour/payables" element={<ModuleProtectedRoute requiredModule="labour"><PayablesOutstandingPage /></ModuleProtectedRoute>} />
         <Route path="reports" element={<ModuleProtectedRoute requiredModule="reports"><ReportsPage /></ModuleProtectedRoute>} />
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />

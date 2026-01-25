@@ -18,6 +18,7 @@ const navigation: Array<{ name: string; href: string; roles: UserRole[]; require
   { name: 'Advances', href: '/app/advances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_advances' },
   { name: 'Sales', href: '/app/sales', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'ar_sales' },
   { name: 'Inventory', href: '/app/inventory', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'inventory' },
+  { name: 'Labour', href: '/app/labour', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'labour' },
   { name: 'Reports', href: '/app/reports', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
   { name: 'AR Ageing', href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
   { name: 'Settings', href: '/app/settings/localisation', roles: ['tenant_admin'] },

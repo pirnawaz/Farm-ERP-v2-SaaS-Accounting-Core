@@ -25,6 +25,7 @@ class Payment extends Model
         'posting_group_id',
         'settlement_id',
         'notes',
+        'purpose',
         'posted_at',
     ];
 

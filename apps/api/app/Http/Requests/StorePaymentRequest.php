@@ -22,6 +22,7 @@ class StorePaymentRequest extends FormRequest
             'reference' => ['nullable', 'string', 'max:255'],
             'settlement_id' => ['nullable', 'uuid', 'exists:settlements,id'],
             'notes' => ['nullable', 'string'],
+            'purpose' => ['nullable', 'string', 'in:GENERAL,WAGES'],
         ];
     }
 }
