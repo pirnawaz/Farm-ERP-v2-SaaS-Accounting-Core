@@ -1,0 +1,14 @@
+{
+  "name": "farm-erp-v2",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "cd apps/api && php artisan serve",
+    "dev:web": "cd apps/web && npm run dev",
+    "install:all": "npm install && cd apps/web && npm install && cd ../../packages/shared && npm install"
+  }
+}

@@ -1,0 +1,541 @@
+import { useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useParty, usePartyBalanceSummary, usePartyStatement, usePartyOpenSales } from '../hooks/useParties';
+import { usePayments } from '../hooks/usePayments';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { DataTable, type Column } from '../components/DataTable';
+import { useFormatting } from '../hooks/useFormatting';
+import type { Payment, PartyStatementLine, PartyStatementGroup, OpenSale } from '../types';
+
+type Tab = 'overview' | 'breakdown' | 'statement' | 'payments' | 'open-sales';
+
+export default function PartyDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [statementFrom, setStatementFrom] = useState<string>('');
+  const [statementTo, setStatementTo] = useState<string>('');
+
+  const { data: party, isLoading: partyLoading } = useParty(id || '');
+  const { data: balances, isLoading: balancesLoading } = usePartyBalanceSummary(id || '');
+  const { data: statement, isLoading: statementLoading } = usePartyStatement(
+    id || '',
+    statementFrom || undefined,
+    statementTo || undefined,
+    activeTab === 'breakdown' ? 'cycle' : undefined
+  );
+  const { data: payments, isLoading: paymentsLoading } = usePayments({ party_id: id });
+  const [openSalesAsOf, setOpenSalesAsOf] = useState<string>(new Date().toISOString().split('T')[0]);
+  const { data: openSales, isLoading: openSalesLoading } = usePartyOpenSales(id || '', openSalesAsOf);
+  const { formatMoney } = useFormatting();
+
+  const payableAmount = parseFloat(balances?.outstanding_total || '0');
+  const receivableAmount = parseFloat(balances?.receivable_balance || '0');
+  const advanceBalanceOutstanding = parseFloat(balances?.advance_balance_outstanding || '0');
+  const isHariOrVendor = party?.party_types?.some(type => ['HARI', 'VENDOR'].includes(type)) || false;
+  const isBuyer = party?.party_types?.some(type => type === 'BUYER') || false;
+
+  if (partyLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!party) {
+    return <div>Party not found</div>;
+  }
+
+  const renderOverview = () => {
+    if (balancesLoading) {
+      return <LoadingSpinner />;
+    }
+
+    return (
+      <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Posted Payables</h3>
+            <p className="text-2xl font-bold text-gray-900">{formatMoney(balances?.allocated_payable_total || '0')}</p>
+            <p className="text-xs text-gray-500 mt-1">From posted settlements</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Paid</h3>
+            <p className="text-2xl font-bold text-gray-900">{formatMoney(balances?.paid_total || '0')}</p>
+            <p className="text-xs text-gray-500 mt-1">Posted payments</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Outstanding</h3>
+            <p className="text-2xl font-bold text-red-600">{formatMoney(balances?.outstanding_total || '0')}</p>
+            <p className="text-xs text-gray-500 mt-1">Posted payables minus posted payments</p>
+          </div>
+        </div>
+        
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-xs text-blue-800">
+            <strong>Note:</strong> Computed from posted settlements/allocations minus posted payments.
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Quick Actions</h3>
+          </div>
+          <div className="flex space-x-4">
+            <Link
+              to={`/app/payments/new?direction=OUT&partyId=${party.id}`}
+              className={`px-4 py-2 rounded-md font-medium ${
+                payableAmount > 0
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Pay OUT
+            </Link>
+            <Link
+              to={`/app/payments/new?direction=IN&partyId=${party.id}`}
+              className={`px-4 py-2 rounded-md font-medium ${
+                receivableAmount > 0
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Receive IN
+            </Link>
+            {isBuyer && (
+              <Link
+                to={`/app/sales/new?buyerPartyId=${party.id}`}
+                className="px-4 py-2 rounded-md font-medium bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Create Sale
+              </Link>
+            )}
+            {isHariOrVendor && (
+              <Link
+                to={`/app/advances/new?partyId=${party.id}&type=${party.party_types?.includes('HARI') ? 'HARI_ADVANCE' : 'VENDOR_ADVANCE'}&direction=OUT`}
+                className="px-4 py-2 rounded-md font-medium bg-purple-600 text-white hover:bg-purple-700"
+              >
+                Create Advance
+              </Link>
+            )}
+          </div>
+          {payableAmount > 0 && (
+            <p className="mt-4 text-sm text-gray-600">
+              Outstanding payable: {formatMoney(balances?.outstanding_total || '0')}. Click "Pay OUT" to record a payment.
+            </p>
+          )}
+          {receivableAmount > 0 && (
+            <p className="mt-4 text-sm text-gray-600">
+              Outstanding receivable: {formatMoney(balances?.receivable_balance || '0')}. Click "Receive IN" to record a payment.
+            </p>
+          )}
+          {isBuyer && receivableAmount === 0 && (
+            <p className="mt-4 text-sm text-gray-600">
+              No outstanding receivables. Click "Create Sale" to record a sale.
+            </p>
+          )}
+        </div>
+
+        {isHariOrVendor && advanceBalanceOutstanding > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Outstanding Advances (they owe us)</h3>
+            <p className="text-2xl font-bold text-green-600">{formatMoney(balances?.advance_balance_outstanding || '0')}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Disbursed: {formatMoney(balances?.advance_balance_disbursed || '0')} | 
+              Repaid: {formatMoney(balances?.advance_balance_repaid || '0')}
+            </p>
+          </div>
+        )}
+
+        {isBuyer && receivableAmount > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Outstanding Receivables (they owe us)</h3>
+            <p className="text-2xl font-bold text-green-600">{formatMoney(balances?.receivable_balance || '0')}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Sales Total: {formatMoney(balances?.receivable_sales_total || '0')} | 
+              Payments Received: {formatMoney(balances?.receivable_payments_in_total || '0')}
+            </p>
+          </div>
+        )}
+
+        {balances?.allocations && balances.allocations.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Allocations</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {balances.allocations.map((allocation, idx) => (
+                    <tr key={idx}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{allocation.posting_date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{allocation.project_name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{allocation.allocation_type}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatMoney(allocation.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderBreakdown = () => {
+    if (statementLoading) {
+      return <LoadingSpinner />;
+    }
+
+    if (!statement || !statement.grouped_breakdown || statement.grouped_breakdown.length === 0) {
+      return (
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-gray-500">No breakdown data available for this period.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Breakdown by Crop Cycle</h3>
+          
+          {statement.summary && parseFloat(statement.summary.unassigned_payments_total || '0') > 0 && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3 flex-1">
+                  <h4 className="text-sm font-medium text-yellow-800">
+                    Unassigned Payments: {formatMoney(statement.summary.unassigned_payments_total)}
+                  </h4>
+                  <p className="mt-1 text-sm text-yellow-700">
+                    These payments reduce total outstanding but aren't assigned to any crop cycle/project in Breakdown because they're not linked to a settlement.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="space-y-4">
+            {statement.grouped_breakdown.map((group: PartyStatementGroup, idx: number) => (
+              <div key={idx} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-medium text-gray-900">
+                    {group.crop_cycle_name || `Crop Cycle ${idx + 1}`}
+                  </h4>
+                  <span className="text-sm font-medium text-gray-600">
+                    Net: {formatMoney(group.net_outstanding)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Allocations:</span>
+                    <span className="ml-2 font-medium">{formatMoney(group.total_allocations)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Payments Out:</span>
+                    <span className="ml-2 font-medium">{formatMoney(group.total_payments_out)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Payments In:</span>
+                    <span className="ml-2 font-medium">{formatMoney(group.total_payments_in)}</span>
+                  </div>
+                </div>
+                {group.projects && group.projects.length > 0 && (
+                  <div className="mt-4 pl-4 border-l-2 border-gray-200">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Projects:</h5>
+                    {group.projects.map((project: PartyStatementGroup, pIdx: number) => (
+                      <div key={pIdx} className="mb-2 text-sm">
+                        <span className="font-medium">{project.project_name}</span>
+                        <span className="ml-2 text-gray-600">Net: {formatMoney(project.net_outstanding)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStatement = () => {
+    if (statementLoading) {
+      return <LoadingSpinner />;
+    }
+
+    const statementColumns: Column<PartyStatementLine>[] = [
+      { header: 'Date', accessor: 'date' },
+      { header: 'Type', accessor: 'type' },
+      { header: 'Description', accessor: 'description' },
+      { header: 'Reference', accessor: 'reference' },
+      {
+        header: 'Amount',
+        accessor: (row) => (
+          <span className={row.direction === '+' ? 'text-green-600' : 'text-red-600'}>
+            {row.direction}{formatMoney(row.amount)}
+          </span>
+        ),
+      },
+    ];
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex space-x-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+              <input
+                type="date"
+                value={statementFrom}
+                onChange={(e) => setStatementFrom(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+              <input
+                type="date"
+                value={statementTo}
+                onChange={(e) => setStatementTo(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+          </div>
+          {statement && statement.summary && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Total Allocations:</span>
+                  <span className="ml-2 font-medium">{formatMoney(statement.summary.total_allocations_increasing_balance)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Payments Out:</span>
+                  <span className="ml-2 font-medium">{formatMoney(statement.summary.total_payments_out)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Payments In:</span>
+                  <span className="ml-2 font-medium">{formatMoney(statement.summary.total_payments_in)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Closing Payable:</span>
+                  <span className="ml-2 font-medium text-red-600">{formatMoney(statement.summary.closing_balance_payable)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Closing Receivable:</span>
+                  <span className="ml-2 font-medium text-green-600">{formatMoney(statement.summary.closing_balance_receivable)}</span>
+                </div>
+                {parseFloat(statement.summary.unassigned_payments_total || '0') > 0 && (
+                  <div>
+                    <span className="text-gray-500">Unassigned Payments:</span>
+                    <span className="ml-2 font-medium text-yellow-600">{formatMoney(statement.summary.unassigned_payments_total)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {statement && statement.line_items && statement.line_items.length > 0 ? (
+            <DataTable data={statement.line_items.map((r, i) => ({ ...r, id: `${r.date}-${r.type}-${r.reference}-${i}` }))} columns={statementColumns} />
+          ) : (
+            <p className="text-gray-500">No statement lines for this period.</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderPayments = () => {
+    if (paymentsLoading) {
+      return <LoadingSpinner />;
+    }
+
+    const paymentColumns: Column<Payment>[] = [
+      { header: 'Date', accessor: 'payment_date' },
+      { header: 'Direction', accessor: 'direction' },
+      { header: 'Amount', accessor: (row) => formatMoney(row.amount) },
+      { header: 'Method', accessor: 'method' },
+      { header: 'Status', accessor: 'status' },
+      {
+        header: 'Actions',
+        accessor: (row) => (
+          <Link
+            to={`/app/payments/${row.id}`}
+            className="text-blue-600 hover:text-blue-900"
+          >
+            View
+          </Link>
+        ),
+      },
+    ];
+
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Payments</h3>
+          <Link
+            to={`/app/payments?party_id=${party.id}`}
+            className="text-sm text-blue-600 hover:text-blue-900"
+          >
+            View all →
+          </Link>
+        </div>
+        {payments && payments.length > 0 ? (
+          <DataTable data={payments} columns={paymentColumns} />
+        ) : (
+          <p className="text-gray-500">No payments found for this party.</p>
+        )}
+      </div>
+    );
+  };
+
+  const renderOpenSales = () => {
+    if (openSalesLoading) {
+      return <LoadingSpinner />;
+    }
+
+    const columns: Column<OpenSale>[] = [
+      { header: 'Sale Ref', accessor: (row) => row.sale_no || 'N/A' },
+      { header: 'Date', accessor: 'posting_date' },
+      { header: 'Due Date', accessor: 'due_date' },
+      { header: 'Amount', accessor: (row) => formatMoney(row.amount) },
+      { header: 'Paid', accessor: (row) => formatMoney(row.allocated) },
+      {
+        header: 'Outstanding',
+        accessor: (row) => (
+          <span className="font-semibold text-red-600">{formatMoney(row.outstanding)}</span>
+        )
+      },
+      {
+        header: 'Actions',
+        accessor: (row) => (
+          <Link
+            to={`/app/payments/new?direction=IN&partyId=${id}&amount=${row.outstanding}`}
+            className="text-blue-600 hover:text-blue-900 text-sm"
+          >
+            Receive Payment
+          </Link>
+        ),
+      },
+    ];
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Open Sales (Outstanding Receivables)</h3>
+            <div className="flex items-center space-x-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">As Of</label>
+                <input
+                  type="date"
+                  value={openSalesAsOf}
+                  onChange={(e) => setOpenSalesAsOf(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+          {openSales && openSales.length > 0 ? (
+            <DataTable data={openSales.map((o) => ({ ...o, id: o.sale_id }))} columns={columns} />
+          ) : (
+            <p className="text-gray-500">No open sales (all receivables are paid).</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div className="mb-6">
+        <Link to="/app/parties" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+          ← Back to Parties
+        </Link>
+        <div className="flex justify-between items-start mt-2">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{party.name}</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {party.party_types.join(', ')}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'overview'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('breakdown')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'breakdown'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Breakdown
+          </button>
+          <button
+            onClick={() => setActiveTab('statement')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'statement'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Statement
+          </button>
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'payments'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Payments
+          </button>
+          {isBuyer && (
+            <button
+              onClick={() => setActiveTab('open-sales')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'open-sales'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Open Sales
+            </button>
+          )}
+        </nav>
+      </div>
+
+      {activeTab === 'overview' && renderOverview()}
+      {activeTab === 'breakdown' && renderBreakdown()}
+      {activeTab === 'statement' && renderStatement()}
+      {activeTab === 'payments' && renderPayments()}
+      {activeTab === 'open-sales' && isBuyer && renderOpenSales()}
+    </div>
+  );
+}

@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+vendor/
+apps/*/node_modules/
+apps/*/vendor/
+
+# Build outputs
+dist/
+build/
+apps/*/dist/
+apps/*/build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Laravel
+apps/api/storage/
+apps/api/bootstrap/cache/
+*.log
+
+# Vite
+apps/web/.vite/
