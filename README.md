@@ -231,7 +231,7 @@ The web app includes pages (and routes) for:
 - **Daily book entries**, **Operational transactions**
 - **Parties**, **Sales**, **Payments**, **Advances**
 - **Land parcels**, **Land allocations**, **Crop cycles**, **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based and sales-based), **Harvests**
-- **Inventory:** items, stores, GRNs, issues, transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
+- **Inventory:** items, stores, categories, UOMs, GRNs, issues, transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
 - **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin

@@ -125,6 +125,20 @@ export function useCreateCategory() {
   });
 }
 
+export function useUpdateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<{ name: string }> }) =>
+      inventoryApi.categories.update(id, payload),
+    onSuccess: (_, v) => {
+      qc.invalidateQueries({ queryKey: ['inventory', 'categories'] });
+      qc.invalidateQueries({ queryKey: ['inventory', 'categories', v.id] });
+      toast.success('Category updated');
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to update category'),
+  });
+}
+
 // GRNs
 export function useGRNs(f?: GrnFilters) {
   return useQuery({ queryKey: ['inventory', 'grns', f], queryFn: () => inventoryApi.grns.list(f) });

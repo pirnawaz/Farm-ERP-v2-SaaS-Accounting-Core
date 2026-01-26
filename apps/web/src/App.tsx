@@ -29,6 +29,7 @@ import SaleDetailPage from './pages/SaleDetailPage';
 import InventoryDashboardPage from './pages/inventory/InventoryDashboardPage';
 import InvItemsPage from './pages/inventory/InvItemsPage';
 import InvStoresPage from './pages/inventory/InvStoresPage';
+import InvCategoriesPage from './pages/inventory/InvCategoriesPage';
 import InvGrnsPage from './pages/inventory/InvGrnsPage';
 import InvGrnFormPage from './pages/inventory/InvGrnFormPage';
 import InvGrnDetailPage from './pages/inventory/InvGrnDetailPage';
@@ -136,6 +137,7 @@ function App() {
         <Route path="inventory" element={<ModuleProtectedRoute requiredModule="inventory"><InventoryDashboardPage /></ModuleProtectedRoute>} />
         <Route path="inventory/items" element={<ModuleProtectedRoute requiredModule="inventory"><InvItemsPage /></ModuleProtectedRoute>} />
         <Route path="inventory/stores" element={<ModuleProtectedRoute requiredModule="inventory"><InvStoresPage /></ModuleProtectedRoute>} />
+        <Route path="inventory/categories" element={<ModuleProtectedRoute requiredModule="inventory"><InvCategoriesPage /></ModuleProtectedRoute>} />
         <Route path="inventory/grns" element={<ModuleProtectedRoute requiredModule="inventory"><InvGrnsPage /></ModuleProtectedRoute>} />
         <Route path="inventory/grns/new" element={<ModuleProtectedRoute requiredModule="inventory"><InvGrnFormPage /></ModuleProtectedRoute>} />
         <Route path="inventory/grns/:id" element={<ModuleProtectedRoute requiredModule="inventory"><InvGrnDetailPage /></ModuleProtectedRoute>} />

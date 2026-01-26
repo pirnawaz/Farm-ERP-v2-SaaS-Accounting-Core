@@ -29,6 +29,10 @@ export default function InventoryDashboardPage() {
           <span className="font-medium text-gray-900">Stores</span>
           <p className="text-sm text-gray-500">Warehouses and locations</p>
         </Link>
+        <Link to="/app/inventory/categories" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+          <span className="font-medium text-gray-900">Categories</span>
+          <p className="text-sm text-gray-500">Item categories</p>
+        </Link>
         <Link to="/app/inventory/grns" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
           <span className="font-medium text-gray-900">GRNs</span>
           <p className="text-sm text-gray-500">Goods received</p>
