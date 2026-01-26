@@ -35,12 +35,16 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Land & Projects** — Land parcels, crop cycles, land allocations, projects, project rules
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
 - **Treasury** — Payments, advances, allocation preview and posting
-- **AR & Sales** — Sales documents, posting, AR ageing
-- **Settlements** — Project settlement preview and posting
+- **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
+- **Settlements** — Project-based and sales-based settlements with share rules, preview and posting, reversals
+- **Share Rules** — Configurable share rules for crop cycles, projects, and sales (margin or revenue basis)
+- **Harvests** — Harvest tracking with lines, posting to inventory, production allocation
 - **Inventory** — Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; stock on-hand and movements
 - **Labour** — Workers (Hari), work logs, wage accrual, wage payments
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
-- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing
+- **Accounting Guards** — Immutability protection for posted transactions, balanced posting validation
+- **Audit Logs** — Transaction audit trail for posted operations
+- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
 ---
@@ -202,16 +206,17 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Land allocations** | `apiResource('land-allocations')`                                   |
 | **Projects**    | `apiResource('projects')`, `POST /projects/from-allocation`              |
 | **Project rules**| `GET/PUT /projects/{id}/rules`                                           |
+| **Share rules**  | `apiResource('share-rules')`                                            |
 | **Operational transactions** | `apiResource('operational-transactions')`, `POST .../post`       |
-| **Settlement**  | `POST /projects/{id}/settlement/preview`, `.../offset-preview`, `.../post` |
+| **Settlement**  | `POST /projects/{id}/settlement/preview`, `.../offset-preview`, `.../post`; `GET/POST /settlements`, `GET /settlements/preview`, `POST /settlements/{id}/post`, `POST /settlements/{id}/reverse` |
 | **Payments**    | `apiResource('payments')`, `.../allocation-preview`, `.../post`           |
 | **Advances**    | `apiResource('advances')`, `.../post`                                    |
-| **Sales**       | `apiResource('sales')`, `.../post`                                      |
+| **Sales**       | `apiResource('sales')`, `.../post`, `.../reverse`                      |
 | **Inventory**   | Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; `.../post`, `.../reverse`; `stock/on-hand`, `stock/movements` |
 | **Labour**      | `v1/labour/workers`, `v1/labour/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/labour/payables/outstanding` |
-| **Crop Ops**    | `v1/crop-ops/activity-types` (CRUD); `v1/crop-ops/activities` (timeline, CRUD, `.../post`, `.../reverse`) |
+| **Crop Ops**    | `v1/crop-ops/activity-types` (CRUD); `v1/crop-ops/activities` (timeline, CRUD, `.../post`, `.../reverse`); `v1/crop-ops/harvests` (CRUD, lines, `.../post`, `.../reverse`) |
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
-| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing` |
+| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `yield` |
 | **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
 
 Exact routes, methods, and middleware are in `apps/api/routes/api.php`.
@@ -225,11 +230,11 @@ The web app includes pages (and routes) for:
 - **Dashboard**, **Health**
 - **Daily book entries**, **Operational transactions**
 - **Parties**, **Sales**, **Payments**, **Advances**
-- **Land parcels**, **Land allocations**, **Crop cycles**, **Projects**, **Project rules**, **Settlement**
+- **Land parcels**, **Land allocations**, **Crop cycles**, **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based and sales-based), **Harvests**
 - **Inventory:** items, stores, GRNs, issues, transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
-- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing
+- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform:** tenants (platform admin)
 

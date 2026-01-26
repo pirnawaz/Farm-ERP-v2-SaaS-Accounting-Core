@@ -4,6 +4,7 @@ import { useSettlementPreview, usePostSettlement, useSettlementOffsetPreview } f
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
+import { settlementPreviewSchema, settlementPostSchema } from '../validation/settlementSchema';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -36,47 +37,58 @@ export default function SettlementPage() {
   }, [offsetPreviewQuery.data, applyAdvanceOffset]);
 
   const handlePreview = async () => {
-    if (!selectedProjectId) {
-      toast.error('Please select a project');
-      return;
-    }
     try {
-      const result = await previewMutation.mutateAsync({
+      const validated = settlementPreviewSchema.parse({
         projectId: selectedProjectId,
         upToDate,
       });
+      const result = await previewMutation.mutateAsync(validated);
       setPreview(result);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to preview settlement');
+      if (error.errors) {
+        // Zod validation errors
+        const firstError = error.errors[0];
+        toast.error(firstError.message || 'Validation error');
+      } else {
+        toast.error(error.message || 'Failed to preview settlement');
+      }
     }
   };
 
   const handlePost = async () => {
-    if (!selectedProjectId) return;
-    
-    // Validate offset amount if applying offset
-    if (applyAdvanceOffset) {
-      if (!advanceOffsetAmount || advanceOffsetAmount <= 0) {
-        toast.error('Please enter a valid offset amount');
-        return;
-      }
-      if (offsetPreviewQuery.data) {
-        const maxOffset = offsetPreviewQuery.data.max_offset;
-        if (advanceOffsetAmount > maxOffset) {
-          toast.error(`Offset amount cannot exceed ${maxOffset.toFixed(2)}`);
+    try {
+      // Validate with zod
+      const validated = settlementPostSchema.parse({
+        projectId: selectedProjectId,
+        postingDate,
+        upToDate,
+        applyAdvanceOffset,
+        advanceOffsetAmount: applyAdvanceOffset && advanceOffsetAmount ? Number(advanceOffsetAmount) : null,
+      });
+
+      // Additional validation for offset amount
+      if (applyAdvanceOffset && validated.advanceOffsetAmount) {
+        if (validated.advanceOffsetAmount <= 0) {
+          toast.error('Please enter a valid offset amount');
           return;
         }
+        if (offsetPreviewQuery.data) {
+          const maxOffset = offsetPreviewQuery.data.max_offset;
+          if (validated.advanceOffsetAmount > maxOffset) {
+            toast.error(`Offset amount cannot exceed ${maxOffset.toFixed(2)}`);
+            return;
+          }
+        }
       }
-    }
 
-    try {
       const result = await postMutation.mutateAsync({
-        projectId: selectedProjectId,
+        projectId: validated.projectId,
         payload: {
-          posting_date: postingDate,
-          up_to_date: upToDate,
+          posting_date: validated.postingDate,
+          up_to_date: validated.upToDate,
           idempotency_key: idempotencyKey,
-          apply_advance_offset: applyAdvanceOffset,
+          apply_advance_offset: validated.applyAdvanceOffset || false,
+          advance_offset_amount: validated.advanceOffsetAmount || null,
           advance_offset_amount: applyAdvanceOffset && advanceOffsetAmount !== '' ? Number(advanceOffsetAmount) : undefined,
         },
       });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { DataTable } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
@@ -69,16 +70,24 @@ export default function PlatformTenantsPage() {
     {
       header: 'Actions',
       accessor: (row: (typeof tenants)[0]) => (
-        <button
-          type="button"
-          onClick={() => {
-            setEditId(row.id);
-            setEditForm({ name: row.name, status: row.status });
-          }}
-          className="text-blue-600 hover:underline text-sm"
-        >
-          Edit
-        </button>
+        <div className="flex gap-2">
+          <Link
+            to={`/app/platform/tenants/${row.id}`}
+            className="text-blue-600 hover:underline text-sm"
+          >
+            View Details
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setEditId(row.id);
+              setEditForm({ name: row.name, status: row.status });
+            }}
+            className="text-blue-600 hover:underline text-sm"
+          >
+            Edit
+          </button>
+        </div>
       ),
     },
   ];

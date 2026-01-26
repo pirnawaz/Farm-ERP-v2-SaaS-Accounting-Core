@@ -37,10 +37,14 @@ use App\Http\Controllers\LabWorkLogController;
 use App\Http\Controllers\LabourReportController;
 use App\Http\Controllers\ActivityTypeController;
 use App\Http\Controllers\CropActivityController;
+use App\Http\Controllers\HarvestController;
+use App\Http\Controllers\ShareRuleController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/logout', [AuthController::class, 'logout']);
+Route::get('/auth/me', [AuthController::class, 'me']);
 
 // Platform admin (no X-Tenant-Id; ResolveTenant skips api/platform/*)
 Route::prefix('platform')->middleware(['role:platform_admin'])->group(function () {
@@ -101,6 +105,11 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::put('projects/{id}/rules', [ProjectRuleController::class, 'update']);
 });
 
+// Share Rules (tenant_admin, accountant)
+Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::apiResource('share-rules', ShareRuleController::class);
+});
+
 // Operational Transactions (operator can create/edit own, accountant can do all)
 // Note: Authorization for operator vs accountant should be handled in controller/policy
 Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () {
@@ -111,9 +120,16 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
 
 // Settlement (accountant, tenant_admin) — requires settlements module
 Route::middleware(['role:tenant_admin,accountant', 'require_module:settlements'])->group(function () {
+    // Project-based settlements (existing, for backward compatibility)
     Route::post('projects/{id}/settlement/preview', [SettlementController::class, 'preview']);
     Route::get('projects/{id}/settlement/offset-preview', [SettlementController::class, 'offsetPreview']);
     Route::post('projects/{id}/settlement/post', [SettlementController::class, 'post']);
+    
+    // Sales-based settlements (Phase 11)
+    Route::get('settlements/preview', [SettlementController::class, 'previewSettlement']);
+    Route::apiResource('settlements', SettlementController::class)->except(['update', 'destroy']);
+    Route::post('settlements/{id}/post', [SettlementController::class, 'postSettlement']);
+    Route::post('settlements/{id}/reverse', [SettlementController::class, 'reverse']);
 });
 
 // Payments (tenant_admin, accountant, operator) — requires treasury_payments module
@@ -135,6 +151,8 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:trea
 Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:ar_sales'])->group(function () {
     Route::apiResource('sales', SaleController::class);
     Route::post('sales/{id}/post', [SaleController::class, 'post'])
+        ->middleware('role:tenant_admin,accountant');
+    Route::post('sales/{id}/reverse', [SaleController::class, 'reverse'])
         ->middleware('role:tenant_admin,accountant');
 });
 
@@ -225,6 +243,16 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::patch('activities/{id}', [CropActivityController::class, 'update']);
         Route::post('activities/{id}/post', [CropActivityController::class, 'post'])->middleware('role:tenant_admin,accountant');
         Route::post('activities/{id}/reverse', [CropActivityController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        // Harvests
+        Route::get('harvests', [HarvestController::class, 'index']);
+        Route::post('harvests', [HarvestController::class, 'store']);
+        Route::get('harvests/{id}', [HarvestController::class, 'show']);
+        Route::put('harvests/{id}', [HarvestController::class, 'update']);
+        Route::post('harvests/{id}/lines', [HarvestController::class, 'addLine']);
+        Route::put('harvests/{id}/lines/{lineId}', [HarvestController::class, 'updateLine']);
+        Route::delete('harvests/{id}/lines/{lineId}', [HarvestController::class, 'deleteLine']);
+        Route::post('harvests/{id}/post', [HarvestController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('harvests/{id}/reverse', [HarvestController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
     });
 });
 
@@ -248,6 +276,11 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/account-balances', [ReportController::class, 'accountBalances']);
     Route::get('reports/cashbook', [ReportController::class, 'cashbook']);
     Route::get('reports/ar-ageing', [ReportController::class, 'arAgeing']);
+    Route::get('reports/yield', [ReportController::class, 'yield']);
+    Route::get('reports/cost-per-unit', [ReportController::class, 'costPerUnit']);
+    Route::get('reports/sales-margin', [ReportController::class, 'salesMargin']);
+    Route::get('reports/settlement-statement', [ReportController::class, 'settlementStatement']);
+    Route::get('reports/crop-cycle-distribution', [ReportController::class, 'cropCycleDistribution']);
 });
 
 // Settings (all authenticated users can view, tenant_admin can update)

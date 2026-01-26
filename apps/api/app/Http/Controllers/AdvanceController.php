@@ -145,6 +145,8 @@ class AdvanceController extends Controller
 
     public function post(PostAdvanceRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $userRole = $request->attributes->get('user_role');
 

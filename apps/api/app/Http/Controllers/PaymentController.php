@@ -164,6 +164,8 @@ class PaymentController extends Controller
 
     public function post(PostPaymentRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $userRole = $request->attributes->get('user_role');
 
@@ -177,6 +179,12 @@ class PaymentController extends Controller
             $request->allocation_mode,
             $request->allocations
         );
+
+        // Log audit event
+        $this->logAudit($request, 'Payment', $id, 'POST', [
+            'posting_date' => $request->posting_date,
+            'posting_group_id' => $postingGroup->id,
+        ]);
 
         return response()->json($postingGroup, 201);
     }

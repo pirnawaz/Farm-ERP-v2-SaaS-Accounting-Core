@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { salesApi, type SaleFilters } from '../api/sales';
-import type { CreateSalePayload, PostSaleRequest } from '../types';
+import type { CreateSalePayload, PostSaleRequest, ReverseSaleRequest } from '../types';
 import toast from 'react-hot-toast';
 
 export function useSales(filters?: SaleFilters) {
@@ -79,6 +79,24 @@ export function usePostSale() {
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.error || 'Failed to post sale');
+    },
+  });
+}
+
+export function useReverseSale() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ReverseSaleRequest }) => 
+      salesApi.reverse(id, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+      toast.success('Sale reversed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.error || 'Failed to reverse sale');
     },
   });
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sale extends Model
 {
@@ -26,6 +27,8 @@ class Sale extends Model
         'status',
         'posting_group_id',
         'posted_at',
+        'reversed_at',
+        'reversal_posting_group_id',
         'notes',
         'idempotency_key',
     ];
@@ -36,6 +39,7 @@ class Sale extends Model
         'sale_date' => 'date',
         'due_date' => 'date',
         'posted_at' => 'datetime',
+        'reversed_at' => 'datetime',
         'created_at' => 'datetime',
     ];
 
@@ -64,9 +68,24 @@ class Sale extends Model
         return $this->belongsTo(CropCycle::class);
     }
 
-    public function paymentAllocations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function paymentAllocations(): HasMany
     {
         return $this->hasMany(SalePaymentAllocation::class);
+    }
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(SaleLine::class);
+    }
+
+    public function inventoryAllocations(): HasMany
+    {
+        return $this->hasMany(SaleInventoryAllocation::class);
+    }
+
+    public function reversalPostingGroup(): BelongsTo
+    {
+        return $this->belongsTo(PostingGroup::class, 'reversal_posting_group_id');
     }
 
     /**
@@ -91,6 +110,38 @@ class Sale extends Model
     public function scopePosted($query)
     {
         return $query->where('status', 'POSTED');
+    }
+
+    /**
+     * Scope to filter reversed sales.
+     */
+    public function scopeReversed($query)
+    {
+        return $query->where('status', 'REVERSED');
+    }
+
+    /**
+     * Check if sale is in DRAFT status.
+     */
+    public function isDraft(): bool
+    {
+        return $this->status === 'DRAFT';
+    }
+
+    /**
+     * Check if sale is in POSTED status.
+     */
+    public function isPosted(): bool
+    {
+        return $this->status === 'POSTED';
+    }
+
+    /**
+     * Check if sale is in REVERSED status.
+     */
+    public function isReversed(): bool
+    {
+        return $this->status === 'REVERSED';
     }
 
     /**

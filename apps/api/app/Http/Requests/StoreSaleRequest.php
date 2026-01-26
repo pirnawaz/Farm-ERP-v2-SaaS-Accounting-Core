@@ -23,6 +23,12 @@ class StoreSaleRequest extends FormRequest
             'sale_date' => ['nullable', 'date', 'date_format:Y-m-d'],
             'due_date' => ['nullable', 'date', 'date_format:Y-m-d'],
             'notes' => ['nullable', 'string'],
+            'sale_lines' => ['nullable', 'array'],
+            'sale_lines.*.inventory_item_id' => ['required_with:sale_lines', 'uuid', 'exists:inv_items,id'],
+            'sale_lines.*.store_id' => ['required_with:sale_lines', 'uuid', 'exists:inv_stores,id'],
+            'sale_lines.*.quantity' => ['required_with:sale_lines', 'numeric', 'min:0.001'],
+            'sale_lines.*.uom' => ['nullable', 'string', 'max:255'],
+            'sale_lines.*.unit_price' => ['required_with:sale_lines', 'numeric', 'min:0.01'],
         ];
     }
 }

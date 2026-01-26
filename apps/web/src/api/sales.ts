@@ -29,4 +29,6 @@ export const salesApi = {
   delete: (id: string) => apiClient.delete(`/api/sales/${id}`),
   post: (id: string, payload: PostSaleRequest) => 
     apiClient.post<PostingGroup>(`/api/sales/${id}/post`, payload),
+  reverse: (id: string, payload: { reversal_date: string; reason?: string }) => 
+    apiClient.post<Sale>(`/api/sales/${id}/reverse`, payload),
 };

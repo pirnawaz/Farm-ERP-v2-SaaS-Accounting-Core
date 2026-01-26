@@ -1,31 +1,96 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useTenant } from '../hooks/useTenant';
 import { useAuth, useRole } from '../hooks';
 import { useModules } from '../contexts/ModulesContext';
 import type { UserRole } from '../types';
 
-const navigation: Array<{ name: string; href: string; roles: UserRole[]; requiredModuleKey?: string }> = [
-  { name: 'Dashboard', href: '/app/dashboard', roles: ['tenant_admin', 'accountant', 'operator'] },
-  { name: 'Land Parcels', href: '/app/land', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'land' },
-  { name: 'Crop Cycles', href: '/app/crop-cycles', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
-  { name: 'Parties', href: '/app/parties', roles: ['tenant_admin', 'accountant'] },
-  { name: 'Allocations', href: '/app/allocations', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
-  { name: 'Projects', href: '/app/projects', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
-  { name: 'Transactions', href: '/app/transactions', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
-  { name: 'Settlement', href: '/app/settlement', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'settlements' },
-  { name: 'Payments', href: '/app/payments', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_payments' },
-  { name: 'Advances', href: '/app/advances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_advances' },
-  { name: 'Sales', href: '/app/sales', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'ar_sales' },
-  { name: 'Inventory', href: '/app/inventory', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'inventory' },
-  { name: 'Labour', href: '/app/labour', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'labour' },
-  { name: 'Crop Ops', href: '/app/crop-ops', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
-  { name: 'Reports', href: '/app/reports', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-  { name: 'AR Ageing', href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
-  { name: 'Settings', href: '/app/settings/localisation', roles: ['tenant_admin'] },
-  { name: 'Farm Profile', href: '/app/admin/farm', roles: ['tenant_admin'] },
-  { name: 'Users', href: '/app/admin/users', roles: ['tenant_admin'] },
-  { name: 'Module Toggles', href: '/app/admin/modules', roles: ['tenant_admin'] },
+type NavigationItem = {
+  name: string;
+  href: string;
+  roles: UserRole[];
+  requiredModuleKey?: string;
+};
+
+type NavigationGroup = {
+  name: string;
+  items: NavigationItem[];
+};
+
+const navigationGroups: NavigationGroup[] = [
+  {
+    name: 'Dashboard',
+    items: [
+      { name: 'Dashboard', href: '/app/dashboard', roles: ['tenant_admin', 'accountant', 'operator'] },
+    ],
+  },
+  {
+    name: 'Land Management',
+    items: [
+      { name: 'Land Parcels', href: '/app/land', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'land' },
+    ],
+  },
+  {
+    name: 'Project Management',
+    items: [
+      { name: 'Crop Cycles', href: '/app/crop-cycles', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Parties', href: '/app/parties', roles: ['tenant_admin', 'accountant'] },
+      { name: 'Allocations', href: '/app/allocations', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Projects', href: '/app/projects', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Transactions', href: '/app/transactions', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
+    ],
+  },
+  {
+    name: 'Treasury',
+    items: [
+      { name: 'Settlement', href: '/app/settlement', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'settlements' },
+      { name: 'Payments', href: '/app/payments', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_payments' },
+      { name: 'Advances', href: '/app/advances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_advances' },
+    ],
+  },
+  {
+    name: 'Sales & Receivables',
+    items: [
+      { name: 'Sales', href: '/app/sales', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'ar_sales' },
+    ],
+  },
+  {
+    name: 'Operations',
+    items: [
+      { name: 'Inventory', href: '/app/inventory', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'inventory' },
+      { name: 'Labour', href: '/app/labour', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'labour' },
+      { name: 'Crop Ops', href: '/app/crop-ops', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
+      { name: 'Harvests', href: '/app/harvests', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
+    ],
+  },
+  {
+    name: 'Reports',
+    items: [
+      { name: 'Trial Balance', href: '/app/reports/trial-balance', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'General Ledger', href: '/app/reports/general-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Project P&L', href: '/app/reports/project-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Crop Cycle P&L', href: '/app/reports/crop-cycle-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Account Balances', href: '/app/reports/account-balances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Cashbook', href: '/app/reports/cashbook', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'AR Ageing', href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
+      { name: 'Sales Margin', href: '/app/reports/sales-margin', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+    ],
+  },
+  {
+    name: 'Settings',
+    items: [
+      { name: 'Settings', href: '/app/settings/localisation', roles: ['tenant_admin'] },
+    ],
+  },
+  {
+    name: 'Administration',
+    items: [
+      { name: 'Farm Profile', href: '/app/admin/farm', roles: ['tenant_admin'] },
+      { name: 'Users', href: '/app/admin/users', roles: ['tenant_admin'] },
+      { name: 'Roles', href: '/app/admin/roles', roles: ['tenant_admin'] },
+      { name: 'Module Toggles', href: '/app/admin/modules', roles: ['tenant_admin'] },
+    ],
+  },
 ];
 
 export function AppLayout() {
@@ -36,6 +101,23 @@ export function AppLayout() {
   const { userRole, logout } = useAuth();
   const { hasRole } = useRole();
   const { isModuleEnabled } = useModules();
+
+  // Track expanded groups - initialize with groups that contain the active route
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    const active = new Set<string>();
+    navigationGroups.forEach((group) => {
+      const hasActiveItem = group.items.some(
+        (item) =>
+          location.pathname === item.href &&
+          hasRole(item.roles) &&
+          (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))
+      );
+      if (hasActiveItem) {
+        active.add(group.name);
+      }
+    });
+    return active;
+  });
 
   const handleLogout = () => {
     logout();
@@ -51,9 +133,48 @@ export function AppLayout() {
     navigate('/login');
   };
 
-  const filteredNavigation = navigation.filter(
-    (item) => hasRole(item.roles) && (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))
-  );
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  };
+
+  // Filter navigation groups and their items
+  const filteredGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => hasRole(item.roles) && (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  // Auto-expand groups when navigating to a page within them
+  useEffect(() => {
+    navigationGroups.forEach((group) => {
+      const hasActiveItem = group.items.some(
+        (item) =>
+          location.pathname === item.href &&
+          hasRole(item.roles) &&
+          (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))
+      );
+      if (hasActiveItem) {
+        setExpandedGroups((prev) => {
+          if (!prev.has(group.name)) {
+            return new Set(prev).add(group.name);
+          }
+          return prev;
+        });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -65,20 +186,71 @@ export function AppLayout() {
               <h1 className="text-xl font-bold text-gray-900">Farm ERP v2</h1>
             </div>
             <nav className="mt-5 flex-1 px-2 space-y-1">
-              {filteredNavigation.map((item) => {
-                const isActive = location.pathname === item.href;
+              {filteredGroups.map((group) => {
+                const isExpanded = expandedGroups.has(group.name);
+                const hasActiveItem = group.items.some((item) => location.pathname === item.href);
+
+                // If group has only one item, render it directly without grouping
+                if (group.items.length === 1) {
+                  const item = group.items[0];
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={`${
+                        isActive
+                          ? 'bg-blue-50 text-blue-600'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                    >
+                      {item.name}
+                    </Link>
+                  );
+                }
+
+                // Render group with collapsible items
                 return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`${
-                      isActive
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
-                  >
-                    {item.name}
-                  </Link>
+                  <div key={group.name}>
+                    <button
+                      onClick={() => toggleGroup(group.name)}
+                      className={`${
+                        hasActiveItem
+                          ? 'bg-blue-50 text-blue-600'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
+                    >
+                      <span>{group.name}</span>
+                      <svg
+                        className={`h-4 w-4 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {group.items.map((item) => {
+                          const isActive = location.pathname === item.href;
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.href}
+                              className={`${
+                                isActive
+                                  ? 'bg-blue-50 text-blue-600'
+                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                            >
+                              {item.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>
@@ -107,21 +279,73 @@ export function AppLayout() {
                 <h1 className="text-xl font-bold text-gray-900">Farm ERP v2</h1>
               </div>
               <nav className="mt-5 px-2 space-y-1">
-                {filteredNavigation.map((item) => {
-                  const isActive = location.pathname === item.href;
+                {filteredGroups.map((group) => {
+                  const isExpanded = expandedGroups.has(group.name);
+                  const hasActiveItem = group.items.some((item) => location.pathname === item.href);
+
+                  // If group has only one item, render it directly without grouping
+                  if (group.items.length === 1) {
+                    const item = group.items[0];
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`${
+                          isActive
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                      >
+                        {item.name}
+                      </Link>
+                    );
+                  }
+
+                  // Render group with collapsible items
                   return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`${
-                        isActive
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
-                    >
-                      {item.name}
-                    </Link>
+                    <div key={group.name}>
+                      <button
+                        onClick={() => toggleGroup(group.name)}
+                        className={`${
+                          hasActiveItem
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
+                      >
+                        <span>{group.name}</span>
+                        <svg
+                          className={`h-4 w-4 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      {isExpanded && (
+                        <div className="ml-4 mt-1 space-y-1">
+                          {group.items.map((item) => {
+                            const isActive = location.pathname === item.href;
+                            return (
+                              <Link
+                                key={item.name}
+                                to={item.href}
+                                onClick={() => setSidebarOpen(false)}
+                                className={`${
+                                  isActive
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                              >
+                                {item.name}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </nav>

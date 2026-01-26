@@ -8,9 +8,14 @@ use App\Models\OperationalTransaction;
 use App\Models\PostingGroup;
 use App\Models\Settlement;
 use App\Models\SettlementOffset;
+use App\Models\SettlementLine;
+use App\Models\SettlementSale;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\CropCycle;
+use App\Models\Sale;
+use App\Models\ShareRule;
+use App\Models\ShareRuleLine;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -450,5 +455,442 @@ class SettlementService
                 'posting_group' => $postingGroup->load(['allocationRows', 'ledgerEntries.account']),
             ];
         });
+    }
+
+    // ============================================================================
+    // SALES-BASED SETTLEMENTS (Phase 11)
+    // ============================================================================
+
+    /**
+     * Preview settlement calculations for posted sales.
+     * 
+     * @param array $filters
+     * @return array
+     */
+    public function preview(array $filters): array
+    {
+        $tenantId = $filters['tenant_id'];
+        $cropCycleId = $filters['crop_cycle_id'] ?? null;
+        $fromDate = $filters['from_date'] ?? null;
+        $toDate = $filters['to_date'] ?? null;
+        $shareRuleId = $filters['share_rule_id'] ?? null;
+
+        // Get posted sales matching filters
+        $salesQuery = Sale::where('tenant_id', $tenantId)
+            ->where('status', 'POSTED')
+            ->with(['lines', 'inventoryAllocations']);
+
+        if ($cropCycleId) {
+            $salesQuery->where('crop_cycle_id', $cropCycleId);
+        }
+
+        if ($fromDate) {
+            $salesQuery->where('posting_date', '>=', $fromDate);
+        }
+
+        if ($toDate) {
+            $salesQuery->where('posting_date', '<=', $toDate);
+        }
+
+        $sales = $salesQuery->get();
+
+        // Filter out sales already settled
+        $settledSaleIds = SettlementSale::where('tenant_id', $tenantId)
+            ->whereHas('settlement', function ($q) {
+                $q->where('status', 'POSTED');
+            })
+            ->pluck('sale_id')
+            ->toArray();
+
+        $sales = $sales->reject(fn($sale) => in_array($sale->id, $settledSaleIds));
+
+        // Calculate totals
+        $totalRevenue = 0;
+        $totalCogs = 0;
+
+        foreach ($sales as $sale) {
+            // Revenue from sale lines
+            $saleRevenue = $sale->lines->sum(fn($line) => (float) $line->line_total);
+            $totalRevenue += $saleRevenue;
+
+            // COGS from inventory allocations
+            $saleCogs = $sale->inventoryAllocations->sum(fn($alloc) => (float) $alloc->total_cost);
+            $totalCogs += $saleCogs;
+        }
+
+        $totalMargin = $totalRevenue - $totalCogs;
+
+        // Resolve share rule if not provided
+        if (!$shareRuleId && $cropCycleId) {
+            $cropCycle = CropCycle::find($cropCycleId);
+            $saleDate = $toDate ?? $fromDate ?? Carbon::now()->format('Y-m-d');
+            $shareRuleService = app(ShareRuleService::class);
+            $shareRule = $shareRuleService->resolveRule($tenantId, $saleDate, $cropCycleId);
+            if ($shareRule) {
+                $shareRuleId = $shareRule->id;
+            }
+        }
+
+        if (!$shareRuleId) {
+            throw new \Exception('Share rule is required. Either provide share_rule_id or ensure crop_cycle_id has an active rule.');
+        }
+
+        $shareRule = ShareRule::with('lines.party')->findOrFail($shareRuleId);
+
+        // Determine basis amount
+        $basisAmount = $shareRule->basis === 'MARGIN' ? $totalMargin : $totalRevenue;
+
+        // Calculate per-party amounts
+        $partyAmounts = [];
+        foreach ($shareRule->lines as $line) {
+            $amount = $basisAmount * ((float) $line->percentage / 100);
+            $partyAmounts[] = [
+                'party_id' => $line->party_id,
+                'party_name' => $line->party->name,
+                'role' => $line->role,
+                'percentage' => (float) $line->percentage,
+                'amount' => round($amount, 2),
+            ];
+        }
+
+        return [
+            'sales' => $sales->map(fn($sale) => [
+                'id' => $sale->id,
+                'sale_no' => $sale->sale_no,
+                'posting_date' => $sale->posting_date->format('Y-m-d'),
+                'revenue' => round($sale->lines->sum(fn($line) => (float) $line->line_total), 2),
+                'cogs' => round($sale->inventoryAllocations->sum(fn($alloc) => (float) $alloc->total_cost), 2),
+                'margin' => round(
+                    $sale->lines->sum(fn($line) => (float) $line->line_total) -
+                    $sale->inventoryAllocations->sum(fn($alloc) => (float) $alloc->total_cost),
+                    2
+                ),
+            ]),
+            'total_revenue' => round($totalRevenue, 2),
+            'total_cogs' => round($totalCogs, 2),
+            'total_margin' => round($totalMargin, 2),
+            'share_rule' => [
+                'id' => $shareRule->id,
+                'name' => $shareRule->name,
+                'basis' => $shareRule->basis,
+            ],
+            'basis_amount' => round($basisAmount, 2),
+            'party_amounts' => $partyAmounts,
+        ];
+    }
+
+    /**
+     * Create a DRAFT settlement.
+     * 
+     * @param array $data
+     * @return Settlement
+     */
+    public function create(array $data): Settlement
+    {
+        return DB::transaction(function () use ($data) {
+            $tenantId = $data['tenant_id'];
+            $saleIds = $data['sale_ids'] ?? [];
+
+            // Validate sales are POSTED
+            $sales = Sale::where('tenant_id', $tenantId)
+                ->whereIn('id', $saleIds)
+                ->where('status', 'POSTED')
+                ->get();
+
+            if ($sales->count() !== count($saleIds)) {
+                throw new \Exception('All sales must be POSTED');
+            }
+
+            // Check sales aren't already settled
+            $this->checkSalesAlreadySettled($saleIds, $tenantId);
+
+            // Get preview to calculate amounts
+            $preview = $this->preview([
+                'tenant_id' => $tenantId,
+                'crop_cycle_id' => $data['crop_cycle_id'] ?? null,
+                'from_date' => $data['from_date'] ?? null,
+                'to_date' => $data['to_date'] ?? null,
+                'share_rule_id' => $data['share_rule_id'],
+            ]);
+
+            // Generate settlement number
+            $settlementNo = $data['settlement_no'] ?? $this->generateSettlementNo($tenantId);
+
+            // Create settlement
+            $settlement = Settlement::create([
+                'tenant_id' => $tenantId,
+                'settlement_no' => $settlementNo,
+                'share_rule_id' => $data['share_rule_id'],
+                'crop_cycle_id' => $data['crop_cycle_id'] ?? null,
+                'from_date' => $data['from_date'] ?? null,
+                'to_date' => $data['to_date'] ?? null,
+                'basis_amount' => $preview['basis_amount'],
+                'status' => 'DRAFT',
+                'created_by' => $data['created_by'] ?? null,
+            ]);
+
+            // Create settlement lines
+            foreach ($preview['party_amounts'] as $partyAmount) {
+                SettlementLine::create([
+                    'settlement_id' => $settlement->id,
+                    'party_id' => $partyAmount['party_id'],
+                    'role' => $partyAmount['role'],
+                    'percentage' => $partyAmount['percentage'],
+                    'amount' => $partyAmount['amount'],
+                ]);
+            }
+
+            // Link sales to settlement
+            foreach ($saleIds as $saleId) {
+                SettlementSale::create([
+                    'tenant_id' => $tenantId,
+                    'settlement_id' => $settlement->id,
+                    'sale_id' => $saleId,
+                ]);
+            }
+
+            return $settlement->load(['lines.party', 'sales', 'shareRule']);
+        });
+    }
+
+    /**
+     * Post a settlement.
+     * 
+     * @param Settlement $settlement
+     * @param string $postingDate
+     * @return array
+     */
+    public function post(Settlement $settlement, string $postingDate): array
+    {
+        return DB::transaction(function () use ($settlement, $postingDate) {
+            // Assert status is DRAFT
+            if ($settlement->status !== 'DRAFT') {
+                throw new \Exception('Settlement must be in DRAFT status to post');
+            }
+
+            // Ensure referenced sales are POSTED and not already settled
+            $saleIds = $settlement->sales->pluck('id')->toArray();
+            $this->checkSalesAlreadySettled($saleIds, $settlement->tenant_id);
+
+            // Verify crop cycle is OPEN if applicable
+            if ($settlement->crop_cycle_id) {
+                $cropCycle = CropCycle::findOrFail($settlement->crop_cycle_id);
+                if ($cropCycle->status !== 'OPEN') {
+                    throw new \Exception('Cannot post settlement to a closed crop cycle');
+                }
+            }
+
+            // Create idempotency key
+            $idempotencyKey = "settlement_{$settlement->tenant_id}_{$settlement->id}";
+
+            // Check idempotency
+            $existingPostingGroup = PostingGroup::where('tenant_id', $settlement->tenant_id)
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
+
+            if ($existingPostingGroup) {
+                $settlement->update([
+                    'status' => 'POSTED',
+                    'posting_group_id' => $existingPostingGroup->id,
+                    'posting_date' => $postingDate,
+                    'posted_at' => now(),
+                ]);
+                return [
+                    'settlement' => $settlement->fresh(['postingGroup', 'lines.party']),
+                    'posting_group' => $existingPostingGroup->load(['allocationRows', 'ledgerEntries.account']),
+                ];
+            }
+
+            // Create posting group
+            $postingGroup = PostingGroup::create([
+                'tenant_id' => $settlement->tenant_id,
+                'crop_cycle_id' => $settlement->crop_cycle_id,
+                'source_type' => 'SETTLEMENT',
+                'source_id' => $settlement->id,
+                'posting_date' => Carbon::parse($postingDate)->format('Y-m-d'),
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+            // Get accounts
+            // Use PROFIT_DISTRIBUTION as settlement clearing (same as project settlements)
+            // Note: SETTLEMENT_CLEARING account should be added to SystemAccountsSeeder in future
+            try {
+                $settlementClearingAccount = $this->accountService->getByCode($settlement->tenant_id, 'SETTLEMENT_CLEARING');
+            } catch (\Exception $e) {
+                // Fallback to PROFIT_DISTRIBUTION if SETTLEMENT_CLEARING doesn't exist
+                $settlementClearingAccount = $this->accountService->getByCode($settlement->tenant_id, 'PROFIT_DISTRIBUTION');
+            }
+            
+            // Use AP (Accounts Payable) as generic payable account
+            // Note: ACCOUNTS_PAYABLE account should be added to SystemAccountsSeeder in future
+            try {
+                $accountsPayableAccount = $this->accountService->getByCode($settlement->tenant_id, 'ACCOUNTS_PAYABLE');
+            } catch (\Exception $e) {
+                // Fallback to AP if ACCOUNTS_PAYABLE doesn't exist
+                $accountsPayableAccount = $this->accountService->getByCode($settlement->tenant_id, 'AP');
+            }
+
+            // Create allocation rows and ledger entries for each settlement line
+            $totalDistribution = 0;
+            foreach ($settlement->lines as $line) {
+                $totalDistribution += (float) $line->amount;
+
+                // Create allocation row
+                AllocationRow::create([
+                    'tenant_id' => $settlement->tenant_id,
+                    'posting_group_id' => $postingGroup->id,
+                    'project_id' => null, // Sales-based settlements don't use projects
+                    'party_id' => $line->party_id,
+                    'allocation_type' => 'SETTLEMENT_PAYABLE',
+                    'amount' => $line->amount,
+                    'rule_snapshot' => [
+                        'settlement_id' => $settlement->id,
+                        'share_rule_id' => $settlement->share_rule_id,
+                        'role' => $line->role,
+                        'percentage' => (float) $line->percentage,
+                    ],
+                ]);
+
+                // Create ledger entry: Credit AP (party-specific payable)
+                LedgerEntry::create([
+                    'tenant_id' => $settlement->tenant_id,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $accountsPayableAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $line->amount,
+                    'currency_code' => 'GBP',
+                ]);
+            }
+
+            // Create ledger entry: Debit SETTLEMENT_CLEARING
+            LedgerEntry::create([
+                'tenant_id' => $settlement->tenant_id,
+                'posting_group_id' => $postingGroup->id,
+                'account_id' => $settlementClearingAccount->id,
+                'debit_amount' => $totalDistribution,
+                'credit_amount' => 0,
+                'currency_code' => 'GBP',
+            ]);
+
+            // Verify debits == credits
+            $totalDebits = LedgerEntry::where('posting_group_id', $postingGroup->id)
+                ->sum('debit_amount');
+            $totalCredits = LedgerEntry::where('posting_group_id', $postingGroup->id)
+                ->sum('credit_amount');
+
+            if (abs($totalDebits - $totalCredits) > 0.01) {
+                throw new \Exception('Debits and credits do not balance');
+            }
+
+            // Update settlement
+            $settlement->update([
+                'status' => 'POSTED',
+                'posting_group_id' => $postingGroup->id,
+                'posting_date' => $postingDate,
+                'posted_at' => now(),
+            ]);
+
+            return [
+                'settlement' => $settlement->fresh(['postingGroup', 'lines.party', 'sales']),
+                'posting_group' => $postingGroup->load(['allocationRows', 'ledgerEntries.account']),
+            ];
+        });
+    }
+
+    /**
+     * Reverse a posted settlement.
+     * 
+     * @param Settlement $settlement
+     * @param string $reversalDate
+     * @return array
+     */
+    public function reverse(Settlement $settlement, string $reversalDate): array
+    {
+        return DB::transaction(function () use ($settlement, $reversalDate) {
+            // Assert status is POSTED
+            if ($settlement->status !== 'POSTED') {
+                throw new \Exception('Settlement must be in POSTED status to reverse');
+            }
+
+            if (!$settlement->posting_group_id) {
+                throw new \Exception('Settlement has no posting group to reverse');
+            }
+
+            // Verify crop cycle is OPEN if applicable
+            if ($settlement->crop_cycle_id) {
+                $cropCycle = CropCycle::findOrFail($settlement->crop_cycle_id);
+                if ($cropCycle->status !== 'OPEN') {
+                    throw new \Exception('Cannot reverse settlement in a closed crop cycle');
+                }
+            }
+
+            // Use ReversalService to reverse the posting group
+            $reversalService = app(ReversalService::class);
+            $reversalPostingGroup = $reversalService->reversePostingGroup(
+                $settlement->posting_group_id,
+                $settlement->tenant_id,
+                $reversalDate,
+                'Settlement reversal'
+            );
+
+            // Update settlement
+            $settlement->update([
+                'status' => 'REVERSED',
+                'reversal_posting_group_id' => $reversalPostingGroup->id,
+                'reversed_at' => now(),
+            ]);
+
+            return [
+                'settlement' => $settlement->fresh(['postingGroup', 'reversalPostingGroup', 'lines.party']),
+                'reversal_posting_group' => $reversalPostingGroup->load(['allocationRows', 'ledgerEntries.account']),
+            ];
+        });
+    }
+
+    /**
+     * Check if sales are already settled.
+     * 
+     * @param array $saleIds
+     * @param string $tenantId
+     * @throws \Exception
+     */
+    public function checkSalesAlreadySettled(array $saleIds, string $tenantId): void
+    {
+        $settledSaleIds = SettlementSale::where('tenant_id', $tenantId)
+            ->whereIn('sale_id', $saleIds)
+            ->whereHas('settlement', function ($q) {
+                $q->where('status', 'POSTED');
+            })
+            ->pluck('sale_id')
+            ->toArray();
+
+        if (!empty($settledSaleIds)) {
+            $saleNos = Sale::whereIn('id', $settledSaleIds)->pluck('sale_no')->join(', ');
+            throw new \Exception("The following sales are already settled: {$saleNos}");
+        }
+    }
+
+    /**
+     * Generate a unique settlement number.
+     * 
+     * @param string $tenantId
+     * @return string
+     */
+    private function generateSettlementNo(string $tenantId): string
+    {
+        $year = Carbon::now()->format('Y');
+        $lastSettlement = Settlement::where('tenant_id', $tenantId)
+            ->where('settlement_no', 'like', "STL-{$year}-%")
+            ->orderBy('settlement_no', 'desc')
+            ->first();
+
+        if ($lastSettlement) {
+            $lastNumber = (int) substr($lastSettlement->settlement_no, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return sprintf('STL-%s-%04d', $year, $nextNumber);
     }
 }

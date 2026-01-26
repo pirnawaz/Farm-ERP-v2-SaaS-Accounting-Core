@@ -188,6 +188,8 @@ class CropActivityController extends Controller
 
     public function post(PostCropActivityRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $pg = $this->postingService->postActivity($id, $tenantId, $request->posting_date, $request->idempotency_key);
         return response()->json($pg, 201);
@@ -195,6 +197,8 @@ class CropActivityController extends Controller
 
     public function reverse(ReverseCropActivityRequest $request, string $id)
     {
+        $this->authorizeReversal($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $pg = $this->postingService->reverseActivity($id, $tenantId, $request->posting_date, $request->reason ?? '', $request->idempotency_key);
         return response()->json($pg, 201);

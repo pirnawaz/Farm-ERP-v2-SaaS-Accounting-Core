@@ -15,7 +15,8 @@ use Carbon\Carbon;
 class SaleService
 {
     public function __construct(
-        private SystemAccountService $accountService
+        private SystemAccountService $accountService,
+        private SaleCOGSService $cogsService
     ) {}
 
     /**
@@ -68,7 +69,13 @@ class SaleService
             $sale = Sale::where('id', $saleId)
                 ->where('tenant_id', $tenantId)
                 ->where('status', 'DRAFT')
+                ->with('lines')
                 ->firstOrFail();
+
+            // If sale has lines, use COGS service
+            if ($sale->lines->isNotEmpty()) {
+                return $this->cogsService->postSaleWithCOGS($sale, $postingDate, $idempotencyKey);
+            }
 
             // Load buyer party
             $buyerParty = Party::where('id', $sale->buyer_party_id)

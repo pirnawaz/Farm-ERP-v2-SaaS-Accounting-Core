@@ -121,6 +121,8 @@ class LabWorkLogController extends Controller
 
     public function post(PostLabWorkLogRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $idempotencyKey = $request->idempotency_key;
         $pg = $this->postingService->postWorkLog($id, $tenantId, $request->posting_date, $idempotencyKey);
@@ -129,6 +131,8 @@ class LabWorkLogController extends Controller
 
     public function reverse(ReverseLabWorkLogRequest $request, string $id)
     {
+        $this->authorizeReversal($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $pg = $this->postingService->reverseWorkLog($id, $tenantId, $request->posting_date, $request->reason);
         return response()->json($pg, 201);

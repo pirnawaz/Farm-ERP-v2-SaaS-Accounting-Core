@@ -5,6 +5,7 @@ import { usePayments } from '../hooks/usePayments';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DataTable, type Column } from '../components/DataTable';
 import { useFormatting } from '../hooks/useFormatting';
+import { exportToCSV } from '../utils/csvExport';
 import type { Payment, PartyStatementLine, PartyStatementGroup, OpenSale } from '../types';
 
 type Tab = 'overview' | 'breakdown' | 'statement' | 'payments' | 'open-sales';
@@ -313,6 +314,22 @@ export default function PartyDetailPage() {
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
+          </div>
+          <div className="mb-4 flex justify-end">
+            {statement && statement.line_items && statement.line_items.length > 0 && (
+              <button
+                onClick={() => {
+                  exportToCSV(
+                    statement.line_items,
+                    `party-statement-${party.name}-${statementFrom || 'all'}-${statementTo || 'all'}.csv`,
+                    ['date', 'type', 'reference', 'description', 'amount', 'direction']
+                  );
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+              >
+                Export CSV
+              </button>
+            )}
           </div>
           {statement && statement.summary && (
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">

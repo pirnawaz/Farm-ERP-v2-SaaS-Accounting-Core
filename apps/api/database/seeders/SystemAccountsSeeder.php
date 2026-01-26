@@ -62,10 +62,13 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'EXP_KAMDARI', 'name' => 'Kamdari Expense', 'type' => 'expense'],
             ['code' => 'PROFIT_DISTRIBUTION', 'name' => 'Profit Distribution / Settlement Clearing', 'type' => 'equity'],
             ['code' => 'INVENTORY_INPUTS', 'name' => 'Inventory / Inputs Stock', 'type' => 'asset'],
+            ['code' => 'INVENTORY_PRODUCE', 'name' => 'Produce Inventory', 'type' => 'asset'],
+            ['code' => 'CROP_WIP', 'name' => 'Crop Work-In-Progress', 'type' => 'asset'],
             ['code' => 'INPUTS_EXPENSE', 'name' => 'Inputs Expense', 'type' => 'expense'],
             ['code' => 'STOCK_VARIANCE', 'name' => 'Stock Variance / Shrinkage', 'type' => 'expense'],
             ['code' => 'LABOUR_EXPENSE', 'name' => 'Labour Expense', 'type' => 'expense'],
             ['code' => 'WAGES_PAYABLE', 'name' => 'Wages Payable', 'type' => 'liability'],
+            ['code' => 'COGS_PRODUCE', 'name' => 'Cost of Goods Sold - Produce', 'type' => 'expense'],
         ];
     }
 }

@@ -34,13 +34,15 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-full divide-y divide-gray-200" role="table" aria-label="Data table">
         <thead className="bg-gray-50">
           <tr>
             {columns.map((column, idx) => (
               <th
                 key={idx}
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                scope="col"
+                aria-label={column.header}
               >
                 {column.header}
               </th>
@@ -52,7 +54,16 @@ export function DataTable<T extends { id: string }>({
             <tr
               key={row.id}
               onClick={() => onRowClick?.(row)}
-              className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+              onKeyDown={(e) => {
+                if (onRowClick && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  onRowClick(row);
+                }
+              }}
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? 'button' : 'row'}
+              aria-label={onRowClick ? 'Click to view details' : undefined}
+              className={onRowClick ? 'cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500' : ''}
             >
               {columns.map((column, idx) => (
                 <td key={idx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

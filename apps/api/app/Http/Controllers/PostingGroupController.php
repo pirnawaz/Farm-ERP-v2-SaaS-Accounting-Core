@@ -50,6 +50,8 @@ class PostingGroupController extends Controller
 
     public function reverse(Request $request, string $id): JsonResponse
     {
+        $this->authorizeReversal($request);
+        
         $tenantId = $request->attributes->get('tenant_id');
         
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
@@ -69,6 +71,13 @@ class PostingGroupController extends Controller
                 $request->input('posting_date'),
                 $request->input('reason')
             );
+            
+            // Log audit event
+            $this->logAudit($request, 'PostingGroup', $id, 'REVERSE', [
+                'posting_date' => $request->input('posting_date'),
+                'reason' => $request->input('reason'),
+                'reversal_posting_group_id' => $reversalPostingGroup->id,
+            ]);
             
             return response()->json($reversalPostingGroup, 201);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {

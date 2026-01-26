@@ -117,6 +117,8 @@ class InvAdjustmentController extends Controller
 
     public function post(PostInvAdjustmentRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $idempotencyKey = $request->filled('idempotency_key')
             ? $request->idempotency_key
@@ -127,6 +129,8 @@ class InvAdjustmentController extends Controller
 
     public function reverse(ReverseInvAdjustmentRequest $request, string $id)
     {
+        $this->authorizeReversal($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $pg = $this->postingService->reverseAdjustment($id, $tenantId, $request->posting_date, $request->reason);
         return response()->json($pg, 201);

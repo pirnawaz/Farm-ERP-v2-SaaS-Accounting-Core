@@ -3,711 +3,529 @@
 namespace Tests\Feature;
 
 use App\Models\Tenant;
-use App\Models\CropCycle;
-use App\Models\Project;
-use App\Models\Party;
-use App\Models\ProjectRule;
-use App\Models\OperationalTransaction;
-use App\Models\PostingGroup;
-use App\Models\Settlement;
-use App\Models\SettlementOffset;
-use App\Models\Advance;
-use App\Models\AllocationRow;
-use App\Models\LedgerEntry;
 use App\Models\Module;
 use App\Models\TenantModule;
+use App\Models\CropCycle;
+use App\Models\Party;
+use App\Models\Project;
+use App\Models\Sale;
+use App\Models\SaleLine;
+use App\Models\SaleInventoryAllocation;
+use App\Models\ShareRule;
+use App\Models\ShareRuleLine;
+use App\Models\Settlement;
+use App\Models\SettlementLine;
+use App\Models\SettlementSale;
+use App\Models\PostingGroup;
+use App\Models\AllocationRow;
+use App\Models\LedgerEntry;
+use App\Models\Account;
+use App\Services\TenantContext;
+use App\Services\SettlementService;
+use App\Services\ShareRuleService;
+use App\Services\SaleCOGSService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 use Database\Seeders\SystemAccountsSeeder;
+use Database\Seeders\ModulesSeeder;
 
 class SettlementTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
+    private function enableSettlements(Tenant $tenant): void
     {
-        \App\Services\TenantContext::clear();
-        parent::setUp();
-    }
-
-    private function enableModules(Tenant $tenant, array $keys): void
-    {
-        foreach ($keys as $key) {
-            $module = Module::where('key', $key)->first();
-            if ($module) {
-                TenantModule::firstOrCreate(
-                    ['tenant_id' => $tenant->id, 'module_id' => $module->id],
-                    ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
-                );
-            }
+        $m = Module::where('key', 'settlements')->first();
+        if ($m) {
+            TenantModule::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'module_id' => $m->id],
+                ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
+            );
         }
     }
 
-    public function test_settlement_math_correctness(): void
+    private function enableARSales(Tenant $tenant): void
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['settlements', 'treasury_advances']);
-        $cropCycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle 1',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
-        ]);
-        $hariParty = Party::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Hari',
-            'party_types' => ['HARI'],
-        ]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'name' => 'Project 1',
-            'status' => 'ACTIVE',
-        ]);
-
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 50.00,
-            'profit_split_hari_pct' => 50.00,
-            'kamdari_pct' => 10.00,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
-        ]);
-
-        // Create and post transactions
-        $income = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'INCOME',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 10000.00,
-            'classification' => 'SHARED',
-        ]);
-
-        $sharedExpense = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'EXPENSE',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 2000.00,
-            'classification' => 'SHARED',
-        ]);
-
-        $hariOnlyExpense = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'EXPENSE',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 500.00,
-            'classification' => 'HARI_ONLY',
-        ]);
-
-        // Post transactions
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$income->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'income-1',
-            ]);
-
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$sharedExpense->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'expense-1',
-            ]);
-
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$hariOnlyExpense->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'expense-2',
-            ]);
-
-        // Preview settlement
-        $previewResponse = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/projects/{$project->id}/settlement/preview", [
-                'up_to_date' => '2024-06-15',
-            ]);
-
-        $previewResponse->assertStatus(200);
-        $preview = $previewResponse->json();
-
-        // Verify calculations per Decision D
-        // pool_revenue = 10000
-        // shared_costs = 2000
-        // pool_profit = 10000 - 2000 = 8000
-        // kamdari_amount = 8000 * 10/100 = 800
-        // remaining_pool = 8000 - 800 = 7200
-        // landlord_gross = 7200 * 50/100 = 3600
-        // hari_gross = 7200 * 50/100 = 3600
-        // hari_only_deductions = 500
-        // hari_net = 3600 - 500 = 3100
-
-        $this->assertEquals('10000.00', $preview['pool_revenue']);
-        $this->assertEquals('2000.00', $preview['shared_costs']);
-        $this->assertEquals('8000.00', $preview['pool_profit']);
-        $this->assertEquals('800.00', $preview['kamdari_amount']);
-        $this->assertEquals('3600.00', $preview['landlord_gross']);
-        $this->assertEquals('3600.00', $preview['hari_gross']);
-        $this->assertEquals('500.00', $preview['hari_only_deductions']);
-        $this->assertEquals('3100.00', $preview['hari_net']);
+        $m = Module::where('key', 'ar_sales')->first();
+        if ($m) {
+            TenantModule::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'module_id' => $m->id],
+                ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
+            );
+        }
     }
 
-    public function test_settlement_idempotency(): void
+    private function headers(string $role = 'accountant'): array
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['settlements', 'treasury_advances']);
-        $cropCycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle 1',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
-        ]);
-        $hariParty = Party::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Hari',
-            'party_types' => ['HARI'],
-        ]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'name' => 'Project 1',
-            'status' => 'ACTIVE',
-        ]);
-
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 50.00,
-            'profit_split_hari_pct' => 50.00,
-            'kamdari_pct' => 0.00,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
-        ]);
-
-        // Post at least one income so settlement creates non-zero ledger entries (avoids ledger_entries_debit_credit_required)
-        $income = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'INCOME',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 10000.00,
-            'classification' => 'SHARED',
-        ]);
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$income->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'idempotency-income-1',
-            ]);
-
-        $idempotencyKey = 'settlement-key-123';
-
-        // First settlement post
-        $response1 = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/projects/{$project->id}/settlement/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => $idempotencyKey,
-            ]);
-
-        $response1->assertStatus(201);
-        $settlementId1 = $response1->json('settlement.id');
-
-        // Second settlement post with same key
-        $response2 = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/projects/{$project->id}/settlement/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => $idempotencyKey,
-            ]);
-
-        $response2->assertStatus(201);
-        $settlementId2 = $response2->json('settlement.id');
-
-        // Should return the same settlement
-        $this->assertEquals($settlementId1, $settlementId2);
-
-        // Verify only one settlement exists
-        $count = Settlement::where('project_id', $project->id)
-            ->whereHas('postingGroup', function ($q) use ($tenant, $idempotencyKey) {
-                $q->where('tenant_id', $tenant->id)
-                  ->where('idempotency_key', $idempotencyKey);
-            })
-            ->count();
-        $this->assertEquals(1, $count);
+        return [
+            'X-Tenant-Id' => $this->tenant->id,
+            'X-User-Role' => $role,
+        ];
     }
 
-    public function test_can_post_settlement_without_offset(): void
+    private Tenant $tenant;
+    private CropCycle $cropCycle;
+    private Party $landlordParty;
+    private Party $growerParty;
+    private Account $settlementClearingAccount;
+    private Account $accountsPayableAccount;
+
+    protected function setUp(): void
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['settlements', 'treasury_advances']);
-        $cropCycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle 1',
+        parent::setUp();
+
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $this->tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($this->tenant->id);
+        $this->enableSettlements($this->tenant);
+        $this->enableARSales($this->tenant);
+
+        $this->cropCycle = CropCycle::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => '2024 Cycle',
             'start_date' => '2024-01-01',
             'end_date' => '2024-12-31',
             'status' => 'OPEN',
         ]);
-        $hariParty = Party::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Hari',
-            'party_types' => ['HARI'],
-        ]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'name' => 'Project 1',
-            'status' => 'ACTIVE',
+
+        $this->landlordParty = Party::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Landlord',
+            'party_types' => ['LANDLORD'],
         ]);
 
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 50.00,
-            'profit_split_hari_pct' => 50.00,
-            'kamdari_pct' => 0.00,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
+        $this->growerParty = Party::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Grower',
+            'party_types' => ['GROWER'],
         ]);
 
-        // Create and post income transaction
-        $income = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'INCOME',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 10000.00,
-            'classification' => 'SHARED',
-        ]);
+        // Create settlement accounts if they don't exist
+        $this->settlementClearingAccount = Account::firstOrCreate(
+            [
+                'tenant_id' => $this->tenant->id,
+                'code' => 'SETTLEMENT_CLEARING',
+            ],
+            [
+                'name' => 'Settlement Clearing',
+                'type' => 'EXPENSE',
+            ]
+        );
 
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$income->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'income-1',
-            ]);
-
-        // Post settlement without offset
-        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/projects/{$project->id}/settlement/post", [
-                'posting_date' => '2024-06-20',
-                'idempotency_key' => 'settlement-no-offset',
-            ]);
-
-        $response->assertStatus(201);
-        $settlementId = $response->json('settlement.id');
-
-        // Verify no offset was created
-        $offsetCount = SettlementOffset::where('settlement_id', $settlementId)->count();
-        $this->assertEquals(0, $offsetCount);
+        $this->accountsPayableAccount = Account::firstOrCreate(
+            [
+                'tenant_id' => $this->tenant->id,
+                'code' => 'ACCOUNTS_PAYABLE',
+            ],
+            [
+                'name' => 'Accounts Payable',
+                'type' => 'LIABILITY',
+            ]
+        );
     }
 
-    public function test_can_post_settlement_with_offset(): void
+    private function createPostedSale(float $revenue, float $cogs): Sale
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['settlements', 'treasury_advances']);
-        $cropCycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle 1',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
-        ]);
-        $hariParty = Party::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Hari',
-            'party_types' => ['HARI'],
-        ]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'name' => 'Project 1',
-            'status' => 'ACTIVE',
+        $buyerParty = Party::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Buyer',
+            'party_types' => ['BUYER'],
         ]);
 
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 50.00,
-            'profit_split_hari_pct' => 50.00,
-            'kamdari_pct' => 0.00,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
-        ]);
-
-        // Create and post income transaction
-        $income = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'INCOME',
+        $sale = Sale::create([
+            'tenant_id' => $this->tenant->id,
+            'buyer_party_id' => $buyerParty->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'amount' => $revenue,
+            'posting_date' => '2024-06-01',
             'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 10000.00,
-            'classification' => 'SHARED',
         ]);
 
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$income->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'income-1',
-            ]);
-
-        // Create and post advance (OUT direction = Hari owes us); project_id required for allocation_rows
-        $advance = Advance::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'project_id' => $project->id,
-            'type' => 'HARI_ADVANCE',
-            'direction' => 'OUT',
-            'amount' => 2000.00,
-            'posting_date' => '2024-06-10',
-            'method' => 'CASH',
-            'status' => 'DRAFT',
-            'crop_cycle_id' => $cropCycle->id,
+        SaleLine::create([
+            'tenant_id' => $this->tenant->id,
+            'sale_id' => $sale->id,
+            'inventory_item_id' => '00000000-0000-0000-0000-000000000001',
+            'store_id' => '00000000-0000-0000-0000-000000000001',
+            'quantity' => 100,
+            'unit_price' => $revenue / 100,
+            'line_total' => $revenue,
         ]);
 
-        $advancePostRes = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/advances/{$advance->id}/post", [
-                'posting_date' => '2024-06-10',
-                'idempotency_key' => 'advance-1',
-            ]);
-        $advancePostRes->assertStatus(201);
-        $advance->refresh();
-        $this->assertEquals('POSTED', $advance->status);
+        // Post the sale
+        $saleCOGSService = app(SaleCOGSService::class);
+        $saleCOGSService->postSaleWithCOGS($sale->id, '2024-06-01', 'test-key-' . uniqid());
 
-        // Post settlement with offset
-        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/projects/{$project->id}/settlement/post", [
-                'posting_date' => '2024-06-20',
-                'idempotency_key' => 'settlement-with-offset',
-                'apply_advance_offset' => true,
-                'advance_offset_amount' => 1500.00,
-            ]);
+        // Manually create inventory allocation for COGS
+        SaleInventoryAllocation::create([
+            'tenant_id' => $this->tenant->id,
+            'sale_id' => $sale->id,
+            'sale_line_id' => $sale->lines->first()->id,
+            'inventory_item_id' => '00000000-0000-0000-0000-000000000001',
+            'crop_cycle_id' => $this->cropCycle->id,
+            'store_id' => '00000000-0000-0000-0000-000000000001',
+            'quantity' => 100,
+            'unit_cost' => $cogs / 100,
+            'total_cost' => $cogs,
+            'costing_method' => 'WAC',
+            'posting_group_id' => $sale->posting_group_id,
+        ]);
 
-        $response->assertStatus(201);
-        $settlementId = $response->json('settlement.id');
+        return $sale->fresh();
+    }
 
-        // Verify offset was created
-        $offset = SettlementOffset::where('settlement_id', $settlementId)->first();
-        $this->assertNotNull($offset);
-        $this->assertEquals(1500.00, (float) $offset->offset_amount);
-        $this->assertEquals($hariParty->id, $offset->party_id);
+    public function test_preview_returns_correct_distribution(): void
+    {
+        // Create posted sale with margin
+        $sale = $this->createPostedSale(1000.00, 600.00); // Revenue: 1000, COGS: 600, Margin: 400
 
-        // Verify allocation rows for offset were created
-        $offsetAllocations = AllocationRow::where('posting_group_id', $offset->posting_group_id)
-            ->where('allocation_type', 'ADVANCE_OFFSET')
+        // Create share rule (70% landlord, 30% grower)
+        $shareRule = ShareRule::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'is_active' => true,
+            'version' => 1,
+        ]);
+
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->landlordParty->id,
+            'percentage' => 70.00,
+            'role' => 'LANDLORD',
+        ]);
+
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->growerParty->id,
+            'percentage' => 30.00,
+            'role' => 'GROWER',
+        ]);
+
+        $settlementService = app(SettlementService::class);
+
+        $preview = $settlementService->preview([
+            'tenant_id' => $this->tenant->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'from_date' => '2024-01-01',
+            'to_date' => '2024-12-31',
+            'share_rule_id' => $shareRule->id,
+        ]);
+
+        $this->assertEquals(1000.00, $preview['total_revenue']);
+        $this->assertEquals(600.00, $preview['total_cogs']);
+        $this->assertEquals(400.00, $preview['total_margin']);
+        $this->assertEquals(400.00, $preview['basis_amount']); // Based on margin
+
+        $landlordAmount = collect($preview['party_amounts'])->firstWhere('party_id', $this->landlordParty->id);
+        $growerAmount = collect($preview['party_amounts'])->firstWhere('party_id', $this->growerParty->id);
+
+        $this->assertEquals(280.00, $landlordAmount['amount']); // 70% of 400
+        $this->assertEquals(120.00, $growerAmount['amount']); // 30% of 400
+    }
+
+    public function test_post_creates_payables(): void
+    {
+        $sale = $this->createPostedSale(1000.00, 600.00);
+
+        $shareRule = ShareRule::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'is_active' => true,
+            'version' => 1,
+        ]);
+
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->landlordParty->id,
+            'percentage' => 70.00,
+            'role' => 'LANDLORD',
+        ]);
+
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->growerParty->id,
+            'percentage' => 30.00,
+            'role' => 'GROWER',
+        ]);
+
+        $settlementService = app(SettlementService::class);
+
+        // Create settlement
+        $settlement = $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'from_date' => '2024-01-01',
+            'to_date' => '2024-12-31',
+        ]);
+
+        $this->assertEquals('DRAFT', $settlement->status);
+
+        // Post settlement
+        $result = $settlementService->post($settlement, '2024-06-15');
+
+        $settlement = $result['settlement'];
+        $postingGroup = $result['posting_group'];
+
+        $this->assertEquals('POSTED', $settlement->status);
+        $this->assertNotNull($settlement->posting_group_id);
+
+        // Verify posting group exists
+        $this->assertNotNull($postingGroup);
+        $this->assertEquals('SETTLEMENT', $postingGroup->source_type);
+        $this->assertEquals($settlement->id, $postingGroup->source_id);
+
+        // Verify allocation rows
+        $allocationRows = $postingGroup->allocationRows;
+        $this->assertCount(2, $allocationRows); // One per party
+
+        $landlordAllocation = $allocationRows->firstWhere('party_id', $this->landlordParty->id);
+        $growerAllocation = $allocationRows->firstWhere('party_id', $this->growerParty->id);
+
+        $this->assertEquals('SETTLEMENT_PAYABLE', $landlordAllocation->allocation_type);
+        $this->assertEquals(280.00, (float) $landlordAllocation->amount);
+        $this->assertEquals(120.00, (float) $growerAllocation->amount);
+
+        // Verify ledger entries are balanced
+        $ledgerEntries = $postingGroup->ledgerEntries;
+        $totalDebits = $ledgerEntries->sum('debit_amount');
+        $totalCredits = $ledgerEntries->sum('credit_amount');
+
+        $this->assertEqualsWithDelta($totalDebits, $totalCredits, 0.01);
+
+        // Verify AP credits per party
+        $apCredits = $ledgerEntries->where('account_id', $this->accountsPayableAccount->id)
+            ->sum('credit_amount');
+        $this->assertEquals(400.00, (float) $apCredits); // Total of all party amounts
+    }
+
+    public function test_reverse_settlement(): void
+    {
+        $sale = $this->createPostedSale(1000.00, 600.00);
+
+        $shareRule = ShareRule::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'is_active' => true,
+            'version' => 1,
+        ]);
+
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->landlordParty->id,
+            'percentage' => 100.00,
+            'role' => 'LANDLORD',
+        ]);
+
+        $settlementService = app(SettlementService::class);
+
+        $settlement = $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+        ]);
+
+        $result = $settlementService->post($settlement, '2024-06-15');
+        $settlement = $result['settlement'];
+
+        // Reverse settlement
+        $reverseResult = $settlementService->reverse($settlement, '2024-06-20');
+
+        $settlement = $reverseResult['settlement'];
+        $reversalPostingGroup = $reverseResult['reversal_posting_group'];
+
+        $this->assertEquals('REVERSED', $settlement->status);
+        $this->assertNotNull($settlement->reversal_posting_group_id);
+        $this->assertEquals('REVERSAL', $reversalPostingGroup->source_type);
+
+        // Verify reversal entries negate original
+        $originalEntries = PostingGroup::find($settlement->posting_group_id)->ledgerEntries;
+        $reversalEntries = $reversalPostingGroup->ledgerEntries;
+
+        foreach ($originalEntries as $original) {
+            $reversal = $reversalEntries->firstWhere('account_id', $original->account_id);
+            $this->assertNotNull($reversal);
+            $this->assertEquals((float) $original->debit_amount, (float) $reversal->credit_amount);
+            $this->assertEquals((float) $original->credit_amount, (float) $reversal->debit_amount);
+        }
+    }
+
+    public function test_idempotent_post(): void
+    {
+        $sale = $this->createPostedSale(1000.00, 600.00);
+
+        $shareRule = ShareRule::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'is_active' => true,
+            'version' => 1,
+        ]);
+
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->landlordParty->id,
+            'percentage' => 100.00,
+            'role' => 'LANDLORD',
+        ]);
+
+        $settlementService = app(SettlementService::class);
+
+        $settlement = $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+        ]);
+
+        // Post first time
+        $result1 = $settlementService->post($settlement, '2024-06-15');
+        $postingGroupId1 = $result1['posting_group']->id;
+
+        // Post second time (should return same posting group)
+        $result2 = $settlementService->post($settlement->fresh(), '2024-06-15');
+        $postingGroupId2 = $result2['posting_group']->id;
+
+        $this->assertEquals($postingGroupId1, $postingGroupId2);
+
+        // Verify only one posting group exists
+        $postingGroups = PostingGroup::where('source_type', 'SETTLEMENT')
+            ->where('source_id', $settlement->id)
             ->get();
-        $this->assertEquals(2, $offsetAllocations->count()); // Two rows: reduce payable and reduce advance
-
-        // Verify ledger entries: Debit PAYABLE_HARI and Credit ADVANCE_HARI
-        $postingGroup = PostingGroup::where('id', $offset->posting_group_id)->first();
-        $payableHariDebit = LedgerEntry::where('posting_group_id', $postingGroup->id)
-            ->whereHas('account', function ($q) use ($tenant) {
-                $q->where('code', 'PAYABLE_HARI')->where('tenant_id', $tenant->id);
-            })
-            ->where('debit_amount', '>', 0)
-            ->first();
-        $this->assertNotNull($payableHariDebit);
-        $this->assertEquals(1500.00, (float) $payableHariDebit->debit_amount);
-
-        $advanceHariCredit = LedgerEntry::where('posting_group_id', $postingGroup->id)
-            ->whereHas('account', function ($q) use ($tenant) {
-                $q->where('code', 'ADVANCE_HARI')->where('tenant_id', $tenant->id);
-            })
-            ->where('credit_amount', '>', 0)
-            ->first();
-        $this->assertNotNull($advanceHariCredit);
-        $this->assertEquals(1500.00, (float) $advanceHariCredit->credit_amount);
+        $this->assertCount(1, $postingGroups);
     }
 
-    public function test_offset_cannot_exceed_outstanding_advance(): void
+    public function test_cannot_settle_unposted_sales(): void
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['settlements', 'treasury_advances']);
-        $cropCycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle 1',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
-        ]);
-        $hariParty = Party::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Hari',
-            'party_types' => ['HARI'],
-        ]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'name' => 'Project 1',
-            'status' => 'ACTIVE',
+        $buyerParty = Party::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Buyer',
+            'party_types' => ['BUYER'],
         ]);
 
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 50.00,
-            'profit_split_hari_pct' => 50.00,
-            'kamdari_pct' => 0.00,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
-        ]);
-
-        // Create and post income transaction
-        $income = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'INCOME',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 10000.00,
-            'classification' => 'SHARED',
-        ]);
-
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$income->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'income-1',
-            ]);
-
-        // Create advance of only 1000; project_id required for allocation_rows
-        $advance = Advance::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'project_id' => $project->id,
-            'type' => 'HARI_ADVANCE',
-            'direction' => 'OUT',
+        $sale = Sale::create([
+            'tenant_id' => $this->tenant->id,
+            'buyer_party_id' => $buyerParty->id,
+            'crop_cycle_id' => $this->cropCycle->id,
             'amount' => 1000.00,
-            'posting_date' => '2024-06-10',
-            'method' => 'CASH',
-            'status' => 'DRAFT',
-            'crop_cycle_id' => $cropCycle->id,
+            'posting_date' => '2024-06-01',
+            'status' => 'DRAFT', // Not posted
         ]);
 
-        $advancePostRes = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/advances/{$advance->id}/post", [
-                'posting_date' => '2024-06-10',
-                'idempotency_key' => 'advance-1',
-            ]);
-        $advancePostRes->assertStatus(201);
+        $shareRule = ShareRule::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'is_active' => true,
+            'version' => 1,
+        ]);
 
-        // Try to post settlement with offset exceeding outstanding advance
-        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/projects/{$project->id}/settlement/post", [
-                'posting_date' => '2024-06-20',
-                'idempotency_key' => 'settlement-invalid-offset',
-                'apply_advance_offset' => true,
-                'advance_offset_amount' => 2000.00, // Exceeds 1000 outstanding
-            ]);
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->landlordParty->id,
+            'percentage' => 100.00,
+            'role' => 'LANDLORD',
+        ]);
 
-        $response->assertStatus(500); // Should fail validation
-        $this->assertStringContainsString('Advance offset amount', $response->getContent());
+        $settlementService = app(SettlementService::class);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('All sales must be POSTED');
+
+        $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+        ]);
     }
 
-    public function test_offset_cannot_exceed_hari_payable(): void
+    public function test_cannot_settle_already_settled_sales(): void
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['settlements', 'treasury_advances']);
-        $cropCycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle 1',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
-        ]);
-        $hariParty = Party::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Hari',
-            'party_types' => ['HARI'],
-        ]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'name' => 'Project 1',
-            'status' => 'ACTIVE',
+        $sale = $this->createPostedSale(1000.00, 600.00);
+
+        $shareRule = ShareRule::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'is_active' => true,
+            'version' => 1,
         ]);
 
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 50.00,
-            'profit_split_hari_pct' => 50.00,
-            'kamdari_pct' => 0.00,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->landlordParty->id,
+            'percentage' => 100.00,
+            'role' => 'LANDLORD',
         ]);
 
-        // Create small income (hari_net will be small)
-        $income = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'INCOME',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 1000.00,
-            'classification' => 'SHARED',
+        $settlementService = app(SettlementService::class);
+
+        // Create and post first settlement
+        $settlement1 = $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
         ]);
 
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$income->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'income-1',
-            ]);
+        $settlementService->post($settlement1, '2024-06-15');
 
-        // Create large advance; project_id required for allocation_rows
-        $advance = Advance::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'project_id' => $project->id,
-            'type' => 'HARI_ADVANCE',
-            'direction' => 'OUT',
-            'amount' => 10000.00,
-            'posting_date' => '2024-06-10',
-            'method' => 'CASH',
-            'status' => 'DRAFT',
-            'crop_cycle_id' => $cropCycle->id,
+        // Try to create second settlement with same sale
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('already settled');
+
+        $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
         ]);
-
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/advances/{$advance->id}/post", [
-                'posting_date' => '2024-06-10',
-                'idempotency_key' => 'advance-1',
-            ]);
-
-        // Try to offset more than hari payable (hari_net will be ~500, but trying to offset 2000)
-        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/projects/{$project->id}/settlement/post", [
-                'posting_date' => '2024-06-20',
-                'idempotency_key' => 'settlement-invalid-offset-2',
-                'apply_advance_offset' => true,
-                'advance_offset_amount' => 2000.00, // Exceeds hari payable
-            ]);
-
-        $response->assertStatus(500); // Should fail validation
     }
 
-    public function test_offset_preview_endpoint(): void
+    public function test_share_rule_percentages_must_sum_to_100(): void
     {
-        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['settlements', 'treasury_advances']);
-        $cropCycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle 1',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
+        $shareRuleService = app(ShareRuleService::class);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('must sum to 100');
+
+        $shareRuleService->create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Invalid Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'lines' => [
+                [
+                    'party_id' => $this->landlordParty->id,
+                    'percentage' => 60.00,
+                    'role' => 'LANDLORD',
+                ],
+                [
+                    'party_id' => $this->growerParty->id,
+                    'percentage' => 30.00, // Total is 90, not 100
+                    'role' => 'GROWER',
+                ],
+            ],
         ]);
-        $hariParty = Party::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Hari',
-            'party_types' => ['HARI'],
-        ]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'name' => 'Project 1',
-            'status' => 'ACTIVE',
-        ]);
-
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 50.00,
-            'profit_split_hari_pct' => 50.00,
-            'kamdari_pct' => 0.00,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
-        ]);
-
-        // Create and post income
-        $income = OperationalTransaction::create([
-            'tenant_id' => $tenant->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cropCycle->id,
-            'type' => 'INCOME',
-            'status' => 'DRAFT',
-            'transaction_date' => '2024-06-15',
-            'amount' => 10000.00,
-            'classification' => 'SHARED',
-        ]);
-
-        $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/operational-transactions/{$income->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'income-1',
-            ]);
-
-        // Create advance; project_id required for allocation_rows
-        $advance = Advance::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $hariParty->id,
-            'project_id' => $project->id,
-            'type' => 'HARI_ADVANCE',
-            'direction' => 'OUT',
-            'amount' => 2000.00,
-            'posting_date' => '2024-06-10',
-            'method' => 'CASH',
-            'status' => 'DRAFT',
-            'crop_cycle_id' => $cropCycle->id,
-        ]);
-
-        $advancePostRes = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/advances/{$advance->id}/post", [
-                'posting_date' => '2024-06-10',
-                'idempotency_key' => 'advance-1',
-            ]);
-        $advancePostRes->assertStatus(201);
-
-        // Get offset preview
-        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->getJson("/api/projects/{$project->id}/settlement/offset-preview?posting_date=2024-06-20");
-
-        $response->assertStatus(200);
-        $preview = $response->json();
-
-        $this->assertEquals($hariParty->id, $preview['hari_party_id']);
-        $this->assertGreaterThan(0, $preview['hari_payable_amount']);
-        $this->assertEquals(2000.00, $preview['outstanding_advance']);
-        $this->assertLessThanOrEqual($preview['hari_payable_amount'], $preview['suggested_offset']);
-        $this->assertLessThanOrEqual($preview['outstanding_advance'], $preview['suggested_offset']);
     }
 }

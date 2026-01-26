@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useSale, useDeleteSale, usePostSale } from '../hooks/useSales';
+import { useSale, useDeleteSale, usePostSale, useReverseSale } from '../hooks/useSales';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { PostButton } from '../components/PostButton';
+import { ReverseButton } from '../components/ReverseButton';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,15 +17,21 @@ export default function SaleDetailPage() {
   const { data: sale, isLoading } = useSale(id || '');
   const deleteMutation = useDeleteSale();
   const postMutation = usePostSale();
+  const reverseMutation = useReverseSale();
   const { hasRole } = useRole();
   const { formatMoney, formatDateTime } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showReverseModal, setShowReverseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reversalDate, setReversalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reverseReason, setReverseReason] = useState('');
   const [idempotencyKey] = useState(uuidv4());
 
   const isDraft = sale?.status === 'DRAFT';
+  const isPosted = sale?.status === 'POSTED';
   const canPost = hasRole(['tenant_admin', 'accountant']);
+  const isCycleClosed = sale?.crop_cycle?.status === 'CLOSED';
 
   const handleDelete = async () => {
     if (!id) return;
@@ -46,6 +54,23 @@ export default function SaleDetailPage() {
         },
       });
       setShowPostModal(false);
+    } catch (error: any) {
+      // Error handled by mutation
+    }
+  };
+
+  const handleReverse = async () => {
+    if (!id) return;
+    try {
+      await reverseMutation.mutateAsync({
+        id,
+        payload: {
+          reversal_date: reversalDate,
+          reason: reverseReason || undefined,
+        },
+      });
+      setShowReverseModal(false);
+      setReverseReason('');
     } catch (error: any) {
       // Error handled by mutation
     }
@@ -136,6 +161,79 @@ export default function SaleDetailPage() {
         </dl>
       </div>
 
+      {/* Sale Lines */}
+      {sale.lines && sale.lines.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Sale Lines</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Store</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Line Total</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sale.lines.map((line) => (
+                  <tr key={line.id}>
+                    <td className="px-4 py-2 text-sm text-gray-900">{line.item?.name || line.inventory_item_id}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{line.store?.name || line.store_id || '-'}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">{line.quantity}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">{formatMoney(line.unit_price)}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">{formatMoney(line.line_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Margin Information (only if posted) */}
+      {sale.status === 'POSTED' && sale.inventory_allocations && sale.inventory_allocations.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Margin Analysis</h2>
+          <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Revenue Total</dt>
+              <dd className="text-lg font-semibold text-gray-900">
+                {formatMoney(sale.lines?.reduce((sum, line) => sum + parseFloat(line.line_total), 0) || sale.amount)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">COGS Total</dt>
+              <dd className="text-lg font-semibold text-gray-900">
+                {formatMoney(sale.inventory_allocations.reduce((sum, alloc) => sum + parseFloat(alloc.total_cost), 0))}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Gross Margin</dt>
+              <dd className="text-lg font-semibold text-green-600">
+                {formatMoney(
+                  (sale.lines?.reduce((sum, line) => sum + parseFloat(line.line_total), 0) || parseFloat(sale.amount)) -
+                  sale.inventory_allocations.reduce((sum, alloc) => sum + parseFloat(alloc.total_cost), 0)
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Gross Margin %</dt>
+              <dd className="text-lg font-semibold text-green-600">
+                {(() => {
+                  const revenue = sale.lines?.reduce((sum, line) => sum + parseFloat(line.line_total), 0) || parseFloat(sale.amount);
+                  const cogs = sale.inventory_allocations.reduce((sum, alloc) => sum + parseFloat(alloc.total_cost), 0);
+                  const margin = revenue - cogs;
+                  const marginPct = revenue > 0 ? (margin / revenue) * 100 : 0;
+                  return `${marginPct.toFixed(2)}%`;
+                })()}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      )}
+
       {isDraft && (
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center">
@@ -152,13 +250,12 @@ export default function SaleDetailPage() {
               >
                 Edit
               </Link>
-              {canPost && (
-                <button
+              {canPost && isDraft && (
+                <PostButton
                   onClick={() => setShowPostModal(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Post
-                </button>
+                  isCycleClosed={isCycleClosed}
+                  cycleName={sale?.crop_cycle?.name}
+                />
               )}
               <button
                 onClick={() => setShowDeleteConfirm(true)}
@@ -171,6 +268,27 @@ export default function SaleDetailPage() {
         </div>
       )}
 
+      {isPosted && canPost && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-medium text-gray-900 mb-2">Actions</h2>
+              <p className="text-sm text-gray-600">
+                This sale has been posted. You can reverse it to create offsetting accounting entries.
+              </p>
+            </div>
+            <div className="flex space-x-4">
+              <ReverseButton
+                onClick={() => setShowReverseModal(true)}
+                isCycleClosed={isCycleClosed}
+                cycleName={sale?.crop_cycle?.name}
+                isPending={reverseMutation.isPending}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPostModal && (
         <Modal
           isOpen={showPostModal}
@@ -178,6 +296,16 @@ export default function SaleDetailPage() {
           onClose={() => setShowPostModal(false)}
         >
           <div className="space-y-4">
+            {isCycleClosed && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-800">
+                <strong>Cannot post:</strong> {sale?.crop_cycle?.name ? `Crop cycle "${sale.crop_cycle.name}" is closed.` : 'Crop cycle is closed.'} Posting is disabled for closed cycles.
+              </div>
+            )}
+            {!isCycleClosed && (
+              <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-sm text-orange-800">
+                <strong>Warning:</strong> Posting this document will create accounting entries that cannot be modified. Only reversal is allowed.
+              </div>
+            )}
             <FormField label="Posting Date" required>
               <input
                 type="date"
@@ -192,8 +320,20 @@ export default function SaleDetailPage() {
                 <ul className="list-disc list-inside mt-2">
                   <li>Debit: Accounts Receivable (AR)</li>
                   <li>Credit: Project Revenue</li>
-                  <li>Allocation row for revenue tracking</li>
+                  {sale.lines && sale.lines.length > 0 && (
+                    <>
+                      <li>Debit: Cost of Goods Sold (COGS)</li>
+                      <li>Credit: Produce Inventory</li>
+                      <li>Stock movements to reduce inventory</li>
+                    </>
+                  )}
+                  <li>Allocation rows for revenue and COGS tracking</li>
                 </ul>
+                {sale.lines && sale.lines.length > 0 && (
+                  <p className="mt-2 text-xs">
+                    <strong>Warning:</strong> Posting requires sufficient inventory stock for all sale lines.
+                  </p>
+                )}
               </p>
             </div>
             <div className="flex justify-end space-x-4 pt-4">
@@ -205,10 +345,85 @@ export default function SaleDetailPage() {
               </button>
               <button
                 onClick={handlePost}
-                disabled={postMutation.isPending}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                disabled={postMutation.isPending || isCycleClosed}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {postMutation.isPending ? 'Posting...' : 'Post Sale'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showReverseModal && (
+        <Modal
+          isOpen={showReverseModal}
+          title="Reverse Sale"
+          onClose={() => {
+            setShowReverseModal(false);
+            setReverseReason('');
+          }}
+        >
+          <div className="space-y-4">
+            {isCycleClosed && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-800">
+                <strong>Cannot reverse:</strong> {sale?.crop_cycle?.name ? `Crop cycle "${sale.crop_cycle.name}" is closed.` : 'Crop cycle is closed.'} Reversals are disabled for closed cycles.
+              </div>
+            )}
+            {!isCycleClosed && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-800">
+                <strong>Warning:</strong> Reversing this sale will create offsetting accounting entries. This action cannot be undone.
+              </div>
+            )}
+            <FormField label="Reversal Date" required>
+              <input
+                type="date"
+                value={reversalDate}
+                onChange={(e) => setReversalDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </FormField>
+            <FormField label="Reason (optional)">
+              <textarea
+                value={reverseReason}
+                onChange={(e) => setReverseReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                placeholder="Reason for reversal"
+              />
+            </FormField>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Reversing will create offsetting entries:
+                <ul className="list-disc list-inside mt-2">
+                  <li>Credit: Accounts Receivable (AR)</li>
+                  <li>Debit: Project Revenue</li>
+                  {sale.lines && sale.lines.length > 0 && (
+                    <>
+                      <li>Credit: Cost of Goods Sold (COGS)</li>
+                      <li>Debit: Produce Inventory</li>
+                      <li>Stock movements to restore inventory</li>
+                    </>
+                  )}
+                </ul>
+              </p>
+            </div>
+            <div className="flex justify-end space-x-4 pt-4">
+              <button
+                onClick={() => {
+                  setShowReverseModal(false);
+                  setReverseReason('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReverse}
+                disabled={reverseMutation.isPending || isCycleClosed}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {reverseMutation.isPending ? 'Reversing...' : 'Reverse Sale'}
               </button>
             </div>
           </div>

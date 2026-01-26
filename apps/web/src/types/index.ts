@@ -274,6 +274,44 @@ export interface Settlement {
   hari_only_deductions: string;
   created_at: string;
   offsets?: SettlementOffset[];
+  // New fields for sales-based settlements (Phase 11)
+  settlement_no?: string;
+  share_rule_id?: string;
+  crop_cycle_id?: string | null;
+  from_date?: string | null;
+  to_date?: string | null;
+  basis_amount?: string;
+  status?: 'DRAFT' | 'POSTED' | 'REVERSED';
+  posting_date?: string | null;
+  reversal_posting_group_id?: string | null;
+  posted_at?: string | null;
+  reversed_at?: string | null;
+  created_by?: string | null;
+  share_rule?: {
+    id: string;
+    name: string;
+    basis: string;
+  };
+  crop_cycle?: {
+    id: string;
+    name: string;
+  };
+  lines?: Array<{
+    id: string;
+    party_id: string;
+    role?: string | null;
+    percentage: string;
+    amount: string;
+    party?: {
+      id: string;
+      name: string;
+    };
+  }>;
+  sales?: Array<{
+    id: string;
+    sale_no?: string | null;
+    posting_date: string;
+  }>;
 }
 
 export interface SettlementOffset {
@@ -572,6 +610,71 @@ export interface ReverseCropActivityRequest {
   idempotency_key?: string;
 }
 
+// Harvest
+export type HarvestStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+
+export interface HarvestLine {
+  id: string;
+  tenant_id: string;
+  harvest_id: string;
+  inventory_item_id: string;
+  store_id: string;
+  quantity: string;
+  uom?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  item?: InvItem;
+  store?: InvStore;
+}
+
+export interface Harvest {
+  id: string;
+  tenant_id: string;
+  harvest_no?: string | null;
+  crop_cycle_id: string;
+  land_parcel_id?: string | null;
+  harvest_date: string;
+  posting_date?: string | null;
+  status: HarvestStatus;
+  notes?: string | null;
+  posted_at?: string | null;
+  reversed_at?: string | null;
+  posting_group_id?: string | null;
+  reversal_posting_group_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  crop_cycle?: CropCycle;
+  land_parcel?: LandParcel | null;
+  posting_group?: PostingGroup;
+  reversal_posting_group?: PostingGroup;
+  lines?: HarvestLine[];
+}
+
+export interface CreateHarvestPayload {
+  harvest_no?: string | null;
+  crop_cycle_id: string;
+  land_parcel_id?: string | null;
+  harvest_date: string;
+  notes?: string | null;
+}
+
+export interface UpdateHarvestPayload {
+  harvest_no?: string | null;
+  land_parcel_id?: string | null;
+  harvest_date?: string;
+  notes?: string | null;
+}
+
+export interface PostHarvestPayload {
+  posting_date: string;
+}
+
+export interface ReverseHarvestPayload {
+  reversal_date: string;
+  reason?: string;
+}
+
 export type AdvanceType = 'HARI_ADVANCE' | 'VENDOR_ADVANCE' | 'LOAN';
 export type AdvanceDirection = 'OUT' | 'IN';
 export type AdvanceStatus = 'DRAFT' | 'POSTED';
@@ -620,6 +723,32 @@ export interface PostAdvanceRequest {
 
 export type SaleStatus = 'DRAFT' | 'POSTED';
 
+export interface SaleLine {
+  id?: string;
+  sale_id?: string;
+  inventory_item_id: string;
+  store_id?: string;
+  quantity: string;
+  uom?: string;
+  unit_price: string;
+  line_total: string;
+  item?: InvItem;
+  store?: InvStore;
+}
+
+export interface SaleInventoryAllocation {
+  id: string;
+  sale_id: string;
+  sale_line_id: string;
+  inventory_item_id: string;
+  crop_cycle_id?: string;
+  store_id: string;
+  quantity: string;
+  unit_cost: string;
+  total_cost: string;
+  costing_method: string;
+}
+
 export interface Sale {
   id: string;
   tenant_id: string;
@@ -634,6 +763,8 @@ export interface Sale {
   status: SaleStatus;
   posting_group_id?: string;
   posted_at?: string;
+  reversed_at?: string;
+  reversal_posting_group_id?: string;
   notes?: string;
   idempotency_key?: string;
   created_at: string;
@@ -641,6 +772,8 @@ export interface Sale {
   project?: Project;
   crop_cycle?: CropCycle;
   posting_group?: PostingGroup;
+  lines?: SaleLine[];
+  inventory_allocations?: SaleInventoryAllocation[];
 }
 
 export interface CreateSalePayload {
@@ -653,11 +786,17 @@ export interface CreateSalePayload {
   sale_date?: string;
   due_date?: string;
   notes?: string;
+  sale_lines?: SaleLine[];
 }
 
 export interface PostSaleRequest {
   posting_date: string;
   idempotency_key: string;
+}
+
+export interface ReverseSaleRequest {
+  reversal_date: string;
+  reason?: string;
 }
 
 export interface PartyBalanceSummary {

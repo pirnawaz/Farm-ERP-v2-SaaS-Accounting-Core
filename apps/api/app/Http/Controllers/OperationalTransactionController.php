@@ -165,6 +165,8 @@ class OperationalTransactionController extends Controller
 
     public function post(PostOperationalTransactionRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
 
         $postingGroup = $this->postingService->postOperationalTransaction(

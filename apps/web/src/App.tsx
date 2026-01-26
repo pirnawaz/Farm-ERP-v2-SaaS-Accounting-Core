@@ -54,13 +54,25 @@ import ActivityTypesPage from './pages/cropOps/ActivityTypesPage';
 import ActivitiesPage from './pages/cropOps/ActivitiesPage';
 import ActivityFormPage from './pages/cropOps/ActivityFormPage';
 import ActivityDetailPage from './pages/cropOps/ActivityDetailPage';
+import HarvestsPage from './pages/harvests/HarvestsPage';
+import HarvestFormPage from './pages/harvests/HarvestFormPage';
+import HarvestDetailPage from './pages/harvests/HarvestDetailPage';
 import ReportsPage from './pages/ReportsPage';
+import TrialBalancePage from './pages/TrialBalancePage';
+import GeneralLedgerPage from './pages/GeneralLedgerPage';
+import ProjectPLPage from './pages/ProjectPLPage';
+import CropCyclePLPage from './pages/CropCyclePLPage';
+import AccountBalancesPage from './pages/AccountBalancesPage';
+import CashbookPage from './pages/CashbookPage';
 import ARAgeingPage from './pages/ARAgeingPage';
+import SalesMarginPage from './pages/SalesMarginPage';
 import LocalisationSettingsPage from './pages/LocalisationSettingsPage';
 import ModuleTogglePage from './pages/ModuleTogglePage';
 import AdminFarmProfilePage from './pages/AdminFarmProfilePage';
 import AdminUsersPage from './pages/AdminUsersPage';
+import AdminRolesPage from './pages/AdminRolesPage';
 import PlatformTenantsPage from './pages/PlatformTenantsPage';
+import PlatformTenantDetailPage from './pages/platform/PlatformTenantDetailPage';
 import { ModulesProvider } from './contexts/ModulesContext';
 import { PlatformLayout } from './components/PlatformLayout';
 import { PlatformAdminRoute } from './components/PlatformAdminRoute';
@@ -81,6 +93,7 @@ function App() {
       >
         <Route index element={<Navigate to="/app/platform/tenants" replace />} />
         <Route path="tenants" element={<PlatformTenantsPage />} />
+        <Route path="tenants/:id" element={<PlatformTenantDetailPage />} />
       </Route>
       <Route
         path="/app"
@@ -148,11 +161,22 @@ function App() {
         <Route path="crop-ops/activities" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivitiesPage /></ModuleProtectedRoute>} />
         <Route path="crop-ops/activities/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivityFormPage /></ModuleProtectedRoute>} />
         <Route path="crop-ops/activities/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivityDetailPage /></ModuleProtectedRoute>} />
+        <Route path="harvests" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestsPage /></ModuleProtectedRoute>} />
+        <Route path="harvests/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestFormPage /></ModuleProtectedRoute>} />
+        <Route path="harvests/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestDetailPage /></ModuleProtectedRoute>} />
         <Route path="reports" element={<ModuleProtectedRoute requiredModule="reports"><ReportsPage /></ModuleProtectedRoute>} />
+        <Route path="reports/trial-balance" element={<ModuleProtectedRoute requiredModule="reports"><TrialBalancePage /></ModuleProtectedRoute>} />
+        <Route path="reports/general-ledger" element={<ModuleProtectedRoute requiredModule="reports"><GeneralLedgerPage /></ModuleProtectedRoute>} />
+        <Route path="reports/project-pl" element={<ModuleProtectedRoute requiredModule="reports"><ProjectPLPage /></ModuleProtectedRoute>} />
+        <Route path="reports/crop-cycle-pl" element={<ModuleProtectedRoute requiredModule="reports"><CropCyclePLPage /></ModuleProtectedRoute>} />
+        <Route path="reports/account-balances" element={<ModuleProtectedRoute requiredModule="reports"><AccountBalancesPage /></ModuleProtectedRoute>} />
+        <Route path="reports/cashbook" element={<ModuleProtectedRoute requiredModule="reports"><CashbookPage /></ModuleProtectedRoute>} />
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />
+        <Route path="reports/sales-margin" element={<ModuleProtectedRoute requiredModule="reports"><SalesMarginPage /></ModuleProtectedRoute>} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />
         <Route path="admin/farm" element={<AdminFarmProfilePage />} />
         <Route path="admin/users" element={<AdminUsersPage />} />
+        <Route path="admin/roles" element={<AdminRolesPage />} />
         <Route path="admin/modules" element={<ModuleTogglePage />} />
       </Route>
       <Route path="/" element={<Navigate to="/login" replace />} />

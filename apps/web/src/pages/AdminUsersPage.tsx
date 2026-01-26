@@ -100,29 +100,39 @@ export default function AdminUsersPage() {
       ),
     },
     {
-      header: 'Enabled',
+      header: 'Status',
       accessor: (row: User) => (
-        <button
-          type="button"
-          onClick={() => handleToggleEnabled(row)}
-          className={`px-2 py-1 text-xs rounded ${
-            row.is_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'
-          }`}
-        >
-          {row.is_enabled ? 'Yes' : 'No'}
-        </button>
+        <span className={`px-2 py-1 text-xs rounded ${
+          row.is_enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {row.is_enabled ? 'Enabled' : 'Disabled'}
+        </span>
+      ),
+    },
+    {
+      header: 'Created',
+      accessor: (row: User) => (
+        <span className="text-sm text-gray-600">
+          {row.created_at ? new Date(row.created_at).toLocaleDateString() : '-'}
+        </span>
       ),
     },
     {
       header: 'Actions',
       accessor: (row: User) => (
-        <button
-          type="button"
-          onClick={() => setDisableTarget(row)}
-          className="text-red-600 hover:underline text-sm"
-        >
-          Disable
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => handleToggleEnabled(row)}
+            className={`text-sm px-2 py-1 rounded ${
+              row.is_enabled 
+                ? 'text-orange-600 hover:bg-orange-50' 
+                : 'text-green-600 hover:bg-green-50'
+            }`}
+          >
+            {row.is_enabled ? 'Disable' : 'Enable'}
+          </button>
+        </div>
       ),
     },
   ];

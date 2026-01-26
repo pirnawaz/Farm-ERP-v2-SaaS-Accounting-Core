@@ -31,4 +31,18 @@ export const reportsApi = {
     if (params.up_to_date) query.append('up_to_date', params.up_to_date);
     return apiClient.get<ProjectStatement>(`/api/reports/project-statement?${query.toString()}`);
   },
+  salesMargin: (params: { crop_cycle_id?: string; from?: string; to?: string; group_by?: string }) => {
+    const query = new URLSearchParams();
+    if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
+    if (params.from) query.append('from', params.from);
+    if (params.to) query.append('to', params.to);
+    if (params.group_by) query.append('group_by', params.group_by);
+    return apiClient.get(`/api/reports/sales-margin?${query.toString()}`);
+  },
+  cashbook: (params: { from: string; to: string }) => {
+    const query = new URLSearchParams();
+    query.append('from', params.from);
+    query.append('to', params.to);
+    return apiClient.get(`/api/reports/cashbook?${query.toString()}`);
+  },
 };

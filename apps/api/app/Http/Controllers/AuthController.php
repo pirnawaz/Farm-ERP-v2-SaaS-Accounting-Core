@@ -7,11 +7,12 @@ use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cookie;
 
 class AuthController extends Controller
 {
     /**
-     * Login: validate email+password, return user_id, role, tenant_id.
+     * Login: validate email+password, set httpOnly cookie with auth token, return user info.
      * Reject with 403 if user is disabled.
      * POST /api/auth/login
      * Body: { email, password }
@@ -43,10 +44,64 @@ class AuthController extends Controller
             return response()->json(['error' => 'User is disabled'], 403);
         }
 
+        // Create a simple token (user_id:tenant_id:role signed)
+        $token = base64_encode(json_encode([
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'role' => $user->role,
+            'email' => $user->email,
+            'expires_at' => now()->addDays(7)->timestamp,
+        ]));
+
+        // Set httpOnly cookie
+        $cookie = cookie('farm_erp_auth_token', $token, 60 * 24 * 7, '/', null, true, true); // 7 days, httpOnly, secure in production
+
         return response()->json([
             'user_id' => $user->id,
             'role' => $user->role,
             'tenant_id' => $user->tenant_id,
-        ]);
+            'email' => $user->email,
+        ])->cookie($cookie);
+    }
+
+    /**
+     * Logout: clear auth cookie.
+     * POST /api/auth/logout
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $cookie = cookie()->forget('farm_erp_auth_token');
+        
+        return response()->json(['message' => 'Logged out successfully'])->cookie($cookie);
+    }
+
+    /**
+     * Get current user from cookie.
+     * GET /api/auth/me
+     */
+    public function me(Request $request): JsonResponse
+    {
+        $token = $request->cookie('farm_erp_auth_token');
+        
+        if (!$token) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
+
+        try {
+            $data = json_decode(base64_decode($token), true);
+            
+            if (!isset($data['expires_at']) || $data['expires_at'] < now()->timestamp) {
+                return response()->json(['error' => 'Token expired'], 401);
+            }
+
+            return response()->json([
+                'user_id' => $data['user_id'],
+                'role' => $data['role'],
+                'tenant_id' => $data['tenant_id'],
+                'email' => $data['email'] ?? null,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Invalid token'], 401);
+        }
     }
 }

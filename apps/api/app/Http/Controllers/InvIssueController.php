@@ -117,6 +117,8 @@ class InvIssueController extends Controller
 
     public function post(PostInvIssueRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $pg = $this->postingService->postIssue($id, $tenantId, $request->posting_date, $request->idempotency_key);
         return response()->json($pg, 201);
@@ -124,6 +126,8 @@ class InvIssueController extends Controller
 
     public function reverse(ReverseInvIssueRequest $request, string $id)
     {
+        $this->authorizeReversal($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $pg = $this->postingService->reverseIssue($id, $tenantId, $request->posting_date, $request->reason);
         return response()->json($pg, 201);

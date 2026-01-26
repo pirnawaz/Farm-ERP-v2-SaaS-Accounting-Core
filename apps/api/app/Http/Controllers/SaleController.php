@@ -10,7 +10,10 @@ use App\Http\Requests\UpdateSaleRequest;
 use App\Http\Requests\PostSaleRequest;
 use App\Services\TenantContext;
 use App\Services\SaleService;
+use App\Services\SaleCOGSService;
+use App\Models\SaleLine;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SaleController extends Controller
 {
@@ -23,7 +26,7 @@ class SaleController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         
         $query = Sale::where('tenant_id', $tenantId)
-            ->with(['buyerParty', 'project', 'cropCycle', 'postingGroup']);
+            ->with(['buyerParty', 'project', 'cropCycle', 'postingGroup', 'lines.item', 'lines.store']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -72,25 +75,52 @@ class SaleController extends Controller
         $saleDate = $request->sale_date ?? $request->posting_date;
         $dueDate = $request->due_date ?? $saleDate;
 
-        // Set sale_date and due_date defaults
-        $saleDate = $request->sale_date ?? $request->posting_date;
-        $dueDate = $request->due_date ?? $saleDate;
+        // Calculate amount from sale_lines if provided, otherwise use provided amount
+        $amount = $request->amount;
+        if ($request->has('sale_lines') && is_array($request->sale_lines) && count($request->sale_lines) > 0) {
+            $amount = 0;
+            foreach ($request->sale_lines as $line) {
+                $lineTotal = (float) $line['quantity'] * (float) $line['unit_price'];
+                $amount += $lineTotal;
+            }
+        }
 
-        $sale = Sale::create([
-            'tenant_id' => $tenantId,
-            'buyer_party_id' => $request->buyer_party_id,
-            'project_id' => $request->project_id,
-            'crop_cycle_id' => $request->crop_cycle_id,
-            'amount' => $request->amount,
-            'posting_date' => $request->posting_date,
-            'sale_no' => $request->sale_no,
-            'sale_date' => $saleDate,
-            'due_date' => $dueDate,
-            'notes' => $request->notes,
-            'status' => 'DRAFT',
-        ]);
+        $sale = DB::transaction(function () use ($request, $tenantId, $saleDate, $dueDate, $amount) {
+            $sale = Sale::create([
+                'tenant_id' => $tenantId,
+                'buyer_party_id' => $request->buyer_party_id,
+                'project_id' => $request->project_id,
+                'crop_cycle_id' => $request->crop_cycle_id,
+                'amount' => $amount,
+                'posting_date' => $request->posting_date,
+                'sale_no' => $request->sale_no,
+                'sale_date' => $saleDate,
+                'due_date' => $dueDate,
+                'notes' => $request->notes,
+                'status' => 'DRAFT',
+            ]);
 
-        return response()->json($sale->load(['buyerParty', 'project', 'cropCycle']), 201);
+            // Create sale lines if provided
+            if ($request->has('sale_lines') && is_array($request->sale_lines)) {
+                foreach ($request->sale_lines as $lineData) {
+                    $lineTotal = (float) $lineData['quantity'] * (float) $lineData['unit_price'];
+                    SaleLine::create([
+                        'tenant_id' => $tenantId,
+                        'sale_id' => $sale->id,
+                        'inventory_item_id' => $lineData['inventory_item_id'],
+                        'store_id' => $lineData['store_id'],
+                        'quantity' => $lineData['quantity'],
+                        'uom' => $lineData['uom'] ?? null,
+                        'unit_price' => $lineData['unit_price'],
+                        'line_total' => $lineTotal,
+                    ]);
+                }
+            }
+
+            return $sale;
+        });
+
+        return response()->json($sale->load(['buyerParty', 'project', 'cropCycle', 'lines.item', 'lines.store']), 201);
     }
 
     public function show(Request $request, string $id)
@@ -99,7 +129,7 @@ class SaleController extends Controller
 
         $sale = Sale::where('id', $id)
             ->where('tenant_id', $tenantId)
-            ->with(['buyerParty', 'project', 'cropCycle', 'postingGroup'])
+            ->with(['buyerParty', 'project', 'cropCycle', 'postingGroup', 'lines.item', 'lines.store', 'inventoryAllocations.item', 'reversalPostingGroup'])
             ->firstOrFail();
 
         return response()->json($sale);
@@ -128,9 +158,47 @@ class SaleController extends Controller
                 ->firstOrFail();
         }
 
-        $sale->update($request->validated());
+        $sale = DB::transaction(function () use ($sale, $request, $tenantId) {
+            // Calculate amount from sale_lines if provided
+            $amount = $sale->amount;
+            if ($request->has('sale_lines') && is_array($request->sale_lines) && count($request->sale_lines) > 0) {
+                $amount = 0;
+                foreach ($request->sale_lines as $line) {
+                    $lineTotal = (float) $line['quantity'] * (float) $line['unit_price'];
+                    $amount += $lineTotal;
+                }
+            }
 
-        return response()->json($sale->load(['buyerParty', 'project', 'cropCycle']));
+            // Update sale
+            $updateData = $request->validated();
+            $updateData['amount'] = $amount;
+            $sale->update($updateData);
+
+            // Update sale lines if provided
+            if ($request->has('sale_lines') && is_array($request->sale_lines)) {
+                // Delete existing lines
+                $sale->lines()->delete();
+
+                // Create new lines
+                foreach ($request->sale_lines as $lineData) {
+                    $lineTotal = (float) $lineData['quantity'] * (float) $lineData['unit_price'];
+                    SaleLine::create([
+                        'tenant_id' => $tenantId,
+                        'sale_id' => $sale->id,
+                        'inventory_item_id' => $lineData['inventory_item_id'],
+                        'store_id' => $lineData['store_id'],
+                        'quantity' => $lineData['quantity'],
+                        'uom' => $lineData['uom'] ?? null,
+                        'unit_price' => $lineData['unit_price'],
+                        'line_total' => $lineTotal,
+                    ]);
+                }
+            }
+
+            return $sale->fresh();
+        });
+
+        return response()->json($sale->load(['buyerParty', 'project', 'cropCycle', 'lines.item', 'lines.store']));
     }
 
     public function destroy(Request $request, string $id)
@@ -149,6 +217,8 @@ class SaleController extends Controller
 
     public function post(PostSaleRequest $request, string $id)
     {
+        $this->authorizePosting($request);
+        
         $tenantId = TenantContext::getTenantId($request);
         $userRole = $request->attributes->get('user_role');
 
@@ -160,6 +230,60 @@ class SaleController extends Controller
             $userRole
         );
 
+        // Log audit event
+        $this->logAudit($request, 'Sale', $id, 'POST', [
+            'posting_date' => $request->posting_date,
+            'posting_group_id' => $postingGroup->id,
+        ]);
+
         return response()->json($postingGroup, 201);
+    }
+
+    public function reverse(Request $request, string $id)
+    {
+        $this->authorizeReversal($request);
+        
+        $tenantId = TenantContext::getTenantId($request);
+
+        $sale = Sale::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'reversal_date' => ['required', 'date', 'date_format:Y-m-d'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $sale = $this->cogsService->reverseSale(
+                $sale,
+                $request->reversal_date,
+                $request->reason ?? ''
+            );
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        // Log audit event
+        $this->logAudit($request, 'Sale', $id, 'REVERSE', [
+            'reversal_date' => $request->reversal_date,
+            'reason' => $request->reason ?? '',
+            'reversal_posting_group_id' => $sale->reversal_posting_group_id ?? null,
+        ]);
+
+        return response()->json($sale->load([
+            'buyerParty',
+            'project',
+            'cropCycle',
+            'postingGroup',
+            'reversalPostingGroup',
+            'lines.item',
+            'lines.store',
+            'inventoryAllocations'
+        ]), 200);
     }
 }

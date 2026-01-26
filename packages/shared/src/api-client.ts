@@ -81,6 +81,7 @@ async function request<T>(
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include', // Include cookies (httpOnly auth token)
     })
 
     // Get response text first to check content type
