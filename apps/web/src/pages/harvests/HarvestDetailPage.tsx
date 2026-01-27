@@ -17,6 +17,7 @@ import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
+import { useFormatting } from '../../hooks/useFormatting';
 import type { UpdateHarvestPayload } from '../../types';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
@@ -39,6 +40,7 @@ export default function HarvestDetailPage() {
   const { data: stores } = useInventoryStores();
   const { data: items } = useInventoryItems(true);
   const { hasRole } = useRole();
+  const { formatDate } = useFormatting();
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
@@ -159,7 +161,7 @@ export default function HarvestDetailPage() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Harvest No</dt><dd className="font-medium">{harvest.harvest_no || '—'}</dd></div>
-          <div><dt className="text-sm text-gray-500">Harvest Date</dt><dd>{harvest.harvest_date}</dd></div>
+          <div><dt className="text-sm text-gray-500">Harvest Date</dt><dd>{formatDate(harvest.harvest_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{harvest.crop_cycle?.name || harvest.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Land Parcel</dt><dd>{harvest.land_parcel?.name || harvest.land_parcel_id || '—'}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
@@ -171,10 +173,10 @@ export default function HarvestDetailPage() {
           {harvest.posting_group_id && (
             <div className="md:col-span-2">
               <dt className="text-sm text-gray-500">Posting Group</dt>
-              <dd><Link to={`/app/posting-groups/${harvest.posting_group_id}`} className="text-blue-600">{harvest.posting_group_id}</Link></dd>
+              <dd><Link to={`/app/posting-groups/${harvest.posting_group_id}`} className="text-[#1F6F5C]">{harvest.posting_group_id}</Link></dd>
             </div>
           )}
-          {harvest.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{harvest.posting_date}</dd></div>}
+          {harvest.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(harvest.posting_date)}</dd></div>}
           {harvest.notes && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Notes</dt><dd>{harvest.notes}</dd></div>}
         </dl>
       </div>
@@ -182,7 +184,7 @@ export default function HarvestDetailPage() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h3 className="font-medium mb-4">Lines</h3>
         <table className="min-w-full border">
-          <thead className="bg-gray-50">
+          <thead className="bg-[#E6ECEA]">
             <tr>
               <th className="px-3 py-2 text-left text-xs text-gray-500">Item</th>
               <th className="px-3 py-2 text-left text-xs text-gray-500">Store</th>
@@ -270,11 +272,11 @@ export default function HarvestDetailPage() {
                 className="w-20 px-2 py-1 border rounded text-sm"
                 placeholder="UOM"
               />
-              <button onClick={handleAddLine} className="text-blue-600 hover:underline text-sm">Add</button>
+              <button onClick={handleAddLine} className="text-[#1F6F5C] hover:underline text-sm">Add</button>
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded">
+            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">
               Save
             </button>
             {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}

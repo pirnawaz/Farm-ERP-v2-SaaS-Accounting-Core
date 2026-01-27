@@ -139,7 +139,7 @@ export default function PartiesPage() {
       accessor: (row) => (
         <Link
           to={`/app/parties/${row.id}`}
-          className="text-blue-600 hover:text-blue-900 font-medium"
+          className="text-[#1F6F5C] hover:text-[#1a5a4a] font-medium"
         >
           {row.name}
         </Link>
@@ -159,7 +159,7 @@ export default function PartiesPage() {
         <div className="flex space-x-2">
           <Link
             to={`/app/parties/${row.id}`}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View
           </Link>
@@ -169,7 +169,7 @@ export default function PartiesPage() {
                 e.stopPropagation();
                 handleEdit(row);
               }}
-              className="text-blue-600 hover:text-blue-900"
+              className="text-[#1F6F5C] hover:text-[#1a5a4a]"
             >
               Edit
             </button>
@@ -215,7 +215,7 @@ export default function PartiesPage() {
               setFormData({ name: '', party_types: [] });
               setErrors({});
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Party
           </button>
@@ -228,7 +228,7 @@ export default function PartiesPage() {
           onClick={() => setFilter('all')}
           className={`px-4 py-2 text-sm font-medium rounded-md ${
             filter === 'all'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-[#1F6F5C] text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
@@ -238,7 +238,7 @@ export default function PartiesPage() {
           onClick={() => setFilter('haris')}
           className={`px-4 py-2 text-sm font-medium rounded-md ${
             filter === 'haris'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-[#1F6F5C] text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
@@ -248,7 +248,7 @@ export default function PartiesPage() {
           onClick={() => setFilter('vendors')}
           className={`px-4 py-2 text-sm font-medium rounded-md ${
             filter === 'vendors'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-[#1F6F5C] text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
@@ -258,7 +258,7 @@ export default function PartiesPage() {
           onClick={() => setFilter('buyers')}
           className={`px-4 py-2 text-sm font-medium rounded-md ${
             filter === 'buyers'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-[#1F6F5C] text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
@@ -268,7 +268,7 @@ export default function PartiesPage() {
           onClick={() => setFilter('kamdars')}
           className={`px-4 py-2 text-sm font-medium rounded-md ${
             filter === 'kamdars'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-[#1F6F5C] text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
@@ -305,7 +305,7 @@ export default function PartiesPage() {
                   });
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <FormField label="Party Types" required error={errors.party_types}>
@@ -316,7 +316,7 @@ export default function PartiesPage() {
                     type="checkbox"
                     checked={formData.party_types.includes(type)}
                     onChange={() => togglePartyType(type)}
-                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="mr-2 h-4 w-4 text-[#1F6F5C] focus:ring-[#1F6F5C] border-gray-300 rounded"
                   />
                   <span className="text-sm text-gray-700">{type}</span>
                 </label>
@@ -337,7 +337,7 @@ export default function PartiesPage() {
             <button
               onClick={handleCreate}
               disabled={createMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}
             </button>
@@ -370,7 +370,7 @@ export default function PartiesPage() {
                   });
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <FormField label="Party Types" required error={errors.party_types}>
@@ -381,7 +381,7 @@ export default function PartiesPage() {
                     type="checkbox"
                     checked={formData.party_types.includes(type)}
                     onChange={() => togglePartyType(type)}
-                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="mr-2 h-4 w-4 text-[#1F6F5C] focus:ring-[#1F6F5C] border-gray-300 rounded"
                   />
                   <span className="text-sm text-gray-700">{type}</span>
                 </label>
@@ -402,7 +402,7 @@ export default function PartiesPage() {
             <button
               onClick={handleUpdate}
               disabled={updateMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {updateMutation.isPending ? 'Updating...' : 'Update'}
             </button>

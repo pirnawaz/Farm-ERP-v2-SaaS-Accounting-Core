@@ -34,7 +34,7 @@ export default function PayablesOutstandingPage() {
           <div className="text-center py-8 text-gray-500">No worker balances. Post work logs to accrue wages payable.</div>
         ) : (
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-[#E6ECEA]">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Worker</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payable Balance</th>
@@ -45,12 +45,12 @@ export default function PayablesOutstandingPage() {
               {rows.map((r) => (
                 <tr key={r.worker_id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.worker_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatMoney(r.payable_balance)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><span className="tabular-nums">{formatMoney(r.payable_balance)}</span></td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {r.party_id ? (
                       <button
                         onClick={() => handlePay(r)}
-                        className="text-blue-600 hover:text-blue-800"
+                        className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                       >
                         Pay
                       </button>

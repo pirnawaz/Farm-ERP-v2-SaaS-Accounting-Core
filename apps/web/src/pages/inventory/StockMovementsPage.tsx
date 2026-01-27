@@ -19,15 +19,15 @@ export default function StockMovementsPage() {
   });
   const { data: stores } = useInventoryStores();
   const { data: items } = useInventoryItems(true);
-  const { formatMoney, formatDateTime } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const cols: Column<InvStockMovement>[] = [
-    { header: 'Occurred at', accessor: (r) => formatDateTime(r.occurred_at) },
+    { header: 'Occurred at', accessor: (r) => formatDate(r.occurred_at) },
     { header: 'Type', accessor: 'movement_type' },
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
     { header: 'Item', accessor: (r) => r.item?.name || r.item_id },
     { header: 'Qty delta', accessor: (r) => String(r.qty_delta) },
-    { header: 'Value delta', accessor: (r) => formatMoney(r.value_delta) },
+    { header: 'Value delta', accessor: (r) => <span className="tabular-nums">{formatMoney(r.value_delta)}</span> },
     { header: 'Source', accessor: (r) => `${r.source_type} ${r.source_id}` },
   ];
 

@@ -15,7 +15,7 @@ export default function SettlementsPage() {
   });
 
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const canCreate = hasRole(['tenant_admin', 'accountant']);
 
@@ -45,15 +45,15 @@ export default function SettlementsPage() {
         {row.status}
       </span>
     )},
-    { header: 'Basis Amount', accessor: (row) => formatMoney(parseFloat(row.basis_amount)) },
-    { header: 'Posting Date', accessor: (row) => row.posting_date || '-' },
+    { header: 'Basis Amount', accessor: (row) => <span className="tabular-nums">{formatMoney(parseFloat(row.basis_amount)}</span>) },
+    { header: 'Posting Date', accessor: (row) => formatDate(row.posting_date) },
     { header: 'Share Rule', accessor: (row) => row.share_rule?.name || '-' },
     {
       header: 'Actions',
       accessor: (row) => (
         <Link
           to={`/app/settlements/${row.id}`}
-          className="text-blue-600 hover:text-blue-900"
+          className="text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           View
         </Link>
@@ -76,7 +76,7 @@ export default function SettlementsPage() {
         {canCreate && (
           <Link
             to="/app/settlements/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
           >
             New Settlement
           </Link>

@@ -206,7 +206,7 @@ function DailyBookEntryFormPage() {
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
             </button>

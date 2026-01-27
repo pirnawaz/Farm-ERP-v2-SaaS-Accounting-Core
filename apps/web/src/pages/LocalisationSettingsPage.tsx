@@ -125,7 +125,7 @@ export default function LocalisationSettingsPage() {
                 value={formData.currency_code}
                 onChange={(e) => setFormData({ ...formData, currency_code: e.target.value })}
                 disabled={!canEdit || saving}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 {CURRENCIES.map((currency) => (
                   <option key={currency.code} value={currency.code}>
@@ -146,7 +146,7 @@ export default function LocalisationSettingsPage() {
                 value={formData.locale}
                 onChange={(e) => setFormData({ ...formData, locale: e.target.value })}
                 disabled={!canEdit || saving}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 {LOCALES.map((locale) => (
                   <option key={locale.code} value={locale.code}>
@@ -167,7 +167,7 @@ export default function LocalisationSettingsPage() {
                 value={formData.timezone}
                 onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
                 disabled={!canEdit || saving}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 {TIMEZONES.map((tz) => (
                   <option key={tz.code} value={tz.code}>
@@ -186,7 +186,7 @@ export default function LocalisationSettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : 'Save Settings'}
               </button>
@@ -195,8 +195,8 @@ export default function LocalisationSettingsPage() {
         </form>
       </div>
 
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
+      <div className="mt-6 bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4">
+        <p className="text-sm text-[#2D3A3A]">
           <strong>Note:</strong> Changes to these settings will immediately affect how money and dates are displayed throughout the application. No page reload is required.
         </p>
       </div>

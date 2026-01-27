@@ -6,7 +6,7 @@ import { useFormatting } from '../hooks/useFormatting'
 function PostingGroupDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { formatMoney, formatDateTime } = useFormatting()
+  const { formatMoney, formatDate, formatDateTime } = useFormatting()
   const [postingGroup, setPostingGroup] = useState<PostingGroup | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +65,7 @@ function PostingGroupDetailPage() {
     return (
       <div className="bg-red-50 border border-red-200 rounded p-4">
         <p className="text-red-800">{error || 'Posting group not found'}</p>
-        <Link to="/daily-book-entries" className="text-blue-600 hover:underline mt-2 inline-block">
+        <Link to="/daily-book-entries" className="text-[#1F6F5C] hover:underline mt-2 inline-block">
           Back to Entries
         </Link>
       </div>
@@ -78,7 +78,7 @@ function PostingGroupDetailPage() {
         <h2 className="text-2xl font-bold">Posting Group Details</h2>
         <Link
           to="/daily-book-entries"
-          className="text-blue-600 hover:text-blue-800"
+          className="text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           ← Back to Entries
         </Link>
@@ -100,7 +100,7 @@ function PostingGroupDetailPage() {
         <dl className="grid grid-cols-2 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Posting Date</dt>
-            <dd className="mt-1 text-sm text-gray-900">{postingGroup.posting_date}</dd>
+            <dd className="mt-1 text-sm text-gray-900">{formatDate(postingGroup.posting_date)}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Source Type</dt>
@@ -125,7 +125,7 @@ function PostingGroupDetailPage() {
                 <dd className="mt-1 text-sm text-gray-900">
                   <Link
                     to={`/posting-groups/${postingGroup.reversal_of_posting_group_id}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-[#1F6F5C] hover:underline"
                   >
                     {postingGroup.reversal_of_posting_group_id}
                   </Link>
@@ -150,7 +150,7 @@ function PostingGroupDetailPage() {
         {postingGroup.allocation_rows && postingGroup.allocation_rows.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Cost Type
@@ -176,7 +176,7 @@ function PostingGroupDetailPage() {
                       {row.cost_type}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {formatMoney(row.amount)}
+                      <span className="tabular-nums">{formatMoney(row.amount)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {row.currency_code}
@@ -187,7 +187,7 @@ function PostingGroupDetailPage() {
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {row.rule_hash ? (
                         <details className="cursor-pointer">
-                          <summary className="text-blue-600 hover:underline">
+                          <summary className="text-[#1F6F5C] hover:underline">
                             {row.rule_hash.substring(0, 8)}...
                           </summary>
                           <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto max-w-md">
@@ -215,7 +215,7 @@ function PostingGroupDetailPage() {
         </div>
         {postingGroup.ledger_entries && postingGroup.ledger_entries.length > 0 ? (
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-[#E6ECEA]">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Account
@@ -239,10 +239,10 @@ function PostingGroupDetailPage() {
                     <span className="text-gray-500 ml-2">({entry.account?.code || 'N/A'})</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                    {parseFloat(entry.debit.toString()) > 0 ? formatMoney(entry.debit) : '-'}
+                    {parseFloat(entry.debit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.debit)}</span> : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                    {parseFloat(entry.credit.toString()) > 0 ? formatMoney(entry.credit) : '-'}
+                    {parseFloat(entry.credit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.credit)}</span> : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {entry.currency_code}
@@ -252,15 +252,15 @@ function PostingGroupDetailPage() {
               <tr className="bg-gray-50 font-semibold">
                 <td className="px-6 py-4 whitespace-nowrap text-sm">Total</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                  {formatMoney(
+                  <span className="tabular-nums">{formatMoney(
                     postingGroup.ledger_entries
-                      .reduce((sum, e) => sum + parseFloat(e.debit.toString()), 0)
+                      .reduce((sum, e)}</span> => sum + parseFloat(e.debit.toString()), 0)
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                  {formatMoney(
+                  <span className="tabular-nums">{formatMoney(
                     postingGroup.ledger_entries
-                      .reduce((sum, e) => sum + parseFloat(e.credit.toString()), 0)
+                      .reduce((sum, e)}</span> => sum + parseFloat(e.credit.toString()), 0)
                   )}
                 </td>
                 <td></td>

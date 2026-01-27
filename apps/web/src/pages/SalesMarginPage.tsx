@@ -47,7 +47,7 @@ export default function SalesMarginPage() {
       { 
         header: 'Sale ID', 
         accessor: (row) => row.sale_id ? (
-          <Link to={`/app/sales/${row.sale_id}`} className="text-blue-600 hover:text-blue-900">
+          <Link to={`/app/sales/${row.sale_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
             {row.sale_id.substring(0, 8)}...
           </Link>
         ) : '-'
@@ -65,11 +65,11 @@ export default function SalesMarginPage() {
     },
     { 
       header: 'Revenue', 
-      accessor: (row) => <span className="text-right block font-semibold">{formatMoney(row.revenue_total)}</span>
+      accessor: (row) => <span className="text-right block font-semibold"><span className="tabular-nums">{formatMoney(row.revenue_total)}</span></span>
     },
     { 
       header: 'COGS', 
-      accessor: (row) => <span className="text-right block">{formatMoney(row.cogs_total)}</span>
+      accessor: (row) => <span className="text-right block"><span className="tabular-nums">{formatMoney(row.cogs_total)}</span></span>
     },
     { 
       header: 'Gross Margin', 
@@ -77,7 +77,7 @@ export default function SalesMarginPage() {
         const margin = parseFloat(row.gross_margin);
         return (
           <span className={`text-right block font-semibold ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatMoney(row.gross_margin)}
+            <span className="tabular-nums">{formatMoney(row.gross_margin)}</span>
           </span>
         );
       }
@@ -132,7 +132,7 @@ export default function SalesMarginPage() {
             <select
               value={filters.crop_cycle_id}
               onChange={(e) => setFilters({ ...filters, crop_cycle_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All Crop Cycles</option>
               {cropCycles?.map((cycle) => (
@@ -150,7 +150,7 @@ export default function SalesMarginPage() {
               type="date"
               value={filters.from}
               onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </div>
           <div>
@@ -161,7 +161,7 @@ export default function SalesMarginPage() {
               type="date"
               value={filters.to}
               onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </div>
           <div>
@@ -171,7 +171,7 @@ export default function SalesMarginPage() {
             <select
               value={filters.group_by}
               onChange={(e) => setFilters({ ...filters, group_by: e.target.value as 'sale' | 'item' | 'crop_cycle' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="sale">By Sale</option>
               <option value="item">By Item</option>
@@ -201,16 +201,16 @@ export default function SalesMarginPage() {
                       </div>
                       <div>
                         <div className="text-sm text-gray-500">Revenue Total</div>
-                        <div className="text-lg font-semibold">{formatMoney(totals.revenue_total.toFixed(2))}</div>
+                        <div className="text-lg font-semibold"><span className="tabular-nums">{formatMoney(totals.revenue_total.toFixed(2))}</span></div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-500">COGS Total</div>
-                        <div className="text-lg font-semibold">{formatMoney(totals.cogs_total.toFixed(2))}</div>
+                        <div className="text-lg font-semibold"><span className="tabular-nums">{formatMoney(totals.cogs_total.toFixed(2))}</span></div>
                       </div>
                       <div>
                         <div className="text-sm text-gray-500">Gross Margin</div>
                         <div className={`text-lg font-semibold ${totals.gross_margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatMoney(totals.gross_margin.toFixed(2))}
+                          <span className="tabular-nums">{formatMoney(totals.gross_margin.toFixed(2))}</span>
                         </div>
                       </div>
                       <div>

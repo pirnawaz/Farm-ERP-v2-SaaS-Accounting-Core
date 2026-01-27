@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useTenant } from '../hooks/useTenant';
 import { useAuth, useRole } from '../hooks';
 import { useModules } from '../contexts/ModulesContext';
+import { BrandLogo } from './BrandLogo';
 import type { UserRole } from '../types';
 
 type NavigationItem = {
@@ -183,7 +184,7 @@ export function AppLayout() {
         <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             <div className="flex items-center flex-shrink-0 px-4">
-              <h1 className="text-xl font-bold text-gray-900">Farm ERP v2</h1>
+              <BrandLogo size="md" />
             </div>
             <nav className="mt-5 flex-1 px-2 space-y-1">
               {filteredGroups.map((group) => {
@@ -200,7 +201,7 @@ export function AppLayout() {
                       to={item.href}
                       className={`${
                         isActive
-                          ? 'bg-blue-50 text-blue-600'
+                          ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
                     >
@@ -216,7 +217,7 @@ export function AppLayout() {
                       onClick={() => toggleGroup(group.name)}
                       className={`${
                         hasActiveItem
-                          ? 'bg-blue-50 text-blue-600'
+                          ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
                     >
@@ -240,7 +241,7 @@ export function AppLayout() {
                               to={item.href}
                               className={`${
                                 isActive
-                                  ? 'bg-blue-50 text-blue-600'
+                                  ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                               } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
                             >
@@ -276,7 +277,7 @@ export function AppLayout() {
             </div>
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
               <div className="flex-shrink-0 flex items-center px-4">
-                <h1 className="text-xl font-bold text-gray-900">Farm ERP v2</h1>
+                <BrandLogo size="md" />
               </div>
               <nav className="mt-5 px-2 space-y-1">
                 {filteredGroups.map((group) => {
@@ -294,7 +295,7 @@ export function AppLayout() {
                         onClick={() => setSidebarOpen(false)}
                         className={`${
                           isActive
-                            ? 'bg-blue-50 text-blue-600'
+                            ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                         } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
                       >
@@ -310,7 +311,7 @@ export function AppLayout() {
                         onClick={() => toggleGroup(group.name)}
                         className={`${
                           hasActiveItem
-                            ? 'bg-blue-50 text-blue-600'
+                            ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                         } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
                       >
@@ -335,7 +336,7 @@ export function AppLayout() {
                                 onClick={() => setSidebarOpen(false)}
                                 className={`${
                                   isActive
-                                    ? 'bg-blue-50 text-blue-600'
+                                    ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                                 } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
                               >
@@ -360,7 +361,7 @@ export function AppLayout() {
         <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow">
           <button
             type="button"
-            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 md:hidden"
+            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#1F6F5C] md:hidden"
             onClick={() => setSidebarOpen(true)}
           >
             <span className="sr-only">Open sidebar</span>
@@ -382,13 +383,13 @@ export function AppLayout() {
             <div className="ml-4 flex items-center space-x-2 md:ml-6">
               <button
                 onClick={handleSwitchFarm}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
               >
                 Switch Farm
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
               >
                 Logout
               </button>

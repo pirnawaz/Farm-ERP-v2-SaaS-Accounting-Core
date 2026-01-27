@@ -52,13 +52,13 @@ export default function ProjectsPage() {
         <div className="flex space-x-2">
           <Link
             to={`/app/projects/${row.id}`}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View
           </Link>
           <Link
             to={`/app/projects/${row.id}/rules`}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             Rules
           </Link>
@@ -84,7 +84,7 @@ export default function ProjectsPage() {
         {canCreate && (
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Project from Allocation
           </button>
@@ -109,7 +109,7 @@ export default function ProjectsPage() {
             <select
               value={formData.land_allocation_id}
               onChange={(e) => setFormData({ ...formData, land_allocation_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">Select allocation</option>
               {availableAllocations.map((alloc) => (
@@ -124,7 +124,7 @@ export default function ProjectsPage() {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <div className="flex justify-end space-x-3">
@@ -137,7 +137,7 @@ export default function ProjectsPage() {
             <button
               onClick={handleCreate}
               disabled={createFromAllocationMutation.isPending || !formData.land_allocation_id || !formData.name}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createFromAllocationMutation.isPending ? 'Creating...' : 'Create'}
             </button>

@@ -125,7 +125,7 @@ function CropCyclePLPage() {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Crop Cycle
@@ -161,13 +161,13 @@ function CropCyclePLPage() {
                         {row.currency_code}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                        {formatMoney(row.income)}
+                        <span className="tabular-nums">{formatMoney(row.income)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                        {formatMoney(row.expenses)}
+                        <span className="tabular-nums">{formatMoney(row.expenses)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                        {formatMoney(row.net_profit)}
+                        <span className="tabular-nums">{formatMoney(row.net_profit)}</span>
                       </td>
                     </tr>
                   ))

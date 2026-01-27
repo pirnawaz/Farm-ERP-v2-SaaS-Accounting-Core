@@ -33,7 +33,7 @@ export default function InvTransferDetailPage() {
   const { data: items } = useInventoryItems(true);
   const { data: stock } = useStockOnHand(transfer?.from_store_id ? { store_id: transfer.from_store_id } : undefined);
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
@@ -116,14 +116,14 @@ export default function InvTransferDetailPage() {
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{transfer.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">From Store</dt><dd className="font-medium">{transfer.from_store?.name || transfer.from_store_id}</dd></div>
           <div><dt className="text-sm text-gray-500">To Store</dt><dd className="font-medium">{transfer.to_store?.name || transfer.to_store_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{transfer.doc_date}</dd></div>
+          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(transfer.doc_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
             <dd><span className={`px-2 py-1 rounded text-xs ${transfer.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : transfer.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{transfer.status}</span></dd>
           </div>
           {transfer.posting_group_id && (
-            <div className="md:col-span-2"><dt className="text-sm text-gray-500">Posting Group</dt><dd><Link to={`/app/posting-groups/${transfer.posting_group_id}`} className="text-blue-600">{transfer.posting_group_id}</Link></dd></div>
+            <div className="md:col-span-2"><dt className="text-sm text-gray-500">Posting Group</dt><dd><Link to={`/app/posting-groups/${transfer.posting_group_id}`} className="text-[#1F6F5C]">{transfer.posting_group_id}</Link></dd></div>
           )}
-          {transfer.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{transfer.posting_date}</dd></div>}
+          {transfer.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(transfer.posting_date)}</dd></div>}
         </dl>
       </div>
 
@@ -141,9 +141,9 @@ export default function InvTransferDetailPage() {
             </FormField>
           </div>
           <div className="mb-4">
-            <div className="flex justify-between mb-2"><h4 className="font-medium">Lines</h4><button type="button" onClick={addLine} className="text-sm text-blue-600">+ Add</button></div>
+            <div className="flex justify-between mb-2"><h4 className="font-medium">Lines</h4><button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add</button></div>
             <table className="min-w-full border">
-              <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr></thead>
+              <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr></thead>
               <tbody>
                 {lines.map((line, i) => (
                   <tr key={i}>
@@ -162,7 +162,7 @@ export default function InvTransferDetailPage() {
             </table>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
             {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
           </div>
         </div>
@@ -170,14 +170,14 @@ export default function InvTransferDetailPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="font-medium mb-2">Lines</h3>
           <table className="min-w-full border">
-            <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
+            <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
             <tbody>
               {(transfer.lines || []).map((l) => (
-                <tr key={l.id}><td className="px-3 py-2">{l.item?.name}</td><td>{l.qty}</td><td>{l.line_total ? formatMoney(parseFloat(String(l.line_total))) : '—'}</td></tr>
+                <tr key={l.id}><td className="px-3 py-2">{l.item?.name}</td><td>{l.qty}</td><td>{l.line_total ? <span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span> : '—'}</td></tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-2 font-medium">Total: {formatMoney(total)}</p>
+          <p className="mt-2 font-medium">Total: <span className="tabular-nums">{formatMoney(total)}</span></p>
         </div>
       )}
 

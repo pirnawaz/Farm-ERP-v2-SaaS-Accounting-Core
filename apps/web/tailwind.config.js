@@ -5,7 +5,17 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        terrava: {
+          primary: "#1F6F5C",
+          secondary: "#2D3A3A",
+          accent: "#C9A24D",
+          neutral: "#E6ECEA",
+        },
+        primary: "#1F6F5C",
+      },
+    },
   },
   plugins: [],
 }

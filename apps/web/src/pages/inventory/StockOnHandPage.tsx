@@ -21,8 +21,8 @@ export default function StockOnHandPage() {
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
     { header: 'Item', accessor: (r) => r.item?.name || r.item_id },
     { header: 'Qty on hand', accessor: (r) => String(r.qty_on_hand) },
-    { header: 'Value on hand', accessor: (r) => formatMoney(r.value_on_hand) },
-    { header: 'WAC cost', accessor: (r) => formatMoney(r.wac_cost) },
+    { header: 'Value on hand', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.value_on_hand)}</span> },
+    { header: 'WAC cost', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.wac_cost)}</span> },
   ];
 
   return (

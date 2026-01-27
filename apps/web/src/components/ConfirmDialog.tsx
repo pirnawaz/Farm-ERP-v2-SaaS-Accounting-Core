@@ -47,7 +47,7 @@ export function ConfirmDialog({
 
   const buttonClass = variant === 'danger'
     ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-    : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500';
+    : 'bg-[#1F6F5C] hover:bg-[#1a5a4a] focus:ring-[#1F6F5C]';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
@@ -61,7 +61,7 @@ export function ConfirmDialog({
                 onClose();
               }
             }}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             aria-label={cancelText}
           >
             {cancelText}

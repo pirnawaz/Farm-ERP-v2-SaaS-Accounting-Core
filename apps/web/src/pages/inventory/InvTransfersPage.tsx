@@ -5,6 +5,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
+import { useFormatting } from '../../hooks/useFormatting';
 import type { InvTransfer } from '../../types';
 
 export default function InvTransfersPage() {
@@ -25,7 +26,7 @@ export default function InvTransfersPage() {
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'From', accessor: (r) => r.from_store?.name || r.from_store_id },
     { header: 'To', accessor: (r) => r.to_store?.name || r.to_store_id },
-    { header: 'Doc Date', accessor: 'doc_date' },
+    { header: 'Doc Date', accessor: (r) => formatDate(r.doc_date) },
     {
       header: 'Status',
       accessor: (r) => (
@@ -43,7 +44,7 @@ export default function InvTransfersPage() {
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Transfers' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => navigate('/app/inventory/transfers/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Transfer</button>
+          <button onClick={() => navigate('/app/inventory/transfers/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Transfer</button>
         ) : undefined}
       />
       <div className="flex gap-4 mb-4">

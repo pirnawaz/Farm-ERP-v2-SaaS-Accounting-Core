@@ -9,7 +9,7 @@ interface StatCardProps {
 
 export function StatCard({ title, value, link, icon }: StatCardProps) {
   const content = (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>

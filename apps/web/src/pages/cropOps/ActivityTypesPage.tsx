@@ -53,7 +53,7 @@ export default function ActivityTypesPage() {
         backTo="/app/crop-ops"
         breadcrumbs={[{ label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activity Types' }]}
         right={
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Type
           </button>
         }
@@ -82,7 +82,7 @@ export default function ActivityTypesPage() {
           </FormField>
           <div className="flex gap-2 pt-4">
             <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">
               Create
             </button>
           </div>

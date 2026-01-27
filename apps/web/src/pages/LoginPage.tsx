@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useTenant } from '../hooks/useTenant';
 import { devApi } from '../api/dev';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { BrandLogo } from '../components/BrandLogo';
 import toast from 'react-hot-toast';
 import type { UserRole } from '../types';
 import type { Tenant } from '@farm-erp/shared';
@@ -108,8 +109,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl w-full space-y-8">
         <div>
+          <div className="flex justify-center mb-4">
+            <BrandLogo size="lg" />
+          </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Farm ERP v2
+            Welcome back to Terrava
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Select Farm (Tenant) - Development Mode
@@ -130,7 +134,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-[#E6ECEA]">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Name
@@ -148,7 +152,7 @@ export default function LoginPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {tenants.map((tenant) => (
-                        <tr key={tenant.id} className={selectedTenantId === tenant.id ? 'bg-blue-50' : ''}>
+                        <tr key={tenant.id} className={selectedTenantId === tenant.id ? 'bg-[#E6ECEA]' : ''}>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                             {tenant.name}
                           </td>
@@ -169,7 +173,7 @@ export default function LoginPage() {
                               onClick={() => handleSelectTenant(tenant.id)}
                               className={`px-3 py-1 rounded text-sm font-medium ${
                                 selectedTenantId === tenant.id
-                                  ? 'bg-blue-600 text-white'
+                                  ? 'bg-[#1F6F5C] text-white'
                                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                               }`}
                             >
@@ -194,7 +198,7 @@ export default function LoginPage() {
                 value={newFarmName}
                 onChange={(e) => setNewFarmName(e.target.value)}
                 placeholder="Enter farm name"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && !creating) {
                     handleCreateTenant();
@@ -220,7 +224,7 @@ export default function LoginPage() {
               id="role"
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
             >
               <option value="tenant_admin">Tenant Admin</option>
               <option value="accountant">Accountant</option>
@@ -234,7 +238,7 @@ export default function LoginPage() {
             <button
               onClick={handleContinue}
               disabled={!selectedRole || (!isPlatformAdmin && !selectedTenantId)}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#1F6F5C] hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue
             </button>

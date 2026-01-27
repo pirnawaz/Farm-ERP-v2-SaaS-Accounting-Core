@@ -5,7 +5,7 @@ import { exportToCSV } from '../utils/csvExport'
 import { useFormatting } from '../hooks/useFormatting'
 
 function GeneralLedgerPage() {
-  const { formatMoney } = useFormatting()
+  const { formatMoney, formatDate } = useFormatting()
   const [data, setData] = useState<GeneralLedgerLine[]>([])
   const [pagination, setPagination] = useState({ page: 1, per_page: 50, total: 0, last_page: 1 })
   const [projects, setProjects] = useState<Project[]>([])
@@ -172,7 +172,7 @@ function GeneralLedgerPage() {
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[#E6ECEA]">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
@@ -208,7 +208,7 @@ function GeneralLedgerPage() {
                     data.map((row) => (
                       <tr key={row.ledger_entry_id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {row.posting_date}
+                          {formatDate(row.posting_date)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div>
@@ -229,19 +229,19 @@ function GeneralLedgerPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <Link
                             to={`/posting-groups/${row.posting_group_id}`}
-                            className="text-blue-600 hover:text-blue-800"
+                            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                           >
                             {row.posting_group_id.substring(0, 8)}...
                           </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatMoney(row.debit)}
+                          <span className="tabular-nums">{formatMoney(row.debit)}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {formatMoney(row.credit)}
+                          <span className="tabular-nums">{formatMoney(row.credit)}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                          {formatMoney(row.net)}
+                          <span className="tabular-nums">{formatMoney(row.net)}</span>
                         </td>
                       </tr>
                     ))

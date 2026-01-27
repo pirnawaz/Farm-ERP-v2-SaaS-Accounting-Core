@@ -190,7 +190,7 @@ export default function SaleFormPage() {
     return (
       <div>
         <p className="text-red-600">This sale cannot be edited because it is not in DRAFT status.</p>
-        <Link to="/app/sales" className="text-blue-600 hover:text-blue-900">
+        <Link to="/app/sales" className="text-[#1F6F5C] hover:text-[#1a5a4a]">
           Back to Sales
         </Link>
       </div>
@@ -200,7 +200,7 @@ export default function SaleFormPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/sales" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/sales" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Sales
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">
@@ -215,7 +215,7 @@ export default function SaleFormPage() {
               value={formData.buyer_party_id}
               onChange={(e) => setFormData({ ...formData, buyer_party_id: e.target.value })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
               <option value="">Select a buyer</option>
               {parties?.map((party) => (
@@ -234,7 +234,7 @@ export default function SaleFormPage() {
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               disabled={!canEdit || saleLines.length > 0}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
             {saleLines.length > 0 && (
               <p className="text-xs text-gray-500 mt-1">Amount is calculated from sale lines</p>
@@ -247,7 +247,7 @@ export default function SaleFormPage() {
               {canEdit && (
                 <button
                   onClick={addSaleLine}
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-sm text-[#1F6F5C] hover:underline"
                   type="button"
                 >
                   + Add Line
@@ -342,7 +342,7 @@ export default function SaleFormPage() {
                 });
               }}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -353,7 +353,7 @@ export default function SaleFormPage() {
               onChange={(e) => setFormData({ ...formData, sale_no: e.target.value })}
               disabled={!canEdit}
               placeholder="e.g., SALE-001"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -363,7 +363,7 @@ export default function SaleFormPage() {
               value={formData.sale_date}
               onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
             <p className="text-xs text-gray-500 mt-1">Defaults to posting date if not set</p>
           </FormField>
@@ -374,7 +374,7 @@ export default function SaleFormPage() {
               value={formData.due_date}
               onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
             <p className="text-xs text-gray-500 mt-1">Used for AR ageing. Defaults to sale date if not set</p>
           </FormField>
@@ -384,7 +384,7 @@ export default function SaleFormPage() {
               value={formData.project_id}
               onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
               <option value="">None</option>
               {projects?.map((project) => (
@@ -400,7 +400,7 @@ export default function SaleFormPage() {
               value={formData.crop_cycle_id}
               onChange={(e) => setFormData({ ...formData, crop_cycle_id: e.target.value })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
               <option value="">None</option>
               {cropCycles?.map((cycle) => (
@@ -417,7 +417,7 @@ export default function SaleFormPage() {
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               disabled={!canEdit}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -432,7 +432,7 @@ export default function SaleFormPage() {
               <button
                 onClick={handleSubmit}
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
               </button>

@@ -18,7 +18,7 @@ describe('LoginPage', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Farm ERP v2')).toBeInTheDocument();
+    expect(screen.getByText(/Welcome back to Terrava|Terrava/i)).toBeInTheDocument();
     expect(screen.getByText('Select Role')).toBeInTheDocument();
   });
 

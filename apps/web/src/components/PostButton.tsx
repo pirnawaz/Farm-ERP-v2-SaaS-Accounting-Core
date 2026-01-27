@@ -40,7 +40,7 @@ export function PostButton({
           </div>
         )}
         {!isCycleClosed && (
-          <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-sm text-orange-800">
+          <div className="bg-[#C9A24D]/10 border border-[#C9A24D]/30 rounded-md p-3 text-sm text-[#2D3A3A]">
             <strong>Warning:</strong> This action is irreversible. Posting will create accounting entries that cannot be modified. Only reversal is allowed.
           </div>
         )}
@@ -48,7 +48,7 @@ export function PostButton({
           type="button"
           onClick={handleClick}
           disabled={isDisabled}
-          className={`px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+          className={`px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         >
           {isPending ? 'Posting...' : 'Post'}
         </button>

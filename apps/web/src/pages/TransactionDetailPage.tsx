@@ -6,6 +6,7 @@ import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useRole } from '../hooks/useRole';
+import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,6 +16,7 @@ export default function TransactionDetailPage() {
   const deleteMutation = useDeleteOperationalTransaction();
   const postMutation = usePostOperationalTransaction();
   const { canPost } = useRole();
+  const { formatDate } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
@@ -66,7 +68,7 @@ export default function TransactionDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/transactions" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/transactions" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Transactions
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">Transaction Details</h1>
@@ -90,7 +92,7 @@ export default function TransactionDetailPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Transaction Date</dt>
-            <dd className="text-sm text-gray-900">{transaction.transaction_date}</dd>
+            <dd className="text-sm text-gray-900">{formatDate(transaction.transaction_date)}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Amount</dt>
@@ -104,7 +106,7 @@ export default function TransactionDetailPage() {
             <div>
               <dt className="text-sm font-medium text-gray-500">Project</dt>
               <dd className="text-sm text-gray-900">
-                <Link to={`/app/projects/${transaction.project.id}`} className="text-blue-600 hover:text-blue-900">
+                <Link to={`/app/projects/${transaction.project.id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
                   {transaction.project.name}
                 </Link>
               </dd>
@@ -123,7 +125,7 @@ export default function TransactionDetailPage() {
         <div className="flex space-x-3">
           <Link
             to={`/app/transactions/${id}/edit`}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
           >
             Edit
           </Link>
@@ -155,7 +157,7 @@ export default function TransactionDetailPage() {
               type="date"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <FormField label="Idempotency Key">

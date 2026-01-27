@@ -5,6 +5,7 @@ import { useCropCycles } from '../../hooks/useCropCycles';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
+import { useFormatting } from '../../hooks/useFormatting';
 import type { Harvest } from '../../types';
 
 export default function HarvestsPage() {
@@ -29,7 +30,7 @@ export default function HarvestsPage() {
 
   const cols: Column<Harvest>[] = [
     { header: 'Harvest No', accessor: (r) => r.harvest_no || '—' },
-    { header: 'Harvest Date', accessor: 'harvest_date' },
+    { header: 'Harvest Date', accessor: (r) => formatDate(r.harvest_date) },
     { header: 'Crop Cycle', accessor: (r) => r.crop_cycle?.name || r.crop_cycle_id },
     { header: 'Total Qty', accessor: (r) => totalQty(r).toFixed(3) },
     {
@@ -56,7 +57,7 @@ export default function HarvestsPage() {
         backTo="/app/crop-ops"
         breadcrumbs={[{ label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Harvests' }]}
         right={
-          <button onClick={() => navigate('/app/harvests/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          <button onClick={() => navigate('/app/harvests/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Harvest
           </button>
         }

@@ -35,7 +35,7 @@ export function DataTable<T extends { id: string }>({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200" role="table" aria-label="Data table">
-        <thead className="bg-gray-50">
+        <thead className="bg-[#E6ECEA]">
           <tr>
             {columns.map((column, idx) => (
               <th
@@ -63,7 +63,7 @@ export function DataTable<T extends { id: string }>({
               tabIndex={onRowClick ? 0 : undefined}
               role={onRowClick ? 'button' : 'row'}
               aria-label={onRowClick ? 'Click to view details' : undefined}
-              className={onRowClick ? 'cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500' : ''}
+              className={onRowClick ? 'cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]' : ''}
             >
               {columns.map((column, idx) => (
                 <td key={idx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

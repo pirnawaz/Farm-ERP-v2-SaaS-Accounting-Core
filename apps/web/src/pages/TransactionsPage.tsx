@@ -6,6 +6,7 @@ import { useProjects } from '../hooks/useProjects';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useRole } from '../hooks/useRole';
+import { useFormatting } from '../hooks/useFormatting';
 import type { OperationalTransaction } from '../types';
 
 export default function TransactionsPage() {
@@ -24,6 +25,7 @@ export default function TransactionsPage() {
   const { data: cropCycles } = useCropCycles();
   const { data: projects } = useProjects();
   const { hasRole } = useRole();
+  const { formatDate } = useFormatting();
 
   const canCreate = hasRole(['tenant_admin', 'accountant', 'operator']);
 
@@ -38,7 +40,7 @@ export default function TransactionsPage() {
   };
 
   const columns: Column<OperationalTransaction>[] = [
-    { header: 'Date', accessor: 'transaction_date' },
+    { header: 'Date', accessor: (row) => formatDate(row.transaction_date) },
     { header: 'Type', accessor: 'type' },
     { header: 'Amount', accessor: 'amount' },
     { header: 'Classification', accessor: 'classification' },
@@ -56,7 +58,7 @@ export default function TransactionsPage() {
       accessor: (row) => (
         <Link
           to={`/app/transactions/${row.id}`}
-          className="text-blue-600 hover:text-blue-900"
+          className="text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           View
         </Link>
@@ -79,15 +81,15 @@ export default function TransactionsPage() {
         {canCreate && (
           <Link
             to="/app/transactions/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Transaction
           </Link>
         )}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm text-blue-800">
+      <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-6">
+        <p className="text-sm text-[#2D3A3A]">
           <strong>Note:</strong> Draft transactions do not appear in reports until posted.
         </p>
       </div>
@@ -100,7 +102,7 @@ export default function TransactionsPage() {
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All</option>
               <option value="DRAFT">Draft</option>
@@ -112,7 +114,7 @@ export default function TransactionsPage() {
             <select
               value={filters.crop_cycle_id}
               onChange={(e) => handleFilterChange('crop_cycle_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All</option>
               {cropCycles?.map((cycle) => (
@@ -127,7 +129,7 @@ export default function TransactionsPage() {
             <select
               value={filters.project_id}
               onChange={(e) => handleFilterChange('project_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All</option>
               {projects?.map((project) => (
@@ -142,7 +144,7 @@ export default function TransactionsPage() {
             <select
               value={filters.classification}
               onChange={(e) => handleFilterChange('classification', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All</option>
               <option value="SHARED">Shared</option>
@@ -156,7 +158,7 @@ export default function TransactionsPage() {
               type="date"
               value={filters.date_from}
               onChange={(e) => handleFilterChange('date_from', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </div>
           <div>
@@ -165,7 +167,7 @@ export default function TransactionsPage() {
               type="date"
               value={filters.date_to}
               onChange={(e) => handleFilterChange('date_to', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </div>
         </div>

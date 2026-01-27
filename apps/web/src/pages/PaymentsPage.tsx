@@ -22,7 +22,7 @@ export default function PaymentsPage() {
   const { data: payments, isLoading } = usePayments(filters);
   const { data: parties } = useParties();
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const canCreate = hasRole(['tenant_admin', 'accountant', 'operator']);
 
@@ -37,7 +37,7 @@ export default function PaymentsPage() {
   };
 
   const columns: Column<Payment>[] = [
-    { header: 'Date', accessor: 'payment_date' },
+    { header: 'Date', accessor: (row) => formatDate(row.payment_date) },
     {
       header: 'Party',
       accessor: (row) => row.party?.name || 'N/A',
@@ -45,7 +45,7 @@ export default function PaymentsPage() {
     { header: 'Direction', accessor: 'direction' },
     { 
       header: 'Amount', 
-      accessor: (row) => formatMoney(row.amount)
+      accessor: (row) => <span className="tabular-nums">{formatMoney(row.amount)}</span>
     },
     { header: 'Method', accessor: 'method' },
     { header: 'Status', accessor: 'status' },
@@ -54,7 +54,7 @@ export default function PaymentsPage() {
       accessor: (row) => (
         <Link
           to={`/app/payments/${row.id}`}
-          className="text-blue-600 hover:text-blue-900"
+          className="text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           View
         </Link>
@@ -77,15 +77,15 @@ export default function PaymentsPage() {
         {canCreate && (
           <Link
             to="/app/payments/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Payment
           </Link>
         )}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm text-blue-800">
+      <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-6">
+        <p className="text-sm text-[#2D3A3A]">
           <strong>Note:</strong> Payments affect accounting only after POST.
         </p>
       </div>
@@ -98,7 +98,7 @@ export default function PaymentsPage() {
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All</option>
               <option value="DRAFT">Draft</option>
@@ -110,7 +110,7 @@ export default function PaymentsPage() {
             <select
               value={filters.direction}
               onChange={(e) => handleFilterChange('direction', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All</option>
               <option value="IN">IN</option>
@@ -122,7 +122,7 @@ export default function PaymentsPage() {
             <select
               value={filters.party_id}
               onChange={(e) => handleFilterChange('party_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">All</option>
               {parties?.map((party) => (
@@ -138,7 +138,7 @@ export default function PaymentsPage() {
               type="date"
               value={filters.date_from}
               onChange={(e) => handleFilterChange('date_from', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </div>
           <div>
@@ -147,7 +147,7 @@ export default function PaymentsPage() {
               type="date"
               value={filters.date_to}
               onChange={(e) => handleFilterChange('date_to', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </div>
         </div>

@@ -101,12 +101,12 @@ export default function InvGrnFormPage() {
         <div>
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-medium">Lines</h3>
-            {canEdit && <button type="button" onClick={addLine} className="text-sm text-blue-600">+ Add line</button>}
+            {canEdit && <button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add line</button>}
           </div>
           {errors.lines && <p className="text-sm text-red-600 mb-2">{errors.lines}</p>}
           <div className="overflow-x-auto">
             <table className="min-w-full border">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Item</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Qty</th>
@@ -151,7 +151,7 @@ export default function InvGrnFormPage() {
                         className="w-24 px-2 py-1 border rounded text-sm"
                       />
                     </td>
-                    <td className="px-3 py-2 text-sm">{formatMoney((parseFloat(line.qty) || 0) * (parseFloat(line.unit_cost) || 0))}</td>
+                    <td className="px-3 py-2 text-sm"><span className="tabular-nums">{formatMoney((parseFloat(line.qty) || 0) * (parseFloat(line.unit_cost) || 0))}</span></td>
                     {canEdit && (
                       <td className="px-3 py-2">
                         <button type="button" onClick={() => removeLine(i)} className="text-red-600 text-sm">Remove</button>
@@ -162,13 +162,13 @@ export default function InvGrnFormPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-sm font-medium">Total: {formatMoney(total)}</p>
+          <p className="mt-2 text-sm font-medium">Total: <span className="tabular-nums">{formatMoney(total)}</span></p>
         </div>
 
         {canEdit && (
           <div className="flex justify-end gap-2 pt-4">
             <button type="button" onClick={() => navigate('/app/inventory/grns')} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">
               {createM.isPending ? 'Creating...' : 'Create'}
             </button>
           </div>

@@ -35,7 +35,7 @@ export default function InvAdjustmentDetailPage() {
   const { data: items } = useInventoryItems(true);
   const { data: stock } = useStockOnHand(adj?.store_id ? { store_id: adj.store_id } : undefined);
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
@@ -117,13 +117,13 @@ export default function InvAdjustmentDetailPage() {
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{adj.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Store</dt><dd className="font-medium">{adj.store?.name || adj.store_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Reason</dt><dd>{adj.reason}</dd></div>
-          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{adj.doc_date}</dd></div>
+          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(adj.doc_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
             <dd><span className={`px-2 py-1 rounded text-xs ${adj.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : adj.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{adj.status}</span></dd>
           </div>
           {adj.notes && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Notes</dt><dd>{adj.notes}</dd></div>}
-          {adj.posting_group_id && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Posting Group</dt><dd><Link to={`/app/posting-groups/${adj.posting_group_id}`} className="text-blue-600">{adj.posting_group_id}</Link></dd></div>}
-          {adj.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{adj.posting_date}</dd></div>}
+          {adj.posting_group_id && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Posting Group</dt><dd><Link to={`/app/posting-groups/${adj.posting_group_id}`} className="text-[#1F6F5C]">{adj.posting_group_id}</Link></dd></div>}
+          {adj.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(adj.posting_date)}</dd></div>}
         </dl>
       </div>
 
@@ -138,9 +138,9 @@ export default function InvAdjustmentDetailPage() {
             <div className="md:col-span-2"><FormField label="Notes"><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField></div>
           </div>
           <div className="mb-4">
-            <div className="flex justify-between mb-2"><h4 className="font-medium">Lines (qty_delta: + gain, - loss)</h4><button type="button" onClick={addLine} className="text-sm text-blue-600">+ Add</button></div>
+            <div className="flex justify-between mb-2"><h4 className="font-medium">Lines (qty_delta: + gain, - loss)</h4><button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add</button></div>
             <table className="min-w-full border">
-              <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty delta</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr></thead>
+              <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty delta</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr></thead>
               <tbody>
                 {lines.map((line, i) => (
                   <tr key={i}>
@@ -154,7 +154,7 @@ export default function InvAdjustmentDetailPage() {
             </table>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
             {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
           </div>
         </div>
@@ -162,14 +162,14 @@ export default function InvAdjustmentDetailPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="font-medium mb-2">Lines</h3>
           <table className="min-w-full border">
-            <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty delta</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
+            <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty delta</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
             <tbody>
               {(adj.lines || []).map((l) => (
-                <tr key={l.id}><td className="px-3 py-2">{l.item?.name}</td><td>{l.qty_delta}</td><td>{l.line_total ? formatMoney(parseFloat(String(l.line_total))) : '—'}</td></tr>
+                <tr key={l.id}><td className="px-3 py-2">{l.item?.name}</td><td>{l.qty_delta}</td><td>{l.line_total ? <span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span> : '—'}</td></tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-2 font-medium">Total: {formatMoney(total)}</p>
+          <p className="mt-2 font-medium">Total: <span className="tabular-nums">{formatMoney(total)}</span></p>
         </div>
       )}
 

@@ -46,7 +46,7 @@ export function PageHeader({ title, backTo, breadcrumbs, right }: PageHeaderProp
           <button
             type="button"
             onClick={handleBack}
-            className="text-blue-600 hover:text-blue-900 mb-2 inline-block text-sm"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block text-sm"
           >
             ← Back
           </button>
@@ -56,7 +56,7 @@ export function PageHeader({ title, backTo, breadcrumbs, right }: PageHeaderProp
                 <span key={i} className="flex items-center gap-1">
                   {i > 0 && <span className="text-gray-400">/</span>}
                   {b.to ? (
-                    <Link to={b.to} className="text-blue-600 hover:text-blue-900">
+                    <Link to={b.to} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
                       {b.label}
                     </Link>
                   ) : (
@@ -66,7 +66,7 @@ export function PageHeader({ title, backTo, breadcrumbs, right }: PageHeaderProp
               ))}
             </nav>
           )}
-          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
         </div>
         {right && <div className="flex-shrink-0">{right}</div>}
       </div>

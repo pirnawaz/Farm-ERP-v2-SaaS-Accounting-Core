@@ -166,7 +166,7 @@ export default function ActivityDetailPage() {
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{activity.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Type</dt><dd>{activity.type?.name || activity.activity_type_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Activity Date</dt><dd>{activity.activity_date}</dd></div>
+          <div><dt className="text-sm text-gray-500">Activity Date</dt><dd>{formatDate(activity.activity_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{activity.crop_cycle?.name || activity.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Project</dt><dd>{activity.project?.name || activity.project_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Land Parcel</dt><dd>{activity.land_parcel?.name || activity.land_parcel_id || '—'}</dd></div>
@@ -179,15 +179,15 @@ export default function ActivityDetailPage() {
           {activity.posting_group_id && (
             <div className="md:col-span-2">
               <dt className="text-sm text-gray-500">Posting Group</dt>
-              <dd><Link to={`/app/posting-groups/${activity.posting_group_id}`} className="text-blue-600">{activity.posting_group_id}</Link></dd>
+              <dd><Link to={`/app/posting-groups/${activity.posting_group_id}`} className="text-[#1F6F5C]">{activity.posting_group_id}</Link></dd>
             </div>
           )}
-          {activity.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{activity.posting_date}</dd></div>}
+          {activity.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(activity.posting_date)}</dd></div>}
           {(isPosted || activity.status === 'REVERSED') && (
             <>
-              <div><dt className="text-sm text-gray-500">Inputs cost</dt><dd>{formatMoney(inputsCost)}</dd></div>
-              <div><dt className="text-sm text-gray-500">Labour cost</dt><dd>{formatMoney(labourCost)}</dd></div>
-              <div><dt className="text-sm text-gray-500">Total cost</dt><dd className="font-medium">{formatMoney(totalCost)}</dd></div>
+              <div><dt className="text-sm text-gray-500">Inputs cost</dt><dd><span className="tabular-nums">{formatMoney(inputsCost)}</span></dd></div>
+              <div><dt className="text-sm text-gray-500">Labour cost</dt><dd><span className="tabular-nums">{formatMoney(labourCost)}</span></dd></div>
+              <div><dt className="text-sm text-gray-500">Total cost</dt><dd className="font-medium"><span className="tabular-nums">{formatMoney(totalCost)}</span></dd></div>
             </>
           )}
         </dl>
@@ -226,9 +226,9 @@ export default function ActivityDetailPage() {
             </div>
           </div>
           <div className="mb-4">
-            <div className="flex justify-between mb-2"><h4 className="font-medium">Inputs</h4><button type="button" onClick={addInput} className="text-sm text-blue-600">+ Add</button></div>
+            <div className="flex justify-between mb-2"><h4 className="font-medium">Inputs</h4><button type="button" onClick={addInput} className="text-sm text-[#1F6F5C]">+ Add</button></div>
             <table className="min-w-full border">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr><th className="px-3 py-2 text-left text-xs text-gray-500">Store</th><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr>
               </thead>
               <tbody>
@@ -255,9 +255,9 @@ export default function ActivityDetailPage() {
             </table>
           </div>
           <div className="mb-4">
-            <div className="flex justify-between mb-2"><h4 className="font-medium">Labour</h4><button type="button" onClick={addLabour} className="text-sm text-blue-600">+ Add</button></div>
+            <div className="flex justify-between mb-2"><h4 className="font-medium">Labour</h4><button type="button" onClick={addLabour} className="text-sm text-[#1F6F5C]">+ Add</button></div>
             <table className="min-w-full border">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr><th className="px-3 py-2 text-left text-xs text-gray-500">Worker</th><th className="px-3 py-2 text-left text-xs text-gray-500">Basis</th><th className="px-3 py-2 text-left text-xs text-gray-500">Units</th><th className="px-3 py-2 text-left text-xs text-gray-500">Rate</th><th className="w-10" /></tr>
               </thead>
               <tbody>
@@ -283,7 +283,7 @@ export default function ActivityDetailPage() {
             </table>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
             {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
           </div>
         </div>
@@ -292,40 +292,40 @@ export default function ActivityDetailPage() {
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h3 className="font-medium mb-2">Inputs</h3>
             <table className="min-w-full border">
-              <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Store</th><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
+              <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Store</th><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
               <tbody>
                 {(activity.inputs || []).map((l) => (
                   <tr key={l.id}>
                     <td className="px-3 py-2">{l.store?.name}</td>
                     <td>{l.item?.name}</td>
                     <td>{l.qty}</td>
-                    <td>{l.unit_cost_snapshot != null ? formatMoney(l.unit_cost_snapshot) : '—'}</td>
-                    <td>{l.line_total != null ? formatMoney(l.line_total) : '—'}</td>
+                    <td>{l.unit_cost_snapshot != null ? <span className="tabular-nums">{formatMoney(l.unit_cost_snapshot)}</span> : '—'}</td>
+                    <td>{l.line_total != null ? <span className="tabular-nums">{formatMoney(l.line_total)}</span> : '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {activity.inputs && activity.inputs.some((l) => l.line_total) && (
-              <p className="mt-2 font-medium">Inputs total: {formatMoney(inputsCost)}</p>
+              <p className="mt-2 font-medium">Inputs total: <span className="tabular-nums">{formatMoney(inputsCost)}</span></p>
             )}
           </div>
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h3 className="font-medium mb-2">Labour</h3>
             <table className="min-w-full border">
-              <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Worker</th><th className="px-3 py-2 text-left text-xs text-gray-500">Units</th><th className="px-3 py-2 text-left text-xs text-gray-500">Rate</th><th className="px-3 py-2 text-left text-xs text-gray-500">Amount</th></tr></thead>
+              <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Worker</th><th className="px-3 py-2 text-left text-xs text-gray-500">Units</th><th className="px-3 py-2 text-right text-xs text-gray-500">Rate</th><th className="px-3 py-2 text-right text-xs text-gray-500">Amount</th></tr></thead>
               <tbody>
                 {(activity.labour || []).map((l) => (
                   <tr key={l.id}>
                     <td className="px-3 py-2">{l.worker?.name}</td>
                     <td>{l.units}</td>
-                    <td>{formatMoney(l.rate)}</td>
-                    <td>{l.amount != null ? formatMoney(l.amount) : '—'}</td>
+                    <td className="text-right"><span className="tabular-nums">{formatMoney(l.rate)}</span></td>
+                    <td className="text-right">{l.amount != null ? <span className="tabular-nums">{formatMoney(l.amount)}</span> : '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {activity.labour && activity.labour.some((l) => l.amount) && (
-              <p className="mt-2 font-medium">Labour total: {formatMoney(labourCost)}</p>
+              <p className="mt-2 font-medium">Labour total: <span className="tabular-nums">{formatMoney(labourCost)}</span></p>
             )}
           </div>
         </>

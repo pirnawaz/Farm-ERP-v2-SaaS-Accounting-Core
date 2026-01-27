@@ -19,7 +19,7 @@ export default function SaleDetailPage() {
   const postMutation = usePostSale();
   const reverseMutation = useReverseSale();
   const { hasRole } = useRole();
-  const { formatMoney, formatDateTime } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -91,7 +91,7 @@ export default function SaleDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/sales" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/sales" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Sales
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">Sale Details</h1>
@@ -115,11 +115,11 @@ export default function SaleDetailPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Amount</dt>
-            <dd className="text-sm text-gray-900">{formatMoney(sale.amount)}</dd>
+            <dd className="text-sm text-gray-900"><span className="tabular-nums">{formatMoney(sale.amount)}</span></dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Posting Date</dt>
-            <dd className="text-sm text-gray-900">{sale.posting_date}</dd>
+            <dd className="text-sm text-gray-900">{formatDate(sale.posting_date)}</dd>
           </div>
           {sale.project && (
             <div>
@@ -145,7 +145,7 @@ export default function SaleDetailPage() {
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${sale.posting_group_id}`}
-                  className="text-blue-600 hover:text-blue-900"
+                  className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                 >
                   {sale.posting_group_id}
                 </Link>
@@ -167,7 +167,7 @@ export default function SaleDetailPage() {
           <h2 className="text-lg font-medium text-gray-900 mb-4">Sale Lines</h2>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Store</th>
@@ -182,8 +182,8 @@ export default function SaleDetailPage() {
                     <td className="px-4 py-2 text-sm text-gray-900">{line.item?.name || line.inventory_item_id}</td>
                     <td className="px-4 py-2 text-sm text-gray-900">{line.store?.name || line.store_id || '-'}</td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">{line.quantity}</td>
-                    <td className="px-4 py-2 text-sm text-gray-900 text-right">{formatMoney(line.unit_price)}</td>
-                    <td className="px-4 py-2 text-sm text-gray-900 text-right">{formatMoney(line.line_total)}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right tabular-nums"><span className="tabular-nums">{formatMoney(line.unit_price)}</span></td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right tabular-nums"><span className="tabular-nums">{formatMoney(line.line_total)}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -200,22 +200,22 @@ export default function SaleDetailPage() {
             <div>
               <dt className="text-sm font-medium text-gray-500">Revenue Total</dt>
               <dd className="text-lg font-semibold text-gray-900">
-                {formatMoney(sale.lines?.reduce((sum, line) => sum + parseFloat(line.line_total), 0) || sale.amount)}
+                <span className="tabular-nums">{formatMoney(sale.lines?.reduce((sum, line) => sum + parseFloat(line.line_total), 0) || sale.amount)}</span>
               </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">COGS Total</dt>
               <dd className="text-lg font-semibold text-gray-900">
-                {formatMoney(sale.inventory_allocations.reduce((sum, alloc) => sum + parseFloat(alloc.total_cost), 0))}
+                <span className="tabular-nums">{formatMoney(sale.inventory_allocations.reduce((sum, alloc) => sum + parseFloat(alloc.total_cost), 0))}</span>
               </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Gross Margin</dt>
               <dd className="text-lg font-semibold text-green-600">
-                {formatMoney(
+                <span className="tabular-nums">{formatMoney(
                   (sale.lines?.reduce((sum, line) => sum + parseFloat(line.line_total), 0) || parseFloat(sale.amount)) -
                   sale.inventory_allocations.reduce((sum, alloc) => sum + parseFloat(alloc.total_cost), 0)
-                )}
+                )}</span>
               </dd>
             </div>
             <div>
@@ -311,11 +311,11 @@ export default function SaleDetailPage() {
                 type="date"
                 value={postingDate}
                 onChange={(e) => setPostingDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
               />
             </FormField>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4">
+              <p className="text-sm text-[#2D3A3A]">
                 <strong>Note:</strong> Posting will create:
                 <ul className="list-disc list-inside mt-2">
                   <li>Debit: Accounts Receivable (AR)</li>
@@ -380,20 +380,20 @@ export default function SaleDetailPage() {
                 type="date"
                 value={reversalDate}
                 onChange={(e) => setReversalDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
               />
             </FormField>
             <FormField label="Reason (optional)">
               <textarea
                 value={reverseReason}
                 onChange={(e) => setReverseReason(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
                 rows={3}
                 placeholder="Reason for reversal"
               />
             </FormField>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4">
+              <p className="text-sm text-[#2D3A3A]">
                 <strong>Note:</strong> Reversing will create offsetting entries:
                 <ul className="list-disc list-inside mt-2">
                   <li>Credit: Accounts Receivable (AR)</li>

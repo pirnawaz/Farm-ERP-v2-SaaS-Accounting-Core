@@ -32,14 +32,14 @@ export default function LandParcelsPage() {
         <div className="flex space-x-2">
           <Link
             to={`/app/land/${row.id}`}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View
           </Link>
           {canCreate && (
             <Link
               to={`/app/land/${row.id}/edit`}
-              className="text-blue-600 hover:text-blue-900"
+              className="text-[#1F6F5C] hover:text-[#1a5a4a]"
             >
               Edit
             </Link>
@@ -75,7 +75,7 @@ export default function LandParcelsPage() {
         {canCreate && (
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Land Parcel
           </button>
@@ -101,7 +101,7 @@ export default function LandParcelsPage() {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <FormField label="Total Acres" required>
@@ -110,7 +110,7 @@ export default function LandParcelsPage() {
               step="0.01"
               value={formData.total_acres}
               onChange={(e) => setFormData({ ...formData, total_acres: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <FormField label="Notes">
@@ -118,7 +118,7 @@ export default function LandParcelsPage() {
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <div className="flex justify-end space-x-3">
@@ -131,7 +131,7 @@ export default function LandParcelsPage() {
             <button
               onClick={handleCreate}
               disabled={createMutation.isPending || !formData.name || !formData.total_acres}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}
             </button>

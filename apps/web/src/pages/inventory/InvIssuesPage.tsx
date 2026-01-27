@@ -5,6 +5,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
+import { useFormatting } from '../../hooks/useFormatting';
 import type { InvIssue } from '../../types';
 
 export default function InvIssuesPage() {
@@ -15,12 +16,13 @@ export default function InvIssuesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasRole } = useRole();
+  const { formatDate } = useFormatting();
 
   const cols: Column<InvIssue>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
     { header: 'Project', accessor: (r) => r.project?.name || r.project_id },
-    { header: 'Doc Date', accessor: 'doc_date' },
+    { header: 'Doc Date', accessor: (r) => formatDate(r.doc_date) },
     { header: 'Status', accessor: (r) => (
       <span className={`px-2 py-1 rounded text-xs ${
         r.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
@@ -38,7 +40,7 @@ export default function InvIssuesPage() {
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Issues' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => navigate('/app/inventory/issues/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Issue</button>
+          <button onClick={() => navigate('/app/inventory/issues/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Issue</button>
         ) : undefined}
       />
       <div className="flex gap-4 mb-4">

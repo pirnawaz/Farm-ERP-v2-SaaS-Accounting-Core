@@ -22,7 +22,7 @@ export default function ProjectDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/projects" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/projects" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Projects
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">{project.name}</h1>
@@ -58,7 +58,7 @@ export default function ProjectDetailPage() {
           <div className="space-y-2">
             <Link
               to={`/app/projects/${project.id}/rules`}
-              className="block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-center"
+              className="block px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-center"
             >
               View/Edit Rules
             </Link>

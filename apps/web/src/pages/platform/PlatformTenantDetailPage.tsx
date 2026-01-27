@@ -55,7 +55,7 @@ export default function PlatformTenantDetailPage() {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-800">Error: {(error as Error)?.message || 'Tenant not found'}</p>
-        <Link to="/app/platform/tenants" className="text-blue-600 hover:underline mt-2 inline-block">
+        <Link to="/app/platform/tenants" className="text-[#1F6F5C] hover:underline mt-2 inline-block">
           Back to tenants
         </Link>
       </div>
@@ -66,7 +66,7 @@ export default function PlatformTenantDetailPage() {
     <div>
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <Link to="/app/platform/tenants" className="text-blue-600 hover:underline text-sm mb-2 inline-block">
+          <Link to="/app/platform/tenants" className="text-[#1F6F5C] hover:underline text-sm mb-2 inline-block">
             ← Back to tenants
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">{tenant.name}</h1>
@@ -78,7 +78,7 @@ export default function PlatformTenantDetailPage() {
             setEditForm({ name: tenant.name, status: tenant.status });
             setEditOpen(true);
           }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
         >
           Edit tenant
         </button>
@@ -196,7 +196,7 @@ export default function PlatformTenantDetailPage() {
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {updateMutation.isPending ? 'Saving...' : 'Save'}
             </button>

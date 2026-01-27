@@ -20,7 +20,7 @@ export default function PaymentFormPage() {
   const updateMutation = useUpdatePayment();
   const { data: parties } = useParties();
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
   
   // Get query params for prefill
   const prefilledPartyId = searchParams.get('partyId') || searchParams.get('party_id');
@@ -174,7 +174,7 @@ export default function PaymentFormPage() {
     return (
       <div>
         <p className="text-red-600">This payment cannot be edited because it is not in DRAFT status.</p>
-        <Link to="/app/payments" className="text-blue-600 hover:text-blue-900">
+        <Link to="/app/payments" className="text-[#1F6F5C] hover:text-[#1a5a4a]">
           Back to Payments
         </Link>
       </div>
@@ -184,7 +184,7 @@ export default function PaymentFormPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/payments" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/payments" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Payments
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">
@@ -210,7 +210,7 @@ export default function PaymentFormPage() {
                 }
               }}
               disabled={!canEdit || isEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
               <option value="OUT">OUT</option>
               <option value="IN">IN</option>
@@ -223,7 +223,7 @@ export default function PaymentFormPage() {
                 value={formData.purpose || 'GENERAL'}
                 onChange={(e) => setFormData({ ...formData, purpose: e.target.value as 'GENERAL' | 'WAGES' })}
                 disabled={!canEdit || isEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
               >
                 <option value="GENERAL">General (settlement/advance)</option>
                 <option value="WAGES">Wages</option>
@@ -235,14 +235,14 @@ export default function PaymentFormPage() {
             <>
               <div className={`rounded-lg p-4 mb-4 ${
                 parseFloat(balances?.receivable_balance || '0') > 0
-                  ? 'bg-blue-50 border border-blue-200'
+                  ? 'bg-[#E6ECEA] border border-[#1F6F5C]/20'
                   : 'bg-yellow-50 border border-yellow-200'
               }`}>
                 {parseFloat(balances?.receivable_balance || '0') > 0 ? (
-                  <p className="text-sm text-blue-800">
-                    <strong>Outstanding receivable:</strong> {formatMoney(balances?.receivable_balance || '0')}
+                  <p className="text-sm text-[#2D3A3A]">
+                    <strong>Outstanding receivable:</strong> <span className="tabular-nums">{formatMoney(balances?.receivable_balance || '0')}</span>
                     <br />
-                    <span className="text-xs">Sales: {formatMoney(balances?.receivable_sales_total || '0')} | Payments Received: {formatMoney(balances?.receivable_payments_in_total || '0')}</span>
+                    <span className="text-xs">Sales: <span className="tabular-nums">{formatMoney(balances?.receivable_sales_total || '0')}</span> | Payments Received: <span className="tabular-nums">{formatMoney(balances?.receivable_payments_in_total || '0')}</span></span>
                   </p>
                 ) : (
                   <div className="text-sm text-yellow-800">
@@ -296,14 +296,14 @@ export default function PaymentFormPage() {
                             {allocationPreview.suggested_allocations.map((alloc: { sale_id: string; sale_no?: string; posting_date: string; due_date: string; outstanding: string; amount: string }) => (
                               <div key={alloc.sale_id} className="flex justify-between text-sm bg-gray-50 p-2 rounded">
                                 <span>
-                                  {alloc.sale_no || 'Sale'} ({alloc.posting_date}) - Outstanding: {formatMoney(alloc.outstanding)}
+                                  {alloc.sale_no || 'Sale'} ({formatDate(alloc.posting_date)}) - Outstanding: <span className="tabular-nums">{formatMoney(alloc.outstanding)}</span>
                                 </span>
-                                <span className="font-medium">{formatMoney(alloc.amount)}</span>
+                                <span className="font-medium"><span className="tabular-nums">{formatMoney(alloc.amount)}</span></span>
                               </div>
                             ))}
                             {parseFloat(allocationPreview.unallocated_amount) > 0 && (
                               <p className="text-xs text-red-600 mt-2">
-                                Warning: {formatMoney(allocationPreview.unallocated_amount)} will remain unallocated (exceeds receivable)
+                                Warning: <span className="tabular-nums">{formatMoney(allocationPreview.unallocated_amount)}</span> will remain unallocated (exceeds receivable)
                               </p>
                             )}
                           </div>
@@ -315,9 +315,9 @@ export default function PaymentFormPage() {
                             {allocationPreview.open_sales.map((sale: OpenSale) => (
                               <div key={sale.sale_id} className="flex items-center space-x-4 bg-gray-50 p-2 rounded">
                                 <div className="flex-1 text-sm">
-                                  <div className="font-medium">{sale.sale_no || 'Sale'} ({sale.posting_date})</div>
+                                  <div className="font-medium">{sale.sale_no || 'Sale'} ({formatDate(sale.posting_date)})</div>
                                   <div className="text-xs text-gray-500">
-                                    Outstanding: {formatMoney(sale.outstanding)}
+                                    Outstanding: <span className="tabular-nums">{formatMoney(sale.outstanding)}</span>
                                   </div>
                                 </div>
                                 <div className="w-32">
@@ -345,14 +345,14 @@ export default function PaymentFormPage() {
                             <div className="flex justify-between text-sm">
                               <span>Total Allocated:</span>
                               <span className="font-medium">
-                                {formatMoney(
-                                  Object.values(manualAllocations).reduce((sum, val) => sum + parseFloat(val || '0'), 0).toFixed(2)
-                                )}
+                                <span className="tabular-nums">{formatMoney(
+                                  Object.values(manualAllocations).reduce((sum, val) => sum + parseFloat(val || '0'), 0)
+                                )}</span>
                               </span>
                             </div>
                             <div className="flex justify-between text-sm mt-1">
                               <span>Payment Amount:</span>
-                              <span className="font-medium">{formatMoney(formData.amount)}</span>
+                              <span className="font-medium"><span className="tabular-nums">{formatMoney(formData.amount)}</span></span>
                             </div>
                             {Math.abs(
                               Object.values(manualAllocations).reduce((sum, val) => sum + parseFloat(val || '0'), 0) -
@@ -388,7 +388,7 @@ export default function PaymentFormPage() {
                 }
               }}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
               <option value="">Select a party</option>
               {parties?.map((party) => (
@@ -400,20 +400,20 @@ export default function PaymentFormPage() {
           </FormField>
 
           {formData.party_id && balances && formData.direction === 'OUT' && formData.purpose !== 'WAGES' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>Outstanding Payable:</strong> {formatMoney(balances.outstanding_total || '0')}
+            <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-4">
+              <p className="text-sm text-[#2D3A3A]">
+                <strong>Outstanding Payable:</strong> <span className="tabular-nums">{formatMoney(balances.outstanding_total || '0')}</span>
               </p>
               {parseFloat(balances.outstanding_total || '0') > 0 && (
-                <p className="text-xs text-blue-600 mt-1">
-                  You can pay up to {formatMoney(balances.outstanding_total)}
+                <p className="text-xs text-[#1F6F5C] mt-1">
+                  You can pay up to <span className="tabular-nums">{formatMoney(balances.outstanding_total)}</span>
                 </p>
               )}
             </div>
           )}
           {formData.direction === 'OUT' && formData.purpose === 'WAGES' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">Wage payment. Party must be linked to a worker. Amount is validated on post.</p>
+            <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-4">
+              <p className="text-sm text-[#2D3A3A]">Wage payment. Party must be linked to a worker. Amount is validated on post.</p>
             </div>
           )}
 
@@ -434,7 +434,7 @@ export default function PaymentFormPage() {
                 }
               }}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
             {formData.amount && formData.party_id && formData.direction === 'OUT' && formData.purpose !== 'WAGES' && (() => {
               const amount = parseFloat(String(formData.amount));
@@ -442,7 +442,7 @@ export default function PaymentFormPage() {
               if (amount > outstandingPayable) {
                 return (
                   <div className="mt-2">
-                    <Link to={`/app/advances/new?partyId=${formData.party_id}&type=HARI_ADVANCE&direction=OUT`} className="text-blue-600 hover:text-blue-900 underline text-sm">Create Advance instead</Link>
+                    <Link to={`/app/advances/new?partyId=${formData.party_id}&type=HARI_ADVANCE&direction=OUT`} className="text-[#1F6F5C] hover:text-[#1a5a4a] underline text-sm">Create Advance instead</Link>
                   </div>
                 );
               }
@@ -456,7 +456,7 @@ export default function PaymentFormPage() {
               value={formData.payment_date}
               onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -465,7 +465,7 @@ export default function PaymentFormPage() {
               value={formData.method}
               onChange={(e) => setFormData({ ...formData, method: e.target.value as PaymentMethod })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
               <option value="CASH">CASH</option>
               <option value="BANK">BANK</option>
@@ -478,7 +478,7 @@ export default function PaymentFormPage() {
               value={formData.reference}
               onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -489,7 +489,7 @@ export default function PaymentFormPage() {
               onChange={(e) => setFormData({ ...formData, settlement_id: e.target.value })}
               disabled={!canEdit}
               placeholder="UUID of settlement (optional)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -499,7 +499,7 @@ export default function PaymentFormPage() {
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               disabled={!canEdit}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -514,7 +514,7 @@ export default function PaymentFormPage() {
               <button
                 onClick={handleSubmit}
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
               </button>

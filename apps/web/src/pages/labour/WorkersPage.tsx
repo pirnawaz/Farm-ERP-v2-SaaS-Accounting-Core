@@ -69,7 +69,7 @@ export default function WorkersPage() {
         backTo="/app/labour"
         breadcrumbs={[{ label: 'Labour', to: '/app/labour' }, { label: 'Workers' }]}
         right={
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Worker</button>
+          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Worker</button>
         }
       />
       <div className="flex gap-4 mb-4 flex-wrap">
@@ -113,7 +113,7 @@ export default function WorkersPage() {
           <FormField label="Create as Party for payments"><label><input type="checkbox" checked={createParty} onChange={(e) => setCreateParty(e.target.checked)} /> Create Party (for wage payments)</label></FormField>
           <div className="flex gap-2 pt-4">
             <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">Create</button>
+            <button onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">Create</button>
           </div>
         </div>
       </Modal>

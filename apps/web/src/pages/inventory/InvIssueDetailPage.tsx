@@ -36,7 +36,7 @@ export default function InvIssueDetailPage() {
   const { data: items } = useInventoryItems(true);
   const { data: stock } = useStockOnHand(issue?.store_id ? { store_id: issue.store_id } : undefined);
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
@@ -134,7 +134,7 @@ export default function InvIssueDetailPage() {
           <div><dt className="text-sm text-gray-500">Store</dt><dd>{issue.store?.name || issue.store_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{issue.crop_cycle?.name || issue.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Project</dt><dd>{issue.project?.name || issue.project_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{issue.doc_date}</dd></div>
+          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(issue.doc_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
             <dd><span className={`px-2 py-1 rounded text-xs ${
               issue.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
@@ -144,10 +144,10 @@ export default function InvIssueDetailPage() {
           {issue.posting_group_id && (
             <div className="md:col-span-2">
               <dt className="text-sm text-gray-500">Posting Group</dt>
-              <dd><Link to={`/app/posting-groups/${issue.posting_group_id}`} className="text-blue-600">{issue.posting_group_id}</Link></dd>
+              <dd><Link to={`/app/posting-groups/${issue.posting_group_id}`} className="text-[#1F6F5C]">{issue.posting_group_id}</Link></dd>
             </div>
           )}
-          {issue.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{issue.posting_date}</dd></div>}
+          {issue.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(issue.posting_date)}</dd></div>}
         </dl>
       </div>
 
@@ -176,9 +176,9 @@ export default function InvIssueDetailPage() {
             <FormField label="Activity"><input value={activity_id} onChange={(e) => setActivityId(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           </div>
           <div className="mb-4">
-            <div className="flex justify-between mb-2"><h4 className="font-medium">Lines</h4><button type="button" onClick={addLine} className="text-sm text-blue-600">+ Add</button></div>
+            <div className="flex justify-between mb-2"><h4 className="font-medium">Lines</h4><button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add</button></div>
             <table className="min-w-full border">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr>
               </thead>
               <tbody>
@@ -199,7 +199,7 @@ export default function InvIssueDetailPage() {
             </table>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
             {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
           </div>
         </div>
@@ -207,20 +207,20 @@ export default function InvIssueDetailPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="font-medium mb-2">Lines</h3>
           <table className="min-w-full border">
-            <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
+            <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
             <tbody>
               {(issue.lines || []).map((l) => (
                 <tr key={l.id}>
                   <td className="px-3 py-2">{l.item?.name}</td>
                   <td>{l.qty}</td>
-                  <td>{l.unit_cost_snapshot != null ? formatMoney(l.unit_cost_snapshot) : '—'}</td>
-                  <td>{l.line_total != null ? formatMoney(l.line_total) : '—'}</td>
+                  <td>{l.unit_cost_snapshot != null ? <span className="tabular-nums">{formatMoney(l.unit_cost_snapshot)}</span> : '—'}</td>
+                  <td>{l.line_total != null ? <span className="tabular-nums">{formatMoney(l.line_total)}</span> : '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           {issue.lines && issue.lines.some((l) => l.line_total) && (
-            <p className="mt-2 font-medium">Total: {formatMoney((issue.lines || []).reduce((a, l) => a + parseFloat(String(l.line_total || 0)), 0))}</p>
+            <p className="mt-2 font-medium">Total: <span className="tabular-nums">{formatMoney((issue.lines || []).reduce((a, l) => a + parseFloat(String(l.line_total || 0)), 0))}</span></p>
           )}
         </div>
       )}

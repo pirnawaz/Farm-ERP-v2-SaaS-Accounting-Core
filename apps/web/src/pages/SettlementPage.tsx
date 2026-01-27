@@ -123,7 +123,7 @@ export default function SettlementPage() {
             <select
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">Select project</option>
               {projects?.map((project) => (
@@ -138,14 +138,14 @@ export default function SettlementPage() {
               type="date"
               value={upToDate}
               onChange={(e) => setUpToDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <div className="flex items-end">
             <button
               onClick={handlePreview}
               disabled={previewMutation.isPending || !selectedProjectId}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {previewMutation.isPending ? 'Loading...' : 'Preview Settlement'}
             </button>
@@ -218,7 +218,7 @@ export default function SettlementPage() {
               type="date"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <FormField label="Idempotency Key">
@@ -246,7 +246,7 @@ export default function SettlementPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Suggested Offset:</span>
-                  <span className="font-medium text-blue-600">{offsetPreviewQuery.data.suggested_offset.toFixed(2)}</span>
+                  <span className="font-medium text-[#1F6F5C]">{offsetPreviewQuery.data.suggested_offset.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -263,7 +263,7 @@ export default function SettlementPage() {
                         setAdvanceOffsetAmount('');
                       }
                     }}
-                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="mr-2 h-4 w-4 text-[#1F6F5C] focus:ring-[#1F6F5C] border-gray-300 rounded"
                   />
                   <span className="text-sm text-gray-700">Apply advance offset</span>
                 </label>
@@ -284,7 +284,7 @@ export default function SettlementPage() {
                       const val = e.target.value === '' ? '' : parseFloat(e.target.value);
                       setAdvanceOffsetAmount(val);
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
                     placeholder={offsetPreviewQuery.data.suggested_offset.toFixed(2)}
                   />
                   <p className="text-xs text-gray-500 mt-1">

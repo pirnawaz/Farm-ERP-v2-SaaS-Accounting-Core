@@ -72,7 +72,7 @@ export default function PaymentDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/payments" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/payments" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Payments
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">Payment Details</h1>
@@ -100,7 +100,7 @@ export default function PaymentDetailPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Amount</dt>
-            <dd className="text-sm text-gray-900">{formatMoney(payment.amount)}</dd>
+            <dd className="text-sm text-gray-900"><span className="tabular-nums">{formatMoney(payment.amount)}</span></dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Payment Date</dt>
@@ -120,7 +120,7 @@ export default function PaymentDetailPage() {
             <div>
               <dt className="text-sm font-medium text-gray-500">Settlement</dt>
               <dd className="text-sm text-gray-900">
-                <Link to={`/app/settlement`} className="text-blue-600 hover:text-blue-900">
+                <Link to={`/app/settlement`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
                   {payment.settlement_id}
                 </Link>
               </dd>
@@ -130,7 +130,7 @@ export default function PaymentDetailPage() {
             <div>
               <dt className="text-sm font-medium text-gray-500">Posting Group</dt>
               <dd className="text-sm text-gray-900">
-                <Link to={`/app/posting-groups/${payment.posting_group_id}`} className="text-blue-600 hover:text-blue-900">
+                <Link to={`/app/posting-groups/${payment.posting_group_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
                   {payment.posting_group_id}
                 </Link>
               </dd>
@@ -158,7 +158,7 @@ export default function PaymentDetailPage() {
                       <div>
                         <Link
                           to={`/app/sales/${alloc.sale_id}`}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                         >
                           {alloc.sale?.sale_no || `Sale ${alloc.sale_id.substring(0, 8)}`}
                         </Link>
@@ -166,7 +166,7 @@ export default function PaymentDetailPage() {
                           ({alloc.allocation_date})
                         </span>
                       </div>
-                      <span className="font-medium">{formatMoney(alloc.amount)}</span>
+                      <span className="font-medium"><span className="tabular-nums">{formatMoney(alloc.amount)}</span></span>
                     </div>
                   ))}
                 </div>
@@ -193,7 +193,7 @@ export default function PaymentDetailPage() {
           {canPost && (
             <button
               onClick={() => setShowPostModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
             >
               Post
             </button>
@@ -208,7 +208,7 @@ export default function PaymentDetailPage() {
               type="date"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           {!payment.settlement_id && (
@@ -216,7 +216,7 @@ export default function PaymentDetailPage() {
               <select
                 value={cropCycleId}
                 onChange={(e) => setCropCycleId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
               >
                 <option value="">Select crop cycle</option>
                 {cropCycles?.map((cycle) => (
@@ -245,7 +245,7 @@ export default function PaymentDetailPage() {
             <button
               onClick={handlePost}
               disabled={postMutation.isPending || (!payment.settlement_id && !cropCycleId)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {postMutation.isPending ? 'Posting...' : 'Post'}
             </button>

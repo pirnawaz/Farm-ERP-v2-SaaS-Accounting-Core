@@ -9,7 +9,7 @@ import type { TrialBalanceRow, GeneralLedgerRow } from '../types';
 type Tab = 'trial-balance' | 'general-ledger' | 'project-statement';
 
 export default function ReportsPage() {
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
   const [activeTab, setActiveTab] = useState<Tab>('trial-balance');
   const [trialBalanceParams, setTrialBalanceParams] = useState({
     from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -44,7 +44,7 @@ export default function ReportsPage() {
   ];
 
   const generalLedgerColumns: Column<GeneralLedgerRow>[] = [
-    { header: 'Date', accessor: 'posting_date' },
+    { header: 'Date', accessor: (row) => formatDate(row.posting_date) },
     { header: 'Account Code', accessor: 'account_code' },
     { header: 'Account Name', accessor: 'account_name' },
     { header: 'Debit', accessor: 'debit' },
@@ -91,9 +91,9 @@ export default function ReportsPage() {
           {trialBalance && trialBalance.length > 0 && (
             <div className="p-4 bg-gray-50 border-t">
               <div className="grid grid-cols-3 gap-4 text-sm font-medium">
-                <div>Total Debit: {formatMoney(totalDebit)}</div>
-                <div>Total Credit: {formatMoney(totalCredit)}</div>
-                <div>Total Net: {formatMoney(totalNet)}</div>
+                <div>Total Debit: <span className="tabular-nums">{formatMoney(totalDebit)}</span></div>
+                <div>Total Credit: <span className="tabular-nums">{formatMoney(totalCredit)}</span></div>
+                <div>Total Net: <span className="tabular-nums">{formatMoney(totalNet)}</span></div>
               </div>
             </div>
           )}
@@ -263,7 +263,7 @@ export default function ReportsPage() {
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">Posting Date</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.posting_date}</dd>
+                      <dd className="text-sm font-semibold">{formatDate(projectStatement.settlement.posting_date)}</dd>
                     </div>
                   </dl>
                 </div>
@@ -285,7 +285,7 @@ export default function ReportsPage() {
             onClick={() => setActiveTab('trial-balance')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'trial-balance'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#1F6F5C] text-[#1F6F5C]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -295,7 +295,7 @@ export default function ReportsPage() {
             onClick={() => setActiveTab('general-ledger')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'general-ledger'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#1F6F5C] text-[#1F6F5C]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -305,7 +305,7 @@ export default function ReportsPage() {
             onClick={() => setActiveTab('project-statement')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'project-statement'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#1F6F5C] text-[#1F6F5C]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >

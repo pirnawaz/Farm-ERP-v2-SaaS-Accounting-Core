@@ -73,7 +73,7 @@ export default function PlatformTenantsPage() {
         <div className="flex gap-2">
           <Link
             to={`/app/platform/tenants/${row.id}`}
-            className="text-blue-600 hover:underline text-sm"
+            className="text-[#1F6F5C] hover:underline text-sm"
           >
             View Details
           </Link>
@@ -83,7 +83,7 @@ export default function PlatformTenantsPage() {
               setEditId(row.id);
               setEditForm({ name: row.name, status: row.status });
             }}
-            className="text-blue-600 hover:underline text-sm"
+            className="text-[#1F6F5C] hover:underline text-sm"
           >
             Edit
           </button>
@@ -118,7 +118,7 @@ export default function PlatformTenantsPage() {
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
         >
           Create tenant
         </button>
@@ -190,7 +190,7 @@ export default function PlatformTenantsPage() {
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}
             </button>
@@ -229,7 +229,7 @@ export default function PlatformTenantsPage() {
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {updateMutation.isPending ? 'Saving...' : 'Save'}
             </button>

@@ -29,7 +29,7 @@ export default function InvCategoriesPage() {
             setForm({ name: r.name });
             setShowModal(true);
           }}
-          className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800"
+          className="px-3 py-1 text-sm text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           Edit
         </button>
@@ -67,7 +67,7 @@ export default function InvCategoriesPage() {
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Categories' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">New Category</button>
+          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Category</button>
         ) : undefined}
       />
       <div className="bg-white rounded-lg shadow">
@@ -89,7 +89,7 @@ export default function InvCategoriesPage() {
               <button
                 onClick={handleUpdate}
                 disabled={!form.name.trim() || updateM.isPending}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {updateM.isPending ? 'Updating...' : 'Update'}
               </button>
@@ -97,7 +97,7 @@ export default function InvCategoriesPage() {
               <button
                 onClick={handleCreate}
                 disabled={!form.name.trim() || createM.isPending}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {createM.isPending ? 'Creating...' : 'Create'}
               </button>

@@ -55,7 +55,7 @@ export default function LandParcelDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/land" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/land" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Land Parcels
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">{parcel.name}</h1>
@@ -90,7 +90,7 @@ export default function LandParcelDetailPage() {
             {canEdit && (
               <button
                 onClick={() => setShowAddDocumentModal(true)}
-                className="text-sm text-blue-600 hover:text-blue-900"
+                className="text-sm text-[#1F6F5C] hover:text-[#1a5a4a]"
               >
                 + Add Document
               </button>
@@ -135,7 +135,7 @@ export default function LandParcelDetailPage() {
                       {alloc.project && (
                         <Link
                           to={`/app/projects/${alloc.project.id}`}
-                          className="ml-2 text-blue-600 hover:text-blue-900"
+                          className="ml-2 text-[#1F6F5C] hover:text-[#1a5a4a]"
                         >
                           (Project: {alloc.project.name})
                         </Link>
@@ -162,7 +162,7 @@ export default function LandParcelDetailPage() {
               type="text"
               value={documentData.file_path}
               onChange={(e) => setDocumentData({ ...documentData, file_path: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
               placeholder="/path/to/document.pdf"
             />
           </FormField>
@@ -171,7 +171,7 @@ export default function LandParcelDetailPage() {
               value={documentData.description}
               onChange={(e) => setDocumentData({ ...documentData, description: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <div className="flex justify-end space-x-3">
@@ -184,7 +184,7 @@ export default function LandParcelDetailPage() {
             <button
               onClick={handleAddDocument}
               disabled={addDocumentMutation.isPending || !documentData.file_path}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {addDocumentMutation.isPending ? 'Adding...' : 'Add'}
             </button>

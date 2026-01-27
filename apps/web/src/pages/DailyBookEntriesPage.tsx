@@ -5,7 +5,7 @@ import { PostModal } from '../components/PostModal'
 import { useFormatting } from '../hooks/useFormatting'
 
 function DailyBookEntriesPage() {
-  const { formatMoney } = useFormatting()
+  const { formatMoney, formatDate } = useFormatting()
   const navigate = useNavigate()
   const [entries, setEntries] = useState<DailyBookEntry[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -98,7 +98,7 @@ function DailyBookEntriesPage() {
         <h2 className="text-2xl font-bold">Daily Book Entries</h2>
         <Link
           to="/daily-book-entries/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a]"
         >
           New Entry
         </Link>
@@ -178,7 +178,7 @@ function DailyBookEntriesPage() {
       {!loading && !error && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-[#E6ECEA]">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
@@ -211,7 +211,7 @@ function DailyBookEntriesPage() {
                 entries.map((entry) => (
                   <tr key={entry.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {entry.event_date}
+                      {formatDate(entry.event_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -228,7 +228,7 @@ function DailyBookEntriesPage() {
                       {entry.description}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {formatMoney(entry.gross_amount, { currencyCode: entry.currency_code })}
+                      <span className="tabular-nums">{formatMoney(entry.gross_amount, { currencyCode: entry.currency_code })}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-800">
@@ -240,7 +240,7 @@ function DailyBookEntriesPage() {
                         <>
                           <Link
                             to={`/daily-book-entries/${entry.id}/edit`}
-                            className="text-blue-600 hover:text-blue-900 mr-4"
+                            className="text-[#1F6F5C] hover:text-[#1a5a4a] mr-4"
                           >
                             Edit
                           </Link>

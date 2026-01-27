@@ -27,7 +27,7 @@ export default function PartyDetailPage() {
   const { data: payments, isLoading: paymentsLoading } = usePayments({ party_id: id });
   const [openSalesAsOf, setOpenSalesAsOf] = useState<string>(new Date().toISOString().split('T')[0]);
   const { data: openSales, isLoading: openSalesLoading } = usePartyOpenSales(id || '', openSalesAsOf);
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const payableAmount = parseFloat(balances?.outstanding_total || '0');
   const receivableAmount = parseFloat(balances?.receivable_balance || '0');
@@ -57,23 +57,23 @@ export default function PartyDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">Posted Payables</h3>
-            <p className="text-2xl font-bold text-gray-900">{formatMoney(balances?.allocated_payable_total || '0')}</p>
+            <p className="text-2xl font-bold text-gray-900"><span className="tabular-nums">{formatMoney(balances?.allocated_payable_total || '0')}</span></p>
             <p className="text-xs text-gray-500 mt-1">From posted settlements</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">Paid</h3>
-            <p className="text-2xl font-bold text-gray-900">{formatMoney(balances?.paid_total || '0')}</p>
+            <p className="text-2xl font-bold text-gray-900"><span className="tabular-nums">{formatMoney(balances?.paid_total || '0')}</span></p>
             <p className="text-xs text-gray-500 mt-1">Posted payments</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">Outstanding</h3>
-            <p className="text-2xl font-bold text-red-600">{formatMoney(balances?.outstanding_total || '0')}</p>
+            <p className="text-2xl font-bold text-red-600"><span className="tabular-nums">{formatMoney(balances?.outstanding_total || '0')}</span></p>
             <p className="text-xs text-gray-500 mt-1">Posted payables minus posted payments</p>
           </div>
         </div>
         
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-xs text-blue-800">
+        <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-3">
+          <p className="text-xs text-[#2D3A3A]">
             <strong>Note:</strong> Computed from posted settlements/allocations minus posted payments.
           </p>
         </div>
@@ -87,7 +87,7 @@ export default function PartyDetailPage() {
               to={`/app/payments/new?direction=OUT&partyId=${party.id}`}
               className={`px-4 py-2 rounded-md font-medium ${
                 payableAmount > 0
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-[#1F6F5C] text-white hover:bg-[#1a5a4a]'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
@@ -106,7 +106,7 @@ export default function PartyDetailPage() {
             {isBuyer && (
               <Link
                 to={`/app/sales/new?buyerPartyId=${party.id}`}
-                className="px-4 py-2 rounded-md font-medium bg-indigo-600 text-white hover:bg-indigo-700"
+                className="px-4 py-2 rounded-md font-medium bg-[#1F6F5C] text-white hover:bg-[#1a5a4a]"
               >
                 Create Sale
               </Link>
@@ -122,12 +122,12 @@ export default function PartyDetailPage() {
           </div>
           {payableAmount > 0 && (
             <p className="mt-4 text-sm text-gray-600">
-              Outstanding payable: {formatMoney(balances?.outstanding_total || '0')}. Click "Pay OUT" to record a payment.
+              Outstanding payable: <span className="tabular-nums">{formatMoney(balances?.outstanding_total || '0')}</span>. Click "Pay OUT" to record a payment.
             </p>
           )}
           {receivableAmount > 0 && (
             <p className="mt-4 text-sm text-gray-600">
-              Outstanding receivable: {formatMoney(balances?.receivable_balance || '0')}. Click "Receive IN" to record a payment.
+              Outstanding receivable: <span className="tabular-nums">{formatMoney(balances?.receivable_balance || '0')}</span>. Click "Receive IN" to record a payment.
             </p>
           )}
           {isBuyer && receivableAmount === 0 && (
@@ -140,10 +140,10 @@ export default function PartyDetailPage() {
         {isHariOrVendor && advanceBalanceOutstanding > 0 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Outstanding Advances (they owe us)</h3>
-            <p className="text-2xl font-bold text-green-600">{formatMoney(balances?.advance_balance_outstanding || '0')}</p>
+            <p className="text-2xl font-bold text-green-600"><span className="tabular-nums">{formatMoney(balances?.advance_balance_outstanding || '0')}</span></p>
             <p className="text-xs text-gray-500 mt-1">
-              Disbursed: {formatMoney(balances?.advance_balance_disbursed || '0')} | 
-              Repaid: {formatMoney(balances?.advance_balance_repaid || '0')}
+              Disbursed: <span className="tabular-nums">{formatMoney(balances?.advance_balance_disbursed || '0')}</span> | 
+              Repaid: <span className="tabular-nums">{formatMoney(balances?.advance_balance_repaid || '0')}</span>
             </p>
           </div>
         )}
@@ -151,10 +151,10 @@ export default function PartyDetailPage() {
         {isBuyer && receivableAmount > 0 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Outstanding Receivables (they owe us)</h3>
-            <p className="text-2xl font-bold text-green-600">{formatMoney(balances?.receivable_balance || '0')}</p>
+            <p className="text-2xl font-bold text-green-600"><span className="tabular-nums">{formatMoney(balances?.receivable_balance || '0')}</span></p>
             <p className="text-xs text-gray-500 mt-1">
-              Sales Total: {formatMoney(balances?.receivable_sales_total || '0')} | 
-              Payments Received: {formatMoney(balances?.receivable_payments_in_total || '0')}
+              Sales Total: <span className="tabular-nums">{formatMoney(balances?.receivable_sales_total || '0')}</span> | 
+              Payments Received: <span className="tabular-nums">{formatMoney(balances?.receivable_payments_in_total || '0')}</span>
             </p>
           </div>
         )}
@@ -164,7 +164,7 @@ export default function PartyDetailPage() {
             <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Allocations</h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[#E6ECEA]">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
@@ -175,10 +175,10 @@ export default function PartyDetailPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {balances.allocations.map((allocation, idx) => (
                     <tr key={idx}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{allocation.posting_date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(allocation.posting_date)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{allocation.project_name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{allocation.allocation_type}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatMoney(allocation.amount)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right"><span className="tabular-nums">{formatMoney(allocation.amount)}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -218,7 +218,7 @@ export default function PartyDetailPage() {
                 </div>
                 <div className="ml-3 flex-1">
                   <h4 className="text-sm font-medium text-yellow-800">
-                    Unassigned Payments: {formatMoney(statement.summary.unassigned_payments_total)}
+                    Unassigned Payments: <span className="tabular-nums">{formatMoney(statement.summary.unassigned_payments_total)}</span>
                   </h4>
                   <p className="mt-1 text-sm text-yellow-700">
                     These payments reduce total outstanding but aren't assigned to any crop cycle/project in Breakdown because they're not linked to a settlement.
@@ -236,21 +236,21 @@ export default function PartyDetailPage() {
                     {group.crop_cycle_name || `Crop Cycle ${idx + 1}`}
                   </h4>
                   <span className="text-sm font-medium text-gray-600">
-                    Net: {formatMoney(group.net_outstanding)}
+                    Net: <span className="tabular-nums">{formatMoney(group.net_outstanding)}</span>
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Allocations:</span>
-                    <span className="ml-2 font-medium">{formatMoney(group.total_allocations)}</span>
+                    <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(group.total_allocations)}</span></span>
                   </div>
                   <div>
                     <span className="text-gray-500">Payments Out:</span>
-                    <span className="ml-2 font-medium">{formatMoney(group.total_payments_out)}</span>
+                    <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(group.total_payments_out)}</span></span>
                   </div>
                   <div>
                     <span className="text-gray-500">Payments In:</span>
-                    <span className="ml-2 font-medium">{formatMoney(group.total_payments_in)}</span>
+                    <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(group.total_payments_in)}</span></span>
                   </div>
                 </div>
                 {group.projects && group.projects.length > 0 && (
@@ -259,7 +259,7 @@ export default function PartyDetailPage() {
                     {group.projects.map((project: PartyStatementGroup, pIdx: number) => (
                       <div key={pIdx} className="mb-2 text-sm">
                         <span className="font-medium">{project.project_name}</span>
-                        <span className="ml-2 text-gray-600">Net: {formatMoney(project.net_outstanding)}</span>
+                        <span className="ml-2 text-gray-600">Net: <span className="tabular-nums">{formatMoney(project.net_outstanding)}</span></span>
                       </div>
                     ))}
                   </div>
@@ -278,7 +278,7 @@ export default function PartyDetailPage() {
     }
 
     const statementColumns: Column<PartyStatementLine>[] = [
-      { header: 'Date', accessor: 'date' },
+      { header: 'Date', accessor: (row) => formatDate(row.date) },
       { header: 'Type', accessor: 'type' },
       { header: 'Description', accessor: 'description' },
       { header: 'Reference', accessor: 'reference' },
@@ -286,7 +286,7 @@ export default function PartyDetailPage() {
         header: 'Amount',
         accessor: (row) => (
           <span className={row.direction === '+' ? 'text-green-600' : 'text-red-600'}>
-            {row.direction}{formatMoney(row.amount)}
+            {row.direction}<span className="tabular-nums">{formatMoney(row.amount)}</span>
           </span>
         ),
       },
@@ -337,28 +337,28 @@ export default function PartyDetailPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Total Allocations:</span>
-                  <span className="ml-2 font-medium">{formatMoney(statement.summary.total_allocations_increasing_balance)}</span>
+                  <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(statement.summary.total_allocations_increasing_balance)}</span></span>
                 </div>
                 <div>
                   <span className="text-gray-500">Payments Out:</span>
-                  <span className="ml-2 font-medium">{formatMoney(statement.summary.total_payments_out)}</span>
+                  <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(statement.summary.total_payments_out)}</span></span>
                 </div>
                 <div>
                   <span className="text-gray-500">Payments In:</span>
-                  <span className="ml-2 font-medium">{formatMoney(statement.summary.total_payments_in)}</span>
+                  <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(statement.summary.total_payments_in)}</span></span>
                 </div>
                 <div>
                   <span className="text-gray-500">Closing Payable:</span>
-                  <span className="ml-2 font-medium text-red-600">{formatMoney(statement.summary.closing_balance_payable)}</span>
+                  <span className="ml-2 font-medium text-red-600"><span className="tabular-nums">{formatMoney(statement.summary.closing_balance_payable)}</span></span>
                 </div>
                 <div>
                   <span className="text-gray-500">Closing Receivable:</span>
-                  <span className="ml-2 font-medium text-green-600">{formatMoney(statement.summary.closing_balance_receivable)}</span>
+                  <span className="ml-2 font-medium text-green-600"><span className="tabular-nums">{formatMoney(statement.summary.closing_balance_receivable)}</span></span>
                 </div>
                 {parseFloat(statement.summary.unassigned_payments_total || '0') > 0 && (
                   <div>
                     <span className="text-gray-500">Unassigned Payments:</span>
-                    <span className="ml-2 font-medium text-yellow-600">{formatMoney(statement.summary.unassigned_payments_total)}</span>
+                    <span className="ml-2 font-medium text-yellow-600"><span className="tabular-nums">{formatMoney(statement.summary.unassigned_payments_total)}</span></span>
                   </div>
                 )}
               </div>
@@ -380,9 +380,9 @@ export default function PartyDetailPage() {
     }
 
     const paymentColumns: Column<Payment>[] = [
-      { header: 'Date', accessor: 'payment_date' },
+      { header: 'Date', accessor: (row) => formatDate(row.payment_date) },
       { header: 'Direction', accessor: 'direction' },
-      { header: 'Amount', accessor: (row) => formatMoney(row.amount) },
+      { header: 'Amount', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.amount)}</span> },
       { header: 'Method', accessor: 'method' },
       { header: 'Status', accessor: 'status' },
       {
@@ -390,7 +390,7 @@ export default function PartyDetailPage() {
         accessor: (row) => (
           <Link
             to={`/app/payments/${row.id}`}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View
           </Link>
@@ -404,7 +404,7 @@ export default function PartyDetailPage() {
           <h3 className="text-lg font-medium text-gray-900">Payments</h3>
           <Link
             to={`/app/payments?party_id=${party.id}`}
-            className="text-sm text-blue-600 hover:text-blue-900"
+            className="text-sm text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View all →
           </Link>
@@ -425,14 +425,14 @@ export default function PartyDetailPage() {
 
     const columns: Column<OpenSale>[] = [
       { header: 'Sale Ref', accessor: (row) => row.sale_no || 'N/A' },
-      { header: 'Date', accessor: 'posting_date' },
-      { header: 'Due Date', accessor: 'due_date' },
-      { header: 'Amount', accessor: (row) => formatMoney(row.amount) },
-      { header: 'Paid', accessor: (row) => formatMoney(row.allocated) },
+      { header: 'Date', accessor: (row) => formatDate(row.posting_date) },
+      { header: 'Due Date', accessor: (row) => formatDate(row.due_date) },
+      { header: 'Amount', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.amount)}</span> },
+      { header: 'Paid', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.allocated)}</span> },
       {
         header: 'Outstanding',
         accessor: (row) => (
-          <span className="font-semibold text-red-600">{formatMoney(row.outstanding)}</span>
+          <span className="font-semibold text-red-600"><span className="tabular-nums">{formatMoney(row.outstanding)}</span></span>
         )
       },
       {
@@ -440,7 +440,7 @@ export default function PartyDetailPage() {
         accessor: (row) => (
           <Link
             to={`/app/payments/new?direction=IN&partyId=${id}&amount=${row.outstanding}`}
-            className="text-blue-600 hover:text-blue-900 text-sm"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a] text-sm"
           >
             Receive Payment
           </Link>
@@ -460,7 +460,7 @@ export default function PartyDetailPage() {
                   type="date"
                   value={openSalesAsOf}
                   onChange={(e) => setOpenSalesAsOf(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
                 />
               </div>
             </div>
@@ -478,7 +478,7 @@ export default function PartyDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/parties" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/parties" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Parties
         </Link>
         <div className="flex justify-between items-start mt-2">
@@ -497,7 +497,7 @@ export default function PartyDetailPage() {
             onClick={() => setActiveTab('overview')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'overview'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#1F6F5C] text-[#1F6F5C]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -507,7 +507,7 @@ export default function PartyDetailPage() {
             onClick={() => setActiveTab('breakdown')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'breakdown'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#1F6F5C] text-[#1F6F5C]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -517,7 +517,7 @@ export default function PartyDetailPage() {
             onClick={() => setActiveTab('statement')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'statement'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#1F6F5C] text-[#1F6F5C]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -527,7 +527,7 @@ export default function PartyDetailPage() {
             onClick={() => setActiveTab('payments')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'payments'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#1F6F5C] text-[#1F6F5C]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -538,7 +538,7 @@ export default function PartyDetailPage() {
               onClick={() => setActiveTab('open-sales')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'open-sales'
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-[#1F6F5C] text-[#1F6F5C]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >

@@ -86,7 +86,7 @@ export default function AdminFarmProfilePage() {
             type="button"
             onClick={handleCreate}
             disabled={createMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {createMutation.isPending ? 'Creating...' : 'Create Farm Profile'}
           </button>
@@ -108,7 +108,7 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.farm_name ?? ''}
             onChange={(e) => setFormData({ ...formData, farm_name: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             required
           />
         </FormField>
@@ -117,7 +117,7 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.country ?? ''}
             onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </FormField>
         <FormField label="Address line 1">
@@ -125,7 +125,7 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.address_line1 ?? ''}
             onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </FormField>
         <FormField label="Address line 2">
@@ -133,7 +133,7 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.address_line2 ?? ''}
             onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </FormField>
         <FormField label="City">
@@ -141,7 +141,7 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.city ?? ''}
             onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </FormField>
         <FormField label="Region / State">
@@ -149,7 +149,7 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.region ?? ''}
             onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </FormField>
         <FormField label="Postal code">
@@ -157,7 +157,7 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.postal_code ?? ''}
             onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </FormField>
         <FormField label="Phone">
@@ -165,14 +165,14 @@ export default function AdminFarmProfilePage() {
             type="text"
             value={formData.phone ?? ''}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </FormField>
         <div className="pt-4">
           <button
             type="submit"
             disabled={updateMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {updateMutation.isPending ? 'Saving...' : 'Save'}
           </button>

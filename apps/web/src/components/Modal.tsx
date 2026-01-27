@@ -58,7 +58,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
         <div 
           ref={modalRef}
-          className={`inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-full ${sizeClasses[size]}`}
+          className={`inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:w-full ${sizeClasses[size]}`}
         >
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-center justify-between mb-4">
@@ -66,7 +66,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
               <button
                 ref={closeButtonRef}
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] rounded"
                 aria-label="Close modal"
               >
                 <span className="sr-only">Close</span>

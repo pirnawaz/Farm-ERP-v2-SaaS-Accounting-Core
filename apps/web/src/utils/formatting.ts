@@ -37,13 +37,13 @@ export function formatMoney(
 }
 
 /**
- * Format a date using provided settings
- * @param date - The date to format (string, Date, or timestamp)
- * @param options - Optional overrides for locale, timezone, format, and settings
- * @returns Formatted date string
+ * Format a date to "dd MMM yyyy" format (e.g., "22 Jan 2026")
+ * @param date - The date to format (string, Date, number, null, or undefined)
+ * @param options - Optional overrides for locale, timezone, format, and settings (format option is deprecated, always uses "dd MMM yyyy")
+ * @returns Formatted date string or "—" for null/undefined/empty
  */
 export function formatDate(
-  date: string | Date | number,
+  date: string | Date | number | null | undefined,
   options?: { 
     locale?: string; 
     timezone?: string; 
@@ -51,6 +51,11 @@ export function formatDate(
     settings?: { locale: string; timezone: string };
   }
 ): string {
+  // Handle null, undefined, or empty string
+  if (date === null || date === undefined || (typeof date === 'string' && date.trim() === '')) {
+    return '—';
+  }
+
   let dateObj: Date;
   
   if (typeof date === 'string') {
@@ -62,39 +67,29 @@ export function formatDate(
   }
 
   if (isNaN(dateObj.getTime())) {
-    return 'Invalid Date';
+    return '—';
   }
 
   // Use provided options, then settings, then defaults
   const locale = options?.locale || options?.settings?.locale || 'en-GB';
   const timezone = options?.timezone || options?.settings?.timezone || 'Europe/London';
-  const format = options?.format || 'medium';
-
-  const formatOptions: Intl.DateTimeFormatOptions = {
-    timeZone: timezone,
-  };
-
-  switch (format) {
-    case 'short':
-      formatOptions.dateStyle = 'short';
-      break;
-    case 'medium':
-      formatOptions.dateStyle = 'medium';
-      break;
-    case 'long':
-      formatOptions.dateStyle = 'long';
-      break;
-    case 'full':
-      formatOptions.dateStyle = 'full';
-      break;
-  }
 
   try {
-    const formatter = new Intl.DateTimeFormat(locale, formatOptions);
+    // Format as "dd MMM yyyy" (e.g., "22 Jan 2026")
+    const formatter = new Intl.DateTimeFormat(locale, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: timezone,
+    });
     return formatter.format(dateObj);
   } catch (error) {
     // Fallback if Intl.DateTimeFormat fails
-    return dateObj.toLocaleDateString();
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[dateObj.getMonth()];
+    const year = dateObj.getFullYear();
+    return `${day} ${month} ${year}`;
   }
 }
 

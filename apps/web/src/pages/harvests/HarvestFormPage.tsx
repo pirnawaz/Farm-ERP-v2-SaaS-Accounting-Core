@@ -175,7 +175,7 @@ export default function HarvestFormPage() {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="font-medium">Lines *</label>
-              <button onClick={addLine} className="text-sm text-blue-600 hover:underline">+ Add Line</button>
+              <button onClick={addLine} className="text-sm text-[#1F6F5C] hover:underline">+ Add Line</button>
             </div>
             {errors.lines && <p className="text-red-600 text-sm mb-2">{errors.lines}</p>}
             <div className="space-y-2">
@@ -222,7 +222,7 @@ export default function HarvestFormPage() {
             <button
               onClick={handleSubmit}
               disabled={createM.isPending || addLineM.isPending}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {createM.isPending || addLineM.isPending ? 'Creating...' : 'Create Harvest'}
             </button>

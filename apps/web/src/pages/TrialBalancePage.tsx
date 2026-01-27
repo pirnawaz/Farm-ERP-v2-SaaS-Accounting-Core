@@ -139,7 +139,7 @@ function TrialBalancePage() {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-[#E6ECEA]">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Account Code
@@ -187,13 +187,13 @@ function TrialBalancePage() {
                         {row.currency_code}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                        {formatMoney(row.total_debit)}
+                        <span className="tabular-nums">{formatMoney(row.total_debit)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                        {formatMoney(row.total_credit)}
+                        <span className="tabular-nums">{formatMoney(row.total_credit)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                        {formatMoney(row.net)}
+                        <span className="tabular-nums">{formatMoney(row.net)}</span>
                       </td>
                     </tr>
                   ))

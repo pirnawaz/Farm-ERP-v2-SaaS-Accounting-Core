@@ -96,8 +96,8 @@ export default function ModuleTogglePage() {
                     aria-checked={enabled}
                     disabled={!canToggle}
                     onClick={() => handleToggle(m.key, m.is_core, enabled)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
-                      enabled ? 'bg-blue-600' : 'bg-gray-200'
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      enabled ? 'bg-[#1F6F5C]' : 'bg-gray-200'
                     } ${canToggle ? '' : 'cursor-not-allowed'}`}
                   >
                     <span
@@ -116,7 +116,7 @@ export default function ModuleTogglePage() {
             type="button"
             onClick={handleSave}
             disabled={updateMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {updateMutation.isPending ? 'Saving...' : 'Save'}
           </button>

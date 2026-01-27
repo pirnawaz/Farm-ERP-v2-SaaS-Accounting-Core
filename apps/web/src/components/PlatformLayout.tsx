@@ -34,7 +34,7 @@ export function PlatformLayout() {
                     to={item.href}
                     className={`${
                       isActive
-                        ? 'bg-blue-50 text-blue-600'
+                        ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
                   >
@@ -76,7 +76,7 @@ export function PlatformLayout() {
                       onClick={() => setSidebarOpen(false)}
                       className={`${
                         isActive
-                          ? 'bg-blue-50 text-blue-600'
+                          ? 'bg-[#E6ECEA] text-[#1F6F5C]'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
                     >
@@ -94,7 +94,7 @@ export function PlatformLayout() {
         <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow">
           <button
             type="button"
-            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 md:hidden"
+            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#1F6F5C] md:hidden"
             onClick={() => setSidebarOpen(true)}
           >
             <span className="sr-only">Open sidebar</span>

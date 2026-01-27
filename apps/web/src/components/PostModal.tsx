@@ -36,14 +36,20 @@ export function PostModal({ entryId, isOpen, onClose, onSuccess }: PostModalProp
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+      <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
         <h2 className="text-2xl font-bold mb-4">Post Entry</h2>
         
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded p-3 mb-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
             <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}
+
+        <div className="bg-[#C9A24D]/10 border border-[#C9A24D]/30 rounded-lg p-3 mb-4">
+          <p className="text-sm text-[#2D3A3A]">
+            <strong>Warning:</strong> Posting is irreversible. This will create accounting entries that cannot be modified. Only reversal is allowed.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -55,7 +61,7 @@ export function PostModal({ entryId, isOpen, onClose, onSuccess }: PostModalProp
               required
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
             />
             <p className="text-xs text-gray-500 mt-1">
               The posting date must be within the project's crop cycle date range.
@@ -67,14 +73,14 @@ export function PostModal({ entryId, isOpen, onClose, onSuccess }: PostModalProp
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {loading ? 'Posting...' : 'Post'}
             </button>

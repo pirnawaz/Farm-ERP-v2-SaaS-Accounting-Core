@@ -13,47 +13,47 @@ export default function InventoryDashboardPage() {
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
     { header: 'Item', accessor: (r) => r.item?.name || r.item_id },
     { header: 'Qty', accessor: (r) => String(r.qty_on_hand) },
-    { header: 'Value', accessor: (r) => formatMoney(r.value_on_hand) },
-    { header: 'WAC', accessor: (r) => formatMoney(r.wac_cost) },
+    { header: 'Value', accessor: (r) => <span className="tabular-nums">{formatMoney(r.value_on_hand)}</span> },
+    { header: 'WAC', accessor: (r) => <span className="tabular-nums">{formatMoney(r.wac_cost)}</span> },
   ];
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Inventory</h1>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Link to="/app/inventory/items" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/items" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Items</span>
           <p className="text-sm text-gray-500">Manage items and UoMs</p>
         </Link>
-        <Link to="/app/inventory/stores" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/stores" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Stores</span>
           <p className="text-sm text-gray-500">Warehouses and locations</p>
         </Link>
-        <Link to="/app/inventory/categories" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/categories" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Categories</span>
           <p className="text-sm text-gray-500">Item categories</p>
         </Link>
-        <Link to="/app/inventory/grns" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/grns" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">GRNs</span>
           <p className="text-sm text-gray-500">Goods received</p>
         </Link>
-        <Link to="/app/inventory/issues" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/issues" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Issues</span>
           <p className="text-sm text-gray-500">Stock issued to projects</p>
         </Link>
-        <Link to="/app/inventory/transfers" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/transfers" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Transfers</span>
           <p className="text-sm text-gray-500">Store-to-store transfers</p>
         </Link>
-        <Link to="/app/inventory/adjustments" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/adjustments" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Adjustments</span>
           <p className="text-sm text-gray-500">Loss, damage, count variance</p>
         </Link>
-        <Link to="/app/inventory/stock-on-hand" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/stock-on-hand" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Stock On Hand</span>
           <p className="text-sm text-gray-500">Balances by store/item</p>
         </Link>
-        <Link to="/app/inventory/stock-movements" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/inventory/stock-movements" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Stock Movements</span>
           <p className="text-sm text-gray-500">Movement history</p>
         </Link>

@@ -157,10 +157,10 @@ export default function ActivityFormPage() {
         <div>
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-medium">Inputs</h3>
-            <button type="button" onClick={addInput} className="text-sm text-blue-600">+ Add</button>
+            <button type="button" onClick={addInput} className="text-sm text-[#1F6F5C]">+ Add</button>
           </div>
           <table className="min-w-full border">
-            <thead className="bg-gray-50">
+            <thead className="bg-[#E6ECEA]">
               <tr>
                 <th className="px-3 py-2 text-left text-xs text-gray-500">Store</th>
                 <th className="px-3 py-2 text-left text-xs text-gray-500">Item</th>
@@ -198,10 +198,10 @@ export default function ActivityFormPage() {
         <div>
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-medium">Labour</h3>
-            <button type="button" onClick={addLabour} className="text-sm text-blue-600">+ Add</button>
+            <button type="button" onClick={addLabour} className="text-sm text-[#1F6F5C]">+ Add</button>
           </div>
           <table className="min-w-full border">
-            <thead className="bg-gray-50">
+            <thead className="bg-[#E6ECEA]">
               <tr>
                 <th className="px-3 py-2 text-left text-xs text-gray-500">Worker</th>
                 <th className="px-3 py-2 text-left text-xs text-gray-500">Basis</th>
@@ -237,14 +237,14 @@ export default function ActivityFormPage() {
               ))}
             </tbody>
           </table>
-          <p className="mt-2 font-medium">Labour total: {formatMoney(labourTotal)}</p>
+          <p className="mt-2 font-medium">Labour total: <span className="tabular-nums">{formatMoney(labourTotal)}</span></p>
         </div>
 
         {errors.lines && <p className="text-sm text-red-600">{errors.lines}</p>}
 
         <div className="flex justify-end gap-2 pt-4">
           <button type="button" onClick={() => navigate('/app/crop-ops/activities')} className="px-4 py-2 border rounded">Cancel</button>
-          <button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+          <button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">
             {createM.isPending ? 'Creating...' : 'Create'}
           </button>
         </div>

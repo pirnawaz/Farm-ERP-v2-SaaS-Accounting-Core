@@ -47,7 +47,7 @@ export default function AdminRolesPage() {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200" role="table" aria-label="Role permissions matrix">
-            <thead className="bg-gray-50">
+            <thead className="bg-[#E6ECEA]">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" aria-label="Permission">
                   Permission
@@ -84,9 +84,9 @@ export default function AdminRolesPage() {
         </div>
       </div>
 
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-blue-900 mb-2">Important Notes</h3>
-        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+      <div className="mt-6 bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-[#2D3A3A] mb-2">Important Notes</h3>
+        <ul className="text-sm text-[#2D3A3A] space-y-1 list-disc list-inside">
           <li>POST and REVERSE actions are restricted to tenant_admin and accountant roles only.</li>
           <li>Only tenant_admin can manage users and assign roles.</li>
           <li>Only tenant_admin can close/open crop cycles.</li>

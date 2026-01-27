@@ -159,7 +159,7 @@ export default function ShareRulesPage() {
         <div className="flex gap-2">
           <button
             onClick={() => handleEdit(row)}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
             disabled={!canCreate}
           >
             Edit
@@ -188,7 +188,7 @@ export default function ShareRulesPage() {
               setEditingRule(null);
               setShowCreateModal(true);
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
           >
             New Share Rule
           </button>
@@ -318,7 +318,7 @@ export default function ShareRulesPage() {
               </button>
               <button
                 onClick={editingRule ? handleUpdate : handleCreate}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a]"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 {editingRule ? 'Update' : 'Create'}

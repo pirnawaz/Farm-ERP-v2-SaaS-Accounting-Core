@@ -34,7 +34,7 @@ export default function ActivitiesPage() {
   const { data: landParcels } = useLandParcels();
   const navigate = useNavigate();
   const location = useLocation();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const totalCost = (a: CropActivity) => {
     const inputsTotal = (a.inputs || []).reduce((s, i) => s + parseFloat(String(i.line_total || 0)), 0);
@@ -45,10 +45,10 @@ export default function ActivitiesPage() {
   const cols: Column<CropActivity>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'Type', accessor: (r) => r.type?.name || r.activity_type_id },
-    { header: 'Activity Date', accessor: 'activity_date' },
+    { header: 'Activity Date', accessor: (r) => formatDate(r.activity_date) },
     { header: 'Crop Cycle', accessor: (r) => r.crop_cycle?.name || r.crop_cycle_id },
     { header: 'Project', accessor: (r) => r.project?.name || r.project_id },
-    { header: 'Total', accessor: (r) => formatMoney(totalCost(r)) },
+    { header: 'Total', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(totalCost(r))}</span> },
     {
       header: 'Status',
       accessor: (r) => (
@@ -73,7 +73,7 @@ export default function ActivitiesPage() {
         backTo="/app/crop-ops"
         breadcrumbs={[{ label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activities' }]}
         right={
-          <button onClick={() => navigate('/app/crop-ops/activities/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          <button onClick={() => navigate('/app/crop-ops/activities/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Activity
           </button>
         }

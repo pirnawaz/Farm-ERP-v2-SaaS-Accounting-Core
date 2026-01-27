@@ -23,12 +23,12 @@ export default function ARAgeingPage() {
     { header: 'Buyer', accessor: 'buyer_name' },
     { 
       header: 'Total Outstanding', 
-      accessor: (row) => <span className="font-semibold">{formatMoney(row.total_outstanding)}</span>
+      accessor: (row) => <span className="font-semibold text-right block"><span className="tabular-nums">{formatMoney(row.total_outstanding)}</span></span>
     },
-    { header: '0-30 Days', accessor: (row) => formatMoney(row.bucket_0_30) },
-    { header: '31-60 Days', accessor: (row) => formatMoney(row.bucket_31_60) },
-    { header: '61-90 Days', accessor: (row) => formatMoney(row.bucket_61_90) },
-    { header: '90+ Days', accessor: (row) => formatMoney(row.bucket_90_plus) },
+    { header: '0-30 Days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_0_30)}</span> },
+    { header: '31-60 Days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_31_60)}</span> },
+    { header: '61-90 Days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_61_90)}</span> },
+    { header: '90+ Days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_90_plus)}</span> },
   ];
 
   if (isLoading) {
@@ -55,7 +55,7 @@ export default function ARAgeingPage() {
             type="date"
             value={asOfDate}
             onChange={(e) => setAsOfDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           />
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function ARAgeingPage() {
         <div className="bg-white rounded-lg shadow">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">
-              AR Ageing as of {report.as_of}
+              AR Ageing as of {formatDate(report.as_of)}
             </h2>
             
             {report.rows && report.rows.length > 0 ? (
@@ -76,29 +76,29 @@ export default function ARAgeingPage() {
                   <div className="grid grid-cols-5 gap-4">
                     <div>
                       <div className="text-sm text-gray-500">Total Outstanding</div>
-                      <div className="text-lg font-semibold">{formatMoney(report.totals.total_outstanding)}</div>
+                      <div className="text-lg font-semibold"><span className="tabular-nums">{formatMoney(report.totals.total_outstanding)}</span></div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">0-30 Days</div>
-                      <div className="text-lg font-semibold">{formatMoney(report.totals.bucket_0_30)}</div>
+                      <div className="text-lg font-semibold"><span className="tabular-nums">{formatMoney(report.totals.bucket_0_30)}</span></div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">31-60 Days</div>
-                      <div className="text-lg font-semibold">{formatMoney(report.totals.bucket_31_60)}</div>
+                      <div className="text-lg font-semibold"><span className="tabular-nums">{formatMoney(report.totals.bucket_31_60)}</span></div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">61-90 Days</div>
-                      <div className="text-lg font-semibold">{formatMoney(report.totals.bucket_61_90)}</div>
+                      <div className="text-lg font-semibold"><span className="tabular-nums">{formatMoney(report.totals.bucket_61_90)}</span></div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">90+ Days</div>
-                      <div className="text-lg font-semibold text-red-600">{formatMoney(report.totals.bucket_90_plus)}</div>
+                      <div className="text-lg font-semibold text-red-600"><span className="tabular-nums">{formatMoney(report.totals.bucket_90_plus)}</span></div>
                     </div>
                   </div>
                 </div>
               </>
             ) : (
-              <p className="text-gray-500">No outstanding receivables as of {report.as_of}</p>
+              <p className="text-gray-500">No outstanding receivables as of {formatDate(report.as_of)}</p>
             )}
           </div>
         </div>

@@ -16,7 +16,7 @@ interface CashbookRow {
 }
 
 export default function CashbookPage() {
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
   const [data, setData] = useState<CashbookRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,24 +55,22 @@ export default function CashbookPage() {
   };
 
   const columns: Column<CashbookRow>[] = [
-    { header: 'Date', accessor: 'date' },
+    { header: 'Date', accessor: (row) => formatDate(row.date) },
     { header: 'Description', accessor: 'description' },
     { header: 'Reference', accessor: 'reference' },
     { 
       header: 'Type', 
-      accessor: 'type',
-      render: (value) => (
+      accessor: (row) => (
         <span className={`px-2 py-1 rounded text-xs ${
-          value === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          row.type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
         }`}>
-          {value}
+          {row.type}
         </span>
       )
     },
     { 
       header: 'Amount', 
-      accessor: 'amount',
-      render: (value, row) => formatMoney(parseFloat(value || '0'))
+      accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(parseFloat(row.amount || '0'))}</span>
     },
   ];
 
@@ -146,9 +144,9 @@ export default function CashbookPage() {
             {data.length > 0 && (
               <div className="p-4 bg-gray-50 border-t">
                 <div className="grid grid-cols-4 gap-4 text-sm font-medium">
-                  <div>Total In: {formatMoney(totalIn)}</div>
-                  <div>Total Out: {formatMoney(totalOut)}</div>
-                  <div>Net Balance: {formatMoney(netBalance)}</div>
+                  <div>Total In: <span className="tabular-nums">{formatMoney(totalIn)}</span></div>
+                  <div>Total Out: <span className="tabular-nums">{formatMoney(totalOut)}</span></div>
+                  <div>Net Balance: <span className="tabular-nums">{formatMoney(netBalance)}</span></div>
                   <div>Transactions: {data.length}</div>
                 </div>
               </div>

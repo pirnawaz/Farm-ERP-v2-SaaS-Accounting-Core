@@ -30,16 +30,16 @@ export default function WorkLogsPage() {
   const { data: projects } = useProjects(cropCycleId || undefined);
   const navigate = useNavigate();
   const location = useLocation();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const cols: Column<LabWorkLog>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'Worker', accessor: (r) => r.worker?.name || r.worker_id },
-    { header: 'Work Date', accessor: 'work_date' },
+    { header: 'Work Date', accessor: (r) => formatDate(r.work_date) },
     { header: 'Project', accessor: (r) => r.project?.name || r.project_id },
     { header: 'Units', accessor: 'units' },
-    { header: 'Rate', accessor: (r) => formatMoney(r.rate) },
-    { header: 'Amount', accessor: (r) => formatMoney(r.amount) },
+    { header: 'Rate', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.rate)}</span> },
+    { header: 'Amount', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.amount)}</span> },
     { header: 'Status', accessor: (r) => (
       <span className={`px-2 py-1 rounded text-xs ${
         r.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
@@ -57,7 +57,7 @@ export default function WorkLogsPage() {
         backTo="/app/labour"
         breadcrumbs={[{ label: 'Labour', to: '/app/labour' }, { label: 'Work Logs' }]}
         right={
-          <button onClick={() => navigate('/app/labour/work-logs/new')} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          <button onClick={() => navigate('/app/labour/work-logs/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Work Log
           </button>
         }

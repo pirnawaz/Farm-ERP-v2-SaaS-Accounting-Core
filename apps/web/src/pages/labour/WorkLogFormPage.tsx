@@ -100,14 +100,14 @@ export default function WorkLogFormPage() {
           <FormField label="Rate" required>
             <input type="number" step="any" min="0" value={rate} onChange={(e) => setRate(e.target.value)} className="w-full px-3 py-2 border rounded" />
           </FormField>
-          <FormField label="Amount (computed)">{formatMoney(amount)}</FormField>
+          <FormField label="Amount (computed)"><span className="tabular-nums">{formatMoney(amount)}</span></FormField>
           <FormField label="Notes">
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} />
           </FormField>
         </div>
         <div className="flex gap-2 pt-4">
           <button type="button" onClick={() => navigate('/app/labour/work-logs')} className="px-4 py-2 border rounded">Cancel</button>
-          <button onClick={handleSubmit} disabled={createM.isPending || !(u > 0) || !(r >= 0) || !doc_no.trim() || !worker_id || !crop_cycle_id || !project_id} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">Create</button>
+          <button onClick={handleSubmit} disabled={createM.isPending || !(u > 0) || !(r >= 0) || !doc_no.trim() || !worker_id || !crop_cycle_id || !project_id} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">Create</button>
         </div>
       </div>
     </div>

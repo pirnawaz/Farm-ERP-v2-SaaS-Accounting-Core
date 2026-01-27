@@ -25,7 +25,7 @@ export default function WorkLogDetailPage() {
   const { data: cropCycles } = useCropCycles();
   const { data: projects } = useProjects(log?.crop_cycle_id);
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
@@ -117,7 +117,7 @@ export default function WorkLogDetailPage() {
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{log.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Worker</dt><dd>{log.worker?.name || log.worker_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Work Date</dt><dd>{log.work_date}</dd></div>
+          <div><dt className="text-sm text-gray-500">Work Date</dt><dd>{formatDate(log.work_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{log.crop_cycle?.name || log.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Project</dt><dd>{log.project?.name || log.project_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
@@ -127,15 +127,15 @@ export default function WorkLogDetailPage() {
             }`}>{log.status}</span></dd>
           </div>
           <div><dt className="text-sm text-gray-500">Units</dt><dd>{log.units}</dd></div>
-          <div><dt className="text-sm text-gray-500">Rate</dt><dd>{formatMoney(log.rate)}</dd></div>
-          <div><dt className="text-sm text-gray-500">Amount</dt><dd>{formatMoney(log.amount)}</dd></div>
+          <div><dt className="text-sm text-gray-500">Rate</dt><dd><span className="tabular-nums">{formatMoney(log.rate)}</span></dd></div>
+          <div><dt className="text-sm text-gray-500">Amount</dt><dd><span className="tabular-nums">{formatMoney(log.amount)}</span></dd></div>
           {log.posting_group_id && (
             <div className="md:col-span-2">
               <dt className="text-sm text-gray-500">Posting Group</dt>
-              <dd><Link to={`/app/posting-groups/${log.posting_group_id}`} className="text-blue-600">{log.posting_group_id}</Link></dd>
+              <dd><Link to={`/app/posting-groups/${log.posting_group_id}`} className="text-[#1F6F5C]">{log.posting_group_id}</Link></dd>
             </div>
           )}
-          {log.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{log.posting_date}</dd></div>}
+          {log.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(log.posting_date)}</dd></div>}
         </dl>
       </div>
 
@@ -173,7 +173,7 @@ export default function WorkLogDetailPage() {
             <FormField label="Notes"><input value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
             {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
           </div>
         </div>

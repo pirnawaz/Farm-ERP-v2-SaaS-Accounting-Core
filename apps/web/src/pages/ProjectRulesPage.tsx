@@ -94,7 +94,7 @@ export default function ProjectRulesPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to={`/app/projects/${id}`} className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to={`/app/projects/${id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Project
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">Project Rules</h1>
@@ -115,7 +115,7 @@ export default function ProjectRulesPage() {
                   setErrors({ ...errors, profit_split: '' });
                 }}
                 disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
               />
             </FormField>
             <FormField label="HARI %" required>
@@ -130,7 +130,7 @@ export default function ProjectRulesPage() {
                   setErrors({ ...errors, profit_split: '' });
                 }}
                 disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
               />
             </FormField>
           </div>
@@ -150,7 +150,7 @@ export default function ProjectRulesPage() {
                 setErrors({ ...errors, kamdari_pct: '' });
               }}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>
 
@@ -163,7 +163,7 @@ export default function ProjectRulesPage() {
                   setErrors({ ...errors, kamdar_party_id: '' });
                 }}
                 disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
               >
                 <option value="">Select kamdar party</option>
                 {kamdarParties.map((party) => (
@@ -180,7 +180,7 @@ export default function ProjectRulesPage() {
               <button
                 onClick={handleSubmit}
                 disabled={updateMutation.isPending || total !== 100}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateMutation.isPending ? 'Saving...' : 'Save Rules'}
               </button>

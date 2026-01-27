@@ -96,7 +96,7 @@ export default function LandAllocationsPage() {
         row.project ? (
           <Link
             to={`/app/projects/${row.project.id}`}
-            className="text-blue-600 hover:text-blue-900"
+            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             {row.project.name}
           </Link>
@@ -121,7 +121,7 @@ export default function LandAllocationsPage() {
         {canCreate && (
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Allocation
           </button>
@@ -135,7 +135,7 @@ export default function LandAllocationsPage() {
         <select
           value={selectedCropCycleId}
           onChange={(e) => setSelectedCropCycleId(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
         >
           <option value="">All Crop Cycles</option>
           {cropCycles?.map((cycle) => (
@@ -171,7 +171,7 @@ export default function LandAllocationsPage() {
                 setFormData({ ...formData, crop_cycle_id: e.target.value });
                 setErrors({ ...errors, crop_cycle_id: '' });
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">Select crop cycle</option>
               {cropCycles?.map((cycle) => (
@@ -188,7 +188,7 @@ export default function LandAllocationsPage() {
                 setFormData({ ...formData, land_parcel_id: e.target.value });
                 setErrors({ ...errors, land_parcel_id: '' });
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">Select land parcel</option>
               {landParcels?.map((parcel) => (
@@ -205,7 +205,7 @@ export default function LandAllocationsPage() {
                 setFormData({ ...formData, party_id: e.target.value });
                 setErrors({ ...errors, party_id: '' });
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
               <option value="">Select HARI party</option>
               {hariParties.map((party) => (
@@ -224,7 +224,7 @@ export default function LandAllocationsPage() {
                 setFormData({ ...formData, allocated_acres: e.target.value });
                 setErrors({ ...errors, allocated_acres: '' });
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
           <div className="flex justify-end space-x-3">
@@ -240,7 +240,7 @@ export default function LandAllocationsPage() {
             <button
               onClick={handleCreate}
               disabled={createMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}
             </button>

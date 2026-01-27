@@ -25,17 +25,17 @@ export default function LabourDashboardPage() {
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Labour</h1>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Link to="/app/labour/workers" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/labour/workers" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Workers</span>
           <p className="text-sm text-gray-500">{workerCount} workers</p>
         </Link>
-        <Link to="/app/labour/work-logs" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/labour/work-logs" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Work Logs</span>
           <p className="text-sm text-gray-500">{logCount} logs</p>
         </Link>
-        <Link to="/app/labour/payables" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-blue-300">
+        <Link to="/app/labour/payables" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Payables</span>
-          <p className="text-sm text-gray-500">{formatMoney(outstandingTotal)} outstanding</p>
+          <p className="text-sm text-gray-500"><span className="tabular-nums">{formatMoney(outstandingTotal)}</span> outstanding</p>
         </Link>
       </div>
     </div>

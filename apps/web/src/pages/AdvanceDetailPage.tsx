@@ -18,7 +18,7 @@ export default function AdvanceDetailPage() {
   const postMutation = usePostAdvance();
   const { data: cropCycles } = useCropCycles();
   const { hasRole } = useRole();
-  const { formatMoney, formatDateTime } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
@@ -83,7 +83,7 @@ export default function AdvanceDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/app/advances" className="text-blue-600 hover:text-blue-900 mb-2 inline-block">
+        <Link to="/app/advances" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Advances
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">Advance Details</h1>
@@ -115,11 +115,11 @@ export default function AdvanceDetailPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Amount</dt>
-            <dd className="text-sm text-gray-900">{formatMoney(advance.amount)}</dd>
+            <dd className="text-sm text-gray-900"><span className="tabular-nums">{formatMoney(advance.amount)}</span></dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Posting Date</dt>
-            <dd className="text-sm text-gray-900">{advance.posting_date}</dd>
+            <dd className="text-sm text-gray-900">{formatDate(advance.posting_date)}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Method</dt>
@@ -149,7 +149,7 @@ export default function AdvanceDetailPage() {
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${advance.posting_group_id}`}
-                  className="text-blue-600 hover:text-blue-900"
+                  className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                 >
                   {advance.posting_group_id}
                 </Link>
@@ -209,7 +209,7 @@ export default function AdvanceDetailPage() {
               type="date"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
 
@@ -218,7 +218,7 @@ export default function AdvanceDetailPage() {
               <select
                 value={cropCycleId}
                 onChange={(e) => setCropCycleId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
               >
                 <option value="">Select crop cycle</option>
                 {cropCycles?.map((cycle) => (
