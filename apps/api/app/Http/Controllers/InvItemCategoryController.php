@@ -13,7 +13,9 @@ class InvItemCategoryController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
         $categories = InvItemCategory::where('tenant_id', $tenantId)->orderBy('name')->get();
-        return response()->json($categories);
+        return response()->json($categories)
+            ->header('Cache-Control', 'private, max-age=60')
+            ->header('Vary', 'X-Tenant-Id');
     }
 
     public function store(Request $request)

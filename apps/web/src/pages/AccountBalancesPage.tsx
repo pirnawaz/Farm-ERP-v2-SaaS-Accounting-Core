@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AccountBalanceRow, Project, apiClient } from '@farm-erp/shared'
 import { exportToCSV } from '../utils/csvExport'
 import { useFormatting } from '../hooks/useFormatting'
+import { PrintableReport } from '../components/print/PrintableReport'
 
 function AccountBalancesPage() {
   const { formatMoney, formatDate } = useFormatting()
@@ -64,27 +65,23 @@ function AccountBalancesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Print Header - only visible when printing */}
-      <div className="print-header hidden">
-        <div className="print-branding">Terrava ERP</div>
-        <h1>Account Balances</h1>
-        <div className="print-date-range">
-          As of {formatDate(filters.as_of)}
-        </div>
-        <div className="print-generated">
-          Generated: {formatDate(new Date())}
-        </div>
-      </div>
-
       <div className="flex justify-between items-center no-print">
         <h2 className="text-2xl font-bold">Account Balances</h2>
-        <button
-          onClick={handleExport}
-          disabled={data.length === 0}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          Export CSV
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.print()}
+            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+          >
+            Print
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={data.length === 0}
+            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
@@ -124,9 +121,81 @@ function AccountBalancesPage() {
       {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>}
 
       {!loading && !error && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+        <>
+          {/* Screen view */}
+          <div className="bg-white rounded-lg shadow overflow-hidden no-print">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-[#E6ECEA]">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Currency
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Debits
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Credits
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Balance
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {data.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                        No data found
+                      </td>
+                    </tr>
+                  ) : (
+                    data.map((row) => (
+                      <tr key={`${row.account_id}-${row.currency_code}`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {row.account_code}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {row.account_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {row.account_type}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {row.currency_code}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          <span className="tabular-nums">{formatMoney(row.debits)}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          <span className="tabular-nums">{formatMoney(row.credits)}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                          <span className="tabular-nums">{formatMoney(row.balance)}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Print view */}
+          <PrintableReport
+            title="Account Balances"
+            metaLeft={`As of ${formatDate(filters.as_of)}`}
+          >
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -162,25 +231,25 @@ function AccountBalancesPage() {
                 ) : (
                   data.map((row) => (
                     <tr key={`${row.account_id}-${row.currency_code}`}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
                         {row.account_code}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 text-sm text-gray-500">
                         {row.account_name}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 text-sm text-gray-500">
                         {row.account_type}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 text-sm text-gray-500">
                         {row.currency_code}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
                         <span className="tabular-nums">{formatMoney(row.debits)}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
                         <span className="tabular-nums">{formatMoney(row.credits)}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
                         <span className="tabular-nums">{formatMoney(row.balance)}</span>
                       </td>
                     </tr>
@@ -188,8 +257,8 @@ function AccountBalancesPage() {
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
+          </PrintableReport>
+        </>
       )}
     </div>
   )

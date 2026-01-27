@@ -7,6 +7,8 @@ export function useProjectRule(projectId: string) {
     queryKey: ['projects', projectId, 'rules'],
     queryFn: () => projectRulesApi.get(projectId),
     enabled: !!projectId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - rules don't change frequently
+    gcTime: 15 * 60 * 1000,
   });
 }
 

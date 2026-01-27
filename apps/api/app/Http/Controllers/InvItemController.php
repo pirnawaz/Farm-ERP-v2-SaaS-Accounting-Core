@@ -19,7 +19,9 @@ class InvItemController extends Controller
         }
 
         $items = $query->orderBy('name')->get();
-        return response()->json($items);
+        return response()->json($items)
+            ->header('Cache-Control', 'private, max-age=60')
+            ->header('Vary', 'X-Tenant-Id');
     }
 
     public function store(Request $request)

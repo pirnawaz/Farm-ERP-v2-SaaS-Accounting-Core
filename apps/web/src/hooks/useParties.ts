@@ -6,6 +6,8 @@ export function useParties() {
   return useQuery({
     queryKey: ['parties'],
     queryFn: () => partiesApi.list(),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -14,6 +16,8 @@ export function useParty(id: string) {
     queryKey: ['parties', id],
     queryFn: () => partiesApi.get(id),
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -70,6 +74,8 @@ export function usePartyBalanceSummary(partyId: string, asOfDate?: string) {
     queryKey: ['parties', partyId, 'balances', asOfDate],
     queryFn: () => partiesApi.getBalances(partyId, asOfDate),
     enabled: !!partyId,
+    staleTime: 30 * 1000, // 30 seconds - balances can change but not too frequently
+    gcTime: 5 * 60 * 1000,
   });
 }
 

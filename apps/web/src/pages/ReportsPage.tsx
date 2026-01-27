@@ -4,6 +4,7 @@ import { useProjects } from '../hooks/useProjects';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useFormatting } from '../hooks/useFormatting';
+import { EmptyState } from '../components/EmptyState';
 import type { TrialBalanceRow, GeneralLedgerRow } from '../types';
 
 type Tab = 'trial-balance' | 'general-ledger' | 'project-statement';
@@ -87,15 +88,22 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow">
-          <DataTable data={(trialBalance || []).map((r, i) => ({ ...r, id: r.account_id || String(i) }))} columns={trialBalanceColumns} />
-          {trialBalance && trialBalance.length > 0 && (
-            <div className="p-4 bg-gray-50 border-t">
-              <div className="grid grid-cols-3 gap-4 text-sm font-medium">
-                <div>Total Debit: <span className="tabular-nums">{formatMoney(totalDebit)}</span></div>
-                <div>Total Credit: <span className="tabular-nums">{formatMoney(totalCredit)}</span></div>
-                <div>Total Net: <span className="tabular-nums">{formatMoney(totalNet)}</span></div>
+          {trialBalance && trialBalance.length > 0 ? (
+            <>
+              <DataTable data={trialBalance.map((r, i) => ({ ...r, id: r.account_id || String(i) }))} columns={trialBalanceColumns} />
+              <div className="p-4 bg-gray-50 border-t">
+                <div className="grid grid-cols-3 gap-4 text-sm font-medium">
+                  <div>Total Debit: <span className="tabular-nums">{formatMoney(totalDebit)}</span></div>
+                  <div>Total Credit: <span className="tabular-nums">{formatMoney(totalCredit)}</span></div>
+                  <div>Total Net: <span className="tabular-nums">{formatMoney(totalNet)}</span></div>
+                </div>
               </div>
-            </div>
+            </>
+          ) : (
+            <EmptyState
+              title="No trial balance data"
+              description="Reports will appear once transactions are posted."
+            />
           )}
         </div>
       </div>
@@ -158,14 +166,23 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow">
-          <DataTable data={(generalLedger?.data || []).map((r, i) => ({ ...r, id: r.ledger_entry_id || String(i) }))} columns={generalLedgerColumns} />
-          {generalLedger?.pagination && (
-            <div className="p-4 bg-gray-50 border-t">
-              <div className="text-sm text-gray-600">
-                Page {generalLedger.pagination.page} of {generalLedger.pagination.last_page} 
-                (Total: {generalLedger.pagination.total} entries)
-              </div>
-            </div>
+          {generalLedger?.data && generalLedger.data.length > 0 ? (
+            <>
+              <DataTable data={generalLedger.data.map((r, i) => ({ ...r, id: r.ledger_entry_id || String(i) }))} columns={generalLedgerColumns} />
+              {generalLedger.pagination && (
+                <div className="p-4 bg-gray-50 border-t">
+                  <div className="text-sm text-gray-600">
+                    Page {generalLedger.pagination.page} of {generalLedger.pagination.last_page} 
+                    (Total: {generalLedger.pagination.total} entries)
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <EmptyState
+              title="No general ledger data"
+              description="Reports will appear once transactions are posted."
+            />
           )}
         </div>
       </div>
@@ -206,7 +223,7 @@ export default function ReportsPage() {
             </div>
           </div>
         </div>
-        {projectStatement && (
+        {projectStatement ? (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">
               Project Statement: {projectStatement.project.name}
@@ -269,6 +286,13 @@ export default function ReportsPage() {
                 </div>
               )}
             </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow">
+            <EmptyState
+              title="No project statement"
+              description="Select a project to view its statement."
+            />
           </div>
         )}
       </div>

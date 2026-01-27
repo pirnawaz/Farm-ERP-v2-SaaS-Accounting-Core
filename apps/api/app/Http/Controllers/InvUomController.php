@@ -13,7 +13,9 @@ class InvUomController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
         $uoms = InvUom::where('tenant_id', $tenantId)->orderBy('code')->get();
-        return response()->json($uoms);
+        return response()->json($uoms)
+            ->header('Cache-Control', 'private, max-age=60')
+            ->header('Vary', 'X-Tenant-Id');
     }
 
     public function store(Request $request)

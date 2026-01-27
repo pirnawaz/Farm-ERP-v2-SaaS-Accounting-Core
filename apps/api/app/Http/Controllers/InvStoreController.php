@@ -19,7 +19,9 @@ class InvStoreController extends Controller
         }
 
         $stores = $query->orderBy('name')->get();
-        return response()->json($stores);
+        return response()->json($stores)
+            ->header('Cache-Control', 'private, max-age=60')
+            ->header('Vary', 'X-Tenant-Id');
     }
 
     public function store(Request $request)

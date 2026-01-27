@@ -31,7 +31,9 @@ class PartyController extends Controller
             ->orderBy('name')
             ->get();
 
-        return response()->json($parties);
+        return response()->json($parties)
+            ->header('Cache-Control', 'private, max-age=60')
+            ->header('Vary', 'X-Tenant-Id');
     }
 
     public function store(StorePartyRequest $request)

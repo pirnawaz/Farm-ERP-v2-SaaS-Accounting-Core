@@ -16,7 +16,9 @@ class CropCycleController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return response()->json($cycles);
+        return response()->json($cycles)
+            ->header('Cache-Control', 'private, max-age=60')
+            ->header('Vary', 'X-Tenant-Id');
     }
 
     public function store(Request $request)

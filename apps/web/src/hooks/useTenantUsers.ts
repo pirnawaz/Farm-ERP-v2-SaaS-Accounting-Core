@@ -6,6 +6,8 @@ export function useTenantUsers() {
   return useQuery({
     queryKey: ['tenantUsers'],
     queryFn: () => tenantUsersApi.list(),
+    staleTime: 5 * 60 * 1000, // 5 minutes - users don't change frequently
+    gcTime: 15 * 60 * 1000,
   });
 }
 

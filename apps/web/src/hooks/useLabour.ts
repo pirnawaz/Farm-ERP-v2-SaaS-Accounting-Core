@@ -14,6 +14,8 @@ export function useWorkers(f?: WorkerFilters) {
   return useQuery({
     queryKey: ['labour', 'workers', f],
     queryFn: () => labourApi.workers.list(f),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -55,6 +57,9 @@ export function useWorkLogs(f?: WorkLogFilters) {
   return useQuery({
     queryKey: ['labour', 'work-logs', f],
     queryFn: () => labourApi.workLogs.list(f),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
   });
 }
 

@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DataTable, type Column } from '../components/DataTable';
 import { useFormatting } from '../hooks/useFormatting';
 import { exportToCSV } from '../utils/csvExport';
+import { PrintHeader } from '../components/print/PrintHeader';
 import type { Payment, PartyStatementLine, PartyStatementGroup, OpenSale } from '../types';
 
 type Tab = 'overview' | 'breakdown' | 'statement' | 'payments' | 'open-sales';
@@ -294,8 +295,98 @@ export default function PartyDetailPage() {
 
     return (
       <div className="space-y-4">
+        {/* Print Template - Statement */}
+        {statement && statement.line_items && statement.line_items.length > 0 && (
+          <div className="print-document hidden">
+            <PrintHeader
+              title="Account Statement"
+              subtitle={party.name}
+              metaLeft={statementFrom && statementTo ? `From ${formatDate(statementFrom)} to ${formatDate(statementTo)}` : undefined}
+            />
+            
+            <div className="print-document-meta">
+              <div>
+                <dl>
+                  <dt>Party:</dt>
+                  <dd>{party.name}</dd>
+                  <dt>Party Types:</dt>
+                  <dd>{party.party_types.join(', ')}</dd>
+                </dl>
+              </div>
+              <div>
+                {statement.summary && (
+                  <dl>
+                    <dt>Closing Payable:</dt>
+                    <dd className="tabular-nums">{formatMoney(statement.summary.closing_balance_payable)}</dd>
+                    <dt>Closing Receivable:</dt>
+                    <dd className="tabular-nums">{formatMoney(statement.summary.closing_balance_receivable)}</dd>
+                  </dl>
+                )}
+              </div>
+            </div>
+
+            <div className="print-line-items">
+              <table className="min-w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left">Date</th>
+                    <th className="text-left">Type</th>
+                    <th className="text-left">Description</th>
+                    <th className="text-left">Reference</th>
+                    <th className="text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statement.line_items.map((line, idx) => (
+                    <tr key={`${line.date}-${line.type}-${line.reference}-${idx}`}>
+                      <td>{formatDate(line.date)}</td>
+                      <td>{line.type}</td>
+                      <td>{line.description}</td>
+                      <td>{line.reference}</td>
+                      <td className="text-right tabular-nums">
+                        {line.direction}{formatMoney(line.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {statement.summary && (
+              <div className="print-totals">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span>Total Allocations:</span>
+                      <span className="tabular-nums">{formatMoney(statement.summary.total_allocations_increasing_balance)}</span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span>Payments Out:</span>
+                      <span className="tabular-nums">{formatMoney(statement.summary.total_payments_out)}</span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span>Payments In:</span>
+                      <span className="tabular-nums">{formatMoney(statement.summary.total_payments_in)}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-semibold">Closing Payable:</span>
+                      <span className="font-semibold tabular-nums text-red-600">{formatMoney(statement.summary.closing_balance_payable)}</span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-semibold">Closing Receivable:</span>
+                      <span className="font-semibold tabular-nums text-green-600">{formatMoney(statement.summary.closing_balance_receivable)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex space-x-4 mb-4">
+          <div className="flex space-x-4 mb-4 no-print">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
               <input
@@ -315,20 +406,28 @@ export default function PartyDetailPage() {
               />
             </div>
           </div>
-          <div className="mb-4 flex justify-end">
+          <div className="mb-4 flex justify-end gap-2 no-print">
             {statement && statement.line_items && statement.line_items.length > 0 && (
-              <button
-                onClick={() => {
-                  exportToCSV(
-                    statement.line_items,
-                    `party-statement-${party.name}-${statementFrom || 'all'}-${statementTo || 'all'}.csv`,
-                    ['date', 'type', 'reference', 'description', 'amount', 'direction']
-                  );
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-              >
-                Export CSV
-              </button>
+              <>
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
+                >
+                  Print Statement
+                </button>
+                <button
+                  onClick={() => {
+                    exportToCSV(
+                      statement.line_items,
+                      `party-statement-${party.name}-${statementFrom || 'all'}-${statementTo || 'all'}.csv`,
+                      ['date', 'type', 'reference', 'description', 'amount', 'direction']
+                    );
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                >
+                  Export CSV
+                </button>
+              </>
             )}
           </div>
           {statement && statement.summary && (

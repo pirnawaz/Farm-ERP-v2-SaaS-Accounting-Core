@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useOperationalTransaction, useDeleteOperationalTransaction, usePostOperationalTransaction } from '../hooks/useOperationalTransactions';
+import { useOperationalTransaction, useDeleteOperationalTransaction, usePostOperationalTransaction, useOperationalTransactions } from '../hooks/useOperationalTransactions';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 export default function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: transaction, isLoading } = useOperationalTransaction(id || '');
+  const { data: postedTransactions } = useOperationalTransactions({ status: 'POSTED' });
   const deleteMutation = useDeleteOperationalTransaction();
   const postMutation = usePostOperationalTransaction();
   const { canPost } = useRole();
@@ -39,6 +40,9 @@ export default function TransactionDetailPage() {
   const handlePost = async () => {
     if (!id) return;
     try {
+      // Check if this is the first posted transaction
+      const isFirstPosted = !postedTransactions || postedTransactions.length === 0;
+      
       const result = await postMutation.mutateAsync({
         id,
         payload: {
@@ -46,7 +50,12 @@ export default function TransactionDetailPage() {
           idempotency_key: idempotencyKey,
         },
       });
-      toast.success(`Transaction posted successfully. Posting Group: ${result.id}`);
+      
+      if (isFirstPosted) {
+        toast.success('Your first transaction has been posted. You can now view reports.');
+      } else {
+        toast.success(`Transaction posted successfully. Posting Group: ${result.id}`);
+      }
       setShowPostModal(false);
     } catch (error: any) {
       toast.error(error.message || 'Failed to post transaction');

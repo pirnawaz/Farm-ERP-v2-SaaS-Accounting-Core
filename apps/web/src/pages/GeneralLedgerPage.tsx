@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { GeneralLedgerLine, Project, Account, apiClient } from '@farm-erp/shared'
 import { exportToCSV } from '../utils/csvExport'
 import { useFormatting } from '../hooks/useFormatting'
+import { PrintableReport } from '../components/print/PrintableReport'
 
 function GeneralLedgerPage() {
   const { formatMoney, formatDate } = useFormatting()
@@ -97,27 +98,23 @@ function GeneralLedgerPage() {
 
   return (
     <div className="space-y-6">
-      {/* Print Header - only visible when printing */}
-      <div className="print-header hidden">
-        <div className="print-branding">Terrava ERP</div>
-        <h1>General Ledger</h1>
-        <div className="print-date-range">
-          From {formatDate(filters.from)} to {formatDate(filters.to)}
-        </div>
-        <div className="print-generated">
-          Generated: {formatDate(new Date())}
-        </div>
-      </div>
-
       <div className="flex justify-between items-center no-print">
         <h2 className="text-2xl font-bold">General Ledger</h2>
-        <button
-          onClick={handleExport}
-          disabled={data.length === 0}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          Export CSV
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.print()}
+            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+          >
+            Print
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={data.length === 0}
+            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
@@ -186,7 +183,8 @@ function GeneralLedgerPage() {
 
       {!loading && !error && (
         <>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          {/* Screen view */}
+          <div className="bg-white rounded-lg shadow overflow-hidden no-print">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-[#E6ECEA]">
@@ -267,6 +265,85 @@ function GeneralLedgerPage() {
               </table>
             </div>
           </div>
+
+          {/* Print view */}
+          <PrintableReport
+            title="General Ledger"
+            metaLeft={`From ${formatDate(filters.from)} to ${formatDate(filters.to)}`}
+          >
+            <table className="w-full divide-y divide-gray-200">
+              <thead className="bg-[#E6ECEA]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Account
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Posting Group
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Debit
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Credit
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Net
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {data.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                      No data found
+                    </td>
+                  </tr>
+                ) : (
+                  data.map((row) => (
+                    <tr key={row.ledger_entry_id}>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {formatDate(row.posting_date)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        <div>
+                          <div className="font-medium">{row.account_code}</div>
+                          <div className="text-xs text-gray-400">{row.account_name}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        <div>
+                          {row.reversal_of_posting_group_id && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mr-1">
+                              REVERSAL
+                            </span>
+                          )}
+                          <span>{row.source_type}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {row.posting_group_id.substring(0, 8)}...
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                        <span className="tabular-nums">{formatMoney(row.debit)}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                        <span className="tabular-nums">{formatMoney(row.credit)}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                        <span className="tabular-nums">{formatMoney(row.net)}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </PrintableReport>
 
           {pagination.last_page > 1 && (
             <div className="flex items-center justify-between bg-white px-4 py-3 rounded-lg shadow">

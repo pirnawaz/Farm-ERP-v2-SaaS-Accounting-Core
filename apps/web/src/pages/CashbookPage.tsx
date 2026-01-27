@@ -4,6 +4,7 @@ import { exportToCSV } from '../utils/csvExport';
 import { useFormatting } from '../hooks/useFormatting';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DataTable, type Column } from '../components/DataTable';
+import { PrintableReport } from '../components/print/PrintableReport';
 
 interface CashbookRow {
   date: string;
@@ -91,27 +92,23 @@ export default function CashbookPage() {
 
   return (
     <div className="space-y-6">
-      {/* Print Header - only visible when printing */}
-      <div className="print-header hidden">
-        <div className="print-branding">Terrava ERP</div>
-        <h1>Cashbook</h1>
-        <div className="print-date-range">
-          From {formatDate(filters.from)} to {formatDate(filters.to)}
-        </div>
-        <div className="print-generated">
-          Generated: {formatDate(new Date())}
-        </div>
-      </div>
-
       <div className="flex justify-between items-center no-print">
         <h2 className="text-2xl font-bold">Cashbook</h2>
-        <button
-          onClick={handleExport}
-          disabled={data.length === 0}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          Export CSV
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.print()}
+            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+          >
+            Print
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={data.length === 0}
+            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
@@ -153,13 +150,14 @@ export default function CashbookPage() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-lg shadow">
+          {/* Screen view */}
+          <div className="bg-white rounded-lg shadow no-print">
             <DataTable 
               data={data.map((r, i) => ({ ...r, id: r.source_id || String(i) }))} 
               columns={columns} 
             />
             {data.length > 0 && (
-              <div className="p-4 bg-gray-50 border-t">
+              <div className="p-4 bg-gray-50 border-t totals-row">
                 <div className="grid grid-cols-4 gap-4 text-sm font-medium">
                   <div>Total In: <span className="tabular-nums">{formatMoney(totalIn)}</span></div>
                   <div>Total Out: <span className="tabular-nums">{formatMoney(totalOut)}</span></div>
@@ -169,6 +167,65 @@ export default function CashbookPage() {
               </div>
             )}
           </div>
+
+          {/* Print view */}
+          <PrintableReport
+            title="Cashbook"
+            metaLeft={`From ${formatDate(filters.from)} to ${formatDate(filters.to)}`}
+          >
+            <table className="w-full divide-y divide-gray-200">
+              <thead className="bg-[#E6ECEA]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {data.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">No data found</td>
+                  </tr>
+                ) : (
+                  data.map((row, i) => (
+                    <tr key={row.source_id || String(i)}>
+                      <td className="px-6 py-4 text-sm text-gray-900">{formatDate(row.date)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{row.description}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{row.reference}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{row.type}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                        <span className="tabular-nums">{formatMoney(parseFloat(row.amount || '0'))}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {data.length > 0 && (
+                <tfoot>
+                  <tr className="print-total-row totals-row bg-gray-50 font-semibold print-avoid-break">
+                    <td colSpan={1} className="px-6 py-4 text-sm text-gray-900">Total In:</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right" colSpan={4}>
+                      <span className="tabular-nums">{formatMoney(totalIn)}</span>
+                    </td>
+                  </tr>
+                  <tr className="print-total-row totals-row bg-gray-50 font-semibold print-avoid-break">
+                    <td colSpan={1} className="px-6 py-4 text-sm text-gray-900">Total Out:</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right" colSpan={4}>
+                      <span className="tabular-nums">{formatMoney(totalOut)}</span>
+                    </td>
+                  </tr>
+                  <tr className="print-total-row totals-row bg-gray-50 font-semibold print-avoid-break">
+                    <td colSpan={1} className="px-6 py-4 text-sm text-gray-900">Net Balance:</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right" colSpan={4}>
+                      <span className="tabular-nums">{formatMoney(netBalance)}</span>
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </PrintableReport>
         </>
       )}
     </div>

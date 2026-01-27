@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
+import { EmptyState } from '../components/EmptyState';
 import toast from 'react-hot-toast';
 import type { Project, CreateProjectFromAllocationPayload } from '../types';
 
@@ -26,8 +27,16 @@ export default function ProjectsPage() {
 
   const handleCreate = async () => {
     try {
+      // Check if this is the first project
+      const isFirstProject = !projects || projects.length === 0;
+      
       await createFromAllocationMutation.mutateAsync(formData);
-      toast.success('Project created successfully');
+      
+      if (isFirstProject) {
+        toast.success('Your first project has been created. You can now track costs and activities.');
+      } else {
+        toast.success('Project created successfully');
+      }
       setShowCreateModal(false);
       setFormData({ land_allocation_id: '', name: '' });
     } catch (error: any) {
@@ -92,11 +101,26 @@ export default function ProjectsPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={projects || []}
-          columns={columns}
-          onRowClick={(row) => navigate(`/app/projects/${row.id}`)}
-        />
+        {projects && projects.length > 0 ? (
+          <DataTable
+            data={projects}
+            columns={columns}
+            onRowClick={(row) => navigate(`/app/projects/${row.id}`)}
+          />
+        ) : (
+          <EmptyState
+            title="No projects yet"
+            description="Projects help track crops, fields, and costs."
+            action={
+              canCreate
+                ? {
+                    label: 'Create Project',
+                    onClick: () => setShowCreateModal(true),
+                  }
+                : undefined
+            }
+          />
+        )}
       </div>
 
       <Modal

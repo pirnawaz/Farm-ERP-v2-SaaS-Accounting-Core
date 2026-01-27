@@ -9,6 +9,7 @@ import { PostButton } from '../components/PostButton';
 import { ReverseButton } from '../components/ReverseButton';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
+import { PrintHeader } from '../components/print/PrintHeader';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function SaleDetailPage() {
@@ -19,7 +20,7 @@ export default function SaleDetailPage() {
   const postMutation = usePostSale();
   const reverseMutation = useReverseSale();
   const { hasRole } = useRole();
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatMoney, formatDate, formatDateTime } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -88,13 +89,110 @@ export default function SaleDetailPage() {
     return <div>Sale not found</div>;
   }
 
+  const totalAmount = sale.lines?.reduce((sum, line) => sum + parseFloat(line.line_total), 0) || parseFloat(sale.amount);
+
   return (
     <div>
-      <div className="mb-6">
+      {/* Print Template - Invoice */}
+      <div className="print-document hidden">
+        <PrintHeader
+          title="Invoice"
+          subtitle={sale.buyer_party?.name}
+        />
+        
+        <div className="print-document-meta">
+          <div>
+            <dl>
+              <dt>Invoice No:</dt>
+              <dd>{sale.sale_no || sale.id.substring(0, 8)}</dd>
+              <dt>Date:</dt>
+              <dd>{formatDate(sale.posting_date)}</dd>
+              {sale.due_date && (
+                <>
+                  <dt>Due Date:</dt>
+                  <dd>{formatDate(sale.due_date)}</dd>
+                </>
+              )}
+            </dl>
+          </div>
+          <div>
+            <dl>
+              <dt>Bill To:</dt>
+              <dd>{sale.buyer_party?.name || 'N/A'}</dd>
+              {sale.project && (
+                <>
+                  <dt>Project:</dt>
+                  <dd>{sale.project.name}</dd>
+                </>
+              )}
+              {sale.crop_cycle && (
+                <>
+                  <dt>Crop Cycle:</dt>
+                  <dd>{sale.crop_cycle.name}</dd>
+                </>
+              )}
+            </dl>
+          </div>
+        </div>
+
+        {sale.lines && sale.lines.length > 0 && (
+          <div className="print-line-items">
+            <table className="min-w-full">
+              <thead>
+                <tr>
+                  <th className="text-left">Item</th>
+                  <th className="text-left">Store</th>
+                  <th className="text-right">Quantity</th>
+                  <th className="text-right">Unit Price</th>
+                  <th className="text-right">Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sale.lines.map((line) => (
+                  <tr key={line.id}>
+                    <td>{line.item?.name || line.inventory_item_id}</td>
+                    <td>{line.store?.name || line.store_id || '-'}</td>
+                    <td className="text-right tabular-nums">{line.quantity}</td>
+                    <td className="text-right tabular-nums">{formatMoney(line.unit_price)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(line.line_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="print-totals">
+          <div className="flex justify-end">
+            <div className="w-64">
+              <div className="flex justify-between mb-2">
+                <span className="font-semibold">Total:</span>
+                <span className="font-semibold tabular-nums">{formatMoney(totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {sale.notes && (
+          <div className="print-footer">
+            <p><strong>Notes:</strong> {sale.notes}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-6 no-print">
         <Link to="/app/sales" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Sales
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">Sale Details</h1>
+        <div className="flex justify-between items-center mt-2">
+          <h1 className="text-2xl font-bold text-gray-900">Sale Details</h1>
+          <button
+            onClick={() => window.print()}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            Print Invoice
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">

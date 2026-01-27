@@ -6,6 +6,8 @@ export function useCropCycles() {
   return useQuery({
     queryKey: ['crop-cycles'],
     queryFn: () => cropCyclesApi.list(),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -14,6 +16,8 @@ export function useCropCycle(id: string) {
     queryKey: ['crop-cycles', id],
     queryFn: () => cropCyclesApi.get(id),
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000,
   });
 }
 

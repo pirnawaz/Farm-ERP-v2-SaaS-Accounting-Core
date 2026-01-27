@@ -7,6 +7,9 @@ export function useAdvances(filters?: AdvanceFilters) {
   return useQuery({
     queryKey: ['advances', filters],
     queryFn: () => advancesApi.list(filters),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
   });
 }
 

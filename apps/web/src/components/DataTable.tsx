@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useMemo, useCallback } from 'react';
 
 export interface Column<T> {
   header: string;
@@ -19,12 +19,23 @@ export function DataTable<T extends { id: string }>({
   onRowClick,
   emptyMessage = 'No data available',
 }: DataTableProps<T>) {
-  const renderCell = (row: T, column: Column<T>) => {
+  const renderCell = useCallback((row: T, column: Column<T>) => {
     if (typeof column.accessor === 'function') {
       return column.accessor(row);
     }
     return String(row[column.accessor] ?? '');
-  };
+  }, []);
+
+  const handleRowClick = useCallback((row: T) => {
+    onRowClick?.(row);
+  }, [onRowClick]);
+
+  const handleRowKeyDown = useCallback((e: React.KeyboardEvent, row: T) => {
+    if (onRowClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onRowClick(row);
+    }
+  }, [onRowClick]);
 
   if (data.length === 0) {
     return (
@@ -53,13 +64,8 @@ export function DataTable<T extends { id: string }>({
           {data.map((row) => (
             <tr
               key={row.id}
-              onClick={() => onRowClick?.(row)}
-              onKeyDown={(e) => {
-                if (onRowClick && (e.key === 'Enter' || e.key === ' ')) {
-                  e.preventDefault();
-                  onRowClick(row);
-                }
-              }}
+              onClick={() => handleRowClick(row)}
+              onKeyDown={(e) => handleRowKeyDown(e, row)}
               tabIndex={onRowClick ? 0 : undefined}
               role={onRowClick ? 'button' : 'row'}
               aria-label={onRowClick ? 'Click to view details' : undefined}

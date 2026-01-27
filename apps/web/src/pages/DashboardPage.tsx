@@ -1,26 +1,46 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useCropCycles } from '../hooks/useCropCycles';
-import { useOperationalTransactions } from '../hooks/useOperationalTransactions';
-import { useProjects } from '../hooks/useProjects';
-import { StatCard } from '../components/StatCard';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import { useRole } from '../hooks/useRole';
+import { useModules } from '../contexts/ModulesContext';
+import { useOnboardingState } from '../hooks/useOnboardingState';
+import { OnboardingPanel } from '../components/OnboardingPanel';
+import { getDashboardConfig } from './dashboard/dashboardConfig';
+import { DashboardWidget } from './dashboard/DashboardWidgets';
+import type { WidgetKey } from './dashboard/dashboardConfig';
 
 export default function DashboardPage() {
-  const { data: cropCycles, isLoading: loadingCycles } = useCropCycles();
-  const { data: transactions, isLoading: loadingTransactions } = useOperationalTransactions({ status: 'DRAFT' });
-  const { data: projects, isLoading: loadingProjects } = useProjects();
+  const { userRole } = useRole();
+  const { isModuleEnabled } = useModules();
+  const onboardingState = useOnboardingState();
 
-  const openCyclesCount = cropCycles?.filter((c) => c.status === 'OPEN').length || 0;
-  const draftTransactionsCount = transactions?.length || 0;
-  const projectsCount = projects?.length || 0;
+  const config = useMemo(() => getDashboardConfig(userRole), [userRole]);
 
-  if (loadingCycles || loadingTransactions || loadingProjects) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
+  // Filter quick actions by module availability - memoized
+  const availableQuickActions = useMemo(
+    () => config.quickActions.filter(
+      (action) => !action.requiredModule || isModuleEnabled(action.requiredModule)
+    ),
+    [config.quickActions, isModuleEnabled]
+  );
+
+  // Filter widgets by module availability - memoized
+  const filterWidgets = useMemo(
+    () => (widgets: WidgetKey[]) =>
+      widgets.filter((widget) => {
+        // Widgets that require specific modules are handled in DashboardWidget component
+        return true;
+      }),
+    []
+  );
+
+  const primaryWidgets = useMemo(
+    () => filterWidgets(config.primaryWidgets),
+    [config.primaryWidgets, filterWidgets]
+  );
+  const secondaryWidgets = useMemo(
+    () => filterWidgets(config.secondaryWidgets),
+    [config.secondaryWidgets, filterWidgets]
+  );
 
   return (
     <div>
@@ -28,50 +48,59 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-        <StatCard
-          title="Open Crop Cycles"
-          value={openCyclesCount}
-          link="/app/crop-cycles"
-        />
-        <StatCard
-          title="Draft Transactions"
-          value={draftTransactionsCount}
-          link="/app/transactions?status=DRAFT"
-        />
-        <StatCard
-          title="Projects"
-          value={projectsCount}
-          link="/app/projects"
-        />
-      </div>
+      {/* Onboarding Panel - only show for tenant_admin */}
+      {userRole === 'tenant_admin' && <OnboardingPanel onboardingState={onboardingState} />}
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Link
-            to="/app/transactions/new"
-            className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            <h3 className="font-medium text-gray-900">New Transaction</h3>
-            <p className="text-sm text-gray-600 mt-1">Create a new operational transaction</p>
-          </Link>
-          <Link
-            to="/app/projects"
-            className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            <h3 className="font-medium text-gray-900">View Projects</h3>
-            <p className="text-sm text-gray-600 mt-1">Manage your projects</p>
-          </Link>
-          <Link
-            to="/app/reports"
-            className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            <h3 className="font-medium text-gray-900">Reports</h3>
-            <p className="text-sm text-gray-600 mt-1">View financial reports</p>
-          </Link>
+      {/* Quick Actions Strip */}
+      {availableQuickActions.length > 0 && (
+        <div className="mb-6">
+          <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+            <div className="flex flex-wrap gap-2">
+              {availableQuickActions.map((action, idx) => (
+                <Link
+                  key={idx}
+                  to={action.to}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    action.variant === 'primary'
+                      ? 'bg-[#1F6F5C] text-white hover:bg-[#1a5a4a]'
+                      : action.variant === 'outline'
+                      ? 'border border-[#1F6F5C] text-[#1F6F5C] hover:bg-[#1F6F5C]/10'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {action.label}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Primary Widgets */}
+      {primaryWidgets.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+          {primaryWidgets.map((widgetKey) => (
+            <DashboardWidget
+              key={widgetKey}
+              widgetKey={widgetKey}
+              isModuleEnabled={isModuleEnabled}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Secondary Widgets */}
+      {secondaryWidgets.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+          {secondaryWidgets.map((widgetKey) => (
+            <DashboardWidget
+              key={widgetKey}
+              widgetKey={widgetKey}
+              isModuleEnabled={isModuleEnabled}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

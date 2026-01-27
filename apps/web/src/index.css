@@ -13,8 +13,35 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Hide print elements on screen */
+.print-header.hidden,
+.print-document.hidden,
+.print-only {
+  display: none;
+}
+
 /* Print Styles */
 @media print {
+  /* CRITICAL: Hide everything except the print root */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the print root and its children */
+  #terrava-print-root,
+  #terrava-print-root * {
+    visibility: visible;
+  }
+
+  /* Position print root absolutely to take full page */
+  #terrava-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: block !important;
+  }
+
   /* Hide navigation, sidebar, buttons, and non-essential UI elements */
   nav,
   aside,
@@ -26,39 +53,94 @@ body {
   [class*="header"] button,
   .print-hide {
     display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Force overflow containers to be visible */
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-auto {
+    overflow: visible !important;
   }
 
   /* Ensure body and main content are visible */
   body {
     background: white;
     color: black;
+    margin: 0;
+    padding: 0;
   }
 
   /* Print header - only visible when printing */
   .print-header {
     display: block !important;
     page-break-after: avoid;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #1F6F5C;
+    margin-bottom: 1.5rem;
   }
 
   .print-header.hidden {
     display: block !important;
   }
 
-  .print-header h1,
-  .print-header h2 {
+  .print-header-content {
+    width: 100%;
+  }
+
+  .print-header-top {
+    margin-bottom: 0.75rem;
+  }
+
+  .print-header .print-logo {
+    margin-bottom: 0.5rem;
+  }
+
+  .print-header .print-logo img {
+    max-height: 32px;
+    width: auto;
+  }
+
+  .print-title-section {
+    margin-bottom: 0.5rem;
+  }
+
+  .print-header .print-title,
+  .print-header h1 {
     margin: 0 0 0.25rem 0;
     font-size: 1.5rem;
     font-weight: bold;
     color: #1F6F5C;
+    font-family: Inter, system-ui, sans-serif;
+    line-height: 1.2;
   }
 
-  .print-header .print-branding {
-    font-size: 0.75rem;
+  .print-header .print-subtitle {
+    font-size: 0.875rem;
     color: #2D3A3A;
-    margin-bottom: 0.25rem;
+    margin-top: 0.25rem;
+    font-weight: 500;
+  }
+
+  .print-header .print-meta-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .print-header .print-meta-left {
+    text-align: left;
+  }
+
+  .print-header .print-meta-right {
+    text-align: right;
+  }
+
+  .print-header-divider {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
   }
 
   .print-header .print-date-range {
@@ -73,34 +155,78 @@ body {
     margin-top: 0.25rem;
   }
 
+  /* Print content wrapper */
+  .print-content {
+    width: 100%;
+    overflow: visible !important;
+  }
+
   /* Tables - ensure they print well */
-  table {
+  #terrava-print-root table {
     width: 100%;
     border-collapse: collapse;
     page-break-inside: auto;
+    font-size: 0.875rem;
+    table-layout: auto; /* Auto layout allows columns to size based on content */
   }
 
-  thead {
+  #terrava-print-root thead {
     display: table-header-group;
   }
 
-  tbody {
+  #terrava-print-root tbody {
     display: table-row-group;
   }
 
-  tr {
+  #terrava-print-root tr {
     page-break-inside: avoid;
     page-break-after: auto;
   }
 
-  th,
-  td {
-    border: 1px solid #ddd;
-    padding: 0.5rem;
-    text-align: left;
+  /* Avoid breaking totals rows - CRITICAL */
+  #terrava-print-root tr.print-total-row,
+  #terrava-print-root tr.totals-row,
+  #terrava-print-root tfoot tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    page-break-after: avoid;
   }
 
-  th {
+  /* Totals row styling */
+  .print-total-row,
+  .totals-row {
+    font-weight: 600;
+    background-color: #f9fafb !important;
+    border-top: 2px solid #d1d5db;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #terrava-print-root th,
+  #terrava-print-root td {
+    border: 1px solid #ddd;
+    padding: 0.5rem 0.5rem; /* Reduced padding to give more space to columns */
+    text-align: left;
+    font-size: 0.875rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Text columns - allow wrapping, reduce padding slightly */
+  #terrava-print-root td:not(.text-right),
+  #terrava-print-root th:not(.text-right) {
+    padding: 0.5rem 0.5rem;
+  }
+
+  /* Ensure numeric columns have adequate width and don't truncate */
+  #terrava-print-root th.text-right,
+  #terrava-print-root td.text-right {
+    min-width: 110px; /* Minimum width for numeric columns to prevent truncation */
+    padding-left: 0.75rem;
+    padding-right: 0.75rem; /* Adequate padding for numeric values */
+  }
+
+  #terrava-print-root th {
     background-color: #E6ECEA !important;
     color: #2D3A3A !important;
     font-weight: 600;
@@ -108,20 +234,34 @@ body {
     print-color-adjust: exact;
   }
 
-  /* Right-align numeric columns */
-  td.text-right,
-  th.text-right,
-  [class*="text-right"] {
+  /* Right-align numeric columns - keep no-wrap for alignment */
+  #terrava-print-root td.text-right,
+  #terrava-print-root th.text-right {
     text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Ensure amount columns use tabular numbers */
+  #terrava-print-root td.text-right .tabular-nums,
+  #terrava-print-root th.text-right .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-family: Inter, system-ui, sans-serif;
   }
 
   /* Ensure tabular numbers are used for amounts */
-  .tabular-nums {
+  #terrava-print-root .tabular-nums {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Allow text wrapping for long content in non-numeric columns */
+  #terrava-print-root td:not(.text-right) {
+    word-break: break-word;
+    white-space: normal;
   }
 
   /* Avoid page breaks in the middle of important content */
   .print-avoid-break {
+    break-inside: avoid;
     page-break-inside: avoid;
   }
 
@@ -157,5 +297,108 @@ body {
   tfoot tr,
   .totals-row {
     page-break-inside: avoid;
+  }
+
+  /* Print button styling - show print button in screen view */
+  .print-button {
+    display: inline-block;
+  }
+
+  /* Hide print button when printing */
+  .print-button {
+    display: none !important;
+  }
+
+  /* Ensure consistent font sizes for print */
+  body {
+    font-size: 12pt;
+  }
+
+  h1, h2, h3 {
+    font-family: Inter, system-ui, sans-serif;
+  }
+
+  /* Invoice/Statement print styles */
+  .print-document {
+    page-break-inside: avoid;
+  }
+
+  .print-document-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .print-document-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .print-document-meta dt {
+    font-weight: 600;
+    color: #2D3A3A;
+  }
+
+  .print-document-meta dd {
+    color: #666;
+    margin: 0;
+  }
+
+  .print-line-items {
+    margin: 1.5rem 0;
+  }
+
+  .print-totals {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 2px solid #1F6F5C;
+    page-break-inside: avoid;
+  }
+
+  /* Print footer */
+  .print-footer {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 0.75rem;
+    color: #666;
+    text-align: center;
+  }
+
+  /* Remove any horizontal scrollbars */
+  #terrava-print-root,
+  #terrava-print-root * {
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+
+  /* Ensure full width tables */
+  #terrava-print-root table {
+    max-width: 100%;
+  }
+
+  /* Better column width distribution for report tables */
+  #terrava-print-root table {
+    width: 100%;
+  }
+
+  /* Ensure account code column doesn't take too much space */
+  #terrava-print-root th:first-child,
+  #terrava-print-root td:first-child {
+    width: auto;
+    min-width: 80px;
+  }
+
+  /* Ensure numeric columns (typically last 3 columns) get adequate space */
+  #terrava-print-root th.text-right:last-child,
+  #terrava-print-root td.text-right:last-child,
+  #terrava-print-root th.text-right:nth-last-child(2),
+  #terrava-print-root td.text-right:nth-last-child(2),
+  #terrava-print-root th.text-right:nth-last-child(3),
+  #terrava-print-root td.text-right:nth-last-child(3) {
+    min-width: 120px; /* Extra width for the last numeric columns (DEBIT, CREDIT, NET) */
   }
 }

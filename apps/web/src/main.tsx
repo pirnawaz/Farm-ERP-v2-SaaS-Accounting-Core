@@ -12,6 +12,10 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      // Default staleTime for queries without explicit staleTime
+      staleTime: 0, // Consider data stale immediately (individual queries can override)
+      // Default gcTime (formerly cacheTime) - keep unused data for 5 minutes
+      gcTime: 5 * 60 * 1000,
     },
   },
 })

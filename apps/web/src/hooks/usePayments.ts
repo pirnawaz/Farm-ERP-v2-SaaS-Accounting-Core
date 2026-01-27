@@ -7,6 +7,9 @@ export function usePayments(filters?: PaymentFilters) {
   return useQuery({
     queryKey: ['payments', filters],
     queryFn: () => paymentsApi.list(filters),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
   });
 }
 

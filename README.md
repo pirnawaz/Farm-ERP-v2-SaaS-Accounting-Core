@@ -44,7 +44,8 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
 - **Accounting Guards** — Immutability protection for posted transactions, balanced posting validation
 - **Audit Logs** — Transaction audit trail for posted operations
-- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports; CSV export with Terrava-branded filenames
+- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports; CSV export with Terrava-branded filenames; print-friendly layouts
+- **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
 ---
@@ -234,7 +235,8 @@ The web app includes pages (and routes) for:
 - **Inventory:** items, stores, categories, UOMs, GRNs, issues, transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
-- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin; CSV export functionality
+- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin; CSV export functionality; print-friendly layouts
+- **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform:** tenants (platform admin)
 

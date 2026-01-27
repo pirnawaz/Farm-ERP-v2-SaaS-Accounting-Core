@@ -25,6 +25,8 @@ export function useInventoryItems(is_active?: boolean) {
   return useQuery({
     queryKey: ['inventory', 'items', is_active],
     queryFn: () => inventoryApi.items.list(is_active),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -33,6 +35,8 @@ export function useInventoryItem(id: string) {
     queryKey: ['inventory', 'items', id],
     queryFn: () => inventoryApi.items.get(id),
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -68,6 +72,8 @@ export function useInventoryStores(is_active?: boolean) {
   return useQuery({
     queryKey: ['inventory', 'stores', is_active],
     queryFn: () => inventoryApi.stores.list(is_active),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -99,7 +105,12 @@ export function useUpdateStore() {
 
 // UoMs
 export function useUoms() {
-  return useQuery({ queryKey: ['inventory', 'uoms'], queryFn: () => inventoryApi.uoms.list() });
+  return useQuery({
+    queryKey: ['inventory', 'uoms'],
+    queryFn: () => inventoryApi.uoms.list(),
+    staleTime: 15 * 60 * 1000, // 15 minutes - very stable reference data
+    gcTime: 60 * 60 * 1000, // 1 hour
+  });
 }
 
 export function useCreateUom() {
@@ -113,7 +124,12 @@ export function useCreateUom() {
 
 // Categories
 export function useCategories() {
-  return useQuery({ queryKey: ['inventory', 'categories'], queryFn: () => inventoryApi.categories.list() });
+  return useQuery({
+    queryKey: ['inventory', 'categories'],
+    queryFn: () => inventoryApi.categories.list(),
+    staleTime: 15 * 60 * 1000, // 15 minutes - very stable reference data
+    gcTime: 60 * 60 * 1000, // 1 hour
+  });
 }
 
 export function useCreateCategory() {
@@ -141,7 +157,13 @@ export function useUpdateCategory() {
 
 // GRNs
 export function useGRNs(f?: GrnFilters) {
-  return useQuery({ queryKey: ['inventory', 'grns', f], queryFn: () => inventoryApi.grns.list(f) });
+  return useQuery({
+    queryKey: ['inventory', 'grns', f],
+    queryFn: () => inventoryApi.grns.list(f),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
+  });
 }
 
 export function useGRN(id: string) {
@@ -200,7 +222,13 @@ export function useReverseGRN() {
 
 // Issues
 export function useIssues(f?: IssueFilters) {
-  return useQuery({ queryKey: ['inventory', 'issues', f], queryFn: () => inventoryApi.issues.list(f) });
+  return useQuery({
+    queryKey: ['inventory', 'issues', f],
+    queryFn: () => inventoryApi.issues.list(f),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
+  });
 }
 
 export function useIssue(id: string) {
@@ -259,7 +287,13 @@ export function useReverseIssue() {
 
 // Transfers
 export function useTransfers(f?: TransferFilters) {
-  return useQuery({ queryKey: ['inventory', 'transfers', f], queryFn: () => inventoryApi.transfers.list(f) });
+  return useQuery({
+    queryKey: ['inventory', 'transfers', f],
+    queryFn: () => inventoryApi.transfers.list(f),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
+  });
 }
 
 export function useTransfer(id: string) {
@@ -318,7 +352,13 @@ export function useReverseTransfer() {
 
 // Adjustments
 export function useAdjustments(f?: AdjustmentFilters) {
-  return useQuery({ queryKey: ['inventory', 'adjustments', f], queryFn: () => inventoryApi.adjustments.list(f) });
+  return useQuery({
+    queryKey: ['inventory', 'adjustments', f],
+    queryFn: () => inventoryApi.adjustments.list(f),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
+  });
 }
 
 export function useAdjustment(id: string) {
@@ -377,9 +417,20 @@ export function useReverseAdjustment() {
 
 // Stock
 export function useStockOnHand(f?: StockOnHandFilters) {
-  return useQuery({ queryKey: ['inventory', 'stock', 'on-hand', f], queryFn: () => inventoryApi.stock.onHand(f) });
+  return useQuery({
+    queryKey: ['inventory', 'stock', 'on-hand', f],
+    queryFn: () => inventoryApi.stock.onHand(f),
+    staleTime: 30 * 1000, // 30 seconds - stock changes but not too frequently
+    gcTime: 5 * 60 * 1000,
+  });
 }
 
 export function useStockMovements(f?: StockMovementsFilters) {
-  return useQuery({ queryKey: ['inventory', 'stock', 'movements', f], queryFn: () => inventoryApi.stock.movements(f) });
+  return useQuery({
+    queryKey: ['inventory', 'stock', 'movements', f],
+    queryFn: () => inventoryApi.stock.movements(f),
+    staleTime: 30 * 1000, // 30 seconds - stock movements
+    gcTime: 5 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
+  });
 }

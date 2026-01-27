@@ -7,6 +7,9 @@ export function useSales(filters?: SaleFilters) {
   return useQuery({
     queryKey: ['sales', filters],
     queryFn: () => salesApi.list(filters),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
   });
 }
 

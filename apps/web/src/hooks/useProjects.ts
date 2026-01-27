@@ -6,6 +6,8 @@ export function useProjects(cropCycleId?: string) {
   return useQuery({
     queryKey: ['projects', cropCycleId],
     queryFn: () => projectsApi.list(cropCycleId),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
   });
 }
 
@@ -14,6 +16,8 @@ export function useProject(id: string) {
     queryKey: ['projects', id],
     queryFn: () => projectsApi.get(id),
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - individual items change less frequently
+    gcTime: 30 * 60 * 1000,
   });
 }
 

@@ -18,6 +18,9 @@ export function useHarvests(f?: HarvestFilters) {
   return useQuery({
     queryKey: ['harvests', f],
     queryFn: () => harvestsApi.list(f),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
   });
 }
 

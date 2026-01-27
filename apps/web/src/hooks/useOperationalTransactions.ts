@@ -10,6 +10,8 @@ export function useOperationalTransactions(filters?: TransactionFilters) {
   return useQuery({
     queryKey: ['operational-transactions', filters],
     queryFn: () => operationalTransactionsApi.list(filters),
+    staleTime: 20 * 1000, // 20 seconds - dashboard data, changes frequently
+    gcTime: 2 * 60 * 1000,
   });
 }
 

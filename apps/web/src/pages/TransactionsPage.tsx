@@ -7,6 +7,7 @@ import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
+import { EmptyState } from '../components/EmptyState';
 import type { OperationalTransaction } from '../types';
 
 export default function TransactionsPage() {
@@ -174,11 +175,25 @@ export default function TransactionsPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={transactions || []}
-          columns={columns}
-          onRowClick={(row) => navigate(`/app/transactions/${row.id}`)}
-        />
+        {transactions && transactions.length > 0 ? (
+          <DataTable
+            data={transactions}
+            columns={columns}
+            onRowClick={(row) => navigate(`/app/transactions/${row.id}`)}
+          />
+        ) : (
+          <EmptyState
+            title="No transactions recorded yet"
+            action={
+              canCreate
+                ? {
+                    label: 'Create Transaction',
+                    onClick: () => navigate('/app/transactions/new'),
+                  }
+                : undefined
+            }
+          />
+        )}
       </div>
     </div>
   );

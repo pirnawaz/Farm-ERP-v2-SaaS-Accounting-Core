@@ -6,6 +6,8 @@ export function useFarmProfile() {
   return useQuery({
     queryKey: ['farmProfile'],
     queryFn: () => farmProfileApi.get(),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 

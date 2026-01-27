@@ -20,6 +20,8 @@ export function useActivityTypes(f?: ActivityTypeFilters) {
   return useQuery({
     queryKey: ['crop-ops', 'activity-types', f],
     queryFn: () => cropOpsApi.activityTypes.list(f),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -51,6 +53,9 @@ export function useActivities(f?: ActivityFilters) {
   return useQuery({
     queryKey: ['crop-ops', 'activities', f],
     queryFn: () => cropOpsApi.activities.list(f),
+    staleTime: 20 * 1000, // 20 seconds - transactional data
+    gcTime: 2 * 60 * 1000,
+    keepPreviousData: true, // Prevent flicker on filter changes
   });
 }
 

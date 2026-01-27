@@ -6,6 +6,8 @@ export function useLandAllocations(cropCycleId?: string) {
   return useQuery({
     queryKey: ['land-allocations', cropCycleId],
     queryFn: () => landAllocationsApi.list(cropCycleId),
+    staleTime: 10 * 60 * 1000, // 10 minutes - reference data
+    gcTime: 30 * 60 * 1000,
   });
 }
 
