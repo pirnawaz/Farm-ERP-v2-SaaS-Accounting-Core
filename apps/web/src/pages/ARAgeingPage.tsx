@@ -8,7 +8,7 @@ import type { ARAgeingReport } from '../types';
 
 export default function ARAgeingPage() {
   const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const { data: report, isLoading } = useQuery<ARAgeingReport>({
     queryKey: ['ar-ageing', asOfDate],

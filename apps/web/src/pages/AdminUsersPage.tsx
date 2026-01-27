@@ -10,6 +10,7 @@ import {
   useUpdateTenantUser,
   useDisableTenantUser,
 } from '../hooks/useTenantUsers';
+import { useFormatting } from '../hooks/useFormatting';
 import type { User, UserRole } from '../types';
 import toast from 'react-hot-toast';
 
@@ -20,6 +21,7 @@ export default function AdminUsersPage() {
   const createMutation = useCreateTenantUser();
   const updateMutation = useUpdateTenantUser();
   const disableMutation = useDisableTenantUser();
+  const { formatDate } = useFormatting();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [disableTarget, setDisableTarget] = useState<User | null>(null);
@@ -113,7 +115,7 @@ export default function AdminUsersPage() {
       header: 'Created',
       accessor: (row: User) => (
         <span className="text-sm text-gray-600">
-          {row.created_at ? new Date(row.created_at).toLocaleDateString() : '-'}
+          {row.created_at ? formatDate(row.created_at) : '-'}
         </span>
       ),
     },

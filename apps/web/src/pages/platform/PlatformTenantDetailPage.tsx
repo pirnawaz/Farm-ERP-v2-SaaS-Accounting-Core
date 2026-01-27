@@ -4,6 +4,7 @@ import { usePlatformTenant, useUpdatePlatformTenant } from '../../hooks/usePlatf
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
+import { useFormatting } from '../../hooks/useFormatting';
 import toast from 'react-hot-toast';
 import type { UpdatePlatformTenantPayload } from '../../types';
 import { platformApi } from '../../api/platform';
@@ -15,6 +16,7 @@ export default function PlatformTenantDetailPage() {
   const queryClient = useQueryClient();
   const { data: tenant, isLoading, error } = usePlatformTenant(id || null);
   const updateMutation = useUpdatePlatformTenant();
+  const { formatDate } = useFormatting();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<UpdatePlatformTenantPayload>({});
@@ -118,7 +120,7 @@ export default function PlatformTenantDetailPage() {
             <div>
               <dt className="text-sm font-medium text-gray-500">Created</dt>
               <dd className="mt-1 text-sm text-gray-900">
-                {new Date(tenant.created_at).toLocaleDateString()}
+                {formatDate(tenant.created_at)}
               </dd>
             </div>
           </dl>

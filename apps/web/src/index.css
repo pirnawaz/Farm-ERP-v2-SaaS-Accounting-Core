@@ -12,3 +12,150 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Print Styles */
+@media print {
+  /* Hide navigation, sidebar, buttons, and non-essential UI elements */
+  nav,
+  aside,
+  header button,
+  button:not(.print-keep),
+  .no-print,
+  [class*="sidebar"],
+  [class*="navigation"],
+  [class*="header"] button,
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Ensure body and main content are visible */
+  body {
+    background: white;
+    color: black;
+  }
+
+  /* Print header - only visible when printing */
+  .print-header {
+    display: block !important;
+    page-break-after: avoid;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #1F6F5C;
+  }
+
+  .print-header.hidden {
+    display: block !important;
+  }
+
+  .print-header h1,
+  .print-header h2 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1F6F5C;
+  }
+
+  .print-header .print-branding {
+    font-size: 0.75rem;
+    color: #2D3A3A;
+    margin-bottom: 0.25rem;
+  }
+
+  .print-header .print-date-range {
+    font-size: 0.875rem;
+    color: #2D3A3A;
+    margin-top: 0.25rem;
+  }
+
+  .print-header .print-generated {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.25rem;
+  }
+
+  /* Tables - ensure they print well */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tbody {
+    display: table-row-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  th,
+  td {
+    border: 1px solid #ddd;
+    padding: 0.5rem;
+    text-align: left;
+  }
+
+  th {
+    background-color: #E6ECEA !important;
+    color: #2D3A3A !important;
+    font-weight: 600;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Right-align numeric columns */
+  td.text-right,
+  th.text-right,
+  [class*="text-right"] {
+    text-align: right;
+  }
+
+  /* Ensure tabular numbers are used for amounts */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Avoid page breaks in the middle of important content */
+  .print-avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure background colors don't print (except for headers) */
+  .bg-white,
+  .bg-gray-50,
+  .bg-gray-100 {
+    background: white !important;
+  }
+
+  /* Remove shadows and rounded corners for print */
+  .shadow,
+  .rounded,
+  .rounded-lg,
+  .rounded-xl {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Ensure links are readable */
+  a {
+    color: #1F6F5C;
+    text-decoration: underline;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+
+  /* Prevent page breaks in totals rows */
+  tfoot tr,
+  .totals-row {
+    page-break-inside: avoid;
+  }
+}
