@@ -342,4 +342,54 @@ class PartyFinancialSourceService
             'payments_in' => $paymentData['payments']->where('direction', 'IN'),
         ];
     }
+
+    /**
+     * Get posted inventory issue allocation totals for a party.
+     * 
+     * @param string $partyId
+     * @param string $tenantId
+     * @param string|null $from YYYY-MM-DD format
+     * @param string|null $to YYYY-MM-DD format
+     * @return array ['total' => float, 'allocations' => Collection]
+     */
+    public function getPostedInventoryIssueAllocations(
+        string $partyId,
+        string $tenantId,
+        ?string $from = null,
+        ?string $to = null
+    ): array {
+        $query = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
+            ->where('allocation_rows.party_id', $partyId)
+            ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
+            ->where('posting_groups.source_type', 'INVENTORY_ISSUE')
+            ->whereRaw("allocation_rows.rule_snapshot->>'cost_type' = 'INVENTORY_INPUT'");
+
+        if ($from) {
+            $query->where('posting_groups.posting_date', '>=', $from);
+        }
+        if ($to) {
+            $query->where('posting_groups.posting_date', '<=', $to);
+        }
+
+        $allocations = $query->select(
+            'allocation_rows.id',
+            'allocation_rows.tenant_id',
+            'allocation_rows.party_id',
+            'allocation_rows.posting_group_id',
+            'allocation_rows.project_id',
+            'allocation_rows.allocation_type',
+            'allocation_rows.amount',
+            'allocation_rows.rule_snapshot',
+            'posting_groups.posting_date',
+            'posting_groups.id as posting_group_id'
+        )
+        ->get();
+
+        $total = (float) $allocations->sum('amount');
+
+        return [
+            'total' => $total,
+            'allocations' => $allocations,
+        ];
+    }
 }

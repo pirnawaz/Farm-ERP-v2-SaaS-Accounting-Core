@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@farm-erp/shared';
 import type { UserRole } from '../types';
 
-const USER_ROLE_KEY = 'farm_erp_user_role'; // Fallback for dev mode only
+const USER_ROLE_KEY = 'farm_erp_user_role';
+const USER_ID_KEY = 'farm_erp_user_id';
+const TENANT_ID_KEY = 'farm_erp_tenant_id';
 
 export function useAuth() {
   const [userRole, setUserRoleState] = useState<UserRole | null>(() => {
@@ -30,11 +32,13 @@ export function useAuth() {
       // Still try to verify with backend in the background (silently)
       apiClient.get<{ user_id: string; role: UserRole; tenant_id: string; email?: string }>('/api/auth/me')
         .then((user) => {
-          // Cookie auth succeeded - use it instead
+          // Cookie auth succeeded - use it and keep localStorage in sync so api-client sends X-User-Role etc.
           setUserRoleState(user.role);
           setUserId(user.user_id);
           setTenantId(user.tenant_id);
-          localStorage.removeItem(USER_ROLE_KEY);
+          localStorage.setItem(USER_ROLE_KEY, user.role);
+          localStorage.setItem(USER_ID_KEY, user.user_id);
+          localStorage.setItem(TENANT_ID_KEY, user.tenant_id);
         })
         .catch(() => {
           // Silently ignore - we're using localStorage fallback
@@ -48,8 +52,10 @@ export function useAuth() {
       setUserRoleState(user.role);
       setUserId(user.user_id);
       setTenantId(user.tenant_id);
-      // Clear localStorage fallback when cookie auth succeeds
-      localStorage.removeItem(USER_ROLE_KEY);
+      // Keep localStorage in sync so api-client always sends X-User-Role, X-Tenant-Id, X-User-Id
+      localStorage.setItem(USER_ROLE_KEY, user.role);
+      localStorage.setItem(USER_ID_KEY, user.user_id);
+      localStorage.setItem(TENANT_ID_KEY, user.tenant_id);
     } catch (error) {
       // Not authenticated - clear state
       setUserRoleState(null);
@@ -76,6 +82,8 @@ export function useAuth() {
     setUserId(null);
     setTenantId(null);
     localStorage.removeItem(USER_ROLE_KEY);
+    localStorage.removeItem(USER_ID_KEY);
+    localStorage.removeItem(TENANT_ID_KEY);
   }, []);
 
   return {

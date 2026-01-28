@@ -27,6 +27,13 @@ class LandAllocation extends Model
         'created_at' => 'datetime',
     ];
 
+    protected $appends = ['allocation_mode'];
+
+    public function getAllocationModeAttribute(): string
+    {
+        return $this->party_id === null ? 'OWNER' : 'HARI';
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

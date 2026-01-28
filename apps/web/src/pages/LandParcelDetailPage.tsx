@@ -131,7 +131,7 @@ export default function LandParcelDetailPage() {
                 <ul className="space-y-1">
                   {group.allocations.map((alloc) => (
                     <li key={alloc.id} className="text-sm text-gray-700">
-                      {alloc.allocated_acres} acres to {alloc.party?.name || 'Unknown'} 
+                      {alloc.allocated_acres} acres to {alloc.party?.name || 'Owner-operated'} 
                       {alloc.project && (
                         <Link
                           to={`/app/projects/${alloc.project.id}`}

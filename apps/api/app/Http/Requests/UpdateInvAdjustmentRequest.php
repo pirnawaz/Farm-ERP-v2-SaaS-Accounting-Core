@@ -14,7 +14,7 @@ class UpdateInvAdjustmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'doc_no' => ['sometimes', 'required', 'string', 'max:100'],
+            'doc_no' => ['sometimes', 'nullable', 'string', 'max:100'],
             'store_id' => ['sometimes', 'required', 'uuid', 'exists:inv_stores,id'],
             'reason' => ['sometimes', 'required', 'string', 'in:LOSS,DAMAGE,COUNT_GAIN,COUNT_LOSS,OTHER'],
             'notes' => ['nullable', 'string', 'max:2000'],

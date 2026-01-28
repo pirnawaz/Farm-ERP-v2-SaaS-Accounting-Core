@@ -65,9 +65,17 @@ class LabWorkLogController extends Controller
 
         $amount = (float) $request->units * (float) $request->rate;
 
+        $docNo = $request->filled('doc_no') ? trim($request->doc_no) : null;
+        if ($docNo === '') {
+            $docNo = null;
+        }
+        if ($docNo === null) {
+            $docNo = $this->generateDocNo($tenantId);
+        }
+
         $log = LabWorkLog::create([
             'tenant_id' => $tenantId,
-            'doc_no' => $request->doc_no,
+            'doc_no' => $docNo,
             'worker_id' => $request->worker_id,
             'work_date' => $request->work_date,
             'crop_cycle_id' => $request->crop_cycle_id,
@@ -84,6 +92,21 @@ class LabWorkLogController extends Controller
         ]);
 
         return response()->json($log->load(['worker', 'cropCycle', 'project', 'machine']), 201);
+    }
+
+    private function generateDocNo(string $tenantId): string
+    {
+        $last = LabWorkLog::where('tenant_id', $tenantId)
+            ->where('doc_no', 'like', 'WL-%')
+            ->orderByRaw('LENGTH(doc_no) DESC, doc_no DESC')
+            ->first();
+
+        $next = 1;
+        if ($last && preg_match('/^WL-(\d+)$/', $last->doc_no, $m)) {
+            $next = (int) $m[1] + 1;
+        }
+
+        return 'WL-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }
 
     public function show(Request $request, string $id)

@@ -46,7 +46,13 @@ export default function CropCyclesPage() {
 
   const handleCreate = async () => {
     try {
-      await createMutation.mutateAsync(formData);
+      const payload: CreateCropCyclePayload = {
+        name: formData.name,
+        start_date: formData.start_date,
+        ...(formData.crop_type?.trim() && { crop_type: formData.crop_type.trim() }),
+        ...(formData.end_date?.trim() && { end_date: formData.end_date.trim() }),
+      };
+      await createMutation.mutateAsync(payload);
       toast.success('Crop cycle created successfully');
       setShowCreateModal(false);
       setFormData({ name: '', crop_type: '', start_date: '', end_date: '' });
@@ -59,7 +65,7 @@ export default function CropCyclesPage() {
     { header: 'Name', accessor: 'name' },
     { header: 'Crop Type', accessor: 'crop_type' },
     { header: 'Start Date', accessor: 'start_date' },
-    { header: 'End Date', accessor: 'end_date' },
+    { header: 'End Date', accessor: (r) => r.end_date ?? '—' },
     { header: 'Status', accessor: 'status' },
     {
       header: 'Actions',
@@ -155,6 +161,7 @@ export default function CropCyclesPage() {
               onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
+            <p className="text-xs text-gray-500 mt-1">Leave blank until cycle ends. You lock the cycle when you close it.</p>
           </FormField>
           <div className="flex justify-end space-x-3">
             <button

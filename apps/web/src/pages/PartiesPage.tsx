@@ -65,7 +65,6 @@ export default function PartiesPage() {
 
     try {
       await createMutation.mutateAsync(formData);
-      toast.success('Party created successfully');
       setShowCreateModal(false);
       setFormData({ name: '', party_types: [] });
       setErrors({});

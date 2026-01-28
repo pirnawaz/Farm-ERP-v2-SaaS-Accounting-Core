@@ -92,7 +92,7 @@ export default function WorkersPage() {
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Worker">
         <div className="space-y-4">
           <FormField label="Name" required><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
-          <FormField label="Worker No"><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+          <FormField label="Worker No"><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} className="w-full px-3 py-2 border rounded" placeholder="Leave blank to auto-generate" /></FormField>
           <FormField label="Type">
             <select value={workerTypeVal} onChange={(e) => setWorkerTypeVal(e.target.value as 'HARI' | 'STAFF' | 'CONTRACT')} className="w-full px-3 py-2 border rounded">
               <option value="HARI">HARI</option>

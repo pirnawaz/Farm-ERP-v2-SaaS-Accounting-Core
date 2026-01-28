@@ -32,14 +32,14 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 
 - **Multi-tenant SaaS** — Tenant isolation, platform admin, and tenant-level modules
 - **Roles** — `platform_admin`, `tenant_admin`, `accountant`, `operator`
-- **Land & Projects** — Land parcels, crop cycles, land allocations, projects, project rules
+- **Land & Projects** — Land parcels, crop cycles, land allocations (owner and Hari), projects, project rules
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
 - **Treasury** — Payments, advances, allocation preview and posting
 - **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
 - **Settlements** — Project-based and sales-based settlements with share rules, preview and posting, reversals
 - **Share Rules** — Configurable share rules for crop cycles, projects, and sales (margin or revenue basis)
 - **Harvests** — Harvest tracking with lines, posting to inventory, production allocation
-- **Inventory** — Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; stock on-hand and movements
+- **Inventory** — Items, stores, UOMs, categories; GRNs, issues with allocation support (share rules, explicit percentages, project rules), transfers, adjustments; stock on-hand and movements
 - **Labour** — Workers (Hari), work logs, wage accrual, wage payments
 - **Machinery** — Machine management, work logs with meter tracking, rate cards, machinery charges, maintenance jobs and types, profitability reports; posting and reversals
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
@@ -234,7 +234,7 @@ The web app includes pages (and routes) for:
 - **Daily book entries**, **Operational transactions**
 - **Parties**, **Sales**, **Payments**, **Advances**
 - **Land parcels**, **Land allocations**, **Crop cycles**, **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based and sales-based), **Harvests**
-- **Inventory:** items, stores, categories, UOMs, GRNs, issues, transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
+- **Inventory:** items, stores, categories, UOMs, GRNs, issues (with allocation configuration), transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Machinery:** machines, work logs, rate cards, charges, maintenance jobs and types, profitability reports (when `machinery` module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)

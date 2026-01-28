@@ -26,11 +26,18 @@ class InvIssue extends Model
         'posting_date',
         'posting_group_id',
         'created_by',
+        'allocation_mode',
+        'hari_id',
+        'sharing_rule_id',
+        'landlord_share_pct',
+        'hari_share_pct',
     ];
 
     protected $casts = [
         'doc_date' => 'date',
         'posting_date' => 'date',
+        'landlord_share_pct' => 'decimal:2',
+        'hari_share_pct' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -75,6 +82,16 @@ class InvIssue extends Model
         return $this->hasMany(InvIssueLine::class, 'issue_id');
     }
 
+    public function hari(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'hari_id');
+    }
+
+    public function sharingRule(): BelongsTo
+    {
+        return $this->belongsTo(ShareRule::class, 'sharing_rule_id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'DRAFT';
@@ -97,7 +114,44 @@ class InvIssue extends Model
 
     public function canBePosted(): bool
     {
-        return $this->isDraft();
+        if (!$this->isDraft()) {
+            return false;
+        }
+
+        return $this->validateAllocationMode();
+    }
+
+    /**
+     * Validate that allocation_mode is properly configured.
+     * 
+     * @return bool
+     */
+    public function validateAllocationMode(): bool
+    {
+        if (!$this->allocation_mode) {
+            return false;
+        }
+
+        if ($this->allocation_mode === 'HARI_ONLY') {
+            return $this->hari_id !== null;
+        }
+
+        if ($this->allocation_mode === 'SHARED') {
+            // Must have either sharing_rule_id or explicit percentages
+            if ($this->sharing_rule_id !== null) {
+                return true;
+            }
+            
+            if ($this->landlord_share_pct !== null && $this->hari_share_pct !== null) {
+                $sum = (float) $this->landlord_share_pct + (float) $this->hari_share_pct;
+                return abs($sum - 100.0) < 0.01;
+            }
+
+            return false;
+        }
+
+        // FARMER_ONLY doesn't need additional fields
+        return true;
     }
 
     public function canBeReversed(): bool

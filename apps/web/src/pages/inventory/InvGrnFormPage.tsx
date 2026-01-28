@@ -39,7 +39,6 @@ export default function InvGrnFormPage() {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!doc_no.trim()) e.doc_no = 'Doc number is required';
     if (!store_id) e.store_id = 'Store is required';
     if (!doc_date) e.doc_date = 'Doc date is required';
     const validLines = lines.filter((l) => l.item_id && parseFloat(l.qty) > 0 && parseFloat(l.unit_cost) >= 0);
@@ -54,7 +53,7 @@ export default function InvGrnFormPage() {
       .filter((l) => l.item_id && parseFloat(l.qty) > 0 && parseFloat(l.unit_cost) >= 0)
       .map((l) => ({ item_id: l.item_id, qty: parseFloat(l.qty), unit_cost: parseFloat(l.unit_cost) }));
     const payload: CreateInvGrnPayload = {
-      doc_no: doc_no.trim(),
+      ...(doc_no.trim() && { doc_no: doc_no.trim() }),
       supplier_party_id: supplier_party_id || undefined,
       store_id,
       doc_date,
@@ -78,8 +77,8 @@ export default function InvGrnFormPage() {
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Doc No" required error={errors.doc_no}>
-            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" />
+          <FormField label="Doc No">
+            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} placeholder="Leave blank to auto-generate" className="w-full px-3 py-2 border rounded" />
           </FormField>
           <FormField label="Doc Date" required error={errors.doc_date}>
             <input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" />

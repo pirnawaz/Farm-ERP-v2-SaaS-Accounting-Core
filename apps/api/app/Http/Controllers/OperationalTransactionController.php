@@ -9,6 +9,7 @@ use App\Http\Requests\PostOperationalTransactionRequest;
 use App\Services\TenantContext;
 use App\Services\PostingService;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class OperationalTransactionController extends Controller
 {
@@ -85,18 +86,29 @@ class OperationalTransactionController extends Controller
             }
         }
 
-        // Verify project belongs to tenant
+        $project = null;
         if ($request->project_id) {
-            Project::where('id', $request->project_id)
+            $project = Project::where('id', $request->project_id)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
         }
 
-        // Verify crop cycle belongs to tenant
-        if ($request->crop_cycle_id) {
-            CropCycle::where('id', $request->crop_cycle_id)
+        $cropCycle = null;
+        $cropCycleId = $request->crop_cycle_id ?? $project?->crop_cycle_id;
+        if ($cropCycleId) {
+            $cropCycle = CropCycle::where('id', $cropCycleId)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
+        }
+
+        if ($cropCycle && $cropCycle->start_date && $cropCycle->end_date) {
+            $txDate = Carbon::parse($request->transaction_date)->format('Y-m-d');
+            if ($txDate < $cropCycle->start_date->format('Y-m-d')) {
+                return response()->json(['error' => 'Transaction date is before crop cycle start date.'], 422);
+            }
+            if ($txDate > $cropCycle->end_date->format('Y-m-d')) {
+                return response()->json(['error' => 'Transaction date is after crop cycle end date.'], 422);
+            }
         }
 
         $transaction = OperationalTransaction::create([
@@ -144,7 +156,28 @@ class OperationalTransactionController extends Controller
             'classification' => ['sometimes', 'required', 'string', 'in:SHARED,HARI_ONLY,FARM_OVERHEAD'],
         ]);
 
-        $transaction->update($request->only(['project_id', 'crop_cycle_id', 'type', 'transaction_date', 'amount', 'classification']));
+        $updates = $request->only(['project_id', 'crop_cycle_id', 'type', 'transaction_date', 'amount', 'classification']);
+        $project = $transaction->project;
+        if ($request->has('project_id')) {
+            $project = $request->project_id
+                ? Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->first()
+                : null;
+        }
+        $cropCycleId = $request->crop_cycle_id ?? $project?->crop_cycle_id ?? $transaction->crop_cycle_id;
+        if ($cropCycleId && ($request->has('transaction_date') || $request->has('project_id') || $request->has('crop_cycle_id'))) {
+            $cropCycle = CropCycle::where('id', $cropCycleId)->where('tenant_id', $tenantId)->first();
+            $txDate = Carbon::parse($updates['transaction_date'] ?? $transaction->transaction_date)->format('Y-m-d');
+            if ($cropCycle && $cropCycle->start_date && $cropCycle->end_date) {
+                if ($txDate < $cropCycle->start_date->format('Y-m-d')) {
+                    return response()->json(['error' => 'Transaction date is before crop cycle start date.'], 422);
+                }
+                if ($txDate > $cropCycle->end_date->format('Y-m-d')) {
+                    return response()->json(['error' => 'Transaction date is after crop cycle end date.'], 422);
+                }
+            }
+        }
+
+        $transaction->update($updates);
 
         return response()->json($transaction->load(['project', 'cropCycle']));
     }

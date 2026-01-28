@@ -55,9 +55,17 @@ class InvTransferController extends Controller
             InvItem::where('id', $l['item_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
 
+        $docNo = $request->filled('doc_no') ? trim($request->doc_no) : null;
+        if ($docNo === '') {
+            $docNo = null;
+        }
+        if ($docNo === null) {
+            $docNo = $this->generateTransferDocNo($tenantId);
+        }
+
         $transfer = InvTransfer::create([
             'tenant_id' => $tenantId,
-            'doc_no' => $request->doc_no,
+            'doc_no' => $docNo,
             'from_store_id' => $request->from_store_id,
             'to_store_id' => $request->to_store_id,
             'doc_date' => $request->doc_date,
@@ -77,6 +85,19 @@ class InvTransferController extends Controller
         return response()->json($transfer->load(['fromStore', 'toStore', 'lines.item']), 201);
     }
 
+    private function generateTransferDocNo(string $tenantId): string
+    {
+        $last = InvTransfer::where('tenant_id', $tenantId)
+            ->where('doc_no', 'like', 'TRF-%')
+            ->orderByRaw('LENGTH(doc_no) DESC, doc_no DESC')
+            ->first();
+        $next = 1;
+        if ($last && preg_match('/^TRF-(\d+)$/', $last->doc_no, $m)) {
+            $next = (int) $m[1] + 1;
+        }
+        return 'TRF-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+    }
+
     public function show(Request $request, string $id)
     {
         $tenantId = TenantContext::getTenantId($request);
@@ -93,6 +114,9 @@ class InvTransferController extends Controller
 
         $data = $request->only(['doc_no', 'from_store_id', 'to_store_id', 'doc_date']);
         $data = array_filter($data, fn ($v) => $v !== null);
+        if (isset($data['doc_no']) && $data['doc_no'] === '') {
+            unset($data['doc_no']);
+        }
         $transfer->update($data);
 
         if ($request->has('lines')) {

@@ -65,7 +65,7 @@ class PartyStatementService
         $allocationData = $financialSourceService->getPostedAllocationTotals($partyId, $tenantId, $from, $to);
         
         // Get allocations with project/crop cycle info (need joins for breakdown)
-        // Include POOL_SHARE, KAMDARI, and ADVANCE_OFFSET allocation types
+        // Include POOL_SHARE, KAMDARI, and ADVANCE_OFFSET allocation types from SETTLEMENT
         $allocations = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
             ->where('allocation_rows.party_id', $partyId)
             ->whereIn('allocation_rows.allocation_type', ['POOL_SHARE', 'KAMDARI', 'ADVANCE_OFFSET'])
@@ -85,6 +85,24 @@ class PartyStatementService
             )
             ->orderBy('posting_groups.posting_date', 'asc')
             ->get();
+
+        // Get inventory issue allocations
+        $inventoryAllocationData = $financialSourceService->getPostedInventoryIssueAllocations($partyId, $tenantId, $from, $to);
+        $inventoryAllocations = $inventoryAllocationData['allocations']->load(['postingGroup', 'project.cropCycle']);
+        
+        // Add project/crop cycle info to inventory allocations
+        foreach ($inventoryAllocations as $alloc) {
+            if ($alloc->project) {
+                $alloc->project_name = $alloc->project->name;
+                $alloc->crop_cycle_id = $alloc->project->crop_cycle_id;
+                if ($alloc->project->cropCycle) {
+                    $alloc->crop_cycle_name = $alloc->project->cropCycle->name;
+                }
+            }
+            if ($alloc->postingGroup) {
+                $alloc->posting_date = $alloc->postingGroup->posting_date;
+            }
+        }
 
         // Get settlement offsets for this party in date range
         $offsets = SettlementOffset::where('settlement_offsets.tenant_id', $tenantId)
@@ -118,6 +136,7 @@ class PartyStatementService
 
         // Calculate summary totals (using shared service data for consistency)
         $totalAllocationsIncreasing = $allocationData['total'];
+        $totalInventoryIssueAllocations = $inventoryAllocationData['total'];
         $totalAllocationsDecreasing = 0; // For Phase 4, no decreasing allocations
         $totalPaymentsOut = $paymentData['out'];
         $totalPaymentsIn = $paymentData['in'];
@@ -170,7 +189,7 @@ class PartyStatementService
         $groupedBreakdown = $this->buildGroupedBreakdown($allocations, $payments, $offsets, $sales, $groupBy);
 
         // Build line items (chronological)
-        $lineItems = $this->buildLineItems($allocations, $payments, $advances, $offsets, $sales);
+        $lineItems = $this->buildLineItems($allocations, $payments, $advances, $offsets, $sales, $inventoryAllocations);
 
         return [
             'party_id' => $partyId,
@@ -178,6 +197,7 @@ class PartyStatementService
             'to' => $to,
             'summary' => [
                 'total_allocations_increasing_balance' => number_format((float) $totalAllocationsIncreasing, 2, '.', ''),
+                'total_inventory_issue_allocations' => number_format((float) $totalInventoryIssueAllocations, 2, '.', ''),
                 'total_allocations_decreasing_balance' => number_format((float) $totalAllocationsDecreasing, 2, '.', ''),
                 'total_payments_out' => number_format((float) $totalPaymentsOut, 2, '.', ''),
                 'total_payments_in' => number_format((float) $totalPaymentsIn, 2, '.', ''),
@@ -407,7 +427,7 @@ class PartyStatementService
     /**
      * Build chronological line items.
      */
-    private function buildLineItems($allocations, $payments, $advances, $offsets, $sales): array
+    private function buildLineItems($allocations, $payments, $advances, $offsets, $sales, $inventoryAllocations = null): array
     {
         $lines = [];
 
@@ -425,6 +445,24 @@ class PartyStatementService
                 'amount' => number_format((float) $allocation->amount, 2, '.', ''),
                 'direction' => '+',
             ];
+        }
+
+        // Add inventory issue allocation lines
+        if ($inventoryAllocations) {
+            foreach ($inventoryAllocations as $allocation) {
+                $projectName = $allocation->project_name ?? 'Unknown Project';
+                $allocationMode = $allocation->rule_snapshot['allocation_mode'] ?? 'UNKNOWN';
+                $postingDate = $allocation->posting_date ?? ($allocation->postingGroup->posting_date ?? '');
+                
+                $lines[] = [
+                    'date' => $postingDate,
+                    'type' => 'INVENTORY_ISSUE_ALLOCATION',
+                    'reference' => $allocation->posting_group_id,
+                    'description' => "Inventory issue cost - {$projectName} ({$allocationMode})",
+                    'amount' => number_format((float) $allocation->amount, 2, '.', ''),
+                    'direction' => '+', // Increases payable (party owes for their share of inventory cost)
+                ];
+            }
         }
 
         // Add offset lines

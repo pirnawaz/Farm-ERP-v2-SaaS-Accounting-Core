@@ -49,9 +49,17 @@ class InvGrnController extends Controller
             InvItem::where('id', $l['item_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
 
+        $docNo = $request->filled('doc_no') ? trim($request->doc_no) : null;
+        if ($docNo === '') {
+            $docNo = null;
+        }
+        if ($docNo === null) {
+            $docNo = $this->generateGrnDocNo($tenantId);
+        }
+
         $grn = InvGrn::create([
             'tenant_id' => $tenantId,
-            'doc_no' => $request->doc_no,
+            'doc_no' => $docNo,
             'supplier_party_id' => $request->supplier_party_id,
             'store_id' => $request->store_id,
             'doc_date' => $request->doc_date,
@@ -74,6 +82,19 @@ class InvGrnController extends Controller
         return response()->json($grn->load(['store', 'supplier', 'lines.item']), 201);
     }
 
+    private function generateGrnDocNo(string $tenantId): string
+    {
+        $last = InvGrn::where('tenant_id', $tenantId)
+            ->where('doc_no', 'like', 'GRN-%')
+            ->orderByRaw('LENGTH(doc_no) DESC, doc_no DESC')
+            ->first();
+        $next = 1;
+        if ($last && preg_match('/^GRN-(\d+)$/', $last->doc_no, $m)) {
+            $next = (int) $m[1] + 1;
+        }
+        return 'GRN-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+    }
+
     public function show(Request $request, string $id)
     {
         $tenantId = TenantContext::getTenantId($request);
@@ -90,6 +111,9 @@ class InvGrnController extends Controller
 
         $data = $request->only(['doc_no', 'supplier_party_id', 'store_id', 'doc_date']);
         $data = array_filter($data, function ($v) { return $v !== null; });
+        if (isset($data['doc_no']) && $data['doc_no'] === '') {
+            unset($data['doc_no']);
+        }
         if ($request->has('supplier_party_id') && $request->supplier_party_id === null) {
             $data['supplier_party_id'] = null;
         }

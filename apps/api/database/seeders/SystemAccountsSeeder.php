@@ -50,6 +50,7 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'ADVANCE_HARI', 'name' => 'Advance to Hari', 'type' => 'asset'],
             ['code' => 'ADVANCE_VENDOR', 'name' => 'Advance to Vendor', 'type' => 'asset'],
             ['code' => 'LOAN_RECEIVABLE', 'name' => 'Loan Receivable', 'type' => 'asset'],
+            ['code' => 'DUE_FROM_HARI', 'name' => 'Due from Hari', 'type' => 'asset'],
             ['code' => 'AP', 'name' => 'Accounts Payable', 'type' => 'liability'],
             ['code' => 'PAYABLE_HARI', 'name' => 'Payable to Hari', 'type' => 'liability'],
             ['code' => 'PAYABLE_LANDLORD', 'name' => 'Payable to Landlord', 'type' => 'liability'],

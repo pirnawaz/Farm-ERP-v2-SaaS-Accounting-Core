@@ -14,7 +14,7 @@ class UpdateInvGrnRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'doc_no' => ['sometimes', 'required', 'string', 'max:100'],
+            'doc_no' => ['sometimes', 'nullable', 'string', 'max:100'],
             'supplier_party_id' => ['nullable', 'uuid', 'exists:parties,id'],
             'store_id' => ['sometimes', 'required', 'uuid', 'exists:inv_stores,id'],
             'doc_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d'],

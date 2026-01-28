@@ -202,7 +202,10 @@ export function usePostGRN() {
       qc.invalidateQueries({ queryKey: ['inventory', 'stock'] });
       toast.success('GRN posted');
     },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to post GRN'),
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
+      toast.error(d?.error || d?.message || 'Failed to post GRN');
+    },
   });
 }
 
@@ -267,7 +270,10 @@ export function usePostIssue() {
       qc.invalidateQueries({ queryKey: ['inventory', 'stock'] });
       toast.success('Issue posted');
     },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to post Issue'),
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
+      toast.error(d?.error || d?.message || 'Failed to post Issue');
+    },
   });
 }
 

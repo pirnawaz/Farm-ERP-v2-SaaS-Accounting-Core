@@ -7,6 +7,7 @@ use App\Models\LandAllocation;
 use App\Models\CropCycle;
 use App\Models\Party;
 use App\Services\TenantContext;
+use App\Services\SystemPartyService;
 use Illuminate\Http\Request;
 
 class ProjectController extends Controller
@@ -25,7 +26,7 @@ class ProjectController extends Controller
         $projects = $query->orderBy('name')->get();
         
         return response()->json($projects)
-            ->header('Cache-Control', 'private, max-age=60')
+            ->header('Cache-Control', 'no-store')
             ->header('Vary', 'X-Tenant-Id');
     }
 
@@ -121,19 +122,32 @@ class ProjectController extends Controller
             ->with(['cropCycle', 'landParcel', 'party'])
             ->firstOrFail();
 
+        // Handle owner-operated allocations (party_id is null)
+        $partyId = $allocation->party_id;
+        $partyName = 'Owner-operated';
+        
+        if ($partyId === null) {
+            // Use system landlord party for owner-operated allocations
+            $partyService = new SystemPartyService();
+            $landlordParty = $partyService->ensureSystemLandlordParty($tenantId);
+            $partyId = $landlordParty->id;
+        } else {
+            $partyName = $allocation->party->name;
+        }
+
         // Build project name
         $projectName = sprintf(
             '%s – %s – %s – %s acres',
             $allocation->cropCycle->name,
             $allocation->landParcel->name,
-            $allocation->party->name,
+            $partyName,
             $allocation->allocated_acres
         );
 
         $project = Project::create([
             'tenant_id' => $tenantId,
             'name' => $projectName,
-            'party_id' => $allocation->party_id,
+            'party_id' => $partyId,
             'crop_cycle_id' => $allocation->crop_cycle_id,
             'land_allocation_id' => $allocation->id,
             'status' => 'ACTIVE',

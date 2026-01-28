@@ -11,27 +11,30 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const hasFocusedForOpen = useRef(false);
+  const onCloseRef = useRef(onClose);
+
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      hasFocusedForOpen.current = false;
+      return;
+    }
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onCloseRef.current();
     };
 
     document.addEventListener('keydown', handleEscape);
-    
-    // Focus the close button when modal opens
-    setTimeout(() => {
-      closeButtonRef.current?.focus();
-    }, 100);
 
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen, onClose]);
+    if (!hasFocusedForOpen.current) {
+      hasFocusedForOpen.current = true;
+      setTimeout(() => closeButtonRef.current?.focus(), 0);
+    }
+
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

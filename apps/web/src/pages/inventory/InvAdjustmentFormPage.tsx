@@ -33,7 +33,6 @@ export default function InvAdjustmentFormPage() {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!doc_no.trim()) e.doc_no = 'Doc number is required';
     if (!store_id) e.store_id = 'Store is required';
     if (!reason) e.reason = 'Reason is required';
     if (!doc_date) e.doc_date = 'Doc date is required';
@@ -48,7 +47,14 @@ export default function InvAdjustmentFormPage() {
     const validLines = lines
       .filter((l) => l.item_id && parseFloat(l.qty_delta) !== 0)
       .map((l) => ({ item_id: l.item_id, qty_delta: parseFloat(l.qty_delta) }));
-    const payload: CreateInvAdjustmentPayload = { doc_no: doc_no.trim(), store_id, reason, notes: notes.trim() || undefined, doc_date, lines: validLines };
+    const payload: CreateInvAdjustmentPayload = {
+      ...(doc_no.trim() && { doc_no: doc_no.trim() }),
+      store_id,
+      reason,
+      notes: notes.trim() || undefined,
+      doc_date,
+      lines: validLines,
+    };
     const adj = await createM.mutateAsync(payload);
     navigate(`/app/inventory/adjustments/${adj.id}`);
   };
@@ -66,7 +72,7 @@ export default function InvAdjustmentFormPage() {
       />
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Doc No" required error={errors.doc_no}><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" /></FormField>
+          <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} placeholder="Leave blank to auto-generate" className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Doc Date" required error={errors.doc_date}><input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Store" required error={errors.store_id}>
             <select value={store_id} onChange={(e) => setStoreId(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded">

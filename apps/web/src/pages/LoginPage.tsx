@@ -20,6 +20,8 @@ export default function LoginPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [bootstrappingId, setBootstrappingId] = useState<string | null>(null);
   const [newFarmName, setNewFarmName] = useState('');
 
   useEffect(() => {
@@ -53,6 +55,34 @@ export default function LoginPage() {
   const handleSelectTenant = (tenantId: string) => {
     setSelectedTenantId(tenantId);
     setTenantId(tenantId);
+  };
+
+  const handleDeleteTenant = async (tenantId: string) => {
+    if (!window.confirm('Remove this farm? This cannot be undone.')) return;
+    try {
+      setDeletingId(tenantId);
+      await devApi.deleteTenant(tenantId);
+      toast.success('Farm removed');
+      if (selectedTenantId === tenantId) setSelectedTenantId('');
+      await loadTenants();
+    } catch (error: any) {
+      const msg = error.message || 'Failed to remove farm';
+      toast.error(msg.includes('linked data') ? 'Farm has data. Use DB reset (migrate:fresh) to remove it.' : msg);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleBootstrapAccounts = async (tenantId: string) => {
+    try {
+      setBootstrappingId(tenantId);
+      const res = await devApi.bootstrapAccounts(tenantId);
+      toast.success(res?.message ?? 'Accounts bootstrapped');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to bootstrap accounts');
+    } finally {
+      setBootstrappingId(null);
+    }
   };
 
   const handleCreateTenant = async () => {
@@ -168,7 +198,7 @@ export default function LoginPage() {
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 font-mono">
                             {tenant.id.substring(0, 8)}...
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm space-x-2">
                             <button
                               onClick={() => handleSelectTenant(tenant.id)}
                               className={`px-3 py-1 rounded text-sm font-medium ${
@@ -178,6 +208,23 @@ export default function LoginPage() {
                               }`}
                             >
                               {selectedTenantId === tenant.id ? 'Selected' : 'Select'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleBootstrapAccounts(tenant.id)}
+                              disabled={bootstrappingId !== null}
+                              title="Add missing system accounts (e.g. for GRN post)"
+                              className="px-3 py-1 rounded text-sm font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {bootstrappingId === tenant.id ? '…' : 'Bootstrap accounts'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTenant(tenant.id)}
+                              disabled={deletingId !== null}
+                              className="px-3 py-1 rounded text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {deletingId === tenant.id ? '…' : 'Delete'}
                             </button>
                           </td>
                         </tr>

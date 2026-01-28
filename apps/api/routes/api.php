@@ -66,6 +66,8 @@ Route::prefix('dev')->middleware('dev')->group(function () {
     Route::get('tenants', [DevTenantController::class, 'index']);
     Route::post('tenants', [DevTenantController::class, 'store']);
     Route::post('tenants/{id}/activate', [DevTenantController::class, 'activate']);
+    Route::post('tenants/{id}/bootstrap-accounts', [DevTenantController::class, 'bootstrapAccounts']);
+    Route::delete('tenants/{id}', [DevTenantController::class, 'destroy']);
 });
 
 // Users (tenant_admin only)

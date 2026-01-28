@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Project;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateProjectRulesRequest extends FormRequest
@@ -29,11 +30,36 @@ class UpdateProjectRulesRequest extends FormRequest
             $landlordPct = $this->input('profit_split_landlord_pct');
             $hariPct = $this->input('profit_split_hari_pct');
 
-            if (abs(($landlordPct + $hariPct) - 100) > 0.01) {
-                $validator->errors()->add(
-                    'profit_split_landlord_pct',
-                    'The sum of landlord and hari percentages must equal 100'
-                );
+            // Get project to check if it's owner-operated
+            $projectId = $this->route('id');
+            $project = Project::with('party')->find($projectId);
+            $isOwnerOperated = $project && (
+                !$project->party || 
+                !in_array('HARI', $project->party->party_types ?? [])
+            );
+
+            if ($isOwnerOperated) {
+                // For owner-operated projects, hari_pct must be 0 and landlord_pct must be 100
+                if (abs($hariPct - 0) > 0.01) {
+                    $validator->errors()->add(
+                        'profit_split_hari_pct',
+                        'HARI percentage must be 0 for owner-operated projects'
+                    );
+                }
+                if (abs($landlordPct - 100) > 0.01) {
+                    $validator->errors()->add(
+                        'profit_split_landlord_pct',
+                        'Landlord percentage must be 100 for owner-operated projects'
+                    );
+                }
+            } else {
+                // For HARI projects, landlord + hari must equal 100
+                if (abs(($landlordPct + $hariPct) - 100) > 0.01) {
+                    $validator->errors()->add(
+                        'profit_split_landlord_pct',
+                        'The sum of landlord and hari percentages must equal 100'
+                    );
+                }
             }
         });
     }

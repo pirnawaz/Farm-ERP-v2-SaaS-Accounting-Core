@@ -14,7 +14,7 @@ class StoreInvTransferRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'doc_no' => ['required', 'string', 'max:100'],
+            'doc_no' => ['nullable', 'string', 'max:100'],
             'from_store_id' => ['required', 'uuid', 'exists:inv_stores,id', 'different:to_store_id'],
             'to_store_id' => ['required', 'uuid', 'exists:inv_stores,id', 'different:from_store_id'],
             'doc_date' => ['required', 'date', 'date_format:Y-m-d'],

@@ -144,7 +144,7 @@ function buildQueryString(params: Record<string, string | number | undefined | n
 
 export const apiClient = {
   get: <T>(endpoint: string): Promise<T> => {
-    return request<T>(endpoint, { method: 'GET' })
+    return request<T>(endpoint, { method: 'GET', cache: 'no-store' })
   },
 
   post: <T>(endpoint: string, data: unknown): Promise<T> => {

@@ -15,8 +15,11 @@ export interface TenantsResponse {
 
 export const devApi = {
   listTenants: () => apiClient.get<TenantsResponse>('/api/dev/tenants'),
-  createTenant: (payload: CreateTenantPayload) => 
+  createTenant: (payload: CreateTenantPayload) =>
     apiClient.post<TenantResponse>('/api/dev/tenants', payload),
-  activateTenant: (id: string) => 
+  activateTenant: (id: string) =>
     apiClient.post<TenantResponse>(`/api/dev/tenants/${id}/activate`, {}),
+  deleteTenant: (id: string) => apiClient.delete(`/api/dev/tenants/${id}`),
+  bootstrapAccounts: (id: string) =>
+    apiClient.post<{ message: string }>(`/api/dev/tenants/${id}/bootstrap-accounts`, {}),
 };

@@ -16,16 +16,20 @@ class ProjectRuleController extends Controller
 
         $project = Project::where('id', $id)
             ->where('tenant_id', $tenantId)
+            ->with('party')
             ->firstOrFail();
 
         $rule = ProjectRule::where('project_id', $project->id)->first();
+
+        // Check if project is owner-operated (no HARI party)
+        $isOwnerOperated = !$project->party || !in_array('HARI', $project->party->party_types ?? []);
 
         // Return default template if no rules exist
         if (!$rule) {
             return response()->json([
                 'project_id' => $project->id,
-                'profit_split_landlord_pct' => 50.00,
-                'profit_split_hari_pct' => 50.00,
+                'profit_split_landlord_pct' => $isOwnerOperated ? 100.00 : 50.00,
+                'profit_split_hari_pct' => $isOwnerOperated ? 0.00 : 50.00,
                 'kamdari_pct' => 0.00,
                 'kamdar_party_id' => null,
                 'kamdari_order' => 'BEFORE_SPLIT',

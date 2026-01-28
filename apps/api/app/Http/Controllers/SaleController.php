@@ -85,7 +85,15 @@ class SaleController extends Controller
             }
         }
 
-        $sale = DB::transaction(function () use ($request, $tenantId, $saleDate, $dueDate, $amount) {
+        $saleNo = $request->filled('sale_no') ? trim($request->sale_no) : null;
+        if ($saleNo === '') {
+            $saleNo = null;
+        }
+
+        $sale = DB::transaction(function () use ($request, $tenantId, $saleDate, $dueDate, $amount, $saleNo) {
+            if ($saleNo === null) {
+                $saleNo = $this->generateSaleNo($tenantId);
+            }
             $sale = Sale::create([
                 'tenant_id' => $tenantId,
                 'buyer_party_id' => $request->buyer_party_id,
@@ -93,7 +101,7 @@ class SaleController extends Controller
                 'crop_cycle_id' => $request->crop_cycle_id,
                 'amount' => $amount,
                 'posting_date' => $request->posting_date,
-                'sale_no' => $request->sale_no,
+                'sale_no' => $saleNo,
                 'sale_date' => $saleDate,
                 'due_date' => $dueDate,
                 'notes' => $request->notes,
@@ -199,6 +207,22 @@ class SaleController extends Controller
         });
 
         return response()->json($sale->load(['buyerParty', 'project', 'cropCycle', 'lines.item', 'lines.store']));
+    }
+
+    private function generateSaleNo(string $tenantId): string
+    {
+        $last = Sale::where('tenant_id', $tenantId)
+            ->whereNotNull('sale_no')
+            ->where('sale_no', 'like', 'SALE-%')
+            ->orderByRaw('LENGTH(sale_no) DESC, sale_no DESC')
+            ->first();
+
+        $next = 1;
+        if ($last && preg_match('/^SALE-(\d+)$/', $last->sale_no, $m)) {
+            $next = (int) $m[1] + 1;
+        }
+
+        return 'SALE-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }
 
     public function destroy(Request $request, string $id)

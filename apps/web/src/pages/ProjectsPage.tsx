@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProjects, useCreateProjectFromAllocation } from '../hooks/useProjects';
 import { useLandAllocations } from '../hooks/useLandAllocations';
 import { DataTable, type Column } from '../components/DataTable';
@@ -13,6 +14,7 @@ import type { Project, CreateProjectFromAllocationPayload } from '../types';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: projects, isLoading } = useProjects();
   const { data: allocations } = useLandAllocations();
   const createFromAllocationMutation = useCreateProjectFromAllocation();
@@ -27,11 +29,13 @@ export default function ProjectsPage() {
 
   const handleCreate = async () => {
     try {
-      // Check if this is the first project
       const isFirstProject = !projects || projects.length === 0;
-      
-      await createFromAllocationMutation.mutateAsync(formData);
-      
+      const created = await createFromAllocationMutation.mutateAsync(formData);
+      queryClient.setQueryData<Project[]>(['projects', undefined], (old) => {
+        if (!old) return [created];
+        return [...old, created].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      });
+      await queryClient.refetchQueries({ queryKey: ['projects', undefined] });
       if (isFirstProject) {
         toast.success('Your first project has been created. You can now track costs and activities.');
       } else {
@@ -138,7 +142,7 @@ export default function ProjectsPage() {
               <option value="">Select allocation</option>
               {availableAllocations.map((alloc) => (
                 <option key={alloc.id} value={alloc.id}>
-                  {alloc.land_parcel?.name} - {alloc.party?.name} ({alloc.allocated_acres} acres)
+                  {alloc.land_parcel?.name} - {alloc.party?.name || 'Owner-operated'} ({alloc.allocated_acres} acres)
                 </option>
               ))}
             </select>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTenant } from '../hooks/useTenant';
 import { useAuth, useRole } from '../hooks';
 import { useModules } from '../contexts/ModulesContext';
@@ -110,6 +111,7 @@ export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { tenantId, setTenantId } = useTenant();
   const { userRole, logout } = useAuth();
   const { hasRole } = useRole();
@@ -133,11 +135,14 @@ export function AppLayout() {
   });
 
   const handleLogout = () => {
+    queryClient.clear();
     logout();
     navigate('/login');
   };
 
   const handleSwitchFarm = () => {
+    // Clear React Query cache so no stale tenant data is shown after switching farms
+    queryClient.clear();
     // Clear tenant, role, and auth token
     setTenantId('');
     logout();

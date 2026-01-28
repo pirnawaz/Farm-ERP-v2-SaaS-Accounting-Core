@@ -254,6 +254,23 @@ export default function SaleFormPage() {
                 </button>
               )}
             </div>
+            {(items && items.length === 0) || (stores && stores.length === 0) ? (
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                {(items?.length === 0) && (stores?.length === 0)
+                  ? 'No inventory items or stores yet. Create them in '
+                  : (items?.length === 0)
+                    ? 'No inventory items yet. Create them in '
+                    : 'No stores yet. Create them in '}
+                {(items?.length === 0) && (
+                  <Link to="/app/inventory/items" className="text-[#1F6F5C] font-medium hover:underline">Inventory → Items</Link>
+                )}
+                {(items?.length === 0) && (stores?.length === 0) && ' and '}
+                {(stores?.length === 0) && (
+                  <Link to="/app/inventory/stores" className="text-[#1F6F5C] font-medium hover:underline">Inventory → Stores</Link>
+                )}
+                {' first.'}
+              </div>
+            ) : null}
             {errors.sale_lines && (
               <p className="text-red-600 text-sm mb-2">{errors.sale_lines}</p>
             )}
@@ -352,7 +369,7 @@ export default function SaleFormPage() {
               value={formData.sale_no}
               onChange={(e) => setFormData({ ...formData, sale_no: e.target.value })}
               disabled={!canEdit}
-              placeholder="e.g., SALE-001"
+              placeholder="Leave blank to auto-generate"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             />
           </FormField>

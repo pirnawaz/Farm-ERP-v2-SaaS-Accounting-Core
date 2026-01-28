@@ -24,20 +24,27 @@ export default function LandAllocationsPage() {
   const [formData, setFormData] = useState<CreateLandAllocationPayload>({
     crop_cycle_id: '',
     land_parcel_id: '',
-    party_id: '',
+    party_id: null,
     allocated_acres: '',
+    allocation_mode: 'OWNER',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const canCreate = hasRole(['tenant_admin', 'accountant']);
   const hariParties = parties?.filter((p) => p.party_types.includes('HARI')) || [];
+  const hasHariParties = hariParties.length > 0;
+  
+  // Initialize allocation mode based on HARI parties availability
+  const [allocationMode, setAllocationMode] = useState<'OWNER' | 'HARI'>('OWNER');
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
     if (!formData.crop_cycle_id) newErrors.crop_cycle_id = 'Crop cycle is required';
     if (!formData.land_parcel_id) newErrors.land_parcel_id = 'Land parcel is required';
-    if (!formData.party_id) newErrors.party_id = 'HARI party is required';
+    if (allocationMode === 'HARI' && !formData.party_id) {
+      newErrors.party_id = 'HARI party is required';
+    }
     if (!formData.allocated_acres || parseFloat(formData.allocated_acres as string) <= 0) {
       newErrors.allocated_acres = 'Valid allocated acres is required';
     }
@@ -70,10 +77,16 @@ export default function LandAllocationsPage() {
     if (!validateForm()) return;
     
     try {
-      await createMutation.mutateAsync(formData);
+      const payload: CreateLandAllocationPayload = {
+        ...formData,
+        allocation_mode: allocationMode,
+        party_id: allocationMode === 'OWNER' ? null : formData.party_id,
+      };
+      await createMutation.mutateAsync(payload);
       toast.success('Land allocation created successfully');
       setShowCreateModal(false);
-      setFormData({ crop_cycle_id: '', land_parcel_id: '', party_id: '', allocated_acres: '' });
+      setFormData({ crop_cycle_id: '', land_parcel_id: '', party_id: null, allocated_acres: '', allocation_mode: 'OWNER' });
+      setAllocationMode('OWNER');
       setErrors({});
     } catch (error: any) {
       toast.error(error.message || 'Failed to create land allocation');
@@ -87,7 +100,7 @@ export default function LandAllocationsPage() {
     },
     {
       header: 'HARI',
-      accessor: (row) => row.party?.name || 'N/A',
+      accessor: (row) => row.party?.name || 'Owner-operated',
     },
     { header: 'Allocated Acres', accessor: 'allocated_acres' },
     {
@@ -120,7 +133,10 @@ export default function LandAllocationsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Land Allocations</h1>
         {canCreate && (
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              setAllocationMode('OWNER');
+              setShowCreateModal(true);
+            }}
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Allocation
@@ -159,6 +175,7 @@ export default function LandAllocationsPage() {
         onClose={() => {
           setShowCreateModal(false);
           setErrors({});
+          setAllocationMode('OWNER');
         }}
         title="Create Land Allocation"
         size="lg"
@@ -198,23 +215,61 @@ export default function LandAllocationsPage() {
               ))}
             </select>
           </FormField>
-          <FormField label="HARI Party" required error={errors.party_id}>
-            <select
-              value={formData.party_id}
-              onChange={(e) => {
-                setFormData({ ...formData, party_id: e.target.value });
-                setErrors({ ...errors, party_id: '' });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">Select HARI party</option>
-              {hariParties.map((party) => (
-                <option key={party.id} value={party.id}>
-                  {party.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
+          {hasHariParties && (
+            <FormField label="Allocation Mode" required>
+              <div className="flex space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="allocation_mode"
+                    value="OWNER"
+                    checked={allocationMode === 'OWNER'}
+                    onChange={(e) => {
+                      setAllocationMode('OWNER');
+                      setFormData({ ...formData, party_id: null });
+                      setErrors({ ...errors, party_id: '' });
+                    }}
+                    className="mr-2"
+                  />
+                  Owner-operated (no HARI)
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="allocation_mode"
+                    value="HARI"
+                    checked={allocationMode === 'HARI'}
+                    onChange={(e) => {
+                      setAllocationMode('HARI');
+                      setFormData({ ...formData, party_id: '' });
+                      setErrors({ ...errors, party_id: '' });
+                    }}
+                    className="mr-2"
+                  />
+                  Allocate to HARI
+                </label>
+              </div>
+            </FormField>
+          )}
+          {allocationMode === 'HARI' && (
+            <FormField label="HARI Party" required error={errors.party_id}>
+              <select
+                value={formData.party_id || ''}
+                onChange={(e) => {
+                  setFormData({ ...formData, party_id: e.target.value || null });
+                  setErrors({ ...errors, party_id: '' });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">Select HARI party</option>
+                {hariParties.map((party) => (
+                  <option key={party.id} value={party.id}>
+                    {party.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <FormField label="Allocated Acres" required error={errors.allocated_acres}>
             <input
               type="number"

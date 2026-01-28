@@ -14,7 +14,7 @@ class StoreLabWorkLogRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'doc_no' => ['required', 'string', 'max:100'],
+            'doc_no' => ['nullable', 'string', 'max:100'],
             'worker_id' => ['required', 'uuid', 'exists:lab_workers,id'],
             'work_date' => ['required', 'date', 'date_format:Y-m-d'],
             'crop_cycle_id' => ['required', 'uuid', 'exists:crop_cycles,id'],

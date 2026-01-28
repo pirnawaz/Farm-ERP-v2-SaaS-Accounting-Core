@@ -68,6 +68,7 @@ class InvIssuePostReducesStockAndCreatesAllocationsTest extends TestCase
             ->postJson('/api/v1/inventory/issues', [
                 'doc_no' => 'ISS-1', 'store_id' => $store->id, 'crop_cycle_id' => $cc->id, 'project_id' => $project->id,
                 'doc_date' => '2024-06-15', 'lines' => [['item_id' => $item->id, 'qty' => 2]],
+                'allocation_mode' => 'HARI_ONLY', 'hari_id' => $party->id,
             ]);
         $cr->assertStatus(201);
         $issueId = $cr->json('id');
@@ -130,6 +131,7 @@ class InvIssuePostReducesStockAndCreatesAllocationsTest extends TestCase
             ->postJson('/api/v1/inventory/issues', [
                 'doc_no' => 'ISS-2', 'store_id' => $store->id, 'crop_cycle_id' => $cc->id, 'project_id' => $project->id,
                 'doc_date' => '2024-06-15', 'machine_id' => $machine->id, 'lines' => [['item_id' => $item->id, 'qty' => 2]],
+                'allocation_mode' => 'HARI_ONLY', 'hari_id' => $party->id,
             ]);
         $cr->assertStatus(201);
         $issueId = $cr->json('id');
@@ -175,6 +177,7 @@ class InvIssuePostReducesStockAndCreatesAllocationsTest extends TestCase
             ->postJson('/api/v1/inventory/issues', [
                 'doc_no' => 'ISS-3', 'store_id' => $store->id, 'crop_cycle_id' => $cc->id, 'project_id' => $project->id,
                 'doc_date' => '2024-06-15', 'lines' => [['item_id' => $item->id, 'qty' => 2]],
+                'allocation_mode' => 'HARI_ONLY', 'hari_id' => $party->id,
             ]);
         $cr->assertStatus(201);
         $issueId = $cr->json('id');

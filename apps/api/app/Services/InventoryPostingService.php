@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\InvAdjustment;
 use App\Models\InvAdjustmentLine;
 use App\Models\InvGrn;
@@ -24,7 +25,9 @@ class InventoryPostingService
     public function __construct(
         private SystemAccountService $accountService,
         private ReversalService $reversalService,
-        private InventoryStockService $stockService
+        private InventoryStockService $stockService,
+        private InventoryAllocationResolver $allocationResolver,
+        private SystemPartyService $partyService
     ) {}
 
     /**
@@ -126,6 +129,15 @@ class InventoryPostingService
                 throw new \Exception('Crop cycle and project are required for posting an issue.');
             }
 
+            // Validate allocation_mode is set and properly configured
+            if (!$issue->allocation_mode) {
+                throw new \Exception('allocation_mode is required for posting an inventory issue.');
+            }
+
+            if (!$issue->validateAllocationMode()) {
+                throw new \Exception('allocation_mode is not properly configured. Check hari_id, sharing_rule_id, or percentage fields.');
+            }
+
             $cropCycle = CropCycle::where('id', $issue->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
             if ($cropCycle->status !== 'OPEN') {
                 throw new \Exception('Cannot post issue: crop cycle is closed.');
@@ -179,9 +191,15 @@ class InventoryPostingService
                 $line->update(['unit_cost_snapshot' => $wac, 'line_total' => $lineTotal]);
             }
 
+            // Get accounts
+            // Account usage rules:
+            // - DUE_FROM_HARI (Asset) → shared expenses only (receivable from Hari)
+            // - PAYABLE_HARI (Liability) → profit share / settlements only
+            // - PROFIT_DISTRIBUTION (Equity) → settlements only, never for expenses
             $inputsExpenseAccount = $this->accountService->getByCode($tenantId, 'INPUTS_EXPENSE');
             $inventoryAccount = $this->accountService->getByCode($tenantId, 'INVENTORY_INPUTS');
 
+            // Create base ledger entries: Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
@@ -199,16 +217,168 @@ class InventoryPostingService
                 'currency_code' => 'GBP',
             ]);
 
-            AllocationRow::create([
-                'tenant_id' => $tenantId,
-                'posting_group_id' => $postingGroup->id,
-                'project_id' => $issue->project_id,
-                'party_id' => $project->party_id,
-                'allocation_type' => 'POOL_SHARE',
-                'amount' => (string) $totalValue,
-                'machine_id' => $issue->machine_id,
-                'rule_snapshot' => ['source' => 'inv_issue'],
-            ]);
+            // Get landlord party (used in multiple allocation modes)
+            $landlordParty = $this->partyService->ensureSystemLandlordParty($tenantId);
+            $ruleSnapshot = ['source' => 'inv_issue', 'cost_type' => 'INVENTORY_INPUT'];
+
+            if ($issue->allocation_mode === 'HARI_ONLY') {
+                // 100% to Hari
+                $hariPartyId = $issue->hari_id;
+                if (!$hariPartyId) {
+                    throw new \Exception('hari_id is required for HARI_ONLY allocation_mode');
+                }
+
+                AllocationRow::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'project_id' => $issue->project_id,
+                    'party_id' => $hariPartyId,
+                    'allocation_type' => 'HARI_ONLY',
+                    'amount' => (string) $totalValue,
+                    'machine_id' => $issue->machine_id,
+                    'rule_snapshot' => array_merge($ruleSnapshot, [
+                        'allocation_mode' => 'HARI_ONLY',
+                        'hari_id' => $hariPartyId,
+                    ]),
+                ]);
+
+                // HARI_ONLY: Hari owes the full amount (payable)
+                // Dr PAYABLE_HARI (Hari owes), Cr PROFIT_DISTRIBUTION (clearing)
+                $payableHariAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
+                $clearingAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION');
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $payableHariAccount->id,
+                    'debit_amount' => (string) $totalValue,
+                    'credit_amount' => 0,
+                    'currency_code' => 'GBP',
+                ]);
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $clearingAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => (string) $totalValue,
+                    'currency_code' => 'GBP',
+                ]);
+
+            } elseif ($issue->allocation_mode === 'FARMER_ONLY') {
+                // 100% to Landlord (Farmer)
+                AllocationRow::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'project_id' => $issue->project_id,
+                    'party_id' => $landlordParty->id,
+                    'allocation_type' => 'POOL_SHARE',
+                    'amount' => (string) $totalValue,
+                    'machine_id' => $issue->machine_id,
+                    'rule_snapshot' => array_merge($ruleSnapshot, [
+                        'allocation_mode' => 'FARMER_ONLY',
+                        'landlord_party_id' => $landlordParty->id,
+                    ]),
+                ]);
+
+                // No settlement balance needed - Landlord funded it, Landlord owns it
+
+            } else {
+                // SHARED: Split between Landlord and Hari
+                $resolved = $this->allocationResolver->resolveShares(
+                    $issue->project_id,
+                    $postingDateObj,
+                    $issue->sharing_rule_id,
+                    $issue->landlord_share_pct ? (float) $issue->landlord_share_pct : null,
+                    $issue->hari_share_pct ? (float) $issue->hari_share_pct : null
+                );
+
+                $landlordShare = $totalValue * ($resolved['landlord_pct'] / 100);
+                $hariShare = $totalValue * ($resolved['hari_pct'] / 100);
+
+                // Create AllocationRows for both parties
+                AllocationRow::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'project_id' => $issue->project_id,
+                    'party_id' => $resolved['landlord_party_id'],
+                    'allocation_type' => 'POOL_SHARE',
+                    'amount' => (string) $landlordShare,
+                    'machine_id' => $issue->machine_id,
+                    'rule_snapshot' => array_merge($ruleSnapshot, $resolved['rule_snapshot'], [
+                        'allocation_mode' => 'SHARED',
+                        'landlord_share_amount' => (string) $landlordShare,
+                    ]),
+                ]);
+
+                AllocationRow::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'project_id' => $issue->project_id,
+                    'party_id' => $resolved['hari_party_id'],
+                    'allocation_type' => 'POOL_SHARE',
+                    'amount' => (string) $hariShare,
+                    'machine_id' => $issue->machine_id,
+                    'rule_snapshot' => array_merge($ruleSnapshot, $resolved['rule_snapshot'], [
+                        'allocation_mode' => 'SHARED',
+                        'hari_share_amount' => (string) $hariShare,
+                    ]),
+                ]);
+
+                // SHARED expenses: Hari owes his share (receivable), reduce landlord expense
+                // Correct accounting: Dr DUE_FROM_HARI (hari_share), Cr INPUTS_EXPENSE (hari_share)
+                // This reduces the expense to landlord's share and creates a receivable from Hari
+                // NO profit distribution accounts should be used for expenses
+                if ($hariShare > 0.01) {
+                    // Ensure DUE_FROM_HARI account exists (create if missing for backward compatibility)
+                    try {
+                        $dueFromHariAccount = $this->accountService->getByCode($tenantId, 'DUE_FROM_HARI');
+                    } catch (\Exception $e) {
+                        // Account doesn't exist, create it
+                        $dueFromHariAccount = Account::create([
+                            'tenant_id' => $tenantId,
+                            'code' => 'DUE_FROM_HARI',
+                            'name' => 'Due from Hari',
+                            'type' => 'asset',
+                            'is_system' => true,
+                        ]);
+                    }
+                    
+                    // Validate: Ensure we're not using profit distribution for expenses
+                    $profitDistributionAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION');
+                    if ($dueFromHariAccount->id === $profitDistributionAccount->id) {
+                        throw new \Exception('DUE_FROM_HARI account must not be the same as PROFIT_DISTRIBUTION account');
+                    }
+                    
+                    LedgerEntry::create([
+                        'tenant_id' => $tenantId,
+                        'posting_group_id' => $postingGroup->id,
+                        'account_id' => $dueFromHariAccount->id,
+                        'debit_amount' => (string) $hariShare,
+                        'credit_amount' => 0,
+                        'currency_code' => 'GBP',
+                    ]);
+                    LedgerEntry::create([
+                        'tenant_id' => $tenantId,
+                        'posting_group_id' => $postingGroup->id,
+                        'account_id' => $inputsExpenseAccount->id,
+                        'debit_amount' => 0,
+                        'credit_amount' => (string) $hariShare,
+                        'currency_code' => 'GBP',
+                    ]);
+                }
+                
+                // Landlord's share: Already recorded in INPUTS_EXPENSE (net after Hari share reduction)
+                // No additional entries needed - the expense is already reduced to landlord's share
+            }
+
+            // Verify debits == credits
+            $totalDebits = LedgerEntry::where('posting_group_id', $postingGroup->id)
+                ->sum('debit_amount');
+            $totalCredits = LedgerEntry::where('posting_group_id', $postingGroup->id)
+                ->sum('credit_amount');
+
+            if (abs($totalDebits - $totalCredits) > 0.01) {
+                throw new \Exception('Debits and credits do not balance after inventory issue posting');
+            }
 
             $issue->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 

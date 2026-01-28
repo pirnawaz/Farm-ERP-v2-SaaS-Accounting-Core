@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useCreateIssue } from '../../hooks/useInventory';
 import { useCropCycles } from '../../hooks/useCropCycles';
 import { useProjects } from '../../hooks/useProjects';
@@ -9,6 +10,9 @@ import { useModules } from '../../contexts/ModulesContext';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
+import { useParties } from '../../hooks/useParties';
+import { useProjectRule } from '../../hooks/useProjectRules';
+import { shareRulesApi } from '../../api/shareRules';
 import type { CreateInvIssuePayload } from '../../types';
 
 type Line = { item_id: string; qty: string };
@@ -29,13 +33,66 @@ export default function InvIssueFormPage() {
   const [machine_id, setMachineId] = useState('');
   const [doc_date, setDocDate] = useState(new Date().toISOString().split('T')[0]);
   const [lines, setLines] = useState<Line[]>([{ item_id: '', qty: '' }]);
+  const [allocation_mode, setAllocationMode] = useState<'SHARED' | 'HARI_ONLY' | 'FARMER_ONLY'>('SHARED');
+  const [hari_id, setHariId] = useState('');
+  /** __project__ = use project rule (grey out %), __manual__ = use percentages below, or share rule uuid */
+  const [splitSource, setSplitSource] = useState<'__project__' | '__manual__' | string>('__manual__');
+  const [landlord_share_pct, setLandlordSharePct] = useState('');
+  const [hari_share_pct, setHariSharePct] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { data: projectsForCrop } = useProjects(crop_cycle_id || undefined);
+  const { data: projectRule } = useProjectRule(project_id || '');
+  const { data: parties } = useParties();
+  const { data: shareRules } = useQuery({
+    queryKey: ['shareRules', crop_cycle_id],
+    queryFn: () => shareRulesApi.list({ crop_cycle_id: crop_cycle_id || undefined, is_active: true }),
+    enabled: !!crop_cycle_id && allocation_mode === 'SHARED',
+  });
   const { isModuleEnabled } = useModules();
   const machineryEnabled = isModuleEnabled('machinery');
   const { data: machines } = useMachinesQuery(undefined);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
+
+  // Get hari parties (parties with HARI type)
+  const hariParties = parties?.filter((p) => p.party_types?.includes('HARI')) || [];
+  
+  // Get project's hari party if unique
+  const selectedProject = projectsForCrop?.find((p) => p.id === project_id);
+  const projectHariPartyId = selectedProject?.party_id;
+
+  // Set default hari_id from project if unique and HARI_ONLY mode
+  useEffect(() => {
+    if (allocation_mode === 'HARI_ONLY' && projectHariPartyId && !hari_id) {
+      setHariId(projectHariPartyId);
+    }
+  }, [allocation_mode, projectHariPartyId, hari_id]);
+
+  // Sync display % from project rule when "Use project values"
+  useEffect(() => {
+    if (allocation_mode === 'SHARED' && splitSource === '__project__' && projectRule) {
+      setLandlordSharePct(String(projectRule.profit_split_landlord_pct ?? ''));
+      setHariSharePct(String(projectRule.profit_split_hari_pct ?? ''));
+    }
+  }, [allocation_mode, splitSource, projectRule]);
+
+  // Default to "Use project values" when project has rules and we haven't chosen manual yet
+  useEffect(() => {
+    if (allocation_mode === 'SHARED' && projectRule && splitSource === '__manual__' && !landlord_share_pct && !hari_share_pct) {
+      const lp = projectRule.profit_split_landlord_pct;
+      const hp = projectRule.profit_split_hari_pct;
+      if (lp != null && hp != null && !Number.isNaN(parseFloat(String(lp))) && !Number.isNaN(parseFloat(String(hp)))) {
+        setSplitSource('__project__');
+      }
+    }
+  }, [allocation_mode, projectRule, splitSource, landlord_share_pct, hari_share_pct]);
+
+  // Fall back to "Use percentages below" when project has no rules but we're on "Use project values"
+  useEffect(() => {
+    if (allocation_mode === 'SHARED' && splitSource === '__project__' && !projectRule) {
+      setSplitSource('__manual__');
+    }
+  }, [allocation_mode, splitSource, projectRule]);
 
   const addLine = () => setLines((l) => [...l, { item_id: '', qty: '' }]);
   const removeLine = (i: number) => setLines((l) => l.filter((_, idx) => idx !== i));
@@ -44,13 +101,43 @@ export default function InvIssueFormPage() {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!doc_no.trim()) e.doc_no = 'Doc number is required';
     if (!store_id) e.store_id = 'Store is required';
     if (!crop_cycle_id) e.crop_cycle_id = 'Crop cycle is required';
     if (!project_id) e.project_id = 'Project is required';
     if (!doc_date) e.doc_date = 'Doc date is required';
     const validLines = lines.filter((l) => l.item_id && parseFloat(l.qty) > 0);
     if (validLines.length === 0) e.lines = 'At least one line with item and qty > 0 is required';
+    
+    // Validate allocation mode
+    if (!allocation_mode) {
+      e.allocation_mode = 'Cost ownership is required';
+    } else if (allocation_mode === 'HARI_ONLY' && !hari_id) {
+      e.hari_id = 'Hari is required for Hari Only allocation';
+    } else if (allocation_mode === 'SHARED') {
+      const useRule = splitSource !== '__project__' && splitSource !== '__manual__';
+      const useProject = splitSource === '__project__';
+      const useManual = splitSource === '__manual__';
+      if (useRule) {
+        // no extra validation
+      } else if (useProject) {
+        if (!projectRule) e.allocation_mode = 'Project rules required for "Use project values". Set rules for this project first.';
+        else if (projectRule.profit_split_landlord_pct == null || projectRule.profit_split_hari_pct == null)
+          e.allocation_mode = 'Project rule must define landlord and hari split %.';
+      } else if (useManual) {
+        if (!landlord_share_pct || !hari_share_pct) {
+          e.allocation_mode = 'Both landlord and hari percentages are required';
+        } else {
+          const landlordPct = parseFloat(landlord_share_pct);
+          const hariPct = parseFloat(hari_share_pct);
+          if (isNaN(landlordPct) || isNaN(hariPct) || Math.abs(landlordPct + hariPct - 100) > 0.01) {
+            e.landlord_share_pct = 'Landlord and Hari percentages must sum to 100';
+          }
+        }
+      } else {
+        e.allocation_mode = 'Choose "Use project values", "Use percentages below", or a sharing rule';
+      }
+    }
+    
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -61,7 +148,7 @@ export default function InvIssueFormPage() {
       .filter((l) => l.item_id && parseFloat(l.qty) > 0)
       .map((l) => ({ item_id: l.item_id, qty: parseFloat(l.qty) }));
     const payload: CreateInvIssuePayload = {
-      doc_no: doc_no.trim(),
+      ...(doc_no.trim() && { doc_no: doc_no.trim() }),
       store_id,
       crop_cycle_id,
       project_id,
@@ -69,6 +156,12 @@ export default function InvIssueFormPage() {
       machine_id: machine_id || undefined,
       doc_date,
       lines: validLines,
+      allocation_mode,
+      ...(allocation_mode === 'HARI_ONLY' && hari_id ? { hari_id } : {}),
+      ...(allocation_mode === 'SHARED' && splitSource !== '__project__' && splitSource !== '__manual__' ? { sharing_rule_id: splitSource } : {}),
+      ...(allocation_mode === 'SHARED' && (splitSource === '__project__' || splitSource === '__manual__') && landlord_share_pct && hari_share_pct
+        ? { landlord_share_pct: parseFloat(landlord_share_pct), hari_share_pct: parseFloat(hari_share_pct) }
+        : {}),
     };
     const issue = await createM.mutateAsync(payload);
     navigate(`/app/inventory/issues/${issue.id}`);
@@ -88,8 +181,8 @@ export default function InvIssueFormPage() {
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Doc No" required error={errors.doc_no}>
-            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" />
+          <FormField label="Doc No">
+            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} placeholder="Leave blank to auto-generate" className="w-full px-3 py-2 border rounded" />
           </FormField>
           <FormField label="Doc Date" required error={errors.doc_date}>
             <input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" />
@@ -132,6 +225,134 @@ export default function InvIssueFormPage() {
               </select>
             </FormField>
           )}
+        </div>
+
+        <div className="border-t pt-4">
+          <h3 className="font-medium mb-4">Cost Ownership</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Cost Ownership" required error={errors.allocation_mode}>
+              <select
+                value={allocation_mode}
+                onChange={(e) => {
+                  setAllocationMode(e.target.value as 'SHARED' | 'HARI_ONLY' | 'FARMER_ONLY');
+                if (e.target.value !== 'HARI_ONLY') setHariId('');
+                if (e.target.value !== 'SHARED') {
+                  setSplitSource('__manual__');
+                  setLandlordSharePct('');
+                  setHariSharePct('');
+                }
+                }}
+                disabled={!canEdit}
+                className="w-full px-3 py-2 border rounded"
+              >
+                <option value="SHARED">Shared</option>
+                <option value="HARI_ONLY">Hari Only</option>
+                <option value="FARMER_ONLY">Landlord Only</option>
+              </select>
+            </FormField>
+
+            {allocation_mode === 'HARI_ONLY' && (
+              <FormField label="Hari" required error={errors.hari_id}>
+                <select
+                  value={hari_id}
+                  onChange={(e) => setHariId(e.target.value)}
+                  disabled={!canEdit}
+                  className="w-full px-3 py-2 border rounded"
+                >
+                  <option value="">Select Hari</option>
+                  {hariParties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            )}
+
+            {allocation_mode === 'SHARED' && (
+              <>
+                <FormField label="Split source" error={errors.allocation_mode}>
+                  <select
+                    value={splitSource}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSplitSource(v);
+                      if (v === '__manual__') {
+                        if (!landlord_share_pct && !hari_share_pct && projectRule) {
+                          setLandlordSharePct(String(projectRule.profit_split_landlord_pct ?? ''));
+                          setHariSharePct(String(projectRule.profit_split_hari_pct ?? ''));
+                        }
+                      } else if (v !== '__project__') {
+                        setLandlordSharePct('');
+                        setHariSharePct('');
+                      }
+                    }}
+                    disabled={!canEdit}
+                    className="w-full px-3 py-2 border rounded"
+                  >
+                    <option value="__project__" disabled={!projectRule}>
+                      {projectRule ? 'Use project values' : 'Use project values (set project rules first)'}
+                    </option>
+                    <option value="__manual__">Use percentages below</option>
+                    {shareRules?.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </FormField>
+
+                {splitSource === '__project__' && (
+                  <>
+                    <FormField label="Landlord Share %">
+                      <input
+                        type="text"
+                        readOnly
+                        value={projectRule ? (projectRule.profit_split_landlord_pct ?? '—') : '—'}
+                        className="w-full px-3 py-2 border rounded bg-gray-100 text-gray-600 cursor-not-allowed"
+                      />
+                    </FormField>
+                    <FormField label="Hari Share %">
+                      <input
+                        type="text"
+                        readOnly
+                        value={projectRule ? (projectRule.profit_split_hari_pct ?? '—') : '—'}
+                        className="w-full px-3 py-2 border rounded bg-gray-100 text-gray-600 cursor-not-allowed"
+                      />
+                    </FormField>
+                  </>
+                )}
+                {splitSource === '__manual__' && (
+                  <>
+                    <FormField label="Landlord Share %" error={errors.landlord_share_pct}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={landlord_share_pct}
+                        onChange={(e) => setLandlordSharePct(e.target.value)}
+                        disabled={!canEdit}
+                        className="w-full px-3 py-2 border rounded"
+                        placeholder="50"
+                      />
+                    </FormField>
+                    <FormField label="Hari Share %" error={errors.hari_share_pct}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={hari_share_pct}
+                        onChange={(e) => setHariSharePct(e.target.value)}
+                        disabled={!canEdit}
+                        className="w-full px-3 py-2 border rounded"
+                        placeholder="50"
+                      />
+                    </FormField>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <div>

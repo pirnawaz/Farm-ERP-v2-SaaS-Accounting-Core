@@ -149,9 +149,10 @@ export interface LandAllocation {
   tenant_id: string;
   crop_cycle_id: string;
   land_parcel_id: string;
-  party_id: string;
+  party_id: string | null;
   allocated_acres: string;
   created_at: string;
+  allocation_mode?: 'OWNER' | 'HARI';
   crop_cycle?: CropCycle;
   land_parcel?: LandParcel;
   party?: Party;
@@ -215,6 +216,19 @@ export interface PostTransactionRequest {
   idempotency_key: string;
 }
 
+export interface AllocationRow {
+  id: string;
+  tenant_id: string;
+  posting_group_id: string;
+  project_id?: string;
+  party_id: string;
+  allocation_type: string;
+  amount: string;
+  machine_id?: string;
+  rule_snapshot?: any;
+  party?: Party;
+}
+
 export interface PostingGroup {
   id: string;
   tenant_id: string;
@@ -223,6 +237,8 @@ export interface PostingGroup {
   source_id: string;
   crop_cycle_id?: string;
   created_at: string;
+  allocation_rows?: AllocationRow[];
+  ledger_entries?: any[];
 }
 
 // Settlement
@@ -472,7 +488,7 @@ export interface UpdateLabWorkerPayload {
 
 export interface CreateLabWorkLogPayload {
   machine_id?: string;
-  doc_no: string;
+  doc_no?: string;
   worker_id: string;
   work_date: string;
   crop_cycle_id: string;
@@ -1394,8 +1410,9 @@ export interface CreateCropCyclePayload {
 export interface CreateLandAllocationPayload {
   crop_cycle_id: string;
   land_parcel_id: string;
-  party_id: string;
+  party_id: string | null;
   allocated_acres: number | string;
+  allocation_mode?: 'OWNER' | 'HARI';
 }
 
 export interface CreateProjectPayload {
@@ -1525,6 +1542,11 @@ export interface InvIssue {
   status: 'DRAFT' | 'POSTED' | 'REVERSED';
   posting_date?: string;
   posting_group_id?: string;
+  allocation_mode: 'SHARED' | 'HARI_ONLY' | 'FARMER_ONLY';
+  hari_id?: string;
+  sharing_rule_id?: string;
+  landlord_share_pct?: string;
+  hari_share_pct?: string;
   created_at: string;
   updated_at: string;
   store?: InvStore;
@@ -1533,6 +1555,8 @@ export interface InvIssue {
   machine?: Machine;
   lines?: InvIssueLine[];
   posting_group?: PostingGroup;
+  hari?: Party;
+  sharing_rule?: ShareRule;
 }
 
 export interface InvStockBalance {
@@ -1567,7 +1591,7 @@ export interface InvStockMovement {
 }
 
 export interface CreateInvGrnPayload {
-  doc_no: string;
+  doc_no?: string;
   supplier_party_id?: string;
   store_id: string;
   doc_date: string;
@@ -1593,8 +1617,13 @@ export interface ReverseInvGrnRequest {
 }
 
 export interface CreateInvIssuePayload {
+  allocation_mode?: 'SHARED' | 'HARI_ONLY' | 'FARMER_ONLY';
+  hari_id?: string;
+  sharing_rule_id?: string;
+  landlord_share_pct?: number;
+  hari_share_pct?: number;
   machine_id?: string;
-  doc_no: string;
+  doc_no?: string;
   store_id: string;
   crop_cycle_id: string;
   project_id: string;
@@ -1612,6 +1641,11 @@ export interface UpdateInvIssuePayload {
   machine_id?: string;
   doc_date?: string;
   lines?: { item_id: string; qty: number | string }[];
+  allocation_mode?: 'SHARED' | 'HARI_ONLY' | 'FARMER_ONLY';
+  hari_id?: string;
+  sharing_rule_id?: string;
+  landlord_share_pct?: number;
+  hari_share_pct?: number;
 }
 
 export interface PostInvIssueRequest {
@@ -1654,7 +1688,7 @@ export interface InvTransfer {
 }
 
 export interface CreateInvTransferPayload {
-  doc_no: string;
+  doc_no?: string;
   from_store_id: string;
   to_store_id: string;
   doc_date: string;
@@ -1711,7 +1745,7 @@ export interface InvAdjustment {
 }
 
 export interface CreateInvAdjustmentPayload {
-  doc_no: string;
+  doc_no?: string;
   store_id: string;
   reason: InvAdjustmentReason;
   notes?: string;

@@ -31,7 +31,6 @@ export default function InvTransferFormPage() {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!doc_no.trim()) e.doc_no = 'Doc number is required';
     if (!from_store_id) e.from_store_id = 'From store is required';
     if (!to_store_id) e.to_store_id = 'To store is required';
     if (from_store_id && to_store_id && from_store_id === to_store_id) {
@@ -50,7 +49,7 @@ export default function InvTransferFormPage() {
       .filter((l) => l.item_id && parseFloat(l.qty) > 0)
       .map((l) => ({ item_id: l.item_id, qty: parseFloat(l.qty) }));
     const payload: CreateInvTransferPayload = {
-      doc_no: doc_no.trim(),
+      ...(doc_no.trim() && { doc_no: doc_no.trim() }),
       from_store_id,
       to_store_id,
       doc_date,
@@ -74,8 +73,8 @@ export default function InvTransferFormPage() {
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Doc No" required error={errors.doc_no}>
-            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" />
+          <FormField label="Doc No">
+            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} placeholder="Leave blank to auto-generate" className="w-full px-3 py-2 border rounded" />
           </FormField>
           <FormField label="Doc Date" required error={errors.doc_date}>
             <input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" />

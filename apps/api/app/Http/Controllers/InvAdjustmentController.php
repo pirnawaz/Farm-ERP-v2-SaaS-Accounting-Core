@@ -54,9 +54,17 @@ class InvAdjustmentController extends Controller
             InvItem::where('id', $l['item_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
 
+        $docNo = $request->filled('doc_no') ? trim($request->doc_no) : null;
+        if ($docNo === '') {
+            $docNo = null;
+        }
+        if ($docNo === null) {
+            $docNo = $this->generateAdjustmentDocNo($tenantId);
+        }
+
         $adjustment = InvAdjustment::create([
             'tenant_id' => $tenantId,
-            'doc_no' => $request->doc_no,
+            'doc_no' => $docNo,
             'store_id' => $request->store_id,
             'reason' => $request->reason,
             'notes' => $request->notes,
@@ -77,6 +85,19 @@ class InvAdjustmentController extends Controller
         return response()->json($adjustment->load(['store', 'lines.item']), 201);
     }
 
+    private function generateAdjustmentDocNo(string $tenantId): string
+    {
+        $last = InvAdjustment::where('tenant_id', $tenantId)
+            ->where('doc_no', 'like', 'ADJ-%')
+            ->orderByRaw('LENGTH(doc_no) DESC, doc_no DESC')
+            ->first();
+        $next = 1;
+        if ($last && preg_match('/^ADJ-(\d+)$/', $last->doc_no, $m)) {
+            $next = (int) $m[1] + 1;
+        }
+        return 'ADJ-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+    }
+
     public function show(Request $request, string $id)
     {
         $tenantId = TenantContext::getTenantId($request);
@@ -93,6 +114,9 @@ class InvAdjustmentController extends Controller
 
         $data = $request->only(['doc_no', 'store_id', 'reason', 'doc_date']);
         $data = array_filter($data, fn ($v) => $v !== null);
+        if (isset($data['doc_no']) && $data['doc_no'] === '') {
+            unset($data['doc_no']);
+        }
         if ($request->has('notes')) {
             $data['notes'] = $request->notes;
         }

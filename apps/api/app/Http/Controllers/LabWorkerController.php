@@ -45,10 +45,18 @@ class LabWorkerController extends Controller
             $partyId = $party->id;
         }
 
+        $workerNo = $request->filled('worker_no') ? trim($request->worker_no) : null;
+        if ($workerNo === '') {
+            $workerNo = null;
+        }
+        if ($workerNo === null) {
+            $workerNo = $this->generateWorkerNo($tenantId);
+        }
+
         $worker = LabWorker::create([
             'tenant_id' => $tenantId,
             'name' => $request->name,
-            'worker_no' => $request->worker_no,
+            'worker_no' => $workerNo,
             'worker_type' => $request->worker_type ?? 'HARI',
             'rate_basis' => $request->rate_basis ?? 'DAILY',
             'default_rate' => $request->default_rate,
@@ -60,6 +68,22 @@ class LabWorkerController extends Controller
         LabWorkerBalance::getOrCreate($tenantId, $worker->id);
 
         return response()->json($worker->load(['party', 'balance']), 201);
+    }
+
+    private function generateWorkerNo(string $tenantId): string
+    {
+        $last = LabWorker::where('tenant_id', $tenantId)
+            ->whereNotNull('worker_no')
+            ->where('worker_no', 'like', 'W-%')
+            ->orderByRaw('LENGTH(worker_no) DESC, worker_no DESC')
+            ->first();
+
+        $next = 1;
+        if ($last && preg_match('/^W-(\d+)$/', $last->worker_no, $m)) {
+            $next = (int) $m[1] + 1;
+        }
+
+        return 'W-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 
     public function show(Request $request, string $id)

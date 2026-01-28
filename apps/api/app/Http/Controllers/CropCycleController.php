@@ -28,16 +28,19 @@ class CropCycleController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'start_date' => ['required', 'date', 'date_format:Y-m-d'],
-            'end_date' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'end_date' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
         ]);
 
-        $cycle = CropCycle::create([
+        $data = [
             'tenant_id' => $tenantId,
             'name' => $request->name,
             'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
             'status' => 'OPEN',
-        ]);
+        ];
+        if ($request->filled('end_date')) {
+            $data['end_date'] = $request->end_date;
+        }
+        $cycle = CropCycle::create($data);
 
         return response()->json($cycle, 201);
     }
@@ -64,10 +67,14 @@ class CropCycleController extends Controller
         $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'start_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d'],
-            'end_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'end_date' => ['sometimes', 'nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
         ]);
 
-        $cycle->update($request->only(['name', 'start_date', 'end_date']));
+        $data = $request->only(['name', 'start_date', 'end_date']);
+        if (array_key_exists('end_date', $data) && $data['end_date'] === '') {
+            $data['end_date'] = null;
+        }
+        $cycle->update($data);
 
         return response()->json($cycle);
     }

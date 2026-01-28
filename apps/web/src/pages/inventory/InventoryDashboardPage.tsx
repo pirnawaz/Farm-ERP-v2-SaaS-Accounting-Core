@@ -23,7 +23,11 @@ export default function InventoryDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Link to="/app/inventory/items" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Items</span>
-          <p className="text-sm text-gray-500">Manage items and UoMs</p>
+          <p className="text-sm text-gray-500">Manage items</p>
+        </Link>
+        <Link to="/app/inventory/uoms" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
+          <span className="font-medium text-gray-900">UoMs</span>
+          <p className="text-sm text-gray-500">Units of measure (KG, BAG, L…)</p>
         </Link>
         <Link to="/app/inventory/stores" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Stores</span>

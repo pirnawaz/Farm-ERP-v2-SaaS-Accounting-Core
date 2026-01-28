@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useInventoryItems, useCreateItem, useUoms, useCategories } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -73,6 +74,11 @@ export default function InvItemsPage() {
             </select>
           </FormField>
           <FormField label="Unit of Measure" required>
+            {(uoms && uoms.length === 0) && (
+              <p className="text-sm text-amber-700 mb-1">
+                No UoMs yet. <Link to="/app/inventory/uoms" className="text-[#1F6F5C] font-medium hover:underline">Create them in Inventory → UoMs</Link> first.
+              </p>
+            )}
             <select value={form.uom_id} onChange={e => setForm(f => ({ ...f, uom_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
               <option value="">Select UoM</option>
               {uoms?.map(u => <option key={u.id} value={u.id}>{u.code} ({u.name})</option>)}

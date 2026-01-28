@@ -39,12 +39,17 @@ class SettlementService
     {
         $project = Project::where('id', $projectId)
             ->where('tenant_id', $tenantId)
+            ->with('party')
             ->firstOrFail();
 
         $projectRule = ProjectRule::where('project_id', $projectId)->first();
         if (!$projectRule) {
             throw new \Exception('Project rules not found');
         }
+
+        // Check if project is owner-operated (no HARI party or hari_pct is 0)
+        $isOwnerOperated = $projectRule->profit_split_hari_pct == 0 || 
+                          ($project->party && !in_array('HARI', $project->party->party_types ?? []));
 
         $upToDateObj = $upToDate ? Carbon::parse($upToDate) : Carbon::today();
 
@@ -83,9 +88,17 @@ class SettlementService
         $poolProfit = $poolRevenue - $sharedCosts;
         $kamdariAmount = $poolProfit * ($projectRule->kamdari_pct / 100);
         $remainingPool = $poolProfit - $kamdariAmount;
-        $landlordGross = $remainingPool * ($projectRule->profit_split_landlord_pct / 100);
-        $hariGross = $remainingPool * ($projectRule->profit_split_hari_pct / 100);
-        $hariNet = $hariGross - $hariOnlyDeductions;
+        
+        if ($isOwnerOperated) {
+            // Owner-operated: 100% to landlord, 0% to HARI
+            $landlordGross = $remainingPool;
+            $hariGross = 0;
+            $hariNet = 0;
+        } else {
+            $landlordGross = $remainingPool * ($projectRule->profit_split_landlord_pct / 100);
+            $hariGross = $remainingPool * ($projectRule->profit_split_hari_pct / 100);
+            $hariNet = $hariGross - $hariOnlyDeductions;
+        }
 
         return [
             'pool_revenue' => $poolRevenue,
@@ -112,7 +125,25 @@ class SettlementService
     {
         $project = Project::where('id', $projectId)
             ->where('tenant_id', $tenantId)
+            ->with('party')
             ->firstOrFail();
+
+        $projectRule = ProjectRule::where('project_id', $projectId)->first();
+        $isOwnerOperated = $projectRule && (
+            $projectRule->profit_split_hari_pct == 0 || 
+            ($project->party && !in_array('HARI', $project->party->party_types ?? []))
+        );
+
+        // For owner-operated projects, return zeros
+        if ($isOwnerOperated) {
+            return [
+                'hari_party_id' => null,
+                'hari_payable_amount' => 0,
+                'outstanding_advance' => 0,
+                'suggested_offset' => 0,
+                'max_offset' => 0,
+            ];
+        }
 
         // Calculate Hari payable from settlement preview
         $calculations = $this->previewSettlement($projectId, $tenantId, $postingDate);
@@ -180,12 +211,17 @@ class SettlementService
 
             $project = Project::where('id', $projectId)
                 ->where('tenant_id', $tenantId)
+                ->with('party')
                 ->firstOrFail();
 
             $projectRule = ProjectRule::where('project_id', $projectId)->first();
             if (!$projectRule) {
                 throw new \Exception('Project rules not found');
             }
+
+            // Check if project is owner-operated (no HARI party or hari_pct is 0)
+            $isOwnerOperated = $projectRule->profit_split_hari_pct == 0 || 
+                              ($project->party && !in_array('HARI', $project->party->party_types ?? []));
 
             // Verify crop cycle is OPEN
             $cropCycle = CropCycle::where('id', $project->crop_cycle_id)
@@ -203,11 +239,11 @@ class SettlementService
             $upToDateObj = $upToDate ? Carbon::parse($upToDate) : Carbon::parse($postingDate);
             $calculations = $this->previewSettlement($projectId, $tenantId, $upToDateObj->format('Y-m-d'));
 
-            // Validate and process offset if requested
+            // Validate and process offset if requested (only for HARI projects)
             $offsetAmount = 0;
             $hariPartyId = $project->party_id;
             
-            if ($applyAdvanceOffset) {
+            if ($applyAdvanceOffset && !$isOwnerOperated) {
                 if ($advanceOffsetAmount === null || $advanceOffsetAmount <= 0) {
                     throw new \Exception('Advance offset amount must be greater than 0 when apply_advance_offset is true');
                 }
@@ -233,15 +269,20 @@ class SettlementService
                 }
 
                 $offsetAmount = $advanceOffsetAmount;
+            } elseif ($applyAdvanceOffset && $isOwnerOperated) {
+                throw new \Exception('Advance offset is not applicable for owner-operated projects');
             }
 
             // Get system accounts
             $profitDistributionAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION');
             $payableLandlordAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
-            $payableHariAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
+            $payableHariAccount = null;
             $advanceHariAccount = null;
-            if ($offsetAmount > 0) {
-                $advanceHariAccount = $this->accountService->getByCode($tenantId, 'ADVANCE_HARI');
+            if (!$isOwnerOperated) {
+                $payableHariAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
+                if ($offsetAmount > 0) {
+                    $advanceHariAccount = $this->accountService->getByCode($tenantId, 'ADVANCE_HARI');
+                }
             }
             $payableKamdarAccount = null;
             if ($projectRule->kamdar_party_id && $calculations['kamdari_amount'] > 0) {
@@ -309,19 +350,21 @@ class SettlementService
                 'rule_snapshot' => $ruleSnapshot,
             ]);
 
-            // POOL_SHARE for hari
-            AllocationRow::create([
-                'tenant_id' => $tenantId,
-                'posting_group_id' => $postingGroup->id,
-                'project_id' => $projectId,
-                'party_id' => $project->party_id,
-                'allocation_type' => 'POOL_SHARE',
-                'amount' => $calculations['hari_net'],
-                'rule_snapshot' => $ruleSnapshot,
-            ]);
+            // POOL_SHARE for hari (only if not owner-operated)
+            if (!$isOwnerOperated && $calculations['hari_net'] > 0) {
+                AllocationRow::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'project_id' => $projectId,
+                    'party_id' => $project->party_id,
+                    'allocation_type' => 'POOL_SHARE',
+                    'amount' => $calculations['hari_net'],
+                    'rule_snapshot' => $ruleSnapshot,
+                ]);
+            }
 
-            // HARI_ONLY deductions (for statement clarity)
-            if ($calculations['hari_only_deductions'] > 0) {
+            // HARI_ONLY deductions (for statement clarity, only if not owner-operated)
+            if (!$isOwnerOperated && $calculations['hari_only_deductions'] > 0) {
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
@@ -356,18 +399,20 @@ class SettlementService
                 'currency_code' => 'GBP',
             ]);
 
-            // Cr PAYABLE_HARI (full amount, will be reduced by offset if applicable)
-            LedgerEntry::create([
-                'tenant_id' => $tenantId,
-                'posting_group_id' => $postingGroup->id,
-                'account_id' => $payableHariAccount->id,
-                'debit_amount' => 0,
-                'credit_amount' => $calculations['hari_net'],
-                'currency_code' => 'GBP',
-            ]);
+            // Cr PAYABLE_HARI (full amount, will be reduced by offset if applicable, only if not owner-operated)
+            if (!$isOwnerOperated && $calculations['hari_net'] > 0) {
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $payableHariAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $calculations['hari_net'],
+                    'currency_code' => 'GBP',
+                ]);
+            }
 
-            // Handle offset if applicable
-            if ($offsetAmount > 0) {
+            // Handle offset if applicable (only for HARI projects)
+            if ($offsetAmount > 0 && !$isOwnerOperated) {
                 // Create offset allocation rows for audit trail
                 // Allocation Row A: Settlement advance offset (reduce Hari payable)
                 AllocationRow::create([

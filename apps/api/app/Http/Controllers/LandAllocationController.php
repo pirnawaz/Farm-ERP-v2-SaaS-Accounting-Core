@@ -40,9 +40,30 @@ class LandAllocationController extends Controller
         $request->validate([
             'crop_cycle_id' => ['required', 'uuid', 'exists:crop_cycles,id'],
             'land_parcel_id' => ['required', 'uuid', 'exists:land_parcels,id'],
-            'party_id' => ['required', 'uuid', 'exists:parties,id'],
+            'party_id' => ['nullable', 'uuid', 'exists:parties,id'],
+            'allocation_mode' => ['nullable', 'string', 'in:OWNER,HARI'],
             'allocated_acres' => ['required', 'numeric', 'min:0.01'],
         ]);
+
+        // Determine allocation mode and party_id
+        $allocationMode = $request->allocation_mode;
+        $partyId = $request->party_id;
+
+        // If allocation_mode is provided, enforce it
+        if ($allocationMode === 'HARI') {
+            if (!$partyId) {
+                return response()->json(['errors' => ['party_id' => ['Party ID is required when allocation_mode is HARI']]], 422);
+            }
+        } elseif ($allocationMode === 'OWNER') {
+            $partyId = null; // Force null for OWNER mode
+        } else {
+            // Infer mode from party_id presence
+            if ($partyId) {
+                $allocationMode = 'HARI';
+            } else {
+                $allocationMode = 'OWNER';
+            }
+        }
 
         // Validate acre allocation with locking
         $this->allocationService->validateAcreAllocation(
@@ -56,7 +77,7 @@ class LandAllocationController extends Controller
             'tenant_id' => $tenantId,
             'crop_cycle_id' => $request->crop_cycle_id,
             'land_parcel_id' => $request->land_parcel_id,
-            'party_id' => $request->party_id,
+            'party_id' => $partyId,
             'allocated_acres' => $request->allocated_acres,
         ]);
 
@@ -86,9 +107,30 @@ class LandAllocationController extends Controller
         $request->validate([
             'crop_cycle_id' => ['sometimes', 'required', 'uuid', 'exists:crop_cycles,id'],
             'land_parcel_id' => ['sometimes', 'required', 'uuid', 'exists:land_parcels,id'],
-            'party_id' => ['sometimes', 'required', 'uuid', 'exists:parties,id'],
+            'party_id' => ['sometimes', 'nullable', 'uuid', 'exists:parties,id'],
+            'allocation_mode' => ['sometimes', 'nullable', 'string', 'in:OWNER,HARI'],
             'allocated_acres' => ['sometimes', 'required', 'numeric', 'min:0.01'],
         ]);
+
+        // Determine allocation mode and party_id
+        $allocationMode = $request->allocation_mode;
+        $partyId = $request->has('party_id') ? $request->party_id : $allocation->party_id;
+
+        // If allocation_mode is provided, enforce it
+        if ($allocationMode === 'HARI') {
+            if (!$partyId) {
+                return response()->json(['errors' => ['party_id' => ['Party ID is required when allocation_mode is HARI']]], 422);
+            }
+        } elseif ($allocationMode === 'OWNER') {
+            $partyId = null; // Force null for OWNER mode
+        } elseif ($request->has('party_id')) {
+            // Infer mode from party_id presence if mode not provided
+            if ($partyId) {
+                $allocationMode = 'HARI';
+            } else {
+                $allocationMode = 'OWNER';
+            }
+        }
 
         $landParcelId = $request->land_parcel_id ?? $allocation->land_parcel_id;
         $cropCycleId = $request->crop_cycle_id ?? $allocation->crop_cycle_id;
@@ -105,7 +147,12 @@ class LandAllocationController extends Controller
             );
         }
 
-        $allocation->update($request->only(['crop_cycle_id', 'land_parcel_id', 'party_id', 'allocated_acres']));
+        $updateData = $request->only(['crop_cycle_id', 'land_parcel_id', 'allocated_acres']);
+        if ($request->has('party_id') || $request->has('allocation_mode')) {
+            $updateData['party_id'] = $partyId;
+        }
+
+        $allocation->update($updateData);
 
         return response()->json($allocation->load(['cropCycle', 'landParcel', 'party']));
     }

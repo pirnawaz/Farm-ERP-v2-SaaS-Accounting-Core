@@ -37,9 +37,9 @@ export default function WorkLogFormPage() {
   const amount = u * r;
 
   const handleSubmit = async () => {
-    if (!doc_no.trim() || !worker_id || !work_date || !crop_cycle_id || !project_id || !rate_basis || !(u > 0) || !(r >= 0)) return;
+    if (!worker_id || !work_date || !crop_cycle_id || !project_id || !rate_basis || !(u > 0) || !(r >= 0)) return;
     const log = await createM.mutateAsync({
-      doc_no: doc_no.trim(),
+      ...(doc_no.trim() && { doc_no: doc_no.trim() }),
       worker_id,
       work_date,
       crop_cycle_id,
@@ -67,8 +67,8 @@ export default function WorkLogFormPage() {
       />
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Doc No" required>
-            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" />
+          <FormField label="Doc No">
+            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" placeholder="Leave blank to auto-generate" />
           </FormField>
           <FormField label="Worker" required>
             <select value={worker_id} onChange={(e) => setWorkerId(e.target.value)} className="w-full px-3 py-2 border rounded">
@@ -130,7 +130,7 @@ export default function WorkLogFormPage() {
         </div>
         <div className="flex gap-2 pt-4">
           <button type="button" onClick={() => navigate('/app/labour/work-logs')} className="px-4 py-2 border rounded">Cancel</button>
-          <button onClick={handleSubmit} disabled={createM.isPending || !(u > 0) || !(r >= 0) || !doc_no.trim() || !worker_id || !crop_cycle_id || !project_id} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">Create</button>
+          <button onClick={handleSubmit} disabled={createM.isPending || !(u > 0) || !(r >= 0) || !worker_id || !crop_cycle_id || !project_id} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">Create</button>
         </div>
       </div>
     </div>
