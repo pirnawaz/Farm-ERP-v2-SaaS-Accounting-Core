@@ -20,6 +20,7 @@ class StoreLabWorkLogRequest extends FormRequest
             'crop_cycle_id' => ['required', 'uuid', 'exists:crop_cycles,id'],
             'project_id' => ['required', 'uuid', 'exists:projects,id'],
             'activity_id' => ['nullable', 'uuid'],
+            'machine_id' => ['nullable', 'uuid', 'exists:machines,id'],
             'rate_basis' => ['required', 'string', 'in:DAILY,HOURLY,PIECE'],
             'units' => ['required', 'numeric', 'min:0.000001'],
             'rate' => ['required', 'numeric', 'min:0'],

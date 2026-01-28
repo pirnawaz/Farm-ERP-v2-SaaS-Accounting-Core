@@ -20,6 +20,7 @@ class UpdateLabWorkLogRequest extends FormRequest
             'crop_cycle_id' => ['sometimes', 'required', 'uuid', 'exists:crop_cycles,id'],
             'project_id' => ['sometimes', 'required', 'uuid', 'exists:projects,id'],
             'activity_id' => ['nullable', 'uuid'],
+            'machine_id' => ['nullable', 'uuid', 'exists:machines,id'],
             'rate_basis' => ['sometimes', 'required', 'string', 'in:DAILY,HOURLY,PIECE'],
             'units' => ['sometimes', 'required', 'numeric', 'min:0.000001'],
             'rate' => ['sometimes', 'required', 'numeric', 'min:0'],

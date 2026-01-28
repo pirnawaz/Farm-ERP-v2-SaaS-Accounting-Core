@@ -20,6 +20,7 @@ class LabWorkLog extends Model
         'crop_cycle_id',
         'project_id',
         'activity_id',
+        'machine_id',
         'rate_basis',
         'units',
         'rate',
@@ -59,6 +60,11 @@ class LabWorkLog extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class, 'project_id');
+    }
+
+    public function machine(): BelongsTo
+    {
+        return $this->belongsTo(Machine::class, 'machine_id');
     }
 
     public function postingGroup(): BelongsTo

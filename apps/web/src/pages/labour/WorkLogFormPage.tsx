@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useCreateWorkLog, useWorkers } from '../../hooks/useLabour';
 import { useCropCycles } from '../../hooks/useCropCycles';
 import { useProjects } from '../../hooks/useProjects';
+import { useMachinesQuery } from '../../hooks/useMachinery';
+import { useModules } from '../../contexts/ModulesContext';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
@@ -14,6 +16,9 @@ export default function WorkLogFormPage() {
   const { data: cropCycles } = useCropCycles();
   const [crop_cycle_id, setCropCycleId] = useState('');
   const { data: projects } = useProjects(crop_cycle_id || undefined);
+  const { isModuleEnabled } = useModules();
+  const machineryEnabled = isModuleEnabled('machinery');
+  const { data: machines } = useMachinesQuery(undefined);
   const { formatMoney } = useFormatting();
 
   const [doc_no, setDocNo] = useState('');
@@ -21,6 +26,7 @@ export default function WorkLogFormPage() {
   const [work_date, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
   const [project_id, setProjectId] = useState('');
   const [activity_id, setActivityId] = useState('');
+  const [machine_id, setMachineId] = useState('');
   const [rate_basis, setRateBasis] = useState<'DAILY' | 'HOURLY' | 'PIECE'>('DAILY');
   const [units, setUnits] = useState('');
   const [rate, setRate] = useState('');
@@ -39,6 +45,7 @@ export default function WorkLogFormPage() {
       crop_cycle_id,
       project_id,
       activity_id: activity_id || undefined,
+      machine_id: machine_id || undefined,
       rate_basis,
       units: u,
       rate: r,
@@ -87,6 +94,22 @@ export default function WorkLogFormPage() {
           <FormField label="Activity (optional)">
             <input value={activity_id} onChange={(e) => setActivityId(e.target.value)} className="w-full px-3 py-2 border rounded" placeholder="UUID or leave blank" />
           </FormField>
+          {machineryEnabled && (
+            <FormField label="Machine (optional)">
+              <select
+                value={machine_id}
+                onChange={(e) => setMachineId(e.target.value)}
+                className="w-full px-3 py-2 border rounded"
+              >
+                <option value="">Select machine (optional)</option>
+                {machines?.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.code} - {m.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <FormField label="Rate basis" required>
             <select value={rate_basis} onChange={(e) => setRateBasis(e.target.value as 'DAILY' | 'HOURLY' | 'PIECE')} className="w-full px-3 py-2 border rounded">
               <option value="DAILY">DAILY</option>

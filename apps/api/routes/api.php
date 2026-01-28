@@ -39,6 +39,13 @@ use App\Http\Controllers\ActivityTypeController;
 use App\Http\Controllers\CropActivityController;
 use App\Http\Controllers\HarvestController;
 use App\Http\Controllers\ShareRuleController;
+use App\Http\Controllers\Machinery\MachineController;
+use App\Http\Controllers\Machinery\MachineMaintenanceTypeController;
+use App\Http\Controllers\Machinery\MachineWorkLogController;
+use App\Http\Controllers\Machinery\MachineRateCardController;
+use App\Http\Controllers\Machinery\MachineryChargeController;
+use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
+use App\Http\Controllers\Machinery\MachineryReportsController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -253,6 +260,54 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::delete('harvests/{id}/lines/{lineId}', [HarvestController::class, 'deleteLine']);
         Route::post('harvests/{id}/post', [HarvestController::class, 'post'])->middleware('role:tenant_admin,accountant');
         Route::post('harvests/{id}/reverse', [HarvestController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+    });
+});
+
+// Machinery (tenant_admin, accountant, operator) — requires machinery module
+// Routes under /api/v1/machinery
+Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'require_module:machinery'])->group(function () {
+    Route::prefix('machinery')->group(function () {
+        // Machines
+        Route::get('machines', [MachineController::class, 'index']);
+        Route::post('machines', [MachineController::class, 'store']);
+        Route::get('machines/{id}', [MachineController::class, 'show']);
+        Route::put('machines/{id}', [MachineController::class, 'update']);
+        // Maintenance Types
+        Route::get('maintenance-types', [MachineMaintenanceTypeController::class, 'index']);
+        Route::post('maintenance-types', [MachineMaintenanceTypeController::class, 'store']);
+        Route::put('maintenance-types/{id}', [MachineMaintenanceTypeController::class, 'update']);
+        // Work Logs
+        Route::get('work-logs', [MachineWorkLogController::class, 'index']);
+        Route::post('work-logs', [MachineWorkLogController::class, 'store']);
+        Route::get('work-logs/{id}', [MachineWorkLogController::class, 'show']);
+        Route::put('work-logs/{id}', [MachineWorkLogController::class, 'update']);
+        Route::delete('work-logs/{id}', [MachineWorkLogController::class, 'destroy']);
+        Route::post('work-logs/{id}/post', [MachineWorkLogController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('work-logs/{id}/reverse', [MachineWorkLogController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        // Rate Cards
+        Route::get('rate-cards', [MachineRateCardController::class, 'index']);
+        Route::post('rate-cards', [MachineRateCardController::class, 'store']);
+        Route::get('rate-cards/{id}', [MachineRateCardController::class, 'show']);
+        Route::put('rate-cards/{id}', [MachineRateCardController::class, 'update']);
+        // Charges
+        Route::get('charges', [MachineryChargeController::class, 'index']);
+        Route::get('charges/{id}', [MachineryChargeController::class, 'show']);
+        Route::post('charges/generate', [MachineryChargeController::class, 'generate']);
+        Route::put('charges/{id}', [MachineryChargeController::class, 'update']);
+        Route::post('charges/{id}/post', [MachineryChargeController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('charges/{id}/reverse', [MachineryChargeController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        // Maintenance Jobs
+        Route::get('maintenance-jobs', [MachineMaintenanceJobController::class, 'index']);
+        Route::post('maintenance-jobs', [MachineMaintenanceJobController::class, 'store']);
+        Route::get('maintenance-jobs/{id}', [MachineMaintenanceJobController::class, 'show']);
+        Route::put('maintenance-jobs/{id}', [MachineMaintenanceJobController::class, 'update']);
+        Route::delete('maintenance-jobs/{id}', [MachineMaintenanceJobController::class, 'destroy']);
+        Route::post('maintenance-jobs/{id}/post', [MachineMaintenanceJobController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('maintenance-jobs/{id}/reverse', [MachineMaintenanceJobController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        // Reports
+        Route::get('reports/charges-by-machine', [MachineryReportsController::class, 'chargesByMachine']);
+        Route::get('reports/costs-by-machine', [MachineryReportsController::class, 'costsByMachine']);
+        Route::get('reports/profitability', [MachineryReportsController::class, 'profitability']);
     });
 });
 

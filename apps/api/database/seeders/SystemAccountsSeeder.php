@@ -69,6 +69,13 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'LABOUR_EXPENSE', 'name' => 'Labour Expense', 'type' => 'expense'],
             ['code' => 'WAGES_PAYABLE', 'name' => 'Wages Payable', 'type' => 'liability'],
             ['code' => 'COGS_PRODUCE', 'name' => 'Cost of Goods Sold - Produce', 'type' => 'expense'],
+            ['code' => 'MACHINERY_FUEL_EXPENSE', 'name' => 'Machinery Fuel Expense', 'type' => 'expense'],
+            ['code' => 'MACHINERY_OPERATOR_EXPENSE', 'name' => 'Machinery Operator Expense', 'type' => 'expense'],
+            ['code' => 'MACHINERY_MAINTENANCE_EXPENSE', 'name' => 'Machinery Maintenance Expense', 'type' => 'expense'],
+            ['code' => 'MACHINERY_OTHER_EXPENSE', 'name' => 'Machinery Other Expense', 'type' => 'expense'],
+            ['code' => 'MACHINERY_SERVICE_EXPENSE', 'name' => 'Machinery Service Expense', 'type' => 'expense'],
+            ['code' => 'DUE_TO_LANDLORD', 'name' => 'Due to Landlord', 'type' => 'liability'],
+            ['code' => 'ACCRUED_EXPENSES', 'name' => 'Accrued Expenses', 'type' => 'liability'],
         ];
     }
 }

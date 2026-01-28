@@ -206,6 +206,7 @@ class InventoryPostingService
                 'party_id' => $project->party_id,
                 'allocation_type' => 'POOL_SHARE',
                 'amount' => (string) $totalValue,
+                'machine_id' => $issue->machine_id,
                 'rule_snapshot' => ['source' => 'inv_issue'],
             ]);
 

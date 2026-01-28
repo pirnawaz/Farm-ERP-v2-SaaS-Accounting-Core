@@ -8,6 +8,7 @@ use App\Models\InvStore;
 use App\Models\InvItem;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Models\Machine;
 use App\Http\Requests\StoreInvIssueRequest;
 use App\Http\Requests\UpdateInvIssueRequest;
 use App\Http\Requests\PostInvIssueRequest;
@@ -25,7 +26,7 @@ class InvIssueController extends Controller
     public function index(Request $request)
     {
         $tenantId = TenantContext::getTenantId($request);
-        $query = InvIssue::where('tenant_id', $tenantId)->with(['store', 'cropCycle', 'project', 'postingGroup']);
+        $query = InvIssue::where('tenant_id', $tenantId)->with(['store', 'cropCycle', 'project', 'machine', 'postingGroup']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -48,6 +49,9 @@ class InvIssueController extends Controller
         InvStore::where('id', $request->store_id)->where('tenant_id', $tenantId)->firstOrFail();
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
         Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($request->filled('machine_id')) {
+            Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
         foreach ($request->lines as $l) {
             InvItem::where('id', $l['item_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
@@ -59,6 +63,7 @@ class InvIssueController extends Controller
             'crop_cycle_id' => $request->crop_cycle_id,
             'project_id' => $request->project_id,
             'activity_id' => $request->activity_id,
+            'machine_id' => $request->machine_id,
             'doc_date' => $request->doc_date,
             'status' => 'DRAFT',
             'created_by' => $request->header('X-User-Id'),
@@ -73,14 +78,14 @@ class InvIssueController extends Controller
             ]);
         }
 
-        return response()->json($issue->load(['store', 'cropCycle', 'project', 'lines.item']), 201);
+        return response()->json($issue->load(['store', 'cropCycle', 'project', 'machine', 'lines.item']), 201);
     }
 
     public function show(Request $request, string $id)
     {
         $tenantId = TenantContext::getTenantId($request);
         $issue = InvIssue::where('id', $id)->where('tenant_id', $tenantId)
-            ->with(['store', 'cropCycle', 'project', 'lines.item', 'postingGroup'])
+            ->with(['store', 'cropCycle', 'project', 'machine', 'lines.item', 'postingGroup'])
             ->firstOrFail();
         return response()->json($issue);
     }
@@ -90,10 +95,16 @@ class InvIssueController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $issue = InvIssue::where('id', $id)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
 
-        $data = $request->only(['doc_no', 'store_id', 'crop_cycle_id', 'project_id', 'activity_id', 'doc_date']);
+        $data = $request->only(['doc_no', 'store_id', 'crop_cycle_id', 'project_id', 'activity_id', 'machine_id', 'doc_date']);
         $data = array_filter($data, fn ($v) => $v !== null);
         if ($request->has('activity_id') && $request->activity_id === null) {
             $data['activity_id'] = null;
+        }
+        if ($request->has('machine_id') && $request->machine_id === null) {
+            $data['machine_id'] = null;
+        }
+        if ($request->filled('machine_id')) {
+            Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
         $issue->update($data);
 
@@ -112,7 +123,7 @@ class InvIssueController extends Controller
             }
         }
 
-        return response()->json($issue->fresh(['store', 'cropCycle', 'project', 'lines.item']));
+        return response()->json($issue->fresh(['store', 'cropCycle', 'project', 'machine', 'lines.item']));
     }
 
     public function post(PostInvIssueRequest $request, string $id)

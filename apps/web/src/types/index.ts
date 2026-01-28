@@ -424,6 +424,7 @@ export interface LabWorkLog {
   crop_cycle_id: string;
   project_id: string;
   activity_id?: string | null;
+  machine_id?: string | null;
   rate_basis: LabRateBasis;
   units: string;
   rate: string;
@@ -437,6 +438,7 @@ export interface LabWorkLog {
   worker?: LabWorker;
   crop_cycle?: CropCycle;
   project?: Project;
+  machine?: Machine;
   posting_group?: PostingGroup;
 }
 
@@ -469,6 +471,7 @@ export interface UpdateLabWorkerPayload {
 }
 
 export interface CreateLabWorkLogPayload {
+  machine_id?: string;
   doc_no: string;
   worker_id: string;
   work_date: string;
@@ -488,6 +491,7 @@ export interface UpdateLabWorkLogPayload {
   crop_cycle_id?: string;
   project_id?: string;
   activity_id?: string | null;
+  machine_id?: string | null;
   rate_basis?: LabRateBasis;
   units?: number;
   rate?: number;
@@ -502,6 +506,384 @@ export interface PostLabWorkLogRequest {
 export interface ReverseLabWorkLogRequest {
   posting_date: string;
   reason: string;
+}
+
+// Machinery (Machines, Maintenance Types, Work Logs)
+export type MachineWorkLogStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+export type MachineWorkLogCostCode = 'FUEL' | 'OPERATOR' | 'MAINTENANCE' | 'OTHER';
+
+export interface Machine {
+  id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  machine_type: string;
+  ownership_type: string;
+  status: string;
+  meter_unit: 'HOURS' | 'KM';
+  opening_meter: string;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MachineMaintenanceType {
+  id: string;
+  tenant_id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MachineWorkLogCostLine {
+  id: string;
+  tenant_id: string;
+  machine_work_log_id: string;
+  cost_code: MachineWorkLogCostCode;
+  description?: string | null;
+  amount: string;
+  party_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  party?: Party;
+}
+
+export interface MachineWorkLog {
+  id: string;
+  tenant_id: string;
+  work_log_no: string;
+  status: MachineWorkLogStatus;
+  machine_id: string;
+  project_id: string;
+  crop_cycle_id: string;
+  work_date?: string | null;
+  meter_start?: string | null;
+  meter_end?: string | null;
+  usage_qty: string;
+  notes?: string | null;
+  posting_date?: string | null;
+  posted_at?: string | null;
+  posting_group_id?: string | null;
+  reversal_posting_group_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  machine?: Machine;
+  project?: Project;
+  crop_cycle?: CropCycle;
+  posting_group?: PostingGroup;
+  reversal_posting_group?: PostingGroup;
+  lines?: MachineWorkLogCostLine[];
+}
+
+export interface CreateMachinePayload {
+  code: string;
+  name: string;
+  machine_type: string;
+  ownership_type: string;
+  status: string;
+  meter_unit: 'HOURS' | 'KM';
+  opening_meter?: number;
+  notes?: string | null;
+}
+
+export interface UpdateMachinePayload {
+  code?: string;
+  name?: string;
+  machine_type?: string;
+  ownership_type?: string;
+  status?: string;
+  meter_unit?: 'HOURS' | 'KM';
+  opening_meter?: number;
+  notes?: string | null;
+}
+
+export interface CreateMachineMaintenanceTypePayload {
+  name: string;
+  is_active?: boolean;
+}
+
+export interface UpdateMachineMaintenanceTypePayload {
+  name?: string;
+  is_active?: boolean;
+}
+
+export interface MachineWorkLogCostLineInput {
+  cost_code: MachineWorkLogCostCode;
+  description?: string | null;
+  amount: number;
+  party_id?: string | null;
+}
+
+export interface CreateMachineWorkLogPayload {
+  machine_id: string;
+  project_id: string;
+  work_date?: string | null;
+  meter_start?: number | null;
+  meter_end?: number | null;
+  notes?: string | null;
+  lines: MachineWorkLogCostLineInput[];
+}
+
+export interface UpdateMachineWorkLogPayload {
+  machine_id?: string;
+  project_id?: string;
+  work_date?: string | null;
+  meter_start?: number | null;
+  meter_end?: number | null;
+  notes?: string | null;
+  lines?: MachineWorkLogCostLineInput[];
+}
+
+export interface PostMachineWorkLogRequest {
+  posting_date: string;
+  idempotency_key?: string;
+}
+
+export interface ReverseMachineWorkLogRequest {
+  posting_date: string;
+  reason?: string | null;
+}
+
+export interface MachineWorkLogPostResult {
+  posting_group: PostingGroup;
+  work_log: MachineWorkLog;
+}
+
+export interface MachineRateCard {
+  id: string;
+  tenant_id: string;
+  applies_to_mode: 'MACHINE' | 'MACHINE_TYPE';
+  machine_id?: string | null;
+  machine_type?: string | null;
+  effective_from: string;
+  effective_to?: string | null;
+  rate_unit: 'HOUR' | 'KM' | 'JOB';
+  pricing_model: 'FIXED' | 'COST_PLUS';
+  base_rate: string;
+  cost_plus_percent?: string | null;
+  includes_fuel: boolean;
+  includes_operator: boolean;
+  includes_maintenance: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  machine?: Machine;
+}
+
+export interface CreateMachineRateCardPayload {
+  applies_to_mode: 'MACHINE' | 'MACHINE_TYPE';
+  machine_id?: string | null;
+  machine_type?: string | null;
+  effective_from: string;
+  effective_to?: string | null;
+  rate_unit: 'HOUR' | 'KM' | 'JOB';
+  pricing_model: 'FIXED' | 'COST_PLUS';
+  base_rate: number;
+  cost_plus_percent?: number | null;
+  includes_fuel?: boolean;
+  includes_operator?: boolean;
+  includes_maintenance?: boolean;
+  is_active?: boolean;
+}
+
+export interface UpdateMachineRateCardPayload {
+  applies_to_mode?: 'MACHINE' | 'MACHINE_TYPE';
+  machine_id?: string | null;
+  machine_type?: string | null;
+  effective_from?: string;
+  effective_to?: string | null;
+  rate_unit?: 'HOUR' | 'KM' | 'JOB';
+  pricing_model?: 'FIXED' | 'COST_PLUS';
+  base_rate?: number;
+  cost_plus_percent?: number | null;
+  includes_fuel?: boolean;
+  includes_operator?: boolean;
+  includes_maintenance?: boolean;
+}
+
+export interface MachineryChargeLine {
+  id: string;
+  tenant_id: string;
+  machinery_charge_id: string;
+  machine_work_log_id: string;
+  usage_qty: string;
+  unit: 'HOUR' | 'KM' | 'JOB';
+  rate: string;
+  amount: string;
+  rate_card_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  work_log?: MachineWorkLog;
+  rate_card?: MachineRateCard;
+}
+
+export interface MachineryCharge {
+  id: string;
+  tenant_id: string;
+  charge_no: string;
+  status: 'DRAFT' | 'POSTED' | 'REVERSED';
+  landlord_party_id: string;
+  project_id: string;
+  crop_cycle_id: string;
+  pool_scope: 'SHARED' | 'HARI_ONLY';
+  charge_date: string;
+  posting_date?: string | null;
+  posted_at?: string | null;
+  total_amount: string;
+  posting_group_id?: string | null;
+  reversal_posting_group_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  lines?: MachineryChargeLine[];
+  project?: Project;
+  crop_cycle?: CropCycle;
+  landlord_party?: Party;
+  posting_group?: PostingGroup;
+  reversal_posting_group?: PostingGroup;
+}
+
+export interface GenerateChargesPayload {
+  project_id: string;
+  landlord_party_id: string;
+  from: string;
+  to: string;
+  pool_scope?: 'SHARED' | 'HARI_ONLY';
+  charge_date?: string;
+}
+
+export interface UpdateChargePayload {
+  charge_date?: string;
+  landlord_party_id?: string;
+  lines?: Array<{
+    id: string;
+    rate: number;
+    amount: number;
+  }>;
+}
+
+export interface PostChargeRequest {
+  posting_date: string;
+  idempotency_key?: string;
+}
+
+export interface ReverseChargeRequest {
+  posting_date: string;
+  reason?: string;
+}
+
+export interface ChargePostResult {
+  posting_group: PostingGroup;
+  charge: MachineryCharge;
+  is_active?: boolean;
+}
+
+export interface MachineMaintenanceJobLine {
+  id: string;
+  tenant_id: string;
+  job_id: string;
+  description?: string | null;
+  amount: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MachineMaintenanceJob {
+  id: string;
+  tenant_id: string;
+  job_no: string;
+  status: 'DRAFT' | 'POSTED' | 'REVERSED';
+  machine_id: string;
+  maintenance_type_id?: string | null;
+  vendor_party_id?: string | null;
+  job_date: string;
+  posting_date?: string | null;
+  notes?: string | null;
+  total_amount: string;
+  posting_group_id?: string | null;
+  reversal_posting_group_id?: string | null;
+  posted_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  machine?: Machine;
+  maintenance_type?: MachineMaintenanceType;
+  vendor_party?: Party;
+  lines?: MachineMaintenanceJobLine[];
+  posting_group?: PostingGroup;
+  reversal_posting_group?: PostingGroup;
+}
+
+export interface CreateMachineMaintenanceJobPayload {
+  machine_id: string;
+  maintenance_type_id?: string | null;
+  vendor_party_id?: string | null;
+  job_date: string;
+  notes?: string | null;
+  lines: Array<{
+    description?: string | null;
+    amount: number;
+  }>;
+}
+
+export interface UpdateMachineMaintenanceJobPayload {
+  maintenance_type_id?: string | null;
+  vendor_party_id?: string | null;
+  job_date?: string;
+  notes?: string | null;
+  lines?: Array<{
+    description?: string | null;
+    amount: number;
+  }>;
+}
+
+export interface PostMachineMaintenanceJobRequest {
+  posting_date: string;
+  idempotency_key?: string;
+}
+
+export interface ReverseMachineMaintenanceJobRequest {
+  posting_date: string;
+  reason?: string | null;
+}
+
+export interface PostMachineMaintenanceJobResult {
+  posting_group: PostingGroup;
+  job: MachineMaintenanceJob;
+}
+
+// Machinery Reports
+export interface MachineryProfitabilityRow {
+  machine_id: string;
+  machine_code: string;
+  machine_name: string;
+  unit: string | null;
+  usage_qty: string;
+  charges_total: string;
+  costs_total: string;
+  margin: string;
+  cost_per_unit: string | null;
+  charge_per_unit: string | null;
+  margin_per_unit: string | null;
+}
+
+export interface MachineryChargesByMachineRow {
+  machine_id: string;
+  machine_code: string;
+  machine_name: string;
+  unit: string;
+  usage_qty: string;
+  charges_total: string;
+}
+
+export interface MachineryCostsByMachineRow {
+  machine_id: string;
+  machine_code: string;
+  machine_name: string;
+  costs_total: string;
+  breakdown: Array<{
+    key: string;
+    amount: string;
+  }>;
 }
 
 // Crop Ops / Activities
@@ -1138,6 +1520,7 @@ export interface InvIssue {
   crop_cycle_id: string;
   project_id: string;
   activity_id?: string;
+  machine_id?: string;
   doc_date: string;
   status: 'DRAFT' | 'POSTED' | 'REVERSED';
   posting_date?: string;
@@ -1147,6 +1530,7 @@ export interface InvIssue {
   store?: InvStore;
   crop_cycle?: CropCycle;
   project?: Project;
+  machine?: Machine;
   lines?: InvIssueLine[];
   posting_group?: PostingGroup;
 }
@@ -1209,6 +1593,7 @@ export interface ReverseInvGrnRequest {
 }
 
 export interface CreateInvIssuePayload {
+  machine_id?: string;
   doc_no: string;
   store_id: string;
   crop_cycle_id: string;
@@ -1224,6 +1609,7 @@ export interface UpdateInvIssuePayload {
   crop_cycle_id?: string;
   project_id?: string;
   activity_id?: string;
+  machine_id?: string;
   doc_date?: string;
   lines?: { item_id: string; qty: number | string }[];
 }

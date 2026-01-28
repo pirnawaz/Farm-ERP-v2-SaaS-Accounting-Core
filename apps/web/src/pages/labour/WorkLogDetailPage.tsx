@@ -3,6 +3,8 @@ import { useParams, useLocation, Link } from 'react-router-dom';
 import { useWorkLog, useUpdateWorkLog, usePostWorkLog, useReverseWorkLog, useWorkers } from '../../hooks/useLabour';
 import { useCropCycles } from '../../hooks/useCropCycles';
 import { useProjects } from '../../hooks/useProjects';
+import { useMachinesQuery } from '../../hooks/useMachinery';
+import { useModules } from '../../contexts/ModulesContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
@@ -24,6 +26,9 @@ export default function WorkLogDetailPage() {
   const { data: workers } = useWorkers({});
   const { data: cropCycles } = useCropCycles();
   const { data: projects } = useProjects(log?.crop_cycle_id);
+  const { isModuleEnabled } = useModules();
+  const machineryEnabled = isModuleEnabled('machinery');
+  const { data: machines } = useMachinesQuery(undefined);
   const { hasRole } = useRole();
   const { formatMoney, formatDate } = useFormatting();
 
@@ -39,6 +44,7 @@ export default function WorkLogDetailPage() {
   const [crop_cycle_id, setCropCycleId] = useState('');
   const [project_id, setProjectId] = useState('');
   const [activity_id, setActivityId] = useState('');
+  const [machine_id, setMachineId] = useState('');
   const [rate_basis, setRateBasis] = useState<'DAILY' | 'HOURLY' | 'PIECE'>('DAILY');
   const [units, setUnits] = useState('');
   const [rate, setRate] = useState('');
@@ -52,6 +58,7 @@ export default function WorkLogDetailPage() {
       setCropCycleId(log.crop_cycle_id);
       setProjectId(log.project_id);
       setActivityId(log.activity_id || '');
+      setMachineId(log.machine_id || '');
       setRateBasis(log.rate_basis as 'DAILY' | 'HOURLY' | 'PIECE');
       setUnits(String(log.units));
       setRate(String(log.rate));
@@ -77,6 +84,7 @@ export default function WorkLogDetailPage() {
       crop_cycle_id,
       project_id,
       activity_id: activity_id || undefined,
+      machine_id: machine_id || undefined,
       rate_basis,
       units: u,
       rate: r,
@@ -120,6 +128,9 @@ export default function WorkLogDetailPage() {
           <div><dt className="text-sm text-gray-500">Work Date</dt><dd>{formatDate(log.work_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{log.crop_cycle?.name || log.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Project</dt><dd>{log.project?.name || log.project_id}</dd></div>
+          {log.machine && (
+            <div><dt className="text-sm text-gray-500">Machine</dt><dd>{log.machine.code} - {log.machine.name}</dd></div>
+          )}
           <div><dt className="text-sm text-gray-500">Status</dt>
             <dd><span className={`px-2 py-1 rounded text-xs ${
               log.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
@@ -161,6 +172,22 @@ export default function WorkLogDetailPage() {
                 {(projects || [])?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </FormField>
+            {machineryEnabled && (
+              <FormField label="Machine (optional)">
+                <select
+                  value={machine_id}
+                  onChange={(e) => setMachineId(e.target.value)}
+                  className="w-full px-3 py-2 border rounded"
+                >
+                  <option value="">Select machine (optional)</option>
+                  {machines?.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.code} - {m.name}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            )}
             <FormField label="Rate basis">
               <select value={rate_basis} onChange={(e) => setRateBasis(e.target.value as 'DAILY' | 'HOURLY' | 'PIECE')} className="w-full px-3 py-2 border rounded">
                 <option value="DAILY">DAILY</option>

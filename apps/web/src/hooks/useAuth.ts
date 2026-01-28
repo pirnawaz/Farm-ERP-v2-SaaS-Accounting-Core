@@ -20,8 +20,30 @@ export function useAuth() {
   }, []);
 
   const checkAuth = useCallback(async () => {
+    setIsLoading(true);
+    
+    // Check localStorage first (dev mode fallback)
+    const storedRole = localStorage.getItem(USER_ROLE_KEY);
+    if (storedRole) {
+      setUserRoleState(storedRole as UserRole);
+      setIsLoading(false);
+      // Still try to verify with backend in the background (silently)
+      apiClient.get<{ user_id: string; role: UserRole; tenant_id: string; email?: string }>('/api/auth/me')
+        .then((user) => {
+          // Cookie auth succeeded - use it instead
+          setUserRoleState(user.role);
+          setUserId(user.user_id);
+          setTenantId(user.tenant_id);
+          localStorage.removeItem(USER_ROLE_KEY);
+        })
+        .catch(() => {
+          // Silently ignore - we're using localStorage fallback
+        });
+      return;
+    }
+    
+    // No localStorage fallback - try cookie auth
     try {
-      setIsLoading(true);
       const user = await apiClient.get<{ user_id: string; role: UserRole; tenant_id: string; email?: string }>('/api/auth/me');
       setUserRoleState(user.role);
       setUserId(user.user_id);
@@ -29,15 +51,10 @@ export function useAuth() {
       // Clear localStorage fallback when cookie auth succeeds
       localStorage.removeItem(USER_ROLE_KEY);
     } catch (error) {
-      // Not authenticated via cookie - check localStorage fallback (dev mode only)
-      const storedRole = localStorage.getItem(USER_ROLE_KEY);
-      if (storedRole) {
-        setUserRoleState(storedRole as UserRole);
-      } else {
-        setUserRoleState(null);
-        setUserId(null);
-        setTenantId(null);
-      }
+      // Not authenticated - clear state
+      setUserRoleState(null);
+      setUserId(null);
+      setTenantId(null);
     } finally {
       setIsLoading(false);
     }

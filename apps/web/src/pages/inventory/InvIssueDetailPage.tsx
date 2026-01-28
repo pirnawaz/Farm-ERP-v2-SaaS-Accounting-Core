@@ -11,6 +11,8 @@ import {
 } from '../../hooks/useInventory';
 import { useCropCycles } from '../../hooks/useCropCycles';
 import { useProjects } from '../../hooks/useProjects';
+import { useMachinesQuery } from '../../hooks/useMachinery';
+import { useModules } from '../../contexts/ModulesContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
@@ -49,10 +51,14 @@ export default function InvIssueDetailPage() {
   const [crop_cycle_id, setCropCycleId] = useState('');
   const [project_id, setProjectId] = useState('');
   const [activity_id, setActivityId] = useState('');
+  const [machine_id, setMachineId] = useState('');
   const [doc_date, setDocDate] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
 
   const { data: projectsForCrop } = useProjects(crop_cycle_id || issue?.crop_cycle_id);
+  const { isModuleEnabled } = useModules();
+  const machineryEnabled = isModuleEnabled('machinery');
+  const { data: machines } = useMachinesQuery(undefined);
 
   useEffect(() => {
     if (issue) {
@@ -61,6 +67,7 @@ export default function InvIssueDetailPage() {
       setCropCycleId(issue.crop_cycle_id);
       setProjectId(issue.project_id);
       setActivityId(issue.activity_id || '');
+      setMachineId(issue.machine_id || '');
       setDocDate(issue.doc_date);
       setLines((issue.lines || []).map((l) => ({ item_id: l.item_id, qty: String(l.qty) })));
       if (!showPostModal && !showReverseModal) setPostingDate(new Date().toISOString().split('T')[0]);
@@ -94,6 +101,7 @@ export default function InvIssueDetailPage() {
       crop_cycle_id,
       project_id,
       activity_id: activity_id || undefined,
+      machine_id: machine_id || undefined,
       doc_date,
       lines: validLines,
     };
@@ -134,6 +142,9 @@ export default function InvIssueDetailPage() {
           <div><dt className="text-sm text-gray-500">Store</dt><dd>{issue.store?.name || issue.store_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{issue.crop_cycle?.name || issue.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Project</dt><dd>{issue.project?.name || issue.project_id}</dd></div>
+          {issue.machine && (
+            <div><dt className="text-sm text-gray-500">Machine</dt><dd>{issue.machine.code} - {issue.machine.name}</dd></div>
+          )}
           <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(issue.doc_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
             <dd><span className={`px-2 py-1 rounded text-xs ${
@@ -174,6 +185,22 @@ export default function InvIssueDetailPage() {
               </select>
             </FormField>
             <FormField label="Activity"><input value={activity_id} onChange={(e) => setActivityId(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+            {machineryEnabled && (
+              <FormField label="Machine (optional)">
+                <select
+                  value={machine_id}
+                  onChange={(e) => setMachineId(e.target.value)}
+                  className="w-full px-3 py-2 border rounded"
+                >
+                  <option value="">Select machine (optional)</option>
+                  {machines?.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.code} - {m.name}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            )}
           </div>
           <div className="mb-4">
             <div className="flex justify-between mb-2"><h4 className="font-medium">Lines</h4><button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add</button></div>

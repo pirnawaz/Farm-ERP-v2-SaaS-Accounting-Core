@@ -4,6 +4,8 @@ import { useCreateIssue } from '../../hooks/useInventory';
 import { useCropCycles } from '../../hooks/useCropCycles';
 import { useProjects } from '../../hooks/useProjects';
 import { useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
+import { useMachinesQuery } from '../../hooks/useMachinery';
+import { useModules } from '../../contexts/ModulesContext';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
@@ -24,11 +26,15 @@ export default function InvIssueFormPage() {
   const [crop_cycle_id, setCropCycleId] = useState('');
   const [project_id, setProjectId] = useState('');
   const [activity_id, setActivityId] = useState('');
+  const [machine_id, setMachineId] = useState('');
   const [doc_date, setDocDate] = useState(new Date().toISOString().split('T')[0]);
   const [lines, setLines] = useState<Line[]>([{ item_id: '', qty: '' }]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { data: projectsForCrop } = useProjects(crop_cycle_id || undefined);
+  const { isModuleEnabled } = useModules();
+  const machineryEnabled = isModuleEnabled('machinery');
+  const { data: machines } = useMachinesQuery(undefined);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
 
   const addLine = () => setLines((l) => [...l, { item_id: '', qty: '' }]);
@@ -60,6 +66,7 @@ export default function InvIssueFormPage() {
       crop_cycle_id,
       project_id,
       activity_id: activity_id || undefined,
+      machine_id: machine_id || undefined,
       doc_date,
       lines: validLines,
     };
@@ -108,6 +115,23 @@ export default function InvIssueFormPage() {
           <FormField label="Activity (optional)">
             <input value={activity_id} onChange={(e) => setActivityId(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" placeholder="UUID or leave blank" />
           </FormField>
+          {machineryEnabled && (
+            <FormField label="Machine (optional)">
+              <select
+                value={machine_id}
+                onChange={(e) => setMachineId(e.target.value)}
+                disabled={!canEdit}
+                className="w-full px-3 py-2 border rounded"
+              >
+                <option value="">Select machine (optional)</option>
+                {machines?.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.code} - {m.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
         </div>
 
         <div>

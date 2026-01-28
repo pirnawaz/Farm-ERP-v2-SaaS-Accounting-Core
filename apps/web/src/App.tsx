@@ -58,6 +58,18 @@ import ActivityDetailPage from './pages/cropOps/ActivityDetailPage';
 import HarvestsPage from './pages/harvests/HarvestsPage';
 import HarvestFormPage from './pages/harvests/HarvestFormPage';
 import HarvestDetailPage from './pages/harvests/HarvestDetailPage';
+import MachinesPage from './pages/machinery/MachinesPage';
+import MaintenanceTypesPage from './pages/machinery/MaintenanceTypesPage';
+import RateCardsPage from './pages/machinery/RateCardsPage';
+import ChargesPage from './pages/machinery/ChargesPage';
+import ChargeDetailPage from './pages/machinery/ChargeDetailPage';
+import MaintenanceJobsPage from './pages/machinery/MaintenanceJobsPage';
+import MaintenanceJobFormPage from './pages/machinery/MaintenanceJobFormPage';
+import MaintenanceJobDetailPage from './pages/machinery/MaintenanceJobDetailPage';
+import MachineryWorkLogsPage from './pages/machinery/WorkLogsPage';
+import MachineryWorkLogFormPage from './pages/machinery/WorkLogFormPage';
+import MachineryWorkLogDetailPage from './pages/machinery/WorkLogDetailPage';
+import MachineryProfitabilityPage from './pages/machinery/MachineryProfitabilityPage';
 import ReportsPage from './pages/ReportsPage';
 import TrialBalancePage from './pages/TrialBalancePage';
 import GeneralLedgerPage from './pages/GeneralLedgerPage';
@@ -166,6 +178,21 @@ function App() {
         <Route path="harvests" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestsPage /></ModuleProtectedRoute>} />
         <Route path="harvests/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestFormPage /></ModuleProtectedRoute>} />
         <Route path="harvests/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestDetailPage /></ModuleProtectedRoute>} />
+        <Route path="machinery" element={<Navigate to="/app/machinery/work-logs" replace />} />
+        <Route path="machinery/work-logs" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryWorkLogsPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/work-logs/new" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryWorkLogFormPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/work-logs/:id" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryWorkLogDetailPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/work-logs/:id/edit" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryWorkLogFormPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/machines" element={<ModuleProtectedRoute requiredModule="machinery"><MachinesPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/maintenance-types" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceTypesPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/rate-cards" element={<ModuleProtectedRoute requiredModule="machinery"><RateCardsPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/charges" element={<ModuleProtectedRoute requiredModule="machinery"><ChargesPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/charges/:id" element={<ModuleProtectedRoute requiredModule="machinery"><ChargeDetailPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/maintenance-jobs" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceJobsPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/maintenance-jobs/new" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceJobFormPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/maintenance-jobs/:id" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceJobDetailPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/maintenance-jobs/:id/edit" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceJobFormPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/reports/profitability" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryProfitabilityPage /></ModuleProtectedRoute>} />
         <Route path="reports" element={<ModuleProtectedRoute requiredModule="reports"><ReportsPage /></ModuleProtectedRoute>} />
         <Route path="reports/trial-balance" element={<ModuleProtectedRoute requiredModule="reports"><TrialBalancePage /></ModuleProtectedRoute>} />
         <Route path="reports/general-ledger" element={<ModuleProtectedRoute requiredModule="reports"><GeneralLedgerPage /></ModuleProtectedRoute>} />

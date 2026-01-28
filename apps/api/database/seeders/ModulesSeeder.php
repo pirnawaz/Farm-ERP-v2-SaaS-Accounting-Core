@@ -23,7 +23,7 @@ class ModulesSeeder extends Seeder
             ['key' => 'reports', 'name' => 'Reports', 'description' => 'Trial balance, general ledger, P&L, cashbook, account balances', 'is_core' => false, 'sort_order' => 8],
             ['key' => 'inventory', 'name' => 'Inventory', 'description' => 'Stock: GRNs, Issues, Transfers, Adjustments, Valuation', 'is_core' => false, 'sort_order' => 9],
             ['key' => 'labour', 'name' => 'Labour', 'description' => 'Workers (Hari), work logs, wage accrual, wage payments', 'is_core' => false, 'sort_order' => 10],
-            ['key' => 'machinery', 'name' => 'Machinery', 'description' => 'Machinery and equipment (future)', 'is_core' => false, 'sort_order' => 11],
+            ['key' => 'machinery', 'name' => 'Machinery', 'description' => 'Machinery: work logs, machines, maintenance types', 'is_core' => false, 'sort_order' => 11],
             ['key' => 'loans', 'name' => 'Loans', 'description' => 'Loans and loan transactions (future)', 'is_core' => false, 'sort_order' => 12],
             ['key' => 'crop_ops', 'name' => 'Crop Operations / Activities', 'description' => 'Activity types, activities, inputs, labour; post consumes stock and accrues wages', 'is_core' => false, 'sort_order' => 13],
         ];

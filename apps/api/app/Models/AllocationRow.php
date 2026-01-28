@@ -17,11 +17,15 @@ class AllocationRow extends Model
         'party_id',
         'allocation_type',
         'amount',
+        'quantity',
+        'unit',
+        'machine_id',
         'rule_snapshot',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'quantity' => 'decimal:2',
         'rule_snapshot' => 'array',
         'created_at' => 'datetime',
     ];
@@ -44,5 +48,10 @@ class AllocationRow extends Model
     public function party(): BelongsTo
     {
         return $this->belongsTo(Party::class);
+    }
+
+    public function machine(): BelongsTo
+    {
+        return $this->belongsTo(Machine::class);
     }
 }

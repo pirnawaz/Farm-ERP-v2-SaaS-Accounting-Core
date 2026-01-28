@@ -6,6 +6,7 @@ use App\Models\LabWorkLog;
 use App\Models\LabWorker;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Models\Machine;
 use App\Http\Requests\StoreLabWorkLogRequest;
 use App\Http\Requests\UpdateLabWorkLogRequest;
 use App\Http\Requests\PostLabWorkLogRequest;
@@ -23,7 +24,7 @@ class LabWorkLogController extends Controller
     public function index(Request $request)
     {
         $tenantId = TenantContext::getTenantId($request);
-        $query = LabWorkLog::where('tenant_id', $tenantId)->with(['worker', 'cropCycle', 'project', 'postingGroup']);
+        $query = LabWorkLog::where('tenant_id', $tenantId)->with(['worker', 'cropCycle', 'project', 'machine', 'postingGroup']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -58,6 +59,9 @@ class LabWorkLogController extends Controller
         if ($project->crop_cycle_id !== $request->crop_cycle_id) {
             abort(422, 'Project does not belong to the selected crop cycle.');
         }
+        if ($request->filled('machine_id')) {
+            Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
 
         $amount = (float) $request->units * (float) $request->rate;
 
@@ -69,6 +73,7 @@ class LabWorkLogController extends Controller
             'crop_cycle_id' => $request->crop_cycle_id,
             'project_id' => $request->project_id,
             'activity_id' => $request->activity_id,
+            'machine_id' => $request->machine_id,
             'rate_basis' => $request->rate_basis,
             'units' => $request->units,
             'rate' => $request->rate,
@@ -78,14 +83,14 @@ class LabWorkLogController extends Controller
             'created_by' => $request->header('X-User-Id'),
         ]);
 
-        return response()->json($log->load(['worker', 'cropCycle', 'project']), 201);
+        return response()->json($log->load(['worker', 'cropCycle', 'project', 'machine']), 201);
     }
 
     public function show(Request $request, string $id)
     {
         $tenantId = TenantContext::getTenantId($request);
         $log = LabWorkLog::where('id', $id)->where('tenant_id', $tenantId)
-            ->with(['worker', 'cropCycle', 'project', 'postingGroup'])
+            ->with(['worker', 'cropCycle', 'project', 'machine', 'postingGroup'])
             ->firstOrFail();
         return response()->json($log);
     }
@@ -95,10 +100,16 @@ class LabWorkLogController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $log = LabWorkLog::where('id', $id)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
 
-        $data = $request->only(['doc_no', 'worker_id', 'work_date', 'crop_cycle_id', 'project_id', 'activity_id', 'rate_basis', 'units', 'rate', 'notes']);
+        $data = $request->only(['doc_no', 'worker_id', 'work_date', 'crop_cycle_id', 'project_id', 'activity_id', 'machine_id', 'rate_basis', 'units', 'rate', 'notes']);
         $data = array_filter($data, fn ($v) => $v !== null);
         if ($request->has('activity_id') && $request->activity_id === null) {
             $data['activity_id'] = null;
+        }
+        if ($request->has('machine_id') && $request->machine_id === null) {
+            $data['machine_id'] = null;
+        }
+        if ($request->filled('machine_id')) {
+            Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
 
         if (isset($data['units']) || isset($data['rate'])) {
@@ -116,7 +127,7 @@ class LabWorkLogController extends Controller
             }
         }
 
-        return response()->json($log->fresh(['worker', 'cropCycle', 'project']));
+        return response()->json($log->fresh(['worker', 'cropCycle', 'project', 'machine']));
     }
 
     public function post(PostLabWorkLogRequest $request, string $id)

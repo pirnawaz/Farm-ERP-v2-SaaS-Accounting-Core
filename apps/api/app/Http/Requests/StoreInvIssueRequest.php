@@ -19,6 +19,7 @@ class StoreInvIssueRequest extends FormRequest
             'crop_cycle_id' => ['required', 'uuid', 'exists:crop_cycles,id'],
             'project_id' => ['required', 'uuid', 'exists:projects,id'],
             'activity_id' => ['nullable', 'uuid'],
+            'machine_id' => ['nullable', 'uuid', 'exists:machines,id'],
             'doc_date' => ['required', 'date', 'date_format:Y-m-d'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'uuid', 'exists:inv_items,id'],

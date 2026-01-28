@@ -65,6 +65,18 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
+    name: 'Machinery',
+    items: [
+      { name: 'Work Logs', href: '/app/machinery/work-logs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+      { name: 'Charges', href: '/app/machinery/charges', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+      { name: 'Maintenance Jobs', href: '/app/machinery/maintenance-jobs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+      { name: 'Profitability', href: '/app/machinery/reports/profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+      { name: 'Machines', href: '/app/machinery/machines', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+      { name: 'Maintenance Types', href: '/app/machinery/maintenance-types', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+      { name: 'Rate Cards', href: '/app/machinery/rate-cards', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+    ],
+  },
+  {
     name: 'Reports',
     items: [
       { name: 'Trial Balance', href: '/app/reports/trial-balance', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
