@@ -67,7 +67,7 @@ export default function InvAdjustmentsPage() {
         </select>
       </div>
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={adjustments || []} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No adjustments. Create one." />
+        <DataTable data={(adjustments ?? []) as InvAdjustment[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No adjustments. Create one." />
       </div>
     </div>
   );

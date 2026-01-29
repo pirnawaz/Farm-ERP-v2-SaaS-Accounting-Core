@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { TrialBalanceRow, Project, apiClient } from '@farm-erp/shared'
 import { exportToCSV } from '../utils/csvExport'
 import { useFormatting } from '../hooks/useFormatting'
+import { useTenantSettings } from '../hooks/useTenantSettings'
 import { PrintableReport } from '../components/print/PrintableReport'
 
 function TrialBalancePage() {
   const { formatMoney, formatDate } = useFormatting()
+  const { settings } = useTenantSettings()
   const [data, setData] = useState<TrialBalanceRow[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -138,7 +140,7 @@ function TrialBalancePage() {
               type="text"
               value={filters.currency_code}
               onChange={(e) => setFilters({ ...filters, currency_code: e.target.value.toUpperCase() })}
-              placeholder="GBP"
+              placeholder={settings?.currency_code || 'PKR'}
               maxLength={3}
               className="w-full border border-gray-300 rounded px-3 py-2"
             />

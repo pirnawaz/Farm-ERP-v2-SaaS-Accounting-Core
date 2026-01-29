@@ -9,8 +9,8 @@ export default function LabourDashboardPage() {
   const { data: payables, isLoading: payablesLoading } = usePayablesOutstanding();
   const { formatMoney } = useFormatting();
 
-  const workerCount = workers?.length ?? 0;
-  const logCount = workLogs?.length ?? 0;
+  const workerCount = (workers ?? []).length;
+  const logCount = (workLogs ?? []).length;
   const outstandingTotal = (payables || []).reduce((s, r) => s + parseFloat(r.payable_balance || '0'), 0);
 
   if (workersLoading || logsLoading || payablesLoading) {

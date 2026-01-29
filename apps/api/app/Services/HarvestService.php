@@ -31,6 +31,7 @@ class HarvestService
         return DB::transaction(function () use ($data) {
             $tenantId = $data['tenant_id'];
             $cropCycleId = $data['crop_cycle_id'];
+            $projectId = $data['project_id'];
 
             // Validate crop cycle exists and is OPEN
             $cropCycle = CropCycle::where('id', $cropCycleId)
@@ -41,11 +42,20 @@ class HarvestService
                 throw new \Exception('Cannot create harvest: crop cycle is closed.');
             }
 
+            $project = Project::where('id', $projectId)
+                ->where('tenant_id', $tenantId)
+                ->where('crop_cycle_id', $cropCycleId)
+                ->with('landAllocation')
+                ->firstOrFail();
+
+            $landParcelId = $project->landAllocation?->land_parcel_id ?? null;
+
             $harvest = Harvest::create([
                 'tenant_id' => $tenantId,
                 'harvest_no' => $data['harvest_no'] ?? null,
                 'crop_cycle_id' => $cropCycleId,
-                'land_parcel_id' => $data['land_parcel_id'] ?? null,
+                'project_id' => $projectId,
+                'land_parcel_id' => $landParcelId,
                 'harvest_date' => $data['harvest_date'],
                 'status' => 'DRAFT',
                 'notes' => $data['notes'] ?? null,
@@ -73,12 +83,23 @@ class HarvestService
                 throw new \Exception('Cannot update harvest: crop cycle is closed.');
             }
 
-            $harvest->update([
+            $update = [
                 'harvest_no' => $data['harvest_no'] ?? $harvest->harvest_no,
-                'land_parcel_id' => $data['land_parcel_id'] ?? $harvest->land_parcel_id,
                 'harvest_date' => $data['harvest_date'] ?? $harvest->harvest_date,
                 'notes' => $data['notes'] ?? $harvest->notes,
-            ]);
+            ];
+
+            if (array_key_exists('project_id', $data)) {
+                $project = Project::where('id', $data['project_id'])
+                    ->where('tenant_id', $harvest->tenant_id)
+                    ->where('crop_cycle_id', $harvest->crop_cycle_id)
+                    ->with('landAllocation')
+                    ->firstOrFail();
+                $update['project_id'] = $project->id;
+                $update['land_parcel_id'] = $project->landAllocation?->land_parcel_id ?? null;
+            }
+
+            $harvest->update($update);
 
             return $harvest->fresh();
         });
@@ -286,6 +307,10 @@ class HarvestService
             // Load relationships
             $harvest->load(['lines.item', 'lines.store', 'cropCycle']);
 
+            if (!$harvest->project_id) {
+                throw new \Exception('Cannot post harvest: project is required. Update the harvest with a project.');
+            }
+
             // Validate has lines
             if ($harvest->lines->isEmpty()) {
                 throw new \Exception('Harvest must have at least one line to post.');
@@ -326,14 +351,10 @@ class HarvestService
             // If WIP cost is 0, still allow posting (creates inventory qty with 0 cost)
             // This is documented in code comment per requirements
 
-            // Get first project from crop cycle for allocation rows
-            $project = Project::where('tenant_id', $harvest->tenant_id)
-                ->where('crop_cycle_id', $harvest->crop_cycle_id)
-                ->first();
-
-            if (!$project) {
-                throw new \Exception('Cannot post harvest: no projects exist in crop cycle.');
-            }
+            // Use harvest's project for allocation rows
+            $project = Project::where('id', $harvest->project_id)
+                ->where('tenant_id', $harvest->tenant_id)
+                ->firstOrFail();
 
             // Create posting group
             $postingGroup = PostingGroup::create([

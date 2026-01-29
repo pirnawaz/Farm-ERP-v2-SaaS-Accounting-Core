@@ -109,6 +109,14 @@ class PartyController extends Controller
         // Get balance summary (uses shared service internally)
         $balanceSummary = $this->paymentService->getPartyPayableBalance($id, $tenantId, $asOfDate);
 
+        // Supplier AP from GRNs (for vendor parties - same source of truth as outstanding)
+        $supplierPayableFromGrn = $this->financialSourceService->getSupplierPayableFromGRN(
+            $id,
+            $tenantId,
+            null,
+            $asOfDate
+        );
+
         // Get allocations for display (need project info, so query directly but use same filters as shared service)
         $allocationQuery = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
             ->where('allocation_rows.party_id', $id)
@@ -191,6 +199,7 @@ class PartyController extends Controller
             'allocated_payable_total' => $balanceSummary['allocated_total'],
             'paid_total' => $balanceSummary['paid_total'],
             'outstanding_total' => $balanceSummary['outstanding_total'],
+            'supplier_payable_outstanding' => number_format($supplierPayableFromGrn, 2, '.', ''),
             'advance_balance_disbursed' => number_format($advanceBalanceDisbursed, 2, '.', ''),
             'advance_balance_repaid' => number_format($advanceBalanceRepaid, 2, '.', ''),
             'advance_balance_outstanding' => number_format($advanceBalanceOutstanding, 2, '.', ''),

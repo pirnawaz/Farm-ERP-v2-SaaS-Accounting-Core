@@ -181,7 +181,14 @@ class PartyStatementService
         );
         $allTimeSales = $allTimeSalesData['total'];
 
-        $closingBalancePayable = max(0, $allTimeAllocations - $allTimePaymentsOut);
+        // Include supplier AP (from GRN) in closing payable - same source of truth as getPartyPayableBalance
+        $allTimeSupplierAp = $financialSourceService->getSupplierPayableFromGRN(
+            $partyId,
+            $tenantId,
+            null, // from: all time
+            $toDate->format('Y-m-d') // to: end date
+        );
+        $closingBalancePayable = max(0, $allTimeAllocations + $allTimeSupplierAp - $allTimePaymentsOut);
         $closingBalanceReceivable = max(0, $allTimeSales - $allTimePaymentsIn); // Sales - Payments IN
         $closingBalanceAdvance = max(0, $allTimeAdvancesOut - $allTimeAdvancesIn);
 
@@ -197,6 +204,7 @@ class PartyStatementService
             'to' => $to,
             'summary' => [
                 'total_allocations_increasing_balance' => number_format((float) $totalAllocationsIncreasing, 2, '.', ''),
+                'supplier_payable_total' => number_format((float) $allTimeSupplierAp, 2, '.', ''),
                 'total_inventory_issue_allocations' => number_format((float) $totalInventoryIssueAllocations, 2, '.', ''),
                 'total_allocations_decreasing_balance' => number_format((float) $totalAllocationsDecreasing, 2, '.', ''),
                 'total_payments_out' => number_format((float) $totalPaymentsOut, 2, '.', ''),

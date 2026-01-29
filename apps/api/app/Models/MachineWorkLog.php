@@ -74,6 +74,11 @@ class MachineWorkLog extends Model
         return $this->belongsTo(CropCycle::class, 'crop_cycle_id');
     }
 
+    public function activity(): BelongsTo
+    {
+        return $this->belongsTo(CropActivity::class, 'activity_id');
+    }
+
     public function lines(): HasMany
     {
         return $this->hasMany(MachineWorkLogCostLine::class, 'machine_work_log_id');

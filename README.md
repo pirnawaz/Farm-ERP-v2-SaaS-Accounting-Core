@@ -38,14 +38,15 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
 - **Settlements** — Project-based and sales-based settlements with share rules, preview and posting, reversals
 - **Share Rules** — Configurable share rules for crop cycles, projects, and sales (margin or revenue basis)
-- **Harvests** — Harvest tracking with lines, posting to inventory, production allocation
+- **Harvests** — Harvest tracking with lines, posting to inventory, production allocation, project association
 - **Inventory** — Items, stores, UOMs, categories; GRNs, issues with allocation support (share rules, explicit percentages, project rules), transfers, adjustments; stock on-hand and movements
 - **Labour** — Workers (Hari), work logs, wage accrual, wage payments
-- **Machinery** — Machine management, work logs with meter tracking, rate cards, machinery charges, maintenance jobs and types, profitability reports; posting and reversals
+- **Machinery** — Machine management (with active/inactive status), work logs with meter tracking, rate cards (with activity type support), machinery charges, maintenance jobs and types, profitability reports; posting and reversals
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
 - **Accounting Guards** — Immutability protection for posted transactions, balanced posting validation
 - **Audit Logs** — Transaction audit trail for posted operations
 - **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports; CSV export with Terrava-branded filenames; print-friendly layouts
+- **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, ledger reconciliation for audit and debugging
 - **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
@@ -220,6 +221,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Machinery**   | `v1/machinery/machines` (CRUD); `v1/machinery/maintenance-types` (CRUD); `v1/machinery/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/rate-cards` (CRUD); `v1/machinery/charges` (list, show); `v1/machinery/maintenance-jobs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/reports/profitability` |
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
 | **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `yield` |
+| **Reconciliation** | `GET /reconciliation/project/{id}`, `GET /reconciliation/supplier/{party_id}` |
 | **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
 
 Exact routes, methods, and middleware are in `apps/api/routes/api.php`.

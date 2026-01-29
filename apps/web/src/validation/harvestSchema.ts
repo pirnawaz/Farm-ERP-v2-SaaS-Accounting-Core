@@ -13,7 +13,7 @@ export const harvestLineSchema = z.object({
 
 export const harvestSchema = z.object({
   crop_cycle_id: z.string().min(1, 'Crop cycle is required'),
-  land_parcel_id: z.string().optional().nullable(),
+  project_id: z.string().min(1, 'Project is required'),
   harvest_date: z.string().min(1, 'Harvest date is required'),
   harvest_no: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),

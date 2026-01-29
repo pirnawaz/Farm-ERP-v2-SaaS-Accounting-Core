@@ -56,7 +56,7 @@ export default function InvGrnsPage() {
       </div>
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={grns || []}
+          data={(grns ?? []) as InvGrn[]}
           columns={cols}
           onRowClick={(r) => navigate(`/app/inventory/grns/${r.id}`, { state: { from: location.pathname + location.search } })}
           emptyMessage="No GRNs. Create one."

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { usePlatformTenant, useUpdatePlatformTenant } from '../../hooks/usePlatformTenants';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
@@ -7,13 +8,9 @@ import { FormField } from '../../components/FormField';
 import { useFormatting } from '../../hooks/useFormatting';
 import toast from 'react-hot-toast';
 import type { UpdatePlatformTenantPayload } from '../../types';
-import { platformApi } from '../../api/platform';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export default function PlatformTenantDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { data: tenant, isLoading, error } = usePlatformTenant(id || null);
   const updateMutation = useUpdatePlatformTenant();
   const { formatDate } = useFormatting();
@@ -21,14 +18,9 @@ export default function PlatformTenantDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<UpdatePlatformTenantPayload>({});
 
-  // Fetch modules for this tenant
-  const { data: modulesData } = useQuery({
+  useQuery({
     queryKey: ['tenantModules', id],
-    queryFn: async () => {
-      // Note: This would need a platform admin endpoint to get modules for a tenant
-      // For now, we'll show a placeholder
-      return { modules: [] };
-    },
+    queryFn: async () => ({ modules: [] as unknown[] }),
     enabled: !!id,
   });
 

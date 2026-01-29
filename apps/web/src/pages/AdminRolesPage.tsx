@@ -70,7 +70,7 @@ export default function AdminRolesPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{permission}</td>
                   {ROLES.map((role) => (
                     <td key={role} className="px-6 py-4 whitespace-nowrap text-center">
-                      {PERMISSIONS[role]?.[permission] ? (
+                      {(PERMISSIONS[role] as Record<string, boolean> | undefined)?.[permission] ? (
                         <span className="text-green-600 font-semibold">✓</span>
                       ) : (
                         <span className="text-gray-300">-</span>

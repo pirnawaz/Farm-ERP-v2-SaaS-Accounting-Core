@@ -9,6 +9,7 @@ use App\Models\LedgerEntry;
 use App\Models\AllocationRow;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Models\OperationalTransaction;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -75,6 +76,11 @@ class SaleService
             // If sale has lines, use COGS service
             if ($sale->lines->isNotEmpty()) {
                 return $this->cogsService->postSaleWithCOGS($sale, $postingDate, $idempotencyKey);
+            }
+
+            // Sale must have project_id for settlement
+            if (!$sale->project_id) {
+                throw new \Exception('Sale must have a project_id to be posted for settlement.');
             }
 
             // Load buyer party
@@ -161,6 +167,25 @@ class SaleService
 
             if (abs($totalDebits - $totalCredits) > 0.01) {
                 throw new \Exception('Debits and credits do not balance');
+            }
+
+            // Create INCOME OT for settlement (idempotent: one per posting group)
+            $postingDateStr = Carbon::parse($postingDate)->format('Y-m-d');
+            $existingOt = OperationalTransaction::where('posting_group_id', $postingGroup->id)
+                ->where('type', 'INCOME')
+                ->first();
+            if (!$existingOt) {
+                OperationalTransaction::create([
+                    'tenant_id' => $tenantId,
+                    'project_id' => $sale->project_id,
+                    'crop_cycle_id' => $finalCropCycleId,
+                    'type' => 'INCOME',
+                    'status' => 'POSTED',
+                    'transaction_date' => $postingDateStr,
+                    'amount' => (string) round((float) $sale->amount, 2),
+                    'classification' => 'SHARED',
+                    'posting_group_id' => $postingGroup->id,
+                ]);
             }
 
             // Update sale status to POSTED

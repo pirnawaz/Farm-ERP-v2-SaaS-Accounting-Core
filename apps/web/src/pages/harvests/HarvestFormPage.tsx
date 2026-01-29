@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateHarvest, useAddHarvestLine } from '../../hooks/useHarvests';
 import { useCropCycles } from '../../hooks/useCropCycles';
-import { useLandParcels } from '../../hooks/useLandParcels';
+import { useProjects } from '../../hooks/useProjects';
 import { useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
@@ -17,40 +17,29 @@ export default function HarvestFormPage() {
   const createM = useCreateHarvest();
   const addLineM = useAddHarvestLine();
   const { data: cropCycles } = useCropCycles();
-  const { data: landParcels } = useLandParcels();
+  const [crop_cycle_id, setCropCycleId] = useState('');
+  const { data: projectsForCrop } = useProjects(crop_cycle_id || undefined);
   const { data: stores } = useInventoryStores();
   const { data: items } = useInventoryItems(true);
 
   const [harvest_no, setHarvestNo] = useState('');
-  const [crop_cycle_id, setCropCycleId] = useState('');
-  const [land_parcel_id, setLandParcelId] = useState('');
+  const [project_id, setProjectId] = useState('');
   const [harvest_date, setHarvestDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<HarvestLineForm[]>([{ inventory_item_id: '', store_id: '', quantity: '', uom: '', notes: '' }]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [harvestId, setHarvestId] = useState<string | null>(null);
 
   const addLine = () => setLines((l) => [...l, { inventory_item_id: '', store_id: '', quantity: '', uom: '', notes: '' }]);
   const removeLine = (i: number) => setLines((l) => l.filter((_, idx) => idx !== i));
   const updateLine = (i: number, f: Partial<HarvestLineForm>) =>
     setLines((l) => l.map((row, idx) => (idx === i ? { ...row, ...f } : row)));
 
-  const validate = (): boolean => {
-    const e: Record<string, string> = {};
-    if (!crop_cycle_id) e.crop_cycle_id = 'Crop cycle is required';
-    if (!harvest_date) e.harvest_date = 'Harvest date is required';
-    const validLines = lines.filter((l) => l.inventory_item_id && l.store_id && parseFloat(l.quantity) > 0);
-    if (validLines.length === 0) e.lines = 'Add at least one line with quantity > 0';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
   const handleSubmit = async () => {
     // Prepare form data
     const validLines = lines.filter((l) => l.inventory_item_id && l.store_id && parseFloat(l.quantity) > 0);
     const formData = {
       crop_cycle_id,
-      land_parcel_id: land_parcel_id || null,
+      project_id,
       harvest_date,
       harvest_no: harvest_no || null,
       notes: notes || null,
@@ -84,14 +73,13 @@ export default function HarvestFormPage() {
       const payload: CreateHarvestPayload = {
         harvest_no: harvest_no || undefined,
         crop_cycle_id,
-        land_parcel_id: land_parcel_id || undefined,
+        project_id,
         harvest_date,
         notes: notes || undefined,
       };
 
       const harvest = await createM.mutateAsync(payload);
       const hId = harvest.id;
-      setHarvestId(hId);
 
       // Add lines
       for (const line of validLines) {
@@ -135,7 +123,10 @@ export default function HarvestFormPage() {
           <FormField label="Crop Cycle *" error={errors.crop_cycle_id}>
             <select
               value={crop_cycle_id}
-              onChange={(e) => setCropCycleId(e.target.value)}
+              onChange={(e) => {
+                setCropCycleId(e.target.value);
+                setProjectId('');
+              }}
               className="w-full px-3 py-2 border rounded"
             >
               <option value="">Select crop cycle</option>
@@ -143,15 +134,21 @@ export default function HarvestFormPage() {
             </select>
           </FormField>
 
-          <FormField label="Land Parcel">
+          <FormField label="Project *" error={errors.project_id}>
             <select
-              value={land_parcel_id}
-              onChange={(e) => setLandParcelId(e.target.value)}
+              value={project_id}
+              onChange={(e) => setProjectId(e.target.value)}
               className="w-full px-3 py-2 border rounded"
+              disabled={!crop_cycle_id}
             >
-              <option value="">None</option>
-              {landParcels?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="">Select project</option>
+              {(projectsForCrop ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
             </select>
+            {crop_cycle_id && !(projectsForCrop?.length) && (
+              <p className="text-sm text-gray-500 mt-1">No projects in this crop cycle. Create one first.</p>
+            )}
           </FormField>
 
           <FormField label="Harvest Date *" error={errors.harvest_date}>

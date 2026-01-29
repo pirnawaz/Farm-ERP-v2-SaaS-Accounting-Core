@@ -86,7 +86,7 @@ export default function WorkLogsPage() {
       </div>
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={workLogs || []}
+          data={(workLogs ?? []) as LabWorkLog[]}
           columns={cols}
           onRowClick={(r) => navigate(`/app/labour/work-logs/${r.id}`, { state: { from: location.pathname + location.search } })}
           emptyMessage="No work logs. Create one."

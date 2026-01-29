@@ -41,7 +41,7 @@ export default function ActivityDetailPage() {
   const { data: items } = useInventoryItems(true);
   const { data: stock } = useStockOnHand({});
   const { hasRole } = useRole();
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);

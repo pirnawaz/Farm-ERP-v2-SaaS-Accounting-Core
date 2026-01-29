@@ -78,6 +78,7 @@ export default function ActivitiesPage() {
           </button>
         }
       />
+      <p className="text-sm text-gray-500 mb-4">Activities are field operations (e.g. ploughing, sowing, spraying) linked to a crop cycle and project.</p>
       <div className="flex gap-4 mb-4 flex-wrap">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All statuses</option>
@@ -106,7 +107,7 @@ export default function ActivitiesPage() {
       </div>
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={activities || []}
+          data={(activities ?? []) as CropActivity[]}
           columns={cols}
           onRowClick={(r) => navigate(`/app/crop-ops/activities/${r.id}`, { state: { from: location.pathname + location.search } })}
           emptyMessage="No activities. Create one."

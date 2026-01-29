@@ -75,7 +75,7 @@ export default function PaymentFormPage() {
       setFormData({
         direction: payment.direction,
         party_id: payment.party_id,
-        amount: payment.amount,
+        amount: typeof payment.amount === 'number' ? String(payment.amount) : (payment.amount ?? ''),
         payment_date: payment.payment_date,
         method: payment.method,
         reference: payment.reference || '',

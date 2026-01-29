@@ -9,7 +9,9 @@ use App\Models\Project;
 use App\Models\Party;
 use App\Services\Machinery\MachineryChargeService;
 use App\Services\Machinery\MachineryChargePostingService;
+use App\Services\SystemPartyService;
 use App\Services\TenantContext;
+use App\Exceptions\Machinery\DomainValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -18,7 +20,8 @@ class MachineryChargeController extends Controller
 {
     public function __construct(
         private MachineryChargeService $chargeService,
-        private MachineryChargePostingService $postingService
+        private MachineryChargePostingService $postingService,
+        private SystemPartyService $partyService
     ) {}
 
     public function index(Request $request)
@@ -76,7 +79,7 @@ class MachineryChargeController extends Controller
 
         $validated = $request->validate([
             'project_id' => ['required', 'uuid', 'exists:projects,id'],
-            'landlord_party_id' => ['required', 'uuid', 'exists:parties,id'],
+            'landlord_party_id' => ['nullable', 'uuid', 'exists:parties,id'],
             'from' => ['required', 'date'],
             'to' => ['required', 'date', 'after_or_equal:from'],
             'pool_scope' => ['nullable', 'string', Rule::in([MachineryCharge::POOL_SCOPE_SHARED, MachineryCharge::POOL_SCOPE_HARI_ONLY])],
@@ -88,20 +91,31 @@ class MachineryChargeController extends Controller
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        // Verify landlord party belongs to tenant
-        Party::where('id', $validated['landlord_party_id'])
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        $landlordPartyId = $validated['landlord_party_id'] ?? null;
+        if ($landlordPartyId) {
+            Party::where('id', $landlordPartyId)
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        } else {
+            $landlordPartyId = $this->partyService->ensureSystemLandlordParty($tenantId)->id;
+        }
 
-        $result = $this->chargeService->generateDraftChargeForProject(
-            $tenantId,
-            $validated['project_id'],
-            $validated['landlord_party_id'],
-            $validated['from'],
-            $validated['to'],
-            $validated['pool_scope'] ?? null,
-            $validated['charge_date'] ?? null
-        );
+        try {
+            $result = $this->chargeService->generateDraftChargeForProject(
+                $tenantId,
+                $validated['project_id'],
+                $landlordPartyId,
+                $validated['from'],
+                $validated['to'],
+                $validated['pool_scope'] ?? null,
+                $validated['charge_date'] ?? null
+            );
+        } catch (DomainValidationException $e) {
+            return response()->json([
+                'message' => 'Cannot generate charges',
+                'errors' => $e->getErrors()
+            ], 422);
+        }
 
         // If array (two charges), return both
         if (is_array($result)) {

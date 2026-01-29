@@ -12,6 +12,7 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\InvStockMovement;
 use App\Models\InvStockBalance;
+use App\Models\OperationalTransaction;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -179,12 +180,15 @@ class SaleCOGSService
                 $finalCropCycleId = $sale->crop_cycle_id;
             }
 
-            // Get project for allocation rows
+            // Get project for allocation rows (required for settlement)
             $project = null;
             if ($finalCropCycleId) {
                 $project = Project::where('tenant_id', $sale->tenant_id)
                     ->where('crop_cycle_id', $finalCropCycleId)
                     ->first();
+            }
+            if (!$project) {
+                throw new \Exception('Sale must have a project_id to be posted for settlement.');
             }
 
             // Create posting group
@@ -343,6 +347,24 @@ class SaleCOGSService
                 throw new \Exception('Debits and credits do not balance.');
             }
 
+            // Create INCOME OT for settlement (idempotent: one per posting group)
+            $existingOt = OperationalTransaction::where('posting_group_id', $postingGroup->id)
+                ->where('type', 'INCOME')
+                ->first();
+            if (!$existingOt) {
+                OperationalTransaction::create([
+                    'tenant_id' => $sale->tenant_id,
+                    'project_id' => $project->id,
+                    'crop_cycle_id' => $finalCropCycleId,
+                    'type' => 'INCOME',
+                    'status' => 'POSTED',
+                    'transaction_date' => $postingDateObj->format('Y-m-d'),
+                    'amount' => (string) round($totalRevenue, 2),
+                    'classification' => 'SHARED',
+                    'posting_group_id' => $postingGroup->id,
+                ]);
+            }
+
             // Update sale status
             $sale->update([
                 'status' => 'POSTED',
@@ -406,6 +428,11 @@ class SaleCOGSService
                 $reversalDate,
                 $reason
             );
+
+            // Mark INCOME OT as VOID so settlement excludes it
+            OperationalTransaction::where('posting_group_id', $sale->posting_group_id)
+                ->where('type', 'INCOME')
+                ->update(['status' => 'VOID']);
 
             // Check if stock movements already reversed (idempotency)
             $existing = InvStockMovement::where('tenant_id', $sale->tenant_id)

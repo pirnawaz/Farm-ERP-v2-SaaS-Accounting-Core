@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { salesSettlementApi, type SalesSettlement } from '../api/settlement';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 
@@ -45,8 +46,8 @@ export default function SettlementsPage() {
         {row.status}
       </span>
     )},
-    { header: 'Basis Amount', accessor: (row) => <span className="tabular-nums">{formatMoney(parseFloat(row.basis_amount)}</span>) },
-    { header: 'Posting Date', accessor: (row) => formatDate(row.posting_date) },
+    { header: 'Basis Amount', accessor: (row) => <span className="tabular-nums">{formatMoney(parseFloat(row.basis_amount))}</span> },
+    { header: 'Posting Date', accessor: (row) => (row.posting_date != null ? formatDate(row.posting_date) : '—') },
     { header: 'Share Rule', accessor: (row) => row.share_rule?.name || '-' },
     {
       header: 'Actions',
@@ -71,17 +72,19 @@ export default function SettlementsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Settlements</h1>
-        {canCreate && (
+      <PageHeader
+        title="Settlements"
+        backTo="/app/dashboard"
+        breadcrumbs={[{ label: 'Settlements' }]}
+        right={canCreate ? (
           <Link
             to="/app/settlements/new"
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
           >
             New Settlement
           </Link>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>

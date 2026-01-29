@@ -18,9 +18,9 @@ export function formatMoney(
     return '0.00';
   }
 
-  // Use provided options, then settings, then defaults
-  const currencyCode = options?.currencyCode || options?.settings?.currency_code || 'GBP';
-  const locale = options?.locale || options?.settings?.locale || 'en-GB';
+  // Use provided options, then settings, then defaults (PKR/en-PK for Pakistan)
+  const currencyCode = options?.currencyCode || options?.settings?.currency_code || 'PKR';
+  const locale = options?.locale || options?.settings?.locale || 'en-PK';
 
   try {
     const formatter = new Intl.NumberFormat(locale, {
@@ -70,9 +70,9 @@ export function formatDate(
     return '—';
   }
 
-  // Use provided options, then settings, then defaults
-  const locale = options?.locale || options?.settings?.locale || 'en-GB';
-  const timezone = options?.timezone || options?.settings?.timezone || 'Europe/London';
+  // Use provided options, then settings, then defaults (en-PK / Asia/Karachi for Pakistan)
+  const locale = options?.locale || options?.settings?.locale || 'en-PK';
+  const timezone = options?.timezone || options?.settings?.timezone || 'Asia/Karachi';
 
   try {
     // Format as "dd MMM yyyy" (e.g., "22 Jan 2026")
@@ -121,9 +121,9 @@ export function formatDateTime(
     return 'Invalid Date';
   }
 
-  // Use provided options, then settings, then defaults
-  const locale = options?.locale || options?.settings?.locale || 'en-GB';
-  const timezone = options?.timezone || options?.settings?.timezone || 'Europe/London';
+  // Use provided options, then settings, then defaults (en-PK / Asia/Karachi for Pakistan)
+  const locale = options?.locale || options?.settings?.locale || 'en-PK';
+  const timezone = options?.timezone || options?.settings?.timezone || 'Asia/Karachi';
 
   try {
     const formatter = new Intl.DateTimeFormat(locale, {

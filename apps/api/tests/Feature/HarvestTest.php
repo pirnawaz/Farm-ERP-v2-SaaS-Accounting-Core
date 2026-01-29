@@ -118,6 +118,7 @@ class HarvestTest extends TestCase
         $create = $this->withHeaders($this->headers())
             ->postJson('/api/v1/crop-ops/harvests', [
                 'crop_cycle_id' => $this->cropCycle->id,
+                'project_id' => $this->project->id,
                 'harvest_date' => '2024-06-15',
                 'notes' => 'Test harvest',
             ]);
@@ -149,6 +150,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -200,6 +202,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -266,9 +269,18 @@ class HarvestTest extends TestCase
             'status' => 'CLOSED',
         ]);
 
+        $closedProject = Project::create([
+            'tenant_id' => $this->tenant->id,
+            'party_id' => $this->project->party_id,
+            'crop_cycle_id' => $closedCycle->id,
+            'name' => 'Closed Project',
+            'status' => 'ACTIVE',
+        ]);
+
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $closedCycle->id,
+            'project_id' => $closedProject->id,
             'harvest_date' => '2023-06-15',
             'status' => 'DRAFT',
         ]);
@@ -302,6 +314,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -366,6 +379,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -411,6 +425,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -480,6 +495,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -543,6 +559,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -595,6 +612,7 @@ class HarvestTest extends TestCase
         $harvest1 = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
@@ -625,6 +643,7 @@ class HarvestTest extends TestCase
         $harvest2 = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-20',
             'status' => 'DRAFT',
         ]);
@@ -674,6 +693,7 @@ class HarvestTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);

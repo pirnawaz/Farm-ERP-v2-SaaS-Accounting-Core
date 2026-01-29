@@ -88,7 +88,6 @@ export default function SettlementPage() {
           up_to_date: validated.upToDate,
           idempotency_key: idempotencyKey,
           apply_advance_offset: validated.applyAdvanceOffset || false,
-          advance_offset_amount: validated.advanceOffsetAmount || null,
           advance_offset_amount: applyAdvanceOffset && advanceOffsetAmount !== '' ? Number(advanceOffsetAmount) : undefined,
         },
       });
@@ -166,38 +165,73 @@ export default function SettlementPage() {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Pool Revenue</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.pool_revenue}</dd>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Total Revenue</dt>
+                <dd className="text-xl font-semibold text-gray-900">
+                  {typeof preview.total_revenue === 'number' ? Number(preview.total_revenue).toFixed(2) : preview.total_revenue}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Total Expenses</dt>
+                <dd className="text-xl font-semibold text-gray-900">
+                  {typeof preview.total_expenses === 'number' ? Number(preview.total_expenses).toFixed(2) : preview.total_expenses}
+                </dd>
+              </div>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Shared Costs</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.shared_costs}</dd>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Cost breakdown</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Shared costs</dt>
+                  <dd className="text-lg font-semibold text-gray-900">{preview.shared_costs}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Landlord-only costs</dt>
+                  <dd className="text-lg font-semibold text-gray-900">
+                    {typeof preview.landlord_only_costs === 'number' ? Number(preview.landlord_only_costs).toFixed(2) : preview.landlord_only_costs ?? '0'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Hari-only deductions</dt>
+                  <dd className="text-lg font-semibold text-gray-900">{preview.hari_only_deductions}</dd>
+                </div>
+              </div>
             </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Pool Profit</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.pool_profit}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Kamdari Amount</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.kamdari_amount}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Landlord Gross</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.landlord_gross}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">HARI Gross</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.hari_gross}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">HARI Only Deductions</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.hari_only_deductions}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">HARI Net</dt>
-              <dd className="text-lg font-semibold text-gray-900">{preview.hari_net}</dd>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Pool Revenue</dt>
+                <dd className="text-lg font-semibold text-gray-900">{preview.pool_revenue}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Pool Profit</dt>
+                <dd className="text-lg font-semibold text-gray-900">{preview.pool_profit}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Kamdari Amount</dt>
+                <dd className="text-lg font-semibold text-gray-900">{preview.kamdari_amount}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Landlord Gross</dt>
+                <dd className="text-lg font-semibold text-gray-900">{preview.landlord_gross}</dd>
+              </div>
+              {preview.landlord_net != null && (
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Landlord Net</dt>
+                  <dd className="text-lg font-semibold text-gray-900">
+                    {typeof preview.landlord_net === 'number' ? Number(preview.landlord_net).toFixed(2) : preview.landlord_net}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-sm font-medium text-gray-500">HARI Gross</dt>
+                <dd className="text-lg font-semibold text-gray-900">{preview.hari_gross}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">HARI Net</dt>
+                <dd className="text-lg font-semibold text-gray-900">{preview.hari_net}</dd>
+              </div>
             </div>
           </div>
         </div>

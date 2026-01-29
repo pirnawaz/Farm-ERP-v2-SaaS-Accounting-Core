@@ -33,7 +33,9 @@ export default function PartyDetailPage() {
   const payableAmount = parseFloat(balances?.outstanding_total || '0');
   const receivableAmount = parseFloat(balances?.receivable_balance || '0');
   const advanceBalanceOutstanding = parseFloat(balances?.advance_balance_outstanding || '0');
+  const supplierPayableOutstanding = parseFloat(balances?.supplier_payable_outstanding || '0');
   const isHariOrVendor = party?.party_types?.some(type => ['HARI', 'VENDOR'].includes(type)) || false;
+  const isVendor = party?.party_types?.some(type => type === 'VENDOR') || false;
   const isBuyer = party?.party_types?.some(type => type === 'BUYER') || false;
 
   if (partyLoading) {
@@ -72,10 +74,18 @@ export default function PartyDetailPage() {
             <p className="text-xs text-gray-500 mt-1">Posted payables minus posted payments</p>
           </div>
         </div>
+
+        {isVendor && supplierPayableOutstanding > 0 && (
+          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-[#1F6F5C]">
+            <h3 className="text-sm font-medium text-gray-500 mb-1">Supplier Payable Outstanding</h3>
+            <p className="text-lg font-semibold text-gray-900"><span className="tabular-nums">{formatMoney(balances?.supplier_payable_outstanding || '0')}</span></p>
+            <p className="text-xs text-gray-500 mt-1">From posted GRNs (goods received). Pay OUT to clear.</p>
+          </div>
+        )}
         
         <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-3">
           <p className="text-xs text-[#2D3A3A]">
-            <strong>Note:</strong> Computed from posted settlements/allocations minus posted payments.
+            <strong>Note:</strong> Computed from posted settlements/allocations and supplier GRNs minus posted payments.
           </p>
         </div>
 
@@ -508,8 +518,8 @@ export default function PartyDetailPage() {
             View all →
           </Link>
         </div>
-        {payments && payments.length > 0 ? (
-          <DataTable data={payments} columns={paymentColumns} />
+        {(payments ?? []).length > 0 ? (
+          <DataTable data={(payments ?? []) as Payment[]} columns={paymentColumns} />
         ) : (
           <p className="text-gray-500">No payments found for this party.</p>
         )}

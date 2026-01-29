@@ -240,7 +240,7 @@ export default function WorkLogsPage() {
       </div>
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={workLogs ?? []}
+          data={(workLogs ?? []) as MachineWorkLog[]}
           columns={cols}
           onRowClick={(r) =>
             navigate(`/app/machinery/work-logs/${r.id}`, { state: { from: location.pathname + location.search } })

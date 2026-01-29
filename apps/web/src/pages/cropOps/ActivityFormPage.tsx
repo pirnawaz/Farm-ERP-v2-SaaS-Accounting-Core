@@ -125,6 +125,7 @@ export default function ActivityFormPage() {
               <option value="">Select</option>
               {activityTypes?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
+            <p className="text-sm text-gray-500 mt-1">Activity types represent operations like ploughing, sowing, spraying.</p>
           </FormField>
           <FormField label="Activity Date" required error={errors.activity_date}>
             <input type="date" value={activity_date} onChange={(e) => setActivityDate(e.target.value)} className="w-full px-3 py-2 border rounded" />

@@ -46,7 +46,7 @@ export default function SalesMarginPage() {
     ...(filters.group_by === 'sale' ? [
       { 
         header: 'Sale ID', 
-        accessor: (row) => row.sale_id ? (
+        accessor: (row: SalesMarginRow) => row.sale_id ? (
           <Link to={`/app/sales/${row.sale_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
             {row.sale_id.substring(0, 8)}...
           </Link>
@@ -54,10 +54,10 @@ export default function SalesMarginPage() {
       },
     ] : []),
     ...(filters.group_by === 'item' ? [
-      { header: 'Item ID', accessor: (row) => row.item_id?.substring(0, 8) || '-' },
+      { header: 'Item ID', accessor: (row: SalesMarginRow) => row.item_id?.substring(0, 8) || '-' },
     ] : []),
     ...(filters.group_by === 'crop_cycle' ? [
-      { header: 'Crop Cycle ID', accessor: (row) => row.crop_cycle_id?.substring(0, 8) || '-' },
+      { header: 'Crop Cycle ID', accessor: (row: SalesMarginRow) => row.crop_cycle_id?.substring(0, 8) || '-' },
     ] : []),
     { 
       header: 'Qty Sold', 

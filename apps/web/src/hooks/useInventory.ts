@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { inventoryApi, type GrnFilters, type IssueFilters, type TransferFilters, type AdjustmentFilters, type StockOnHandFilters, type StockMovementsFilters } from '../api/inventory';
 import type {
   CreateInvGrnPayload,
@@ -162,7 +162,7 @@ export function useGRNs(f?: GrnFilters) {
     queryFn: () => inventoryApi.grns.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true, // Prevent flicker on filter changes
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -230,7 +230,7 @@ export function useIssues(f?: IssueFilters) {
     queryFn: () => inventoryApi.issues.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true, // Prevent flicker on filter changes
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -298,7 +298,7 @@ export function useTransfers(f?: TransferFilters) {
     queryFn: () => inventoryApi.transfers.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true, // Prevent flicker on filter changes
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -363,7 +363,7 @@ export function useAdjustments(f?: AdjustmentFilters) {
     queryFn: () => inventoryApi.adjustments.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true, // Prevent flicker on filter changes
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -437,6 +437,6 @@ export function useStockMovements(f?: StockMovementsFilters) {
     queryFn: () => inventoryApi.stock.movements(f),
     staleTime: 30 * 1000, // 30 seconds - stock movements
     gcTime: 5 * 60 * 1000,
-    keepPreviousData: true, // Prevent flicker on filter changes
+    placeholderData: keepPreviousData,
   });
 }

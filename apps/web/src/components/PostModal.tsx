@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiClient, DailyBookEntry } from '@farm-erp/shared'
 import { useFormatting } from '../hooks/useFormatting'
+import { useTenantSettings } from '../hooks/useTenantSettings'
 
 interface PostModalProps {
   entryId: string
@@ -22,7 +23,9 @@ export function PostModal({ entryId, isOpen, onClose, onSuccess }: PostModalProp
   const [error, setError] = useState<string | null>(null)
   const [entry, setEntry] = useState<DailyBookEntry | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
-  const { formatMoney, formatDate } = useFormatting()
+  const { formatMoney } = useFormatting()
+  const { settings } = useTenantSettings()
+  const currencyCode = entry?.currency_code ?? settings?.currency_code ?? 'PKR'
 
   // Fetch entry data when modal opens
   useEffect(() => {
@@ -166,14 +169,14 @@ export function PostModal({ entryId, isOpen, onClose, onSuccess }: PostModalProp
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right whitespace-nowrap">
                           {line.debit > 0 ? (
-                            <span className="tabular-nums">{formatMoney(line.debit, { currencyCode: entry?.currency_code || 'GBP' })}</span>
+                            <span className="tabular-nums">{formatMoney(line.debit, { currencyCode })}</span>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right whitespace-nowrap">
                           {line.credit > 0 ? (
-                            <span className="tabular-nums">{formatMoney(line.credit, { currencyCode: entry?.currency_code || 'GBP' })}</span>
+                            <span className="tabular-nums">{formatMoney(line.credit, { currencyCode })}</span>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
@@ -186,10 +189,10 @@ export function PostModal({ entryId, isOpen, onClose, onSuccess }: PostModalProp
                         Totals
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right whitespace-nowrap">
-                        <span className="tabular-nums">{formatMoney(totalDebit, { currencyCode: entry?.currency_code || 'GBP' })}</span>
+                        <span className="tabular-nums">{formatMoney(totalDebit, { currencyCode })}</span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right whitespace-nowrap">
-                        <span className="tabular-nums">{formatMoney(totalCredit, { currencyCode: entry?.currency_code || 'GBP' })}</span>
+                        <span className="tabular-nums">{formatMoney(totalCredit, { currencyCode })}</span>
                       </td>
                     </tr>
                   </tbody>

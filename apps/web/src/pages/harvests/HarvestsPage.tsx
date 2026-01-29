@@ -23,6 +23,7 @@ export default function HarvestsPage() {
   const { data: cropCycles } = useCropCycles();
   const navigate = useNavigate();
   const location = useLocation();
+  const { formatDate } = useFormatting();
 
   const totalQty = (h: Harvest) => {
     return (h.lines || []).reduce((s, l) => s + parseFloat(String(l.quantity || 0)), 0);
@@ -32,6 +33,7 @@ export default function HarvestsPage() {
     { header: 'Harvest No', accessor: (r) => r.harvest_no || '—' },
     { header: 'Harvest Date', accessor: (r) => formatDate(r.harvest_date) },
     { header: 'Crop Cycle', accessor: (r) => r.crop_cycle?.name || r.crop_cycle_id },
+    { header: 'Project', accessor: (r) => r.project?.name ?? '—' },
     { header: 'Total Qty', accessor: (r) => totalQty(r).toFixed(3) },
     {
       header: 'Status',
@@ -78,7 +80,7 @@ export default function HarvestsPage() {
       </div>
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={harvests || []}
+          data={(harvests ?? []) as Harvest[]}
           columns={cols}
           onRowClick={(r) => navigate(`/app/harvests/${r.id}`, { state: { from: location.pathname + location.search } })}
           emptyMessage="No harvests. Create one."

@@ -1,0 +1,244 @@
+﻿
+> @farm-erp/web@1.0.0 build
+> tsc && vite build
+
+src/api/harvests.ts(9,3): error TS6196: 'PostingGroup' is declared but never used.
+src/components/DataTable.tsx(1,21): error TS6133: 'useMemo' is declared but its value is never read.
+src/components/OnboardingPanel.tsx(3,10): error TS6133: 'useOnboardingState' is declared but its value is never read.
+src/components/PostModal.tsx(25,24): error TS6133: 'formatDate' is declared but its value is never read.
+src/hooks/useAdvances.ts(12,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | AdvanceFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | AdvanceFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<Advance[], Error, Advance[], (string | AdvanceFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<Advance[], Error, Advance[], (string | AdvanceFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<Advance[], Error, Advance[], (string | AdvanceFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<Advance[], Error, Advance[], (string | AdvanceFilters | undefined)[]>'.
+src/hooks/useCropOps.ts(58,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | ActivityFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | ActivityFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<CropActivity[], Error, CropActivity[], (string | ActivityFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<CropActivity[], Error, CropActivity[], (string | ActivityFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<CropActivity[], Error, CropActivity[], (string | ActivityFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<CropActivity[], Error, CropActivity[], (string | ActivityFilters | undefined)[]>'.
+src/hooks/useHarvests.ts(23,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | HarvestFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | HarvestFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<Harvest[], Error, Harvest[], (string | HarvestFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<Harvest[], Error, Harvest[], (string | HarvestFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<Harvest[], Error, Harvest[], (string | HarvestFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<Harvest[], Error, Harvest[], (string | HarvestFilters | undefined)[]>'.
+src/hooks/useInventory.ts(165,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | GrnFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | GrnFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<InvGrn[], Error, InvGrn[], (string | GrnFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<InvGrn[], Error, InvGrn[], (string | GrnFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<InvGrn[], Error, InvGrn[], (string | GrnFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<InvGrn[], Error, InvGrn[], (string | GrnFilters | undefined)[]>'.
+src/hooks/useInventory.ts(233,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | IssueFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | IssueFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<InvIssue[], Error, InvIssue[], (string | IssueFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<InvIssue[], Error, InvIssue[], (string | IssueFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<InvIssue[], Error, InvIssue[], (string | IssueFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<InvIssue[], Error, InvIssue[], (string | IssueFilters | undefined)[]>'.
+src/hooks/useInventory.ts(301,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | TransferFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | TransferFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<InvTransfer[], Error, InvTransfer[], (string | TransferFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<InvTransfer[], Error, InvTransfer[], (string | TransferFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<InvTransfer[], Error, InvTransfer[], (string | TransferFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<InvTransfer[], Error, InvTransfer[], (string | TransferFilters | undefined)[]>'.
+src/hooks/useInventory.ts(366,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | AdjustmentFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | AdjustmentFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<InvAdjustment[], Error, InvAdjustment[], (string | AdjustmentFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<InvAdjustment[], Error, InvAdjustment[], (string | AdjustmentFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<InvAdjustment[], Error, InvAdjustment[], (string | AdjustmentFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<InvAdjustment[], Error, InvAdjustment[], (string | AdjustmentFilters | undefined)[]>'.
+src/hooks/useInventory.ts(440,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | StockMovementsFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | StockMovementsFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<InvStockMovement[], Error, InvStockMovement[], (string | StockMovementsFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<InvStockMovement[], Error, InvStockMovement[], (string | StockMovementsFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<InvStockMovement[], Error, InvStockMovement[], (string | StockMovementsFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<InvStockMovement[], Error, InvStockMovement[], (string | StockMovementsFilters | undefined)[]>'.
+src/hooks/useLabour.ts(62,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | WorkLogFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | WorkLogFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<LabWorkLog[], Error, LabWorkLog[], (string | WorkLogFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<LabWorkLog[], Error, LabWorkLog[], (string | WorkLogFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<LabWorkLog[], Error, LabWorkLog[], (string | WorkLogFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<LabWorkLog[], Error, LabWorkLog[], (string | WorkLogFilters | undefined)[]>'.
+src/hooks/useMachinery.ts(21,3): error TS6196: 'PostMachineWorkLogRequest' is declared but never used.
+src/hooks/useMachinery.ts(22,3): error TS6196: 'ReverseMachineWorkLogRequest' is declared but never used.
+src/hooks/useMachinery.ts(117,20): error TS6133: 'v' is declared but its value is never read.
+src/hooks/useMachinery.ts(133,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | WorkLogFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | WorkLogFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<MachineWorkLog[], Error, MachineWorkLog[], (string | WorkLogFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<MachineWorkLog[], Error, MachineWorkLog[], (string | WorkLogFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<MachineWorkLog[], Error, MachineWorkLog[], (string | WorkLogFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<MachineWorkLog[], Error, MachineWorkLog[], (string | WorkLogFilters | undefined)[]>'.
+src/hooks/useMachinery.ts(289,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | ChargeFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | ChargeFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<MachineryCharge[], Error, MachineryCharge[], (string | ChargeFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<MachineryCharge[], Error, MachineryCharge[], (string | ChargeFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<MachineryCharge[], Error, MachineryCharge[], (string | ChargeFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<MachineryCharge[], Error, MachineryCharge[], (string | ChargeFilters | undefined)[]>'.
+src/hooks/useMachinery.ts(372,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | MaintenanceJobFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | MaintenanceJobFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<MachineMaintenanceJob[], Error, MachineMaintenanceJob[], (string | MaintenanceJobFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<MachineMaintenanceJob[], Error, MachineMaintenanceJob[], (string | MaintenanceJobFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<MachineMaintenanceJob[], Error, MachineMaintenanceJob[], (string | MaintenanceJobFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<MachineMaintenanceJob[], Error, MachineMaintenanceJob[], (string | MaintenanceJobFilters | undefined)[]>'.
+src/hooks/useOnboardingState.ts(52,7): error TS2322: Type 'boolean | undefined' is not assignable to type 'boolean'.
+  Type 'undefined' is not assignable to type 'boolean'.
+src/hooks/useOnboardingState.ts(53,7): error TS2322: Type 'boolean | undefined' is not assignable to type 'boolean'.
+  Type 'undefined' is not assignable to type 'boolean'.
+src/hooks/useOnboardingState.ts(54,7): error TS2322: Type 'boolean | undefined' is not assignable to type 'boolean'.
+  Type 'undefined' is not assignable to type 'boolean'.
+src/hooks/usePayments.ts(12,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | PaymentFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | PaymentFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<Payment[], Error, Payment[], (string | PaymentFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<Payment[], Error, Payment[], (string | PaymentFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<Payment[], Error, Payment[], (string | PaymentFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<Payment[], Error, Payment[], (string | PaymentFilters | undefined)[]>'.
+src/hooks/useReports.ts(26,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | { from: string; to: string; account_id?: string | undefined; project_id?: string | undefined; page?: number | undefined; per_page?: number | undefined; })[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | { from: string; to: string; account_id?: string | undefined; project_id?: string | undefined; page?: number | undefined; per_page?: number | undefined; })[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<GeneralLedgerResponse, Error, GeneralLedgerResponse, (string | { from: string; to: string; account_id?: string | undefined; project_id?: string | undefined; page?: number | undefined; per_page?: number | undefined; })[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<GeneralLedgerResponse, Error, GeneralLedgerResponse, (string | { from: string; to: string; account_id?: string | undefined; project_id?: string | undefined; page?: number | undefined; per_page?: number | undefined; })[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<GeneralLedgerResponse, Error, GeneralLedgerResponse, (string | { from: string; to: string; account_id?: string | undefined; project_id?: string | undefined; page?: number | undefined; per_page?: number | undefined; })[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<GeneralLedgerResponse, Error, GeneralLedgerResponse, (string | { from: string; to: string; account_id?: string | undefined; project_id?: string | undefined; page?: number | undefined; per_page?: number | undefined; })[]>'.
+src/hooks/useSales.ts(12,5): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(options: DefinedInitialDataOptions<unknown, Error, unknown, (string | SaleFilters | undefined)[]>, queryClient?: QueryClient | undefined): DefinedUseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'DefinedInitialDataOptions<unknown, Error, unknown, (string | SaleFilters | undefined)[]>'.
+  Overload 2 of 3, '(options: UndefinedInitialDataOptions<Sale[], Error, Sale[], (string | SaleFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UndefinedInitialDataOptions<Sale[], Error, Sale[], (string | SaleFilters | undefined)[]>'.
+  Overload 3 of 3, '(options: UseQueryOptions<Sale[], Error, Sale[], (string | SaleFilters | undefined)[]>, queryClient?: QueryClient | undefined): UseQueryResult<...>', gave the following error.
+    Object literal may only specify known properties, and 'keepPreviousData' does not exist in type 'UseQueryOptions<Sale[], Error, Sale[], (string | SaleFilters | undefined)[]>'.
+src/pages/__tests__/SaleDetailPage.test.tsx(2,26): error TS6133: 'fireEvent' is declared but its value is never read.
+src/pages/__tests__/SaleDetailPage.test.tsx(2,37): error TS6133: 'waitFor' is declared but its value is never read.
+src/pages/AccountBalancesPage.tsx(61,9): error TS2353: Object literal may only specify known properties, and 'asOfDate' does not exist in type '{ reportName?: string | undefined; fromDate?: string | undefined; toDate?: string | undefined; }'.
+src/pages/AdminRolesPage.tsx(73,24): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ 'Manage tenants': boolean; 'View all tenants': boolean; 'Enable/disable modules per tenant': boolean; } | { 'Manage users': boolean; 'Assign roles': boolean; 'Enable/disable modules': boolean; ... 4 more ...; 'View all data': boolean; } | { ...; } | { ...; }'.
+  No index signature with a parameter of type 'string' was found on type '{ 'Manage tenants': boolean; 'View all tenants': boolean; 'Enable/disable modules per tenant': boolean; } | { 'Manage users': boolean; 'Assign roles': boolean; 'Enable/disable modules': boolean; ... 4 more ...; 'View all data': boolean; } | { ...; } | { ...; }'.
+src/pages/AdvancesPage.tsx(188,11): error TS2740: Type '{}' is missing the following properties from type 'Advance[]': length, pop, push, concat, and 28 more.
+src/pages/cropOps/ActivitiesPage.tsx(110,11): error TS2740: Type '{}' is missing the following properties from type 'CropActivity[]': length, pop, push, concat, and 28 more.
+src/pages/cropOps/ActivityDetailPage.tsx(169,77): error TS2552: Cannot find name 'formatDate'. Did you mean 'FormData'?
+src/pages/cropOps/ActivityDetailPage.tsx(185,102): error TS2552: Cannot find name 'formatDate'. Did you mean 'FormData'?
+src/pages/dashboard/DashboardWidgets.tsx(22,9): error TS6133: 'formatMoney' is declared but its value is never read.
+src/pages/dashboard/DashboardWidgets.tsx(218,36): error TS2339: Property 'length' does not exist on type '{}'.
+src/pages/DashboardPage.tsx(29,23): error TS6133: 'widget' is declared but its value is never read.
+src/pages/harvests/HarvestDetailPage.tsx(38,9): error TS6133: 'cropCycles' is declared but its value is never read.
+src/pages/harvests/HarvestDetailPage.tsx(82,9): error TS6133: 'addLine' is declared but its value is never read.
+src/pages/harvests/HarvestDetailPage.tsx(83,9): error TS6133: 'removeLine' is declared but its value is never read.
+src/pages/harvests/HarvestFormPage.tsx(31,10): error TS6133: 'harvestId' is declared but its value is never read.
+src/pages/harvests/HarvestFormPage.tsx(38,9): error TS6133: 'validate' is declared but its value is never read.
+src/pages/harvests/HarvestsPage.tsx(8,1): error TS6133: 'useFormatting' is declared but its value is never read.
+src/pages/harvests/HarvestsPage.tsx(33,48): error TS2552: Cannot find name 'formatDate'. Did you mean 'FormData'?
+src/pages/harvests/HarvestsPage.tsx(81,11): error TS2740: Type '{}' is missing the following properties from type 'Harvest[]': length, pop, push, concat, and 28 more.
+src/pages/inventory/InvAdjustmentsPage.tsx(70,20): error TS2740: Type '{}' is missing the following properties from type 'InvAdjustment[]': length, pop, push, concat, and 28 more.
+src/pages/inventory/InvGrnsPage.tsx(59,11): error TS2740: Type '{}' is missing the following properties from type 'InvGrn[]': length, pop, push, concat, and 28 more.
+src/pages/inventory/InvIssuesPage.tsx(60,11): error TS2740: Type '{}' is missing the following properties from type 'InvIssue[]': length, pop, push, concat, and 28 more.
+src/pages/inventory/InvTransfersPage.tsx(8,1): error TS6133: 'useFormatting' is declared but its value is never read.
+src/pages/inventory/InvTransfersPage.tsx(29,44): error TS2552: Cannot find name 'formatDate'. Did you mean 'FormData'?
+src/pages/inventory/InvTransfersPage.tsx(67,20): error TS2740: Type '{}' is missing the following properties from type 'InvTransfer[]': length, pop, push, concat, and 28 more.
+src/pages/inventory/StockMovementsPage.tsx(53,22): error TS2740: Type '{}' is missing the following properties from type 'InvStockMovement[]': length, pop, push, concat, and 28 more.
+src/pages/labour/LabourDashboardPage.tsx(13,30): error TS2339: Property 'length' does not exist on type '{}'.
+src/pages/labour/WorkLogsPage.tsx(89,11): error TS2740: Type '{}' is missing the following properties from type 'LabWorkLog[]': length, pop, push, concat, and 28 more.
+src/pages/LandAllocationsPage.tsx(227,32): error TS6133: 'e' is declared but its value is never read.
+src/pages/LandAllocationsPage.tsx(242,32): error TS6133: 'e' is declared but its value is never read.
+src/pages/machinery/ChargeDetailPage.tsx(14,1): error TS6133: 'MachineryChargeLine' is declared but its value is never read.
+src/pages/machinery/ChargeDetailPage.tsx(18,9): error TS6133: 'navigate' is declared but its value is never read.
+src/pages/machinery/ChargeDetailPage.tsx(358,10): error TS2741: Property 'isOpen' is missing in type '{ children: Element; title: string; onClose: () => void; }' but required in type 'ModalProps'.
+src/pages/machinery/ChargeDetailPage.tsx(391,10): error TS2741: Property 'isOpen' is missing in type '{ children: Element; title: string; onClose: () => void; }' but required in type 'ModalProps'.
+src/pages/machinery/ChargesPage.tsx(29,56): error TS2345: Argument of type '{ status: string; project_id: string; crop_cycle_id: string; from: string; to: string; landlord_party_id: string; }' is not assignable to parameter of type 'ChargeFilters'.
+  Types of property 'status' are incompatible.
+    Type 'string' is not assignable to type '"DRAFT" | "POSTED" | "REVERSED" | undefined'.
+src/pages/machinery/ChargesPage.tsx(207,11): error TS2740: Type '{}' is missing the following properties from type 'MachineryCharge[]': length, pop, push, concat, and 28 more.
+src/pages/machinery/MaintenanceJobDetailPage.tsx(53,9): error TS6133: 'handleLineChange' is declared but its value is never read.
+src/pages/machinery/MaintenanceJobDetailPage.tsx(60,7): error TS2322: Type 'string | number' is not assignable to type 'never'.
+  Type 'string' is not assignable to type 'never'.
+src/pages/machinery/MaintenanceJobDetailPage.tsx(65,9): error TS6133: 'handleSave' is declared but its value is never read.
+src/pages/machinery/MaintenanceJobDetailPage.tsx(306,10): error TS2741: Property 'isOpen' is missing in type '{ children: Element; title: string; onClose: () => void; }' but required in type 'ModalProps'.
+src/pages/machinery/MaintenanceJobDetailPage.tsx(339,10): error TS2741: Property 'isOpen' is missing in type '{ children: Element; title: string; onClose: () => void; }' but required in type 'ModalProps'.
+src/pages/machinery/MaintenanceJobFormPage.tsx(175,36): error TS2322: Type '{ children: Element; label: string; className: string; }' is not assignable to type 'IntrinsicAttributes & FormFieldProps'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & FormFieldProps'.
+src/pages/machinery/MaintenanceJobsPage.tsx(18,1): error TS6133: 'uuidv4' is declared but its value is never read.
+src/pages/machinery/MaintenanceJobsPage.tsx(33,61): error TS2345: Argument of type '{ status: string; machine_id: string; from: string; to: string; vendor_party_id: string; }' is not assignable to parameter of type 'MaintenanceJobFilters'.
+  Types of property 'status' are incompatible.
+    Type 'string' is not assignable to type '"DRAFT" | "POSTED" | "REVERSED" | undefined'.
+src/pages/machinery/MaintenanceJobsPage.tsx(162,9): error TS2322: Type '{ title: string; breadcrumbs: ({ label: string; to: string; } | { label: string; })[]; actions: Element | undefined; }' is not assignable to type 'IntrinsicAttributes & PageHeaderProps'.
+  Property 'actions' does not exist on type 'IntrinsicAttributes & PageHeaderProps'.
+src/pages/machinery/MaintenanceJobsPage.tsx(243,11): error TS2740: Type '{}' is missing the following properties from type 'MachineMaintenanceJob[]': length, pop, push, concat, and 28 more.
+src/pages/machinery/MaintenanceJobsPage.tsx(251,10): error TS2741: Property 'isOpen' is missing in type '{ children: Element; title: string; onClose: () => void; }' but required in type 'ModalProps'.
+src/pages/machinery/MaintenanceJobsPage.tsx(271,26): error TS2304: Cannot find name 'handlePost'.
+src/pages/machinery/MaintenanceJobsPage.tsx(284,10): error TS2741: Property 'isOpen' is missing in type '{ children: Element; title: string; onClose: () => void; }' but required in type 'ModalProps'.
+src/pages/machinery/MaintenanceJobsPage.tsx(314,26): error TS2304: Cannot find name 'handleReverse'.
+src/pages/machinery/RateCardsPage.tsx(25,11): error TS2339: Property 'formatCurrency' does not exist on type '{ formatMoney: (amount: string | number, options?: { currencyCode?: string | undefined; locale?: string | undefined; } | undefined) => string; formatDate: (date: string | number | Date, options?: { ...; } | undefined) => string; formatDateTime: (date: string | ... 1 more ... | Date, options?: { ...; } | undefined) =...'.
+src/pages/machinery/RateCardsPage.tsx(136,7): error TS2353: Object literal may only specify known properties, and 'is_active' does not exist in type 'UpdateMachineRateCardPayload'.
+src/pages/machinery/WorkLogsPage.tsx(243,11): error TS2740: Type '{}' is missing the following properties from type 'MachineWorkLog[]': length, pop, push, concat, and 28 more.
+src/pages/PartyDetailPage.tsx(511,31): error TS2339: Property 'length' does not exist on type '{}'.
+src/pages/PartyDetailPage.tsx(512,22): error TS2740: Type '{}' is missing the following properties from type 'Payment[]': length, pop, push, concat, and 28 more.
+src/pages/PaymentsPage.tsx(158,11): error TS2740: Type '{}' is missing the following properties from type 'Payment[]': length, pop, push, concat, and 28 more.
+src/pages/platform/PlatformTenantDetailPage.tsx(10,1): error TS6133: 'platformApi' is declared but its value is never read.
+src/pages/platform/PlatformTenantDetailPage.tsx(15,9): error TS6133: 'navigate' is declared but its value is never read.
+src/pages/platform/PlatformTenantDetailPage.tsx(16,9): error TS6133: 'queryClient' is declared but its value is never read.
+src/pages/platform/PlatformTenantDetailPage.tsx(25,9): error TS6133: 'modulesData' is declared but its value is never read.
+src/pages/ReportsPage.tsx(169,27): error TS2339: Property 'data' does not exist on type '{}'.
+src/pages/ReportsPage.tsx(169,49): error TS2339: Property 'data' does not exist on type '{}'.
+src/pages/ReportsPage.tsx(171,46): error TS2339: Property 'data' does not exist on type '{}'.
+src/pages/ReportsPage.tsx(171,56): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/pages/ReportsPage.tsx(171,59): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/pages/ReportsPage.tsx(171,114): error TS2322: Type 'Column<GeneralLedgerRow>[]' is not assignable to type 'Column<{ id: string; }>[]'.
+  Type 'Column<GeneralLedgerRow>' is not assignable to type 'Column<{ id: string; }>'.
+    Type '{ id: string; }' is missing the following properties from type 'GeneralLedgerRow': posting_date, posting_group_id, source_type, source_id, and 9 more.
+src/pages/ReportsPage.tsx(172,30): error TS2339: Property 'pagination' does not exist on type '{}'.
+src/pages/ReportsPage.tsx(175,41): error TS2339: Property 'pagination' does not exist on type '{}'.
+src/pages/ReportsPage.tsx(175,76): error TS2339: Property 'pagination' does not exist on type '{}'.
+src/pages/ReportsPage.tsx(176,44): error TS2339: Property 'pagination' does not exist on type '{}'.
+src/pages/SaleFormPage.tsx(52,10): error TS6133: 'fieldErrors' is declared but its value is never read.
+src/pages/SaleFormPage.tsx(107,9): error TS6133: 'validateForm' is declared but its value is never read.
+src/pages/SaleFormPage.tsx(167,9): error TS2322: Type '{ inventory_item_id: string; store_id: string | undefined; quantity: string; unit_price: string; uom: string | undefined; }[] | undefined' is not assignable to type 'SaleLine[] | undefined'.
+  Type '{ inventory_item_id: string; store_id: string | undefined; quantity: string; unit_price: string; uom: string | undefined; }[]' is not assignable to type 'SaleLine[]'.
+    Property 'line_total' is missing in type '{ inventory_item_id: string; store_id: string | undefined; quantity: string; unit_price: string; uom: string | undefined; }' but required in type 'SaleLine'.
+src/pages/SalesMarginPage.tsx(49,20): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/pages/SalesMarginPage.tsx(57,39): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/pages/SalesMarginPage.tsx(60,45): error TS7006: Parameter 'row' implicitly has an 'any' type.
+src/pages/SalesPage.tsx(148,11): error TS2740: Type '{}' is missing the following properties from type 'Sale[]': length, pop, push, concat, and 28 more.
+src/pages/SettlementPage.tsx(92,11): error TS1117: An object literal cannot have multiple properties with the same name.
+src/pages/ShareRulesPage.tsx(2,1): error TS6133: 'Link' is declared but its value is never read.
+src/pages/ShareRulesPage.tsx(203,10): error TS2741: Property 'isOpen' is missing in type '{ children: Element; title: string; onClose: () => void; }' but required in type 'ModalProps'.
+src/pages/ShareRulesPage.tsx(214,15): error TS2322: Type '{ label: string; value: string; onChange: (e: any) => void; error: string; }' is not assignable to type 'IntrinsicAttributes & FormFieldProps'.
+  Property 'value' does not exist on type 'IntrinsicAttributes & FormFieldProps'.
+src/pages/ShareRulesPage.tsx(215,26): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/pages/ShareRulesPage.tsx(221,15): error TS2322: Type '{ label: string; type: string; value: "SALE" | "PROJECT" | "CROP_CYCLE"; onChange: (e: any) => void; options: { value: string; label: string; }[]; }' is not assignable to type 'IntrinsicAttributes & FormFieldProps'.
+  Property 'type' does not exist on type 'IntrinsicAttributes & FormFieldProps'.
+src/pages/ShareRulesPage.tsx(223,26): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/pages/ShareRulesPage.tsx(233,15): error TS2322: Type '{ label: string; type: string; value: "MARGIN" | "REVENUE" | undefined; onChange: (e: any) => void; options: { value: string; label: string; }[]; }' is not assignable to type 'IntrinsicAttributes & FormFieldProps'.
+  Property 'type' does not exist on type 'IntrinsicAttributes & FormFieldProps'.
+src/pages/ShareRulesPage.tsx(235,26): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/pages/ShareRulesPage.tsx(244,15): error TS2322: Type '{ label: string; type: string; value: string; onChange: (e: any) => void; error: string; }' is not assignable to type 'IntrinsicAttributes & FormFieldProps'.
+  Property 'type' does not exist on type 'IntrinsicAttributes & FormFieldProps'.
+src/pages/ShareRulesPage.tsx(246,26): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/pages/ShareRulesPage.tsx(252,15): error TS2322: Type '{ label: string; type: string; value: string | null | undefined; onChange: (e: any) => void; }' is not assignable to type 'IntrinsicAttributes & FormFieldProps'.
+  Property 'type' does not exist on type 'IntrinsicAttributes & FormFieldProps'.
+src/pages/ShareRulesPage.tsx(254,26): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/types/index.ts(1565,18): error TS2304: Cannot find name 'ShareRule'.
+src/utils/csvExport.ts(62,93): error TS2339: Property 'asOfDate' does not exist on type '{ reportName?: string | undefined; fromDate?: string | undefined; toDate?: string | undefined; }'.
+node.exe : npm error Lifecycle script `build` failed with error:
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm error Lifec...led with error::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm error code 2
+npm error path C:\laragon\www\Farm ERP v2\apps\web
+npm error workspace @farm-erp/web@1.0.0
+npm error location C:\laragon\www\Farm ERP v2\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c tsc && vite build

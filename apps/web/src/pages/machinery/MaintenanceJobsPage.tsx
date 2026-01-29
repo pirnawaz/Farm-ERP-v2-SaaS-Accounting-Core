@@ -15,7 +15,6 @@ import { FormField } from '../../components/FormField';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
-import { v4 as uuidv4 } from 'uuid';
 import type { MachineMaintenanceJob } from '../../types';
 
 export default function MaintenanceJobsPage() {
@@ -30,7 +29,13 @@ export default function MaintenanceJobsPage() {
     vendor_party_id: searchParams.get('vendor_party_id') || '',
   });
 
-  const { data: jobs, isLoading } = useMaintenanceJobsQuery(filters);
+  const jobFilters = {
+    ...filters,
+    status: (filters.status === 'DRAFT' || filters.status === 'POSTED' || filters.status === 'REVERSED'
+      ? filters.status
+      : undefined) as 'DRAFT' | 'POSTED' | 'REVERSED' | undefined,
+  };
+  const { data: jobs, isLoading } = useMaintenanceJobsQuery(jobFilters);
   const { data: machines } = useMachinesQuery();
   const { data: parties } = useParties();
   const { hasRole } = useRole();
@@ -45,6 +50,33 @@ export default function MaintenanceJobsPage() {
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
   const [reverseDate, setReverseDate] = useState(new Date().toISOString().split('T')[0]);
   const [reverseReason, setReverseReason] = useState('');
+
+  const handlePost = async () => {
+    if (!postingJobId) return;
+    try {
+      await postMutation.mutateAsync({
+        id: postingJobId,
+        payload: { posting_date: postingDate },
+      });
+      setPostingJobId(null);
+    } catch {
+      // Error handled by mutation
+    }
+  };
+
+  const handleReverse = async () => {
+    if (!reversingJobId) return;
+    try {
+      await reverseMutation.mutateAsync({
+        id: reversingJobId,
+        payload: { posting_date: reverseDate, reason: reverseReason || undefined },
+      });
+      setReversingJobId(null);
+      setReverseReason('');
+    } catch {
+      // Error handled by mutation
+    }
+  };
 
   const handleFilterChange = (key: string, value: string) => {
     const newFilters = { ...filters, [key]: value };
@@ -159,7 +191,7 @@ export default function MaintenanceJobsPage() {
           { label: 'Machinery', to: '/app/machinery' },
           { label: 'Maintenance Jobs' },
         ]}
-        actions={
+        right={
           canCreate ? (
             <button
               onClick={() => navigate('/app/machinery/maintenance-jobs/new')}
@@ -240,7 +272,7 @@ export default function MaintenanceJobsPage() {
 
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={jobs || []}
+          data={(jobs ?? []) as MachineMaintenanceJob[]}
           columns={columns}
           onRowClick={(row) => navigate(`/app/machinery/maintenance-jobs/${row.id}`)}
         />
@@ -248,7 +280,7 @@ export default function MaintenanceJobsPage() {
 
       {/* Post Modal */}
       {postingJobId && (
-        <Modal title="Post Maintenance Job" onClose={() => setPostingJobId(null)}>
+        <Modal isOpen={!!postingJobId} title="Post Maintenance Job" onClose={() => setPostingJobId(null)}>
           <div className="space-y-4">
             <FormField label="Posting Date" required>
               <input
@@ -281,7 +313,7 @@ export default function MaintenanceJobsPage() {
 
       {/* Reverse Modal */}
       {reversingJobId && (
-        <Modal title="Reverse Maintenance Job" onClose={() => { setReversingJobId(null); setReverseReason(''); }}>
+        <Modal isOpen={!!reversingJobId} title="Reverse Maintenance Job" onClose={() => { setReversingJobId(null); setReverseReason(''); }}>
           <div className="space-y-4">
             <FormField label="Posting Date" required>
               <input

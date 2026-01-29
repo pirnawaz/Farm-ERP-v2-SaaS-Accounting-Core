@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useCallback } from 'react';
+import { ReactNode, useCallback } from 'react';
 
 export interface Column<T> {
   header: string;

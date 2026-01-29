@@ -224,7 +224,7 @@ export default function LandAllocationsPage() {
                     name="allocation_mode"
                     value="OWNER"
                     checked={allocationMode === 'OWNER'}
-                    onChange={(e) => {
+                    onChange={() => {
                       setAllocationMode('OWNER');
                       setFormData({ ...formData, party_id: null });
                       setErrors({ ...errors, party_id: '' });
@@ -239,7 +239,7 @@ export default function LandAllocationsPage() {
                     name="allocation_mode"
                     value="HARI"
                     checked={allocationMode === 'HARI'}
-                    onChange={(e) => {
+                    onChange={() => {
                       setAllocationMode('HARI');
                       setFormData({ ...formData, party_id: '' });
                       setErrors({ ...errors, party_id: '' });

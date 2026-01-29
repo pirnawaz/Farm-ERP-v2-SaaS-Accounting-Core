@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { paymentsApi, type PaymentFilters } from '../api/payments';
 import type { CreatePaymentPayload, PostPaymentRequest } from '../types';
 import toast from 'react-hot-toast';
@@ -9,7 +9,7 @@ export function usePayments(filters?: PaymentFilters) {
     queryFn: () => paymentsApi.list(filters),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true, // Prevent flicker on filter changes
+    placeholderData: keepPreviousData,
   });
 }
 

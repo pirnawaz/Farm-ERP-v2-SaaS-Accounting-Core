@@ -50,7 +50,7 @@ export default function StockMovementsPage() {
         {isLoading ? (
           <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
         ) : (
-          <DataTable data={movements || []} columns={cols} emptyMessage="No stock movements. Post GRNs or Issues." />
+          <DataTable data={(movements ?? []) as InvStockMovement[]} columns={cols} emptyMessage="No stock movements. Post GRNs or Issues." />
         )}
       </div>
     </div>

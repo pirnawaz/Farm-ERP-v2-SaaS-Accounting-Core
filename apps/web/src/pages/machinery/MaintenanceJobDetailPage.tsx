@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   useMaintenanceJobQuery,
-  useUpdateMaintenanceJob,
   usePostMaintenanceJob,
   useReverseMaintenanceJob,
 } from '../../hooks/useMachinery';
@@ -27,7 +26,6 @@ export default function MaintenanceJobDetailPage() {
   const [editedLines, setEditedLines] = useState<Record<string, { description: string; amount: number }>>({});
 
   const { data: job, isLoading } = useMaintenanceJobQuery(id!);
-  const updateMutation = useUpdateMaintenanceJob();
   const postMutation = usePostMaintenanceJob();
   const reverseMutation = useReverseMaintenanceJob();
 
@@ -49,37 +47,6 @@ export default function MaintenanceJobDetailPage() {
       setEditedLines(initial);
     }
   }, [job?.lines, isDraft]);
-
-  const handleLineChange = (lineId: string, field: 'description' | 'amount', value: string | number) => {
-    if (!isDraft) return;
-    setEditedLines((prev) => {
-      const updated = { ...prev };
-      if (!updated[lineId]) {
-        updated[lineId] = { description: '', amount: 0 };
-      }
-      updated[lineId][field] = value;
-      return updated;
-    });
-  };
-
-  const handleSave = async () => {
-    if (!id || !isDraft) return;
-
-    const lines = Object.entries(editedLines).map(([lineId, values]) => ({
-      id: lineId,
-      description: values.description || undefined,
-      amount: values.amount,
-    }));
-
-    try {
-      await updateMutation.mutateAsync({
-        id,
-        payload: { lines },
-      });
-    } catch (error) {
-      // Error handled by mutation
-    }
-  };
 
   const handlePost = async () => {
     if (!id) return;
@@ -303,7 +270,7 @@ export default function MaintenanceJobDetailPage() {
 
       {/* Post Modal */}
       {showPostModal && (
-        <Modal title="Post Maintenance Job" onClose={() => setShowPostModal(false)}>
+        <Modal isOpen={showPostModal} title="Post Maintenance Job" onClose={() => setShowPostModal(false)}>
           <div className="space-y-4">
             <FormField label="Posting Date" required>
               <input
@@ -336,7 +303,7 @@ export default function MaintenanceJobDetailPage() {
 
       {/* Reverse Modal */}
       {showReverseModal && (
-        <Modal title="Reverse Maintenance Job" onClose={() => setShowReverseModal(false)}>
+        <Modal isOpen={showReverseModal} title="Reverse Maintenance Job" onClose={() => setShowReverseModal(false)}>
           <div className="space-y-4">
             <FormField label="Posting Date" required>
               <input

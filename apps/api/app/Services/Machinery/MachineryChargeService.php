@@ -9,6 +9,10 @@ use App\Models\MachineRateCard;
 use App\Models\Machine;
 use App\Models\Project;
 use App\Models\Party;
+use App\Exceptions\Machinery\MissingRateCardException;
+use App\Exceptions\Machinery\AlreadyChargedException;
+use App\Exceptions\Machinery\NoWorkLogsException;
+use App\Exceptions\Machinery\UnsupportedMeterUnitException;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -22,7 +26,10 @@ class MachineryChargeService
      * If poolScope is not provided and work logs have mixed scopes, creates one charge per scope.
      * 
      * @return MachineryCharge|array Returns single charge or array of two charges (SHARED and HARI_ONLY)
-     * @throws \Exception
+     * @throws MissingRateCardException
+     * @throws AlreadyChargedException
+     * @throws NoWorkLogsException
+     * @throws UnsupportedMeterUnitException
      */
     public function generateDraftChargeForProject(
         string $tenantId,
@@ -42,13 +49,25 @@ class MachineryChargeService
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        // Query work logs
+        // Check if there are any work logs in the range (regardless of charge status)
+        $allWorkLogsQuery = MachineWorkLog::where('tenant_id', $tenantId)
+            ->where('project_id', $projectId)
+            ->where('status', MachineWorkLog::STATUS_POSTED)
+            ->whereBetween('posting_date', [$fromDate, $toDate]);
+
+        if ($poolScope) {
+            $allWorkLogsQuery->where('pool_scope', $poolScope);
+        }
+
+        $totalWorkLogs = $allWorkLogsQuery->count();
+
+        // Query uncharged work logs
         $workLogsQuery = MachineWorkLog::where('tenant_id', $tenantId)
             ->where('project_id', $projectId)
             ->where('status', MachineWorkLog::STATUS_POSTED)
             ->whereBetween('posting_date', [$fromDate, $toDate])
             ->whereNull('machinery_charge_id')
-            ->with(['machine']);
+            ->with(['machine', 'activity']);
 
         if ($poolScope) {
             $workLogsQuery->where('pool_scope', $poolScope);
@@ -56,8 +75,14 @@ class MachineryChargeService
 
         $workLogs = $workLogsQuery->get();
 
+        // If there are work logs in range but none are uncharged, they're already charged
+        if ($totalWorkLogs > 0 && $workLogs->isEmpty()) {
+            throw new AlreadyChargedException('Charges already generated for selected scope/date range.');
+        }
+
+        // If no work logs exist at all
         if ($workLogs->isEmpty()) {
-            throw new \Exception('No uncharged posted work logs found for the specified criteria.');
+            throw new NoWorkLogsException('No uncharged posted work logs found for the specified criteria.');
         }
 
         // Check for mixed pool scopes if poolScope not provided
@@ -154,14 +179,13 @@ class MachineryChargeService
             }
 
             if (!empty($missingRateCards)) {
-                throw new \Exception(
-                    'Rate cards not found for work logs: ' . implode(', ', $missingRateCards) . 
-                    '. Please create rate cards for these machines/machine types.'
-                );
+                $message = 'Rate cards not found for work logs: ' . implode(', ', $missingRateCards) . 
+                    '. Please create rate cards for these machines/machine types.';
+                throw new MissingRateCardException($message);
             }
 
             if (empty($lines)) {
-                throw new \Exception('No valid work logs to charge (all missing rate cards).');
+                throw new MissingRateCardException('No valid work logs to charge (all missing rate cards).');
             }
 
             // Calculate total amount
@@ -203,46 +227,84 @@ class MachineryChargeService
 
     /**
      * Resolve rate card for a work log based on posting date.
-     * Priority: MACHINE-specific, then MACHINE_TYPE.
+     * Priority: machine+activity_type → machine+null → machine_type+activity_type → machine_type+null.
      */
     private function resolveRateCard(string $tenantId, MachineWorkLog $workLog, string $postingDate): ?MachineRateCard
     {
         $machine = $workLog->machine;
+        
+        // Guard against null machine
+        if (!$machine) {
+            $context = "Work log {$workLog->work_log_no} has no associated machine.";
+            throw new MissingRateCardException($context);
+        }
+        
         $unit = $this->mapMeterUnitToChargeUnit($machine->meter_unit);
+        $activityTypeId = $workLog->activity?->activity_type_id ?? null;
 
-        // Try MACHINE-specific rate card first
+        $dateRange = function ($q) use ($postingDate) {
+            $q->where('effective_from', '<=', $postingDate)
+              ->where(function ($q2) use ($postingDate) {
+                  $q2->whereNull('effective_to')->orWhere('effective_to', '>=', $postingDate);
+              });
+        };
+
+        // 1. MACHINE + activity_type
+        if ($activityTypeId) {
+            $rateCard = MachineRateCard::where('tenant_id', $tenantId)
+                ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE)
+                ->where('machine_id', $machine->id)
+                ->where('rate_unit', $unit)
+                ->where('activity_type_id', $activityTypeId)
+                ->where('is_active', true)
+                ->where($dateRange)
+                ->orderBy('effective_from', 'desc')
+                ->first();
+            if ($rateCard) {
+                return $rateCard;
+            }
+        }
+
+        // 2. MACHINE + null
         $rateCard = MachineRateCard::where('tenant_id', $tenantId)
             ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE)
             ->where('machine_id', $machine->id)
             ->where('rate_unit', $unit)
+            ->whereNull('activity_type_id')
             ->where('is_active', true)
-            ->where('effective_from', '<=', $postingDate)
-            ->where(function ($q) use ($postingDate) {
-                $q->whereNull('effective_to')
-                  ->orWhere('effective_to', '>=', $postingDate);
-            })
+            ->where($dateRange)
             ->orderBy('effective_from', 'desc')
             ->first();
-
         if ($rateCard) {
             return $rateCard;
         }
 
-        // Try MACHINE_TYPE rate card
-        $rateCard = MachineRateCard::where('tenant_id', $tenantId)
+        // 3. MACHINE_TYPE + activity_type
+        if ($activityTypeId) {
+            $rateCard = MachineRateCard::where('tenant_id', $tenantId)
+                ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE_TYPE)
+                ->where('machine_type', $machine->machine_type)
+                ->where('rate_unit', $unit)
+                ->where('activity_type_id', $activityTypeId)
+                ->where('is_active', true)
+                ->where($dateRange)
+                ->orderBy('effective_from', 'desc')
+                ->first();
+            if ($rateCard) {
+                return $rateCard;
+            }
+        }
+
+        // 4. MACHINE_TYPE + null
+        return MachineRateCard::where('tenant_id', $tenantId)
             ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE_TYPE)
             ->where('machine_type', $machine->machine_type)
             ->where('rate_unit', $unit)
+            ->whereNull('activity_type_id')
             ->where('is_active', true)
-            ->where('effective_from', '<=', $postingDate)
-            ->where(function ($q) use ($postingDate) {
-                $q->whereNull('effective_to')
-                  ->orWhere('effective_to', '>=', $postingDate);
-            })
+            ->where($dateRange)
             ->orderBy('effective_from', 'desc')
             ->first();
-
-        return $rateCard;
     }
 
     /**
@@ -253,7 +315,7 @@ class MachineryChargeService
         return match ($meterUnit) {
             'HOURS' => MachineRateCard::RATE_UNIT_HOUR,
             'KM' => MachineRateCard::RATE_UNIT_KM,
-            default => throw new \Exception("Unsupported meter unit: {$meterUnit}"),
+            default => throw new UnsupportedMeterUnitException($meterUnit),
         };
     }
 

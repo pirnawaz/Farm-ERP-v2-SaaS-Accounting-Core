@@ -49,7 +49,6 @@ export default function SaleFormPage() {
 
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (sale && isEdit) {
@@ -104,37 +103,23 @@ export default function SaleFormPage() {
     setSaleLines(saleLines.map((line, i) => i === index ? { ...line, ...field } : line));
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.posting_date) newErrors.posting_date = 'Posting date is required';
-    if (!formData.buyer_party_id) newErrors.buyer_party_id = 'Buyer party is required';
-    
-    // Validate sale lines
-    const validLines = saleLines.filter(line => 
-      line.inventory_item_id && line.store_id && 
-      parseFloat(line.quantity) > 0 && parseFloat(line.unit_price) > 0
-    );
-    if (validLines.length === 0) {
-      newErrors.sale_lines = 'Add at least one sale line with item, store, quantity, and unit price';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = async () => {
     // Prepare sale lines
     const validLines = saleLines
       .filter(line => line.inventory_item_id && line.store_id && 
         parseFloat(line.quantity) > 0 && parseFloat(line.unit_price) > 0)
-      .map(line => ({
-        inventory_item_id: line.inventory_item_id,
-        store_id: line.store_id,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        uom: line.uom,
-      }));
+      .map(line => {
+        const qty = parseFloat(line.quantity);
+        const price = parseFloat(line.unit_price);
+        return {
+          inventory_item_id: line.inventory_item_id,
+          store_id: line.store_id,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          uom: line.uom,
+          line_total: (qty * price).toFixed(2),
+        };
+      });
 
     const formPayload = {
       ...formData,
@@ -147,15 +132,16 @@ export default function SaleFormPage() {
     // Validate with zod
     try {
       saleSchema.parse(formPayload);
-      setFieldErrors({});
-    } catch (error: any) {
-      if (error.errors) {
+      setErrors({});
+    } catch (error: unknown) {
+      const z = error as { errors?: Array<{ path: string[]; message: string }> };
+      if (z.errors) {
         const zodErrors: Record<string, string> = {};
-        error.errors.forEach((err: any) => {
+        z.errors.forEach((err: { path: string[]; message: string }) => {
           const path = err.path.join('.');
           zodErrors[path] = err.message;
         });
-        setFieldErrors(zodErrors);
+        setErrors(zodErrors);
         toast.error('Please fix validation errors');
         return;
       }

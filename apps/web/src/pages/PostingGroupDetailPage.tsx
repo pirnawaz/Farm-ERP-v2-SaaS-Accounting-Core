@@ -254,14 +254,14 @@ function PostingGroupDetailPage() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                   <span className="tabular-nums">{formatMoney(
                     postingGroup.ledger_entries
-                      .reduce((sum, e)}</span> => sum + parseFloat(e.debit.toString()), 0)
-                  )}
+                      .reduce((sum, e) => sum + parseFloat(e.debit.toString()), 0)
+                  )}</span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                   <span className="tabular-nums">{formatMoney(
                     postingGroup.ledger_entries
-                      .reduce((sum, e)}</span> => sum + parseFloat(e.credit.toString()), 0)
-                  )}
+                      .reduce((sum, e) => sum + parseFloat(e.credit.toString()), 0)
+                  )}</span>
                 </td>
                 <td></td>
               </tr>

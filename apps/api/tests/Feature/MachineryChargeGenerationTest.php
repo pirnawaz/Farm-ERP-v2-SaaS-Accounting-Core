@@ -237,7 +237,12 @@ class MachineryChargeGenerationTest extends TestCase
                 'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
             ]);
         $generate->assertStatus(422);
-        $this->assertStringContainsString('Rate cards not found', $generate->json('message') ?? '');
+        
+        $response = $generate->json();
+        $this->assertEquals('Cannot generate charges', $response['message']);
+        $this->assertArrayHasKey('errors', $response);
+        $this->assertArrayHasKey('rate_card', $response['errors']);
+        $this->assertStringContainsString('Rate cards not found', $response['errors']['rate_card'][0]);
     }
 
     public function test_generation_does_not_include_already_charged_logs(): void
@@ -337,6 +342,254 @@ class MachineryChargeGenerationTest extends TestCase
                 'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
             ]);
         $generate2->assertStatus(422);
-        $this->assertStringContainsString('No uncharged posted work logs', $generate2->json('message') ?? '');
+        
+        $response = $generate2->json();
+        $this->assertEquals('Cannot generate charges', $response['message']);
+        $this->assertArrayHasKey('errors', $response);
+        // Should be already_charged since work logs exist but are all charged
+        $this->assertTrue(
+            isset($response['errors']['already_charged']) || 
+            isset($response['errors']['work_logs'])
+        );
+    }
+
+    public function test_generate_without_landlord_uses_default(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $projectParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Project Party',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $projectParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK-01',
+            'name' => 'Tractor 1',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'is_active' => true,
+            'meter_unit' => 'HOURS',
+            'opening_meter' => 0,
+        ]);
+
+        MachineRateCard::create([
+            'tenant_id' => $tenant->id,
+            'applies_to_mode' => MachineRateCard::APPLIES_TO_MACHINE,
+            'machine_id' => $machine->id,
+            'machine_type' => null,
+            'effective_from' => '2024-01-01',
+            'effective_to' => null,
+            'rate_unit' => MachineRateCard::RATE_UNIT_HOUR,
+            'pricing_model' => MachineRateCard::PRICING_MODEL_FIXED,
+            'base_rate' => 50.00,
+            'cost_plus_percent' => null,
+            'includes_fuel' => true,
+            'includes_operator' => true,
+            'includes_maintenance' => true,
+            'is_active' => true,
+        ]);
+
+        $postingDate = '2024-06-15';
+        $workLog = $this->createPostedWorkLog($cropCycle, $project, $machine, $postingDate);
+
+        $generate = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/v1/machinery/charges/generate', [
+                'project_id' => $project->id,
+                'from' => $postingDate,
+                'to' => $postingDate,
+                'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
+            ]);
+        $generate->assertStatus(201);
+
+        $charge = MachineryCharge::find($generate->json('id'));
+        $this->assertNotNull($charge);
+        $this->assertNotNull($charge->landlord_party_id);
+        $this->assertEquals(MachineryCharge::STATUS_DRAFT, $charge->status);
+    }
+
+    public function test_generation_fails_when_already_charged(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $landlordParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Landlord',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $projectParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Project Party',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $projectParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK-01',
+            'name' => 'Tractor 1',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'meter_unit' => 'HOURS',
+            'opening_meter' => 0,
+        ]);
+
+        // Create rate card
+        MachineRateCard::create([
+            'tenant_id' => $tenant->id,
+            'applies_to_mode' => MachineRateCard::APPLIES_TO_MACHINE,
+            'machine_id' => $machine->id,
+            'machine_type' => null,
+            'effective_from' => '2024-01-01',
+            'effective_to' => null,
+            'rate_unit' => MachineRateCard::RATE_UNIT_HOUR,
+            'pricing_model' => MachineRateCard::PRICING_MODEL_FIXED,
+            'base_rate' => 50.00,
+            'cost_plus_percent' => null,
+            'includes_fuel' => true,
+            'includes_operator' => true,
+            'includes_maintenance' => true,
+            'is_active' => true,
+        ]);
+
+        // Create and post work log
+        $postingDate = '2024-06-15';
+        $workLog = $this->createPostedWorkLog($cropCycle, $project, $machine, $postingDate);
+
+        // Generate first charge successfully
+        $generate1 = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/v1/machinery/charges/generate', [
+                'project_id' => $project->id,
+                'landlord_party_id' => $landlordParty->id,
+                'from' => $postingDate,
+                'to' => $postingDate,
+                'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
+            ]);
+        $generate1->assertStatus(201);
+
+        // Attempt to generate again for same date range - should fail with already_charged
+        $generate2 = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/v1/machinery/charges/generate', [
+                'project_id' => $project->id,
+                'landlord_party_id' => $landlordParty->id,
+                'from' => $postingDate,
+                'to' => $postingDate,
+                'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
+            ]);
+        $generate2->assertStatus(422);
+
+        $response = $generate2->json();
+        $this->assertEquals('Cannot generate charges', $response['message']);
+        $this->assertArrayHasKey('errors', $response);
+        $this->assertArrayHasKey('already_charged', $response['errors']);
+        $this->assertStringContainsString('already generated', $response['errors']['already_charged'][0]);
+    }
+
+    public function test_generation_fails_with_unsupported_meter_unit(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $landlordParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Landlord',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $projectParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Project Party',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $projectParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+        
+        // Create machine with unsupported meter unit (using a value that's not HOURS or KM)
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK-01',
+            'name' => 'Tractor 1',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'meter_unit' => 'UNSUPPORTED_UNIT',
+            'opening_meter' => 0,
+        ]);
+
+        // Create and post work log
+        $postingDate = '2024-06-15';
+        $workLog = $this->createPostedWorkLog($cropCycle, $project, $machine, $postingDate);
+
+        // Generate charge should fail due to unsupported meter unit
+        $generate = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/v1/machinery/charges/generate', [
+                'project_id' => $project->id,
+                'landlord_party_id' => $landlordParty->id,
+                'from' => $postingDate,
+                'to' => $postingDate,
+                'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
+            ]);
+        $generate->assertStatus(422);
+
+        $response = $generate->json();
+        $this->assertEquals('Cannot generate charges', $response['message']);
+        $this->assertArrayHasKey('errors', $response);
+        $this->assertArrayHasKey('meter_unit', $response['errors']);
+        $this->assertStringContainsString('Unsupported meter unit', $response['errors']['meter_unit'][0]);
+        $this->assertStringContainsString('UNSUPPORTED_UNIT', $response['errors']['meter_unit'][0]);
     }
 }

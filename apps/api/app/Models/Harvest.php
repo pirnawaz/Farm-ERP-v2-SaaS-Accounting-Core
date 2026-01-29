@@ -15,6 +15,7 @@ class Harvest extends Model
         'tenant_id',
         'harvest_no',
         'crop_cycle_id',
+        'project_id',
         'land_parcel_id',
         'harvest_date',
         'posting_date',
@@ -43,6 +44,11 @@ class Harvest extends Model
     public function cropCycle(): BelongsTo
     {
         return $this->belongsTo(CropCycle::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function landParcel(): BelongsTo

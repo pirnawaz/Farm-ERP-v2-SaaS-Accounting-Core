@@ -57,7 +57,7 @@ export default function InvIssuesPage() {
       </div>
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={issues || []}
+          data={(issues ?? []) as InvIssue[]}
           columns={cols}
           onRowClick={(r) => navigate(`/app/inventory/issues/${r.id}`, { state: { from: location.pathname + location.search } })}
           emptyMessage="No issues. Create one."

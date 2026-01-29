@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { shareRulesApi, type ShareRule, type CreateShareRulePayload } from '../api/shareRules';
 import { partiesApi } from '../api/parties';
@@ -89,7 +88,7 @@ export default function ShareRulesPage() {
     if (formData.lines.length === 0) {
       newErrors.lines = 'At least one party line is required';
     }
-    const totalPercentage = formData.lines.reduce((sum, line) => sum + line.percentage, 0);
+    const totalPercentage = formData.lines.reduce((sum, line) => sum + parseFloat(String(line.percentage)) || 0, 0);
     if (Math.abs(totalPercentage - 100) > 0.01) {
       newErrors.lines = `Percentages must sum to 100 (current: ${totalPercentage.toFixed(2)}%)`;
     }
@@ -99,12 +98,20 @@ export default function ShareRulesPage() {
 
   const handleCreate = () => {
     if (!validateForm()) return;
-    createMutation.mutate(formData);
+    const payload = {
+      ...formData,
+      lines: formData.lines.map((l) => ({ ...l, percentage: parseFloat(String(l.percentage)) || 0 })),
+    };
+    createMutation.mutate(payload);
   };
 
   const handleUpdate = () => {
     if (!editingRule || !validateForm()) return;
-    updateMutation.mutate({ id: editingRule.id, payload: formData });
+    const payload = {
+      ...formData,
+      lines: formData.lines.map((l) => ({ ...l, percentage: parseFloat(String(l.percentage)) || 0 })),
+    };
+    updateMutation.mutate({ id: editingRule.id, payload });
   };
 
   const handleEdit = (rule: ShareRule) => {
@@ -118,7 +125,7 @@ export default function ShareRulesPage() {
       is_active: rule.is_active,
       lines: rule.lines?.map((line) => ({
         party_id: line.party_id,
-        percentage: parseFloat(line.percentage),
+        percentage: line.percentage != null ? String(line.percentage) : '',
         role: line.role || undefined,
       })) || [],
     });
@@ -128,7 +135,7 @@ export default function ShareRulesPage() {
   const addLine = () => {
     setFormData({
       ...formData,
-      lines: [...formData.lines, { party_id: '', percentage: 0, role: '' }],
+      lines: [...formData.lines, { party_id: '', percentage: '' as unknown as number, role: '' }],
     });
   };
 
@@ -201,6 +208,7 @@ export default function ShareRulesPage() {
 
       {showCreateModal && (
         <Modal
+          isOpen={showCreateModal}
           title={editingRule ? 'Edit Share Rule' : 'Create Share Rule'}
           onClose={() => {
             setShowCreateModal(false);
@@ -209,50 +217,54 @@ export default function ShareRulesPage() {
           }}
         >
           <div className="space-y-4">
-            <FormField
-              label="Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              error={errors.name}
-            />
+            <FormField label="Name" error={errors.name}>
+              <input
+                value={formData.name}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+              />
+            </FormField>
 
-            <FormField
-              label="Applies To"
-              type="select"
-              value={formData.applies_to}
-              onChange={(e) => setFormData({ ...formData, applies_to: e.target.value as any })}
-              options={[
-                { value: 'CROP_CYCLE', label: 'Crop Cycle' },
-                { value: 'PROJECT', label: 'Project' },
-                { value: 'SALE', label: 'Sale' },
-              ]}
-            />
+            <FormField label="Applies To">
+              <select
+                value={formData.applies_to}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, applies_to: e.target.value as 'SALE' | 'PROJECT' | 'CROP_CYCLE' })}
+                className="w-full px-3 py-2 border rounded"
+              >
+                <option value="CROP_CYCLE">Crop Cycle</option>
+                <option value="PROJECT">Project</option>
+                <option value="SALE">Sale</option>
+              </select>
+            </FormField>
 
-            <FormField
-              label="Basis"
-              type="select"
-              value={formData.basis}
-              onChange={(e) => setFormData({ ...formData, basis: e.target.value as any })}
-              options={[
-                { value: 'MARGIN', label: 'Margin' },
-                { value: 'REVENUE', label: 'Revenue' },
-              ]}
-            />
+            <FormField label="Basis">
+              <select
+                value={formData.basis}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, basis: e.target.value as 'MARGIN' | 'REVENUE' })}
+                className="w-full px-3 py-2 border rounded"
+              >
+                <option value="MARGIN">Margin</option>
+                <option value="REVENUE">Revenue</option>
+              </select>
+            </FormField>
 
-            <FormField
-              label="Effective From"
-              type="date"
-              value={formData.effective_from}
-              onChange={(e) => setFormData({ ...formData, effective_from: e.target.value })}
-              error={errors.effective_from}
-            />
+            <FormField label="Effective From" error={errors.effective_from}>
+              <input
+                type="date"
+                value={formData.effective_from}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, effective_from: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+              />
+            </FormField>
 
-            <FormField
-              label="Effective To (optional)"
-              type="date"
-              value={formData.effective_to}
-              onChange={(e) => setFormData({ ...formData, effective_to: e.target.value })}
-            />
+            <FormField label="Effective To (optional)">
+              <input
+                type="date"
+                value={formData.effective_to ?? ''}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, effective_to: e.target.value })}
+                className="w-full px-3 py-2 border rounded"
+              />
+            </FormField>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -274,8 +286,8 @@ export default function ShareRulesPage() {
                   </select>
                   <input
                     type="number"
-                    value={line.percentage}
-                    onChange={(e) => updateLine(index, 'percentage', parseFloat(e.target.value) || 0)}
+                    value={line.percentage === '' || line.percentage == null ? '' : String(line.percentage)}
+                    onChange={(e) => updateLine(index, 'percentage', e.target.value)}
                     className="w-24 border rounded px-3 py-2"
                     placeholder="%"
                     step="0.01"

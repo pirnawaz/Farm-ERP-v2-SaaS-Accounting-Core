@@ -9,8 +9,7 @@ import {
   usePostHarvest,
   useReverseHarvest,
 } from '../../hooks/useHarvests';
-import { useCropCycles } from '../../hooks/useCropCycles';
-import { useLandParcels } from '../../hooks/useLandParcels';
+import { useProjects } from '../../hooks/useProjects';
 import { useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
@@ -35,8 +34,7 @@ export default function HarvestDetailPage() {
   const deleteLineM = useDeleteHarvestLine();
   const postM = usePostHarvest();
   const reverseM = useReverseHarvest();
-  const { data: cropCycles } = useCropCycles();
-  const { data: landParcels } = useLandParcels();
+  const { data: projectsForCrop } = useProjects(harvest?.crop_cycle_id || undefined);
   const { data: stores } = useInventoryStores();
   const { data: items } = useInventoryItems(true);
   const { hasRole } = useRole();
@@ -49,7 +47,7 @@ export default function HarvestDetailPage() {
   const [reverseReason, setReverseReason] = useState('');
 
   const [harvest_no, setHarvestNo] = useState('');
-  const [land_parcel_id, setLandParcelId] = useState('');
+  const [project_id, setProjectId] = useState('');
   const [harvest_date, setHarvestDate] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<HarvestLineForm[]>([]);
@@ -57,7 +55,7 @@ export default function HarvestDetailPage() {
   useEffect(() => {
     if (harvest) {
       setHarvestNo(harvest.harvest_no || '');
-      setLandParcelId(harvest.land_parcel_id || '');
+      setProjectId(harvest.project_id || '');
       setHarvestDate(harvest.harvest_date);
       setNotes(harvest.notes || '');
       setLines((harvest.lines || []).map((l) => ({
@@ -79,14 +77,6 @@ export default function HarvestDetailPage() {
   const canPost = hasRole(['tenant_admin', 'accountant']);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
 
-  const addLine = () => setLines((l) => [...l, { inventory_item_id: '', store_id: '', quantity: '', uom: '', notes: '' }]);
-  const removeLine = (i: number) => {
-    const line = harvest?.lines?.[i];
-    if (line && isDraft) {
-      deleteLineM.mutate({ id: id!, lineId: line.id });
-    }
-    setLines((l) => l.filter((_, idx) => idx !== i));
-  };
   const updateLine = (i: number, f: Partial<HarvestLineForm>) => {
     setLines((l) => l.map((row, idx) => (idx === i ? { ...row, ...f } : row)));
     if (isDraft && harvest?.lines?.[i]) {
@@ -105,7 +95,7 @@ export default function HarvestDetailPage() {
     if (!id || !isDraft || !canEdit) return;
     const payload: UpdateHarvestPayload = {
       harvest_no: harvest_no || undefined,
-      land_parcel_id: land_parcel_id || undefined,
+      project_id: project_id || undefined,
       harvest_date,
       notes: notes || undefined,
     };
@@ -163,6 +153,7 @@ export default function HarvestDetailPage() {
           <div><dt className="text-sm text-gray-500">Harvest No</dt><dd className="font-medium">{harvest.harvest_no || '—'}</dd></div>
           <div><dt className="text-sm text-gray-500">Harvest Date</dt><dd>{formatDate(harvest.harvest_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{harvest.crop_cycle?.name || harvest.crop_cycle_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">Project</dt><dd>{harvest.project?.name ?? '—'}</dd></div>
           <div><dt className="text-sm text-gray-500">Land Parcel</dt><dd>{harvest.land_parcel?.name || harvest.land_parcel_id || '—'}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
             <dd><span className={`px-2 py-1 rounded text-xs ${
@@ -224,10 +215,12 @@ export default function HarvestDetailPage() {
             <FormField label="Harvest Date">
               <input type="date" value={harvest_date} onChange={(e) => setHarvestDate(e.target.value)} className="w-full px-3 py-2 border rounded" />
             </FormField>
-            <FormField label="Land Parcel">
-              <select value={land_parcel_id} onChange={(e) => setLandParcelId(e.target.value)} className="w-full px-3 py-2 border rounded">
-                <option value="">None</option>
-                {landParcels?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <FormField label="Project">
+              <select value={project_id} onChange={(e) => setProjectId(e.target.value)} className="w-full px-3 py-2 border rounded">
+                <option value="">Select project</option>
+                {(projectsForCrop ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
               </select>
             </FormField>
             <div className="md:col-span-2">

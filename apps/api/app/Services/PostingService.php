@@ -219,8 +219,8 @@ class PostingService
                 throw new \Exception('Debits and credits do not balance');
             }
 
-            // Update transaction status to POSTED
-            $transaction->update(['status' => 'POSTED']);
+            // Update transaction status to POSTED and link to posting group
+            $transaction->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id]);
 
             // Reload posting group with relationships
             return $postingGroup->fresh(['allocationRows', 'ledgerEntries.account']);

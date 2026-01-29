@@ -9,6 +9,7 @@ use App\Models\AllocationRow;
 use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Models\OperationalTransaction;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -101,6 +102,18 @@ class LabourPostingService
                 'rule_snapshot' => ['source' => 'lab_work_log'],
             ]);
 
+            OperationalTransaction::create([
+                'tenant_id' => $tenantId,
+                'project_id' => $workLog->project_id,
+                'crop_cycle_id' => $workLog->crop_cycle_id,
+                'type' => 'EXPENSE',
+                'status' => 'POSTED',
+                'transaction_date' => $postingDateObj,
+                'amount' => (string) round($amount, 2),
+                'classification' => 'SHARED',
+                'posting_group_id' => $postingGroup->id,
+            ]);
+
             $balance = LabWorkerBalance::getOrCreate($tenantId, $workLog->worker_id);
             $balance->increment('payable_balance', $amount);
 
@@ -132,6 +145,8 @@ class LabourPostingService
                 $postingDate,
                 $reason
             );
+
+            OperationalTransaction::where('posting_group_id', $workLog->posting_group_id)->update(['status' => 'VOID']);
 
             $balance = LabWorkerBalance::where('tenant_id', $tenantId)
                 ->where('worker_id', $workLog->worker_id)

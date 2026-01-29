@@ -87,6 +87,9 @@ export default function MaintenanceTypesPage() {
       </div>
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingType ? 'Edit Maintenance Type' : 'New Maintenance Type'}>
         <div className="space-y-4">
+          {!editingType && (
+            <p className="text-sm text-gray-500">e.g. Oil Change, Belt Replacement, Engine Service…</p>
+          )}
           <FormField label="Name" required>
             <input
               value={form.name}

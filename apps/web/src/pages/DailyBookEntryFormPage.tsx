@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { DailyBookEntry, Project, apiClient } from '@farm-erp/shared'
+import { useTenantSettings } from '../hooks/useTenantSettings'
 
 function DailyBookEntryFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isEdit = !!id
+  const { settings } = useTenantSettings()
 
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
@@ -18,8 +20,14 @@ function DailyBookEntryFormPage() {
     event_date: new Date().toISOString().split('T')[0],
     description: '',
     gross_amount: '',
-    currency_code: 'GBP',
+    currency_code: '',
   })
+
+  useEffect(() => {
+    if (!id && settings?.currency_code) {
+      setFormData((prev) => (prev.currency_code === '' ? { ...prev, currency_code: settings.currency_code } : prev))
+    }
+  }, [id, settings?.currency_code])
 
   useEffect(() => {
     const fetchData = async () => {

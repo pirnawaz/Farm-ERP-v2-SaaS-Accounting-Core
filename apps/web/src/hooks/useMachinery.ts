@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   machineryApi,
   type MachineFilters,
@@ -18,8 +18,6 @@ import type {
   UpdateMachineWorkLogPayload,
   CreateMachineRateCardPayload,
   UpdateMachineRateCardPayload,
-  PostMachineWorkLogRequest,
-  ReverseMachineWorkLogRequest,
   GenerateChargesPayload,
   UpdateChargePayload,
   PostChargeRequest,
@@ -114,7 +112,7 @@ export function useUpdateMaintenanceType() {
       id: string;
       payload: UpdateMachineMaintenanceTypePayload;
     }) => machineryApi.maintenanceTypes.update(id, payload),
-    onSuccess: (_, v) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['machinery', 'maintenance-types'] });
       toast.success('Maintenance type updated');
     },
@@ -130,7 +128,7 @@ export function useWorkLogsQuery(f?: WorkLogFilters) {
     queryFn: () => machineryApi.workLogs.list(f),
     staleTime: 20 * 1000,
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -286,7 +284,7 @@ export function useChargesQuery(f?: ChargeFilters) {
     queryFn: () => machineryApi.charges.list(f),
     staleTime: 20 * 1000,
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -369,7 +367,7 @@ export function useMaintenanceJobsQuery(f?: MaintenanceJobFilters) {
     queryFn: () => machineryApi.maintenanceJobs.list(f),
     staleTime: 20 * 1000,
     gcTime: 2 * 60 * 1000,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -23,9 +23,9 @@ class SettingsController extends Controller
         }
 
         return response()->json([
-            'currency_code' => $tenant->currency_code ?? 'GBP',
-            'locale' => $tenant->locale ?? 'en-GB',
-            'timezone' => $tenant->timezone ?? 'Europe/London',
+            'currency_code' => $tenant->currency_code ?? 'PKR',
+            'locale' => $tenant->locale ?? 'en-PK',
+            'timezone' => $tenant->timezone ?? 'Asia/Karachi',
         ]);
     }
 

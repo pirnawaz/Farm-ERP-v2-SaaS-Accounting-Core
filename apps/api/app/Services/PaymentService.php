@@ -14,6 +14,7 @@ use App\Models\CropCycle;
 use App\Models\AllocationRow;
 use App\Services\SaleARService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class PaymentService
@@ -135,10 +136,22 @@ class PaymentService
                 }
             }
 
+            // Validate Payment OUT (non-WAGES) does not exceed outstanding payable
+            $isWages = $payment->direction === 'OUT' && (string) ($payment->purpose ?? '') === 'WAGES';
+            if ($payment->direction === 'OUT' && !$isWages) {
+                $balanceSummary = $this->getPartyPayableBalance($payment->party_id, $tenantId, $postingDate);
+                $outstandingTotal = (float) $balanceSummary['outstanding_total'];
+                if ($payment->amount > $outstandingTotal) {
+                    throw ValidationException::withMessages([
+                        'amount' => [
+                            'Payment amount exceeds outstanding payable (' . number_format($outstandingTotal, 2, '.', '') . '). Reduce amount or add advance.',
+                        ],
+                    ]);
+                }
+            }
+
             // Determine payable/debit account for Payment OUT
             $payableAccount = null;
-            $isWages = $payment->direction === 'OUT' && (string) ($payment->purpose ?? '') === 'WAGES';
-
             if ($isWages) {
                 $payableAccount = $this->accountService->getByCode($tenantId, 'WAGES_PAYABLE');
             } else {
@@ -149,6 +162,8 @@ class PaymentService
                     $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_KAMDAR');
                 } elseif (in_array('LANDLORD', $partyTypes)) {
                     $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
+                } elseif (in_array('VENDOR', $partyTypes) && $payment->direction === 'OUT') {
+                    $payableAccount = $this->accountService->getByCode($tenantId, 'AP');
                 } else {
                     $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
                 }
@@ -302,22 +317,28 @@ class PaymentService
     {
         $financialSourceService = app(PartyFinancialSourceService::class);
         
-        // Use shared service for single source of truth
         $allocationData = $financialSourceService->getPostedAllocationTotals(
             $partyId,
             $tenantId,
-            null, // from: all time
-            $asOfDate // to: as of date
+            null,
+            $asOfDate
+        );
+        
+        $supplierAp = $financialSourceService->getSupplierPayableFromGRN(
+            $partyId,
+            $tenantId,
+            null,
+            $asOfDate
         );
         
         $paymentData = $financialSourceService->getPostedPaymentsTotals(
             $partyId,
             $tenantId,
-            null, // from: all time
-            $asOfDate // to: as of date
+            null,
+            $asOfDate
         );
 
-        $allocatedTotal = $allocationData['total'];
+        $allocatedTotal = $allocationData['total'] + $supplierAp;
         $paidTotal = $paymentData['out'];
         $outstandingTotal = $allocatedTotal - $paidTotal;
 

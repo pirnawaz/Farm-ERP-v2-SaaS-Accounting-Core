@@ -46,7 +46,7 @@ class PaymentTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
         SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['treasury_payments']);
+        $this->enableModules($tenant, ['treasury_payments', 'settlements']);
         $cropCycle = CropCycle::create([
             'tenant_id' => $tenant->id,
             'name' => 'Cycle 1',
@@ -59,6 +59,43 @@ class PaymentTest extends TestCase
             'name' => 'Hari',
             'party_types' => ['HARI'],
         ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $hariParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+        ProjectRule::create([
+            'project_id' => $project->id,
+            'profit_split_landlord_pct' => 50.00,
+            'profit_split_hari_pct' => 50.00,
+            'kamdari_pct' => 0.00,
+            'kamdari_order' => 'BEFORE_SPLIT',
+            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
+        ]);
+        $income = OperationalTransaction::create([
+            'tenant_id' => $tenant->id,
+            'project_id' => $project->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'type' => 'INCOME',
+            'status' => 'DRAFT',
+            'transaction_date' => '2024-06-15',
+            'amount' => 1000.00,
+            'classification' => 'SHARED',
+        ]);
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/operational-transactions/{$income->id}/post", [
+                'posting_date' => '2024-06-15',
+                'idempotency_key' => 'income-ledger-test',
+            ]);
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/projects/{$project->id}/settlement/post", [
+                'posting_date' => '2024-06-15',
+                'idempotency_key' => 'settlement-ledger-test',
+            ]);
 
         $payment = Payment::create([
             'tenant_id' => $tenant->id,
@@ -109,7 +146,7 @@ class PaymentTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
         SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableModules($tenant, ['treasury_payments']);
+        $this->enableModules($tenant, ['treasury_payments', 'settlements']);
         $cropCycle = CropCycle::create([
             'tenant_id' => $tenant->id,
             'name' => 'Cycle 1',
@@ -122,6 +159,43 @@ class PaymentTest extends TestCase
             'name' => 'Hari',
             'party_types' => ['HARI'],
         ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $hariParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+        ProjectRule::create([
+            'project_id' => $project->id,
+            'profit_split_landlord_pct' => 50.00,
+            'profit_split_hari_pct' => 50.00,
+            'kamdari_pct' => 0.00,
+            'kamdari_order' => 'BEFORE_SPLIT',
+            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
+        ]);
+        $income = OperationalTransaction::create([
+            'tenant_id' => $tenant->id,
+            'project_id' => $project->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'type' => 'INCOME',
+            'status' => 'DRAFT',
+            'transaction_date' => '2024-06-15',
+            'amount' => 1000.00,
+            'classification' => 'SHARED',
+        ]);
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/operational-transactions/{$income->id}/post", [
+                'posting_date' => '2024-06-15',
+                'idempotency_key' => 'income-idem-test',
+            ]);
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/projects/{$project->id}/settlement/post", [
+                'posting_date' => '2024-06-15',
+                'idempotency_key' => 'settlement-idem-test',
+            ]);
 
         $payment = Payment::create([
             'tenant_id' => $tenant->id,

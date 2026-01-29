@@ -46,6 +46,7 @@ use App\Http\Controllers\Machinery\MachineRateCardController;
 use App\Http\Controllers\Machinery\MachineryChargeController;
 use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
 use App\Http\Controllers\Machinery\MachineryReportsController;
+use App\Http\Controllers\ReconciliationController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -338,6 +339,12 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/sales-margin', [ReportController::class, 'salesMargin']);
     Route::get('reports/settlement-statement', [ReportController::class, 'settlementStatement']);
     Route::get('reports/crop-cycle-distribution', [ReportController::class, 'cropCycleDistribution']);
+});
+
+// Reconciliation (tenant_admin, accountant) — read-only audit/debugging endpoints
+Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::get('reconciliation/project/{id}', [ReconciliationController::class, 'projectReconciliation']);
+    Route::get('reconciliation/supplier/{party_id}', [ReconciliationController::class, 'supplierAPReconciliation']);
 });
 
 // Settings (all authenticated users can view, tenant_admin can update)

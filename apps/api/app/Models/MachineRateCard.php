@@ -30,6 +30,7 @@ class MachineRateCard extends Model
         'applies_to_mode',
         'machine_id',
         'machine_type',
+        'activity_type_id',
         'effective_from',
         'effective_to',
         'rate_unit',
@@ -63,6 +64,11 @@ class MachineRateCard extends Model
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class);
+    }
+
+    public function activityType(): BelongsTo
+    {
+        return $this->belongsTo(CropActivityType::class, 'activity_type_id');
     }
 
     public function scopeForTenant($query, string $tenantId)

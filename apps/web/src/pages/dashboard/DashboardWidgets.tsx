@@ -19,8 +19,6 @@ interface DashboardWidgetProps {
 }
 
 export function DashboardWidget({ widgetKey, isModuleEnabled }: DashboardWidgetProps) {
-  const { formatMoney } = useFormatting();
-
   switch (widgetKey) {
     case 'open_crop_cycles':
       if (!isModuleEnabled('projects_crop_cycles')) return null;
@@ -215,7 +213,7 @@ function InventoryAlertsWidget() {
 
 function WorkLogsSummaryWidget() {
   const { data: workLogs, isLoading } = useWorkLogs({ status: 'DRAFT' });
-  const draftLogsCount = workLogs?.length || 0;
+  const draftLogsCount = (workLogs ?? []).length;
 
   if (isLoading) return <LoadingSpinner />;
   return (

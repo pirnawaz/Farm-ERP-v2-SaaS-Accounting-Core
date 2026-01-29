@@ -15,9 +15,9 @@ export default function ProjectRulesPage() {
   const updateMutation = useUpdateProjectRule();
   const { hasRole } = useRole();
   const [formData, setFormData] = useState<UpdateProjectRulePayload>({
-    profit_split_landlord_pct: 50,
-    profit_split_hari_pct: 50,
-    kamdari_pct: 0,
+    profit_split_landlord_pct: '50',
+    profit_split_hari_pct: '50',
+    kamdari_pct: '0',
     kamdar_party_id: '',
     kamdari_order: 'BEFORE_SPLIT',
     pool_definition: 'REVENUE_MINUS_SHARED_COSTS',
@@ -30,9 +30,9 @@ export default function ProjectRulesPage() {
   useEffect(() => {
     if (rule) {
       setFormData({
-        profit_split_landlord_pct: parseFloat(rule.profit_split_landlord_pct || '50'),
-        profit_split_hari_pct: parseFloat(rule.profit_split_hari_pct || '50'),
-        kamdari_pct: parseFloat(rule.kamdari_pct || '0'),
+        profit_split_landlord_pct: rule.profit_split_landlord_pct != null ? String(rule.profit_split_landlord_pct) : '50',
+        profit_split_hari_pct: rule.profit_split_hari_pct != null ? String(rule.profit_split_hari_pct) : '50',
+        kamdari_pct: rule.kamdari_pct != null ? String(rule.kamdari_pct) : '0',
         kamdar_party_id: rule.kamdar_party_id || '',
         kamdari_order: rule.kamdari_order || 'BEFORE_SPLIT',
         pool_definition: rule.pool_definition || 'REVENUE_MINUS_SHARED_COSTS',
@@ -68,7 +68,13 @@ export default function ProjectRulesPage() {
     if (!id || !validateForm()) return;
 
     try {
-      await updateMutation.mutateAsync({ projectId: id, payload: formData });
+      const payload = {
+        ...formData,
+        profit_split_landlord_pct: parseFloat(String(formData.profit_split_landlord_pct || 0)),
+        profit_split_hari_pct: parseFloat(String(formData.profit_split_hari_pct || 0)),
+        kamdari_pct: parseFloat(String(formData.kamdari_pct || 0)),
+      };
+      await updateMutation.mutateAsync({ projectId: id, payload });
       toast.success('Project rules updated successfully');
     } catch (error: any) {
       toast.error(error.message || 'Failed to update project rules');
@@ -111,7 +117,7 @@ export default function ProjectRulesPage() {
                 max="100"
                 value={formData.profit_split_landlord_pct}
                 onChange={(e) => {
-                  setFormData({ ...formData, profit_split_landlord_pct: parseFloat(e.target.value) || 0 });
+                  setFormData({ ...formData, profit_split_landlord_pct: e.target.value });
                   setErrors({ ...errors, profit_split: '' });
                 }}
                 disabled={!canEdit}
@@ -126,7 +132,7 @@ export default function ProjectRulesPage() {
                 max="100"
                 value={formData.profit_split_hari_pct}
                 onChange={(e) => {
-                  setFormData({ ...formData, profit_split_hari_pct: parseFloat(e.target.value) || 0 });
+                  setFormData({ ...formData, profit_split_hari_pct: e.target.value });
                   setErrors({ ...errors, profit_split: '' });
                 }}
                 disabled={!canEdit}
@@ -146,7 +152,7 @@ export default function ProjectRulesPage() {
               max="100"
               value={formData.kamdari_pct}
               onChange={(e) => {
-                setFormData({ ...formData, kamdari_pct: parseFloat(e.target.value) || 0 });
+                setFormData({ ...formData, kamdari_pct: e.target.value });
                 setErrors({ ...errors, kamdari_pct: '' });
               }}
               disabled={!canEdit}

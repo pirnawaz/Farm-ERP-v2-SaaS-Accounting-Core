@@ -1,18 +1,16 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useState, type ChangeEvent } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { salesSettlementApi, type SalesSettlement } from '../api/settlement';
+import { salesSettlementApi } from '../api/settlement';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
 
 export default function SettlementDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasRole } = useRole();
   const { formatMoney, formatDate } = useFormatting();
@@ -110,7 +108,7 @@ export default function SettlementDetailPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Basis Amount</dt>
-            <dd className="text-sm text-gray-900"><span className="tabular-nums">{formatMoney(parseFloat(settlement.basis_amount)}</span>)}</dd>
+            <dd className="text-sm text-gray-900"><span className="tabular-nums">{formatMoney(parseFloat(settlement.basis_amount))}</span></dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Share Rule</dt>
@@ -164,7 +162,7 @@ export default function SettlementDetailPage() {
                     <td className="px-4 py-2 text-sm text-gray-900">{line.party?.name || line.party_id}</td>
                     <td className="px-4 py-2 text-sm text-gray-900">{line.role || '-'}</td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">{parseFloat(line.percentage).toFixed(2)}%</td>
-                    <td className="px-4 py-2 text-sm text-gray-900 text-right"><span className="tabular-nums">{formatMoney(parseFloat(line.amount)}</span>)}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right"><span className="tabular-nums">{formatMoney(parseFloat(line.amount))}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -200,14 +198,16 @@ export default function SettlementDetailPage() {
 
       {/* Post Modal */}
       {showPostModal && (
-        <Modal title="Post Settlement" onClose={() => setShowPostModal(false)}>
+        <Modal isOpen={showPostModal} title="Post Settlement" onClose={() => setShowPostModal(false)}>
           <div className="space-y-4">
-            <FormField
-              label="Posting Date"
-              type="date"
-              value={postingDate}
-              onChange={(e) => setPostingDate(e.target.value)}
-            />
+            <FormField label="Posting Date">
+              <input
+                type="date"
+                value={postingDate}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setPostingDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded"
+              />
+            </FormField>
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => setShowPostModal(false)}
@@ -229,17 +229,19 @@ export default function SettlementDetailPage() {
 
       {/* Reverse Modal */}
       {showReverseModal && (
-        <Modal title="Reverse Settlement" onClose={() => setShowReverseModal(false)}>
+        <Modal isOpen={showReverseModal} title="Reverse Settlement" onClose={() => setShowReverseModal(false)}>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
               This will create a reversal posting group that negates all accounting entries from this settlement.
             </p>
-            <FormField
-              label="Reversal Date"
-              type="date"
-              value={reversalDate}
-              onChange={(e) => setReversalDate(e.target.value)}
-            />
+            <FormField label="Reversal Date">
+              <input
+                type="date"
+                value={reversalDate}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setReversalDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded"
+              />
+            </FormField>
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => setShowReverseModal(false)}

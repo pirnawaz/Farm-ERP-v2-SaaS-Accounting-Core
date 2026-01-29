@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Harvest;
 use App\Models\HarvestLine;
 use App\Models\CropCycle;
-use App\Models\LandParcel;
+use App\Models\Project;
 use App\Models\InvItem;
 use App\Models\InvStore;
 use App\Services\TenantContext;
@@ -23,13 +23,16 @@ class HarvestController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
         $query = Harvest::where('tenant_id', $tenantId)
-            ->with(['cropCycle', 'landParcel', 'postingGroup', 'lines.item', 'lines.store']);
+            ->with(['cropCycle', 'project', 'landParcel', 'postingGroup', 'lines.item', 'lines.store']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
         if ($request->filled('crop_cycle_id')) {
             $query->where('crop_cycle_id', $request->crop_cycle_id);
+        }
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->project_id);
         }
         if ($request->filled('from')) {
             $query->where('harvest_date', '>=', $request->from);
@@ -49,7 +52,7 @@ class HarvestController extends Controller
         $validator = Validator::make($request->all(), [
             'harvest_no' => 'nullable|string|max:255',
             'crop_cycle_id' => 'required|uuid|exists:crop_cycles,id',
-            'land_parcel_id' => 'nullable|uuid|exists:land_parcels,id',
+            'project_id' => 'required|uuid|exists:projects,id',
             'harvest_date' => 'required|date|date_format:Y-m-d',
             'notes' => 'nullable|string',
         ]);
@@ -58,22 +61,23 @@ class HarvestController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Validate tenant ownership
+        // Validate tenant ownership and project belongs to crop cycle
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-        if ($request->land_parcel_id) {
-            LandParcel::where('id', $request->land_parcel_id)->where('tenant_id', $tenantId)->firstOrFail();
+        $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($project->crop_cycle_id !== $request->crop_cycle_id) {
+            return response()->json(['errors' => ['project_id' => ['Project must belong to the selected crop cycle.']]], 422);
         }
 
         $harvest = $this->harvestService->create([
             'tenant_id' => $tenantId,
             'harvest_no' => $request->harvest_no,
             'crop_cycle_id' => $request->crop_cycle_id,
-            'land_parcel_id' => $request->land_parcel_id,
+            'project_id' => $request->project_id,
             'harvest_date' => $request->harvest_date,
             'notes' => $request->notes,
         ]);
 
-        return response()->json($harvest->load(['cropCycle', 'landParcel', 'lines']), 201);
+        return response()->json($harvest->load(['cropCycle', 'project', 'landParcel', 'lines']), 201);
     }
 
     public function show(Request $request, string $id)
@@ -81,7 +85,7 @@ class HarvestController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $harvest = Harvest::where('id', $id)
             ->where('tenant_id', $tenantId)
-            ->with(['cropCycle', 'landParcel', 'postingGroup', 'reversalPostingGroup', 'lines.item', 'lines.store'])
+            ->with(['cropCycle', 'project', 'landParcel', 'postingGroup', 'reversalPostingGroup', 'lines.item', 'lines.store'])
             ->firstOrFail();
         return response()->json($harvest);
     }
@@ -93,7 +97,7 @@ class HarvestController extends Controller
 
         $validator = Validator::make($request->all(), [
             'harvest_no' => 'nullable|string|max:255',
-            'land_parcel_id' => 'nullable|uuid|exists:land_parcels,id',
+            'project_id' => 'nullable|uuid|exists:projects,id',
             'harvest_date' => 'sometimes|required|date|date_format:Y-m-d',
             'notes' => 'nullable|string',
         ]);
@@ -102,15 +106,15 @@ class HarvestController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if ($request->land_parcel_id) {
-            LandParcel::where('id', $request->land_parcel_id)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($request->filled('project_id')) {
+            $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+            if ($project->crop_cycle_id !== $harvest->crop_cycle_id) {
+                return response()->json(['errors' => ['project_id' => ['Project must belong to the harvest\'s crop cycle.']]], 422);
+            }
         }
 
-        $data = $request->only(['harvest_no', 'land_parcel_id', 'harvest_date', 'notes']);
+        $data = $request->only(['harvest_no', 'project_id', 'harvest_date', 'notes']);
         $data = array_filter($data, fn ($v) => $v !== null);
-        if ($request->has('land_parcel_id') && $request->land_parcel_id === null) {
-            $data['land_parcel_id'] = null;
-        }
 
         try {
             $harvest = $this->harvestService->update($harvest, $data);
@@ -118,7 +122,7 @@ class HarvestController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        return response()->json($harvest->load(['cropCycle', 'landParcel', 'lines']));
+        return response()->json($harvest->load(['cropCycle', 'project', 'landParcel', 'lines']));
     }
 
     public function addLine(Request $request, string $id)
@@ -233,7 +237,7 @@ class HarvestController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        return response()->json($harvest->load(['cropCycle', 'postingGroup', 'lines.item', 'lines.store']), 200);
+        return response()->json($harvest->load(['cropCycle', 'project', 'postingGroup', 'lines.item', 'lines.store']), 200);
     }
 
     public function reverse(Request $request, string $id)
@@ -261,6 +265,6 @@ class HarvestController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        return response()->json($harvest->load(['cropCycle', 'postingGroup', 'reversalPostingGroup', 'lines.item', 'lines.store']), 200);
+        return response()->json($harvest->load(['cropCycle', 'project', 'postingGroup', 'reversalPostingGroup', 'lines.item', 'lines.store']), 200);
     }
 }

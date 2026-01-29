@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useOnboardingState, type OnboardingState } from '../hooks/useOnboardingState';
+import type { OnboardingState } from '../hooks/useOnboardingState';
 
 const DISMISSED_KEY = 'terrava_onboarding_dismissed';
 

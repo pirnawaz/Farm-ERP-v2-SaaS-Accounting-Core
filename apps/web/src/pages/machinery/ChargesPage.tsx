@@ -26,7 +26,13 @@ export default function ChargesPage() {
   });
   const [showGenerateModal, setShowGenerateModal] = useState(false);
 
-  const { data: charges, isLoading } = useChargesQuery(filters);
+  const chargeFilters = {
+    ...filters,
+    status: (filters.status === 'DRAFT' || filters.status === 'POSTED' || filters.status === 'REVERSED'
+      ? filters.status
+      : undefined) as 'DRAFT' | 'POSTED' | 'REVERSED' | undefined,
+  };
+  const { data: charges, isLoading } = useChargesQuery(chargeFilters as import('../../api/machinery').ChargeFilters);
   const { data: projects } = useProjects();
   const { data: cropCycles } = useCropCycles();
   const { data: parties } = useParties();
@@ -204,7 +210,7 @@ export default function ChargesPage() {
 
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={charges || []}
+          data={(charges ?? []) as MachineryCharge[]}
           columns={columns}
           onRowClick={(row) => navigate(`/app/machinery/charges/${row.id}`)}
         />
@@ -231,10 +237,8 @@ function GenerateChargesModal({
   isLoading: boolean;
 }) {
   const { data: projects } = useProjects();
-  const { data: parties } = useParties();
   const [formData, setFormData] = useState({
     project_id: '',
-    landlord_party_id: '',
     from: '',
     to: '',
     pool_scope: '' as 'SHARED' | 'HARI_ONLY' | '',
@@ -245,7 +249,6 @@ function GenerateChargesModal({
     e.preventDefault();
     const payload: any = {
       project_id: formData.project_id,
-      landlord_party_id: formData.landlord_party_id,
       from: formData.from,
       to: formData.to,
     };
@@ -272,22 +275,6 @@ function GenerateChargesModal({
             {projects?.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-
-        <FormField label="Landlord Party" required>
-          <select
-            value={formData.landlord_party_id}
-            onChange={(e) => setFormData({ ...formData, landlord_party_id: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            required
-          >
-            <option value="">Select Landlord Party</option>
-            {parties?.filter((p) => p.party_types?.includes('LANDLORD')).map((party) => (
-              <option key={party.id} value={party.id}>
-                {party.name}
               </option>
             ))}
           </select>
@@ -348,7 +335,7 @@ function GenerateChargesModal({
           <button
             type="submit"
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a]"
-            disabled={isLoading || !formData.project_id || !formData.landlord_party_id || !formData.from || !formData.to}
+            disabled={isLoading || !formData.project_id || !formData.from || !formData.to}
           >
             {isLoading ? 'Generating...' : 'Generate'}
           </button>

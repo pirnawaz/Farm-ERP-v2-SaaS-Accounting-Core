@@ -48,7 +48,7 @@ export default function AdvanceFormPage() {
         party_id: advance.party_id,
         type: advance.type,
         direction: advance.direction,
-        amount: advance.amount,
+        amount: typeof advance.amount === 'number' ? String(advance.amount) : (advance.amount ?? ''),
         posting_date: advance.posting_date,
         method: advance.method,
         project_id: advance.project_id || '',

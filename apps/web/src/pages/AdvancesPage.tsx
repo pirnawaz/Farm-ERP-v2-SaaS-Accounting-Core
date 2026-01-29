@@ -4,6 +4,7 @@ import { useAdvances } from '../hooks/useAdvances';
 import { useParties } from '../hooks/useParties';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import type { Advance } from '../types';
@@ -89,17 +90,19 @@ export default function AdvancesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Advances</h1>
-        {canCreate && (
+      <PageHeader
+        title="Advances"
+        backTo="/app/dashboard"
+        breadcrumbs={[{ label: 'Advances' }]}
+        right={canCreate ? (
           <Link
             to="/app/advances/new"
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Advance
           </Link>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-6">
         <p className="text-sm text-[#2D3A3A]">
@@ -185,7 +188,7 @@ export default function AdvancesPage() {
 
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={advances || []}
+          data={(advances ?? []) as Advance[]}
           columns={columns}
           onRowClick={(row) => navigate(`/app/advances/${row.id}`)}
         />

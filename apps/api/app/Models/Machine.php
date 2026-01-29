@@ -18,6 +18,7 @@ class Machine extends Model
         'machine_type',
         'ownership_type',
         'status',
+        'is_active',
         'meter_unit',
         'opening_meter',
         'notes',
@@ -25,6 +26,7 @@ class Machine extends Model
 
     protected $casts = [
         'opening_meter' => 'decimal:2',
+        'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

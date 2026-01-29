@@ -65,7 +65,7 @@ class OperationalTransactionController extends Controller
             'type' => ['required', 'string', 'in:INCOME,EXPENSE'],
             'transaction_date' => ['required', 'date', 'date_format:Y-m-d'],
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'classification' => ['required', 'string', 'in:SHARED,HARI_ONLY,FARM_OVERHEAD'],
+            'classification' => ['required', 'string', 'in:SHARED,HARI_ONLY,LANDLORD_ONLY,FARM_OVERHEAD'],
         ]);
 
         // Validation rules per spec
@@ -77,11 +77,11 @@ class OperationalTransactionController extends Controller
                 return response()->json(['error' => 'FARM_OVERHEAD transactions require crop_cycle_id'], 422);
             }
         } else {
-            // SHARED or HARI_ONLY
+            // SHARED, HARI_ONLY, or LANDLORD_ONLY
             if (!$request->project_id) {
-                return response()->json(['error' => 'SHARED and HARI_ONLY transactions require project_id'], 422);
+                return response()->json(['error' => 'SHARED, HARI_ONLY and LANDLORD_ONLY transactions require project_id'], 422);
             }
-            if (!in_array($request->classification, ['SHARED', 'HARI_ONLY'])) {
+            if (!in_array($request->classification, ['SHARED', 'HARI_ONLY', 'LANDLORD_ONLY'])) {
                 return response()->json(['error' => 'Invalid classification for project transaction'], 422);
             }
         }
@@ -153,7 +153,7 @@ class OperationalTransactionController extends Controller
             'type' => ['sometimes', 'required', 'string', 'in:INCOME,EXPENSE'],
             'transaction_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d'],
             'amount' => ['sometimes', 'required', 'numeric', 'min:0.01'],
-            'classification' => ['sometimes', 'required', 'string', 'in:SHARED,HARI_ONLY,FARM_OVERHEAD'],
+            'classification' => ['sometimes', 'required', 'string', 'in:SHARED,HARI_ONLY,LANDLORD_ONLY,FARM_OVERHEAD'],
         ]);
 
         $updates = $request->only(['project_id', 'crop_cycle_id', 'type', 'transaction_date', 'amount', 'classification']);

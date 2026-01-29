@@ -21,6 +21,7 @@ export default function InvTransfersPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasRole } = useRole();
+  const { formatDate } = useFormatting();
 
   const cols: Column<InvTransfer>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
@@ -64,7 +65,7 @@ export default function InvTransfersPage() {
         </select>
       </div>
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={transfers || []} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No transfers. Create one." />
+        <DataTable data={(transfers ?? []) as InvTransfer[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No transfers. Create one." />
       </div>
     </div>
   );

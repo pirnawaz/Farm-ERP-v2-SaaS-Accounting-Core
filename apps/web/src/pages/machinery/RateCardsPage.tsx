@@ -5,6 +5,7 @@ import {
   useUpdateRateCard,
   useMachinesQuery,
 } from '../../hooks/useMachinery';
+import { useActivityTypes } from '../../hooks/useCropOps';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
@@ -17,16 +18,18 @@ import type { MachineRateCard, CreateMachineRateCardPayload, UpdateMachineRateCa
 export default function RateCardsPage() {
   const { data: rateCards, isLoading } = useRateCardsQuery();
   const { data: machines } = useMachinesQuery();
+  const { data: activityTypes } = useActivityTypes({ is_active: true });
   const createRC = useCreateRateCard();
   const updateRC = useUpdateRateCard();
   const { hasRole } = useRole();
-  const { formatCurrency, formatDate } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
   const [showModal, setShowModal] = useState(false);
   const [editingRateCard, setEditingRateCard] = useState<MachineRateCard | null>(null);
   const [form, setForm] = useState<CreateMachineRateCardPayload>({
     applies_to_mode: 'MACHINE',
     machine_id: null,
     machine_type: null,
+    activity_type_id: null,
     effective_from: new Date().toISOString().split('T')[0],
     effective_to: null,
     rate_unit: 'HOUR',
@@ -46,11 +49,12 @@ export default function RateCardsPage() {
         ? (r.machine?.name || r.machine_id || 'N/A')
         : (r.machine_type || 'N/A')
     },
+    { header: 'Service', accessor: (r) => r.activity_type?.name || '—' },
     { header: 'Rate Unit', accessor: 'rate_unit' },
     { header: 'Pricing Model', accessor: 'pricing_model' },
     { 
       header: 'Base Rate', 
-      accessor: (r) => formatCurrency(parseFloat(r.base_rate))
+      accessor: (r) => formatMoney(parseFloat(r.base_rate))
     },
     { 
       header: 'Cost Plus %', 
@@ -76,6 +80,7 @@ export default function RateCardsPage() {
               applies_to_mode: r.applies_to_mode,
               machine_id: r.machine_id || null,
               machine_type: r.machine_type || null,
+              activity_type_id: r.activity_type_id || null,
               effective_from: r.effective_from,
               effective_to: r.effective_to || null,
               rate_unit: r.rate_unit,
@@ -98,32 +103,37 @@ export default function RateCardsPage() {
   ];
 
   const handleCreate = async () => {
-    if (!form.effective_from || !form.base_rate || form.base_rate <= 0) return;
+    const baseRate = parseFloat(String(form.base_rate)) || 0;
+    const costPlusPercent = form.pricing_model === 'COST_PLUS' ? (parseFloat(String(form.cost_plus_percent)) || null) : null;
+    if (!form.effective_from || baseRate <= 0) return;
     if (form.applies_to_mode === 'MACHINE' && !form.machine_id) return;
     if (form.applies_to_mode === 'MACHINE_TYPE' && !form.machine_type) return;
-    if (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || form.cost_plus_percent <= 0)) return;
+    if (form.pricing_model === 'COST_PLUS' && (costPlusPercent == null || costPlusPercent <= 0)) return;
     
-    await createRC.mutateAsync(form);
+    await createRC.mutateAsync({ ...form, base_rate: baseRate, cost_plus_percent: costPlusPercent });
     setShowModal(false);
     resetForm();
   };
 
   const handleUpdate = async () => {
-    if (!editingRateCard || !form.effective_from || !form.base_rate || form.base_rate <= 0) return;
+    const baseRate = parseFloat(String(form.base_rate)) || 0;
+    const costPlusPercent = form.pricing_model === 'COST_PLUS' ? (parseFloat(String(form.cost_plus_percent)) || null) : null;
+    if (!editingRateCard || !form.effective_from || baseRate <= 0) return;
     if (form.applies_to_mode === 'MACHINE' && !form.machine_id) return;
     if (form.applies_to_mode === 'MACHINE_TYPE' && !form.machine_type) return;
-    if (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || form.cost_plus_percent <= 0)) return;
+    if (form.pricing_model === 'COST_PLUS' && (costPlusPercent == null || costPlusPercent <= 0)) return;
     
     const payload: UpdateMachineRateCardPayload = {
       applies_to_mode: form.applies_to_mode,
       machine_id: form.machine_id,
       machine_type: form.machine_type,
+      activity_type_id: form.activity_type_id,
       effective_from: form.effective_from,
       effective_to: form.effective_to,
       rate_unit: form.rate_unit,
       pricing_model: form.pricing_model,
-      base_rate: form.base_rate,
-      cost_plus_percent: form.cost_plus_percent,
+      base_rate: baseRate,
+      cost_plus_percent: costPlusPercent,
       includes_fuel: form.includes_fuel,
       includes_operator: form.includes_operator,
       includes_maintenance: form.includes_maintenance,
@@ -146,6 +156,7 @@ export default function RateCardsPage() {
       applies_to_mode: 'MACHINE',
       machine_id: null,
       machine_type: null,
+      activity_type_id: null,
       effective_from: new Date().toISOString().split('T')[0],
       effective_to: null,
       rate_unit: 'HOUR',
@@ -193,6 +204,9 @@ export default function RateCardsPage() {
               <option value="MACHINE">MACHINE</option>
               <option value="MACHINE_TYPE">MACHINE_TYPE</option>
             </select>
+            <p className="text-sm text-gray-500 mt-1">
+              MACHINE: overrides for a specific machine. MACHINE TYPE: default rate for all machines of that type.
+            </p>
           </FormField>
           
           {form.applies_to_mode === 'MACHINE' ? (
@@ -218,6 +232,19 @@ export default function RateCardsPage() {
               />
             </FormField>
           )}
+
+          <FormField label="Service / Activity Type (optional)">
+            <select
+              value={form.activity_type_id || ''}
+              onChange={e => setForm(f => ({ ...f, activity_type_id: e.target.value || null }))}
+              className="w-full px-3 py-2 border rounded"
+            >
+              <option value="">None</option>
+              {activityTypes?.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </FormField>
 
           <FormField label="Effective From" required>
             <input
@@ -266,8 +293,8 @@ export default function RateCardsPage() {
               type="number"
               step="0.01"
               min="0"
-              value={form.base_rate || ''}
-              onChange={e => setForm(f => ({ ...f, base_rate: e.target.value ? parseFloat(e.target.value) : 0 }))}
+              value={form.base_rate === '' || form.base_rate == null ? '' : String(form.base_rate)}
+              onChange={e => setForm(f => ({ ...f, base_rate: e.target.value as unknown as number }))}
               className="w-full px-3 py-2 border rounded"
               placeholder="0.00"
             />
@@ -280,8 +307,8 @@ export default function RateCardsPage() {
                 step="0.01"
                 min="0"
                 max="100"
-                value={form.cost_plus_percent || ''}
-                onChange={e => setForm(f => ({ ...f, cost_plus_percent: e.target.value ? parseFloat(e.target.value) : null }))}
+                value={form.cost_plus_percent === '' || form.cost_plus_percent == null ? '' : String(form.cost_plus_percent)}
+                onChange={e => setForm(f => ({ ...f, cost_plus_percent: e.target.value === '' ? null : (e.target.value as unknown as number | null) }))}
                 className="w-full px-3 py-2 border rounded"
                 placeholder="0.00"
               />

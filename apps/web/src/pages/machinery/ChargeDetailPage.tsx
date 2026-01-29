@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import {
   useChargeQuery,
   useUpdateCharge,
@@ -11,11 +11,8 @@ import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
-import type { MachineryChargeLine } from '../../types';
-
 export default function ChargeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { formatMoney, formatDate } = useFormatting();
   const { hasRole } = useRole();
   const [showPostModal, setShowPostModal] = useState(false);
@@ -23,7 +20,7 @@ export default function ChargeDetailPage() {
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
   const [reverseDate, setReverseDate] = useState(new Date().toISOString().split('T')[0]);
   const [reverseReason, setReverseReason] = useState('');
-  const [editedLines, setEditedLines] = useState<Record<string, { rate: number; amount: number }>>({});
+  const [editedLines, setEditedLines] = useState<Record<string, { rate: string; amount: string }>>({});
 
   const { data: charge, isLoading } = useChargeQuery(id!);
   const updateMutation = useUpdateCharge();
@@ -38,23 +35,23 @@ export default function ChargeDetailPage() {
   // Initialize edited lines from charge lines
   useEffect(() => {
     if (charge?.lines && isDraft) {
-      const initial: Record<string, { rate: number; amount: number }> = {};
+      const initial: Record<string, { rate: string; amount: string }> = {};
       charge.lines.forEach((line) => {
         initial[line.id] = {
-          rate: parseFloat(line.rate),
-          amount: parseFloat(line.amount),
+          rate: line.rate != null ? String(line.rate) : '',
+          amount: line.amount != null ? String(line.amount) : '',
         };
       });
       setEditedLines(initial);
     }
   }, [charge?.lines, isDraft]);
 
-  const handleLineChange = (lineId: string, field: 'rate' | 'amount', value: number) => {
+  const handleLineChange = (lineId: string, field: 'rate' | 'amount', value: string) => {
     if (!isDraft) return;
     setEditedLines((prev) => {
       const updated = { ...prev };
       if (!updated[lineId]) {
-        updated[lineId] = { rate: 0, amount: 0 };
+        updated[lineId] = { rate: '', amount: '' };
       }
       updated[lineId][field] = value;
       
@@ -62,7 +59,8 @@ export default function ChargeDetailPage() {
       if (field === 'rate') {
         const line = charge?.lines?.find((l) => l.id === lineId);
         if (line) {
-          updated[lineId].amount = value * parseFloat(line.usage_qty);
+          const rateNum = parseFloat(value) || 0;
+          updated[lineId].amount = String(rateNum * parseFloat(line.usage_qty));
         }
       }
       return updated;
@@ -74,8 +72,8 @@ export default function ChargeDetailPage() {
     
     const lines = Object.entries(editedLines).map(([lineId, values]) => ({
       id: lineId,
-      rate: values.rate,
-      amount: values.amount,
+      rate: parseFloat(values.rate) || 0,
+      amount: parseFloat(values.amount) || 0,
     }));
 
     try {
@@ -122,7 +120,7 @@ export default function ChargeDetailPage() {
 
   // Calculate total from edited lines or charge
   const totalAmount = isDraft && Object.keys(editedLines).length > 0
-    ? Object.values(editedLines).reduce((sum, line) => sum + line.amount, 0)
+    ? Object.values(editedLines).reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0)
     : parseFloat(charge?.total_amount || '0');
 
   if (isLoading) {
@@ -254,8 +252,8 @@ export default function ChargeDetailPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {charge.lines?.map((line) => {
                 const edited = editedLines[line.id];
-                const rate = edited ? edited.rate : parseFloat(line.rate);
-                const amount = edited ? edited.amount : parseFloat(line.amount);
+                const rate = edited ? edited.rate : (line.rate != null ? String(line.rate) : '');
+                const amount = edited ? edited.amount : (line.amount != null ? String(line.amount) : '');
                 return (
                   <tr key={line.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -275,7 +273,7 @@ export default function ChargeDetailPage() {
                           min="0"
                           value={rate}
                           onChange={(e) =>
-                            handleLineChange(line.id, 'rate', parseFloat(e.target.value) || 0)
+                            handleLineChange(line.id, 'rate', e.target.value)
                           }
                           className="w-24 px-2 py-1 border border-gray-300 rounded text-right tabular-nums"
                         />
@@ -291,7 +289,7 @@ export default function ChargeDetailPage() {
                           min="0"
                           value={amount}
                           onChange={(e) =>
-                            handleLineChange(line.id, 'amount', parseFloat(e.target.value) || 0)
+                            handleLineChange(line.id, 'amount', e.target.value)
                           }
                           className="w-24 px-2 py-1 border border-gray-300 rounded text-right tabular-nums"
                         />
@@ -355,7 +353,7 @@ export default function ChargeDetailPage() {
 
       {/* Post Modal */}
       {showPostModal && (
-        <Modal title="Post Charge" onClose={() => setShowPostModal(false)}>
+        <Modal isOpen={showPostModal} title="Post Charge" onClose={() => setShowPostModal(false)}>
           <div className="space-y-4">
             <FormField label="Posting Date" required>
               <input
@@ -388,7 +386,7 @@ export default function ChargeDetailPage() {
 
       {/* Reverse Modal */}
       {showReverseModal && (
-        <Modal title="Reverse Charge" onClose={() => setShowReverseModal(false)}>
+        <Modal isOpen={showReverseModal} title="Reverse Charge" onClose={() => setShowReverseModal(false)}>
           <div className="space-y-4">
             <FormField label="Posting Date" required>
               <input

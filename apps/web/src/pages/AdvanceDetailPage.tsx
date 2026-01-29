@@ -18,7 +18,7 @@ export default function AdvanceDetailPage() {
   const postMutation = usePostAdvance();
   const { data: cropCycles } = useCropCycles();
   const { hasRole } = useRole();
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatMoney, formatDate, formatDateTime } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);

@@ -58,6 +58,7 @@ export default function ActivityTypesPage() {
           </button>
         }
       />
+      <p className="text-sm text-gray-500 mb-4">Activity types represent operations like ploughing, sowing, spraying.</p>
       <div className="flex gap-4 mb-4 flex-wrap">
         <select
           value={String(isActiveFilter)}
@@ -74,6 +75,7 @@ export default function ActivityTypesPage() {
       </div>
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Activity Type">
         <div className="space-y-4">
+          <p className="text-sm text-gray-500">e.g. Ploughing, Sowing, Fertilizer, Spraying…</p>
           <FormField label="Name" required>
             <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border rounded" />
           </FormField>

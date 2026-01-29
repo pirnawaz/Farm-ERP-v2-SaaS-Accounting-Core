@@ -21,6 +21,7 @@ class OperationalTransaction extends Model
         'transaction_date',
         'amount',
         'classification',
+        'posting_group_id',
         'created_by',
     ];
 
@@ -43,6 +44,11 @@ class OperationalTransaction extends Model
     public function cropCycle(): BelongsTo
     {
         return $this->belongsTo(CropCycle::class);
+    }
+
+    public function postingGroup(): BelongsTo
+    {
+        return $this->belongsTo(PostingGroup::class);
     }
 
     public function createdBy(): BelongsTo

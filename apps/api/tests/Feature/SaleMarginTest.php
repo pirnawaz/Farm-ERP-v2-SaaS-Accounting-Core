@@ -147,6 +147,7 @@ class SaleMarginTest extends TestCase
         $harvest = Harvest::create([
             'tenant_id' => $this->tenant->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'harvest_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);

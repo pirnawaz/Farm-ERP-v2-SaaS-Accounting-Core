@@ -6,7 +6,6 @@ import type {
   UpdateHarvestPayload,
   PostHarvestPayload,
   ReverseHarvestPayload,
-  PostingGroup,
 } from '../types';
 
 const BASE = '/api/v1/crop-ops';
@@ -14,6 +13,7 @@ const BASE = '/api/v1/crop-ops';
 export interface HarvestFilters {
   status?: string;
   crop_cycle_id?: string;
+  project_id?: string;
   from?: string;
   to?: string;
 }

@@ -50,6 +50,7 @@ export function exportToCSV<T extends object>(
     reportName?: string
     fromDate?: string
     toDate?: string
+    asOfDate?: string
   }
 ): void {
   if (data.length === 0) {

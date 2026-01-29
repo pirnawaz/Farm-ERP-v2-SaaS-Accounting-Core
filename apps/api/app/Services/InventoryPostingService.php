@@ -17,6 +17,7 @@ use App\Models\AllocationRow;
 use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Models\OperationalTransaction;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -103,9 +104,24 @@ class InventoryPostingService
                 'currency_code' => 'GBP',
             ]);
 
+            if ($grn->supplier_party_id) {
+                AllocationRow::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'project_id' => null,
+                    'party_id' => $grn->supplier_party_id,
+                    'allocation_type' => 'SUPPLIER_AP',
+                    'amount' => (string) round((float) $totalValue, 2),
+                    'rule_snapshot' => [
+                        'source_type' => 'INVENTORY_GRN',
+                        'grn_id' => $grn->id,
+                    ],
+                ]);
+            }
+
             $grn->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 
-            return $postingGroup->fresh(['ledgerEntries.account']);
+            return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
         });
     }
 
@@ -380,6 +396,24 @@ class InventoryPostingService
                 throw new \Exception('Debits and credits do not balance after inventory issue posting');
             }
 
+            // Map allocation_mode to OT classification for settlement
+            $otClassification = match ($issue->allocation_mode) {
+                'HARI_ONLY' => 'HARI_ONLY',
+                'FARMER_ONLY' => 'LANDLORD_ONLY',
+                default => 'SHARED', // SHARED or any percentage split
+            };
+            OperationalTransaction::create([
+                'tenant_id' => $tenantId,
+                'project_id' => $issue->project_id,
+                'crop_cycle_id' => $issue->crop_cycle_id,
+                'type' => 'EXPENSE',
+                'status' => 'POSTED',
+                'transaction_date' => $postingDateObj,
+                'amount' => (string) round($totalValue, 2),
+                'classification' => $otClassification,
+                'posting_group_id' => $postingGroup->id,
+            ]);
+
             $issue->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
@@ -454,6 +488,8 @@ class InventoryPostingService
             }
 
             $reversalPG = $this->reversalService->reversePostingGroup($issue->posting_group_id, $tenantId, $postingDate, $reason);
+
+            OperationalTransaction::where('posting_group_id', $issue->posting_group_id)->update(['status' => 'VOID']);
 
             $existing = InvStockMovement::where('tenant_id', $tenantId)->where('posting_group_id', $reversalPG->id)->exists();
             if ($existing) {

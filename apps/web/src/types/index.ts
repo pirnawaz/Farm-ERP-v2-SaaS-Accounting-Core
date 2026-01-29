@@ -1,3 +1,5 @@
+import type { ShareRule } from '../api/shareRules';
+
 // Auth & Role Types
 export type UserRole = 'tenant_admin' | 'accountant' | 'operator' | 'platform_admin';
 
@@ -243,11 +245,16 @@ export interface PostingGroup {
 
 // Settlement
 export interface SettlementPreview {
+  total_revenue: string | number;
+  total_expenses: string | number;
   pool_revenue: string;
   shared_costs: string;
+  landlord_only_costs: string | number;
   pool_profit: string;
   kamdari_amount: string;
+  remaining_pool?: string | number;
   landlord_gross: string;
+  landlord_net?: string | number;
   hari_gross: string;
   hari_only_deductions: string;
   hari_net: string;
@@ -536,6 +543,7 @@ export interface Machine {
   machine_type: string;
   ownership_type: string;
   status: string;
+  is_active: boolean;
   meter_unit: 'HOURS' | 'KM';
   opening_meter: string;
   notes?: string | null;
@@ -593,22 +601,21 @@ export interface MachineWorkLog {
 }
 
 export interface CreateMachinePayload {
-  code: string;
+  code?: string | null;
   name: string;
   machine_type: string;
   ownership_type: string;
-  status: string;
+  is_active?: boolean;
   meter_unit: 'HOURS' | 'KM';
   opening_meter?: number;
   notes?: string | null;
 }
 
 export interface UpdateMachinePayload {
-  code?: string;
   name?: string;
   machine_type?: string;
   ownership_type?: string;
-  status?: string;
+  is_active?: boolean;
   meter_unit?: 'HOURS' | 'KM';
   opening_meter?: number;
   notes?: string | null;
@@ -672,6 +679,7 @@ export interface MachineRateCard {
   applies_to_mode: 'MACHINE' | 'MACHINE_TYPE';
   machine_id?: string | null;
   machine_type?: string | null;
+  activity_type_id?: string | null;
   effective_from: string;
   effective_to?: string | null;
   rate_unit: 'HOUR' | 'KM' | 'JOB';
@@ -685,12 +693,14 @@ export interface MachineRateCard {
   created_at: string;
   updated_at: string;
   machine?: Machine;
+  activity_type?: CropActivityType;
 }
 
 export interface CreateMachineRateCardPayload {
   applies_to_mode: 'MACHINE' | 'MACHINE_TYPE';
   machine_id?: string | null;
   machine_type?: string | null;
+  activity_type_id?: string | null;
   effective_from: string;
   effective_to?: string | null;
   rate_unit: 'HOUR' | 'KM' | 'JOB';
@@ -707,6 +717,7 @@ export interface UpdateMachineRateCardPayload {
   applies_to_mode?: 'MACHINE' | 'MACHINE_TYPE';
   machine_id?: string | null;
   machine_type?: string | null;
+  activity_type_id?: string | null;
   effective_from?: string;
   effective_to?: string | null;
   rate_unit?: 'HOUR' | 'KM' | 'JOB';
@@ -716,6 +727,7 @@ export interface UpdateMachineRateCardPayload {
   includes_fuel?: boolean;
   includes_operator?: boolean;
   includes_maintenance?: boolean;
+  is_active?: boolean;
 }
 
 export interface MachineryChargeLine {
@@ -761,7 +773,7 @@ export interface MachineryCharge {
 
 export interface GenerateChargesPayload {
   project_id: string;
-  landlord_party_id: string;
+  landlord_party_id?: string | null;
   from: string;
   to: string;
   pool_scope?: 'SHARED' | 'HARI_ONLY';
@@ -1031,6 +1043,7 @@ export interface Harvest {
   tenant_id: string;
   harvest_no?: string | null;
   crop_cycle_id: string;
+  project_id?: string | null;
   land_parcel_id?: string | null;
   harvest_date: string;
   posting_date?: string | null;
@@ -1043,6 +1056,7 @@ export interface Harvest {
   created_at: string;
   updated_at: string;
   crop_cycle?: CropCycle;
+  project?: Project;
   land_parcel?: LandParcel | null;
   posting_group?: PostingGroup;
   reversal_posting_group?: PostingGroup;
@@ -1052,14 +1066,14 @@ export interface Harvest {
 export interface CreateHarvestPayload {
   harvest_no?: string | null;
   crop_cycle_id: string;
-  land_parcel_id?: string | null;
+  project_id: string;
   harvest_date: string;
   notes?: string | null;
 }
 
 export interface UpdateHarvestPayload {
   harvest_no?: string | null;
-  land_parcel_id?: string | null;
+  project_id?: string | null;
   harvest_date?: string;
   notes?: string | null;
 }
@@ -1202,6 +1216,7 @@ export interface PartyBalanceSummary {
   allocated_payable_total: string;
   paid_total: string;
   outstanding_total: string;
+  supplier_payable_outstanding?: string;
   advance_balance_disbursed?: string;
   advance_balance_repaid?: string;
   advance_balance_outstanding?: string;

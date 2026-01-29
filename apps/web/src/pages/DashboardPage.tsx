@@ -26,7 +26,7 @@ export default function DashboardPage() {
   // Filter widgets by module availability - memoized
   const filterWidgets = useMemo(
     () => (widgets: WidgetKey[]) =>
-      widgets.filter((widget) => {
+      widgets.filter(() => {
         // Widgets that require specific modules are handled in DashboardWidget component
         return true;
       }),

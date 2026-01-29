@@ -53,30 +53,31 @@ class SettlementService
 
         $upToDateObj = $upToDate ? Carbon::parse($upToDate) : Carbon::today();
 
-        // Get all posted transactions for this project up to up_to_date
-        // We need to join with posting_groups to filter by posting_date
-        $postedTransactionIds = PostingGroup::where('tenant_id', $tenantId)
-            ->where('source_type', 'OPERATIONAL')
-            ->where('posting_date', '<=', $upToDateObj->format('Y-m-d'))
-            ->pluck('source_id')
-            ->toArray();
-
-        // Get transactions that are posted and belong to this project
-        // FARM_OVERHEAD transactions are excluded from project settlement
-        $postedTransactions = OperationalTransaction::where('tenant_id', $tenantId)
-            ->where('project_id', $projectId)
-            ->where('status', 'POSTED')
-            ->whereIn('id', $postedTransactionIds)
+        // Get all posted transactions for this project up to up_to_date.
+        // "Posted" = OT has status POSTED and posting_group_id set, with that PG's posting_date <= up_to_date.
+        // Includes OTs from OPERATIONAL (manual), INVENTORY_ISSUE, and LABOUR_WORK_LOG.
+        $postedTransactions = OperationalTransaction::where('operational_transactions.tenant_id', $tenantId)
+            ->where('operational_transactions.project_id', $projectId)
+            ->where('operational_transactions.status', 'POSTED')
+            ->whereNotNull('operational_transactions.posting_group_id')
+            ->join('posting_groups', 'operational_transactions.posting_group_id', '=', 'posting_groups.id')
+            ->where('posting_groups.posting_date', '<=', $upToDateObj->format('Y-m-d'))
+            ->select('operational_transactions.*')
             ->get();
 
-        // Calculate totals
-        $poolRevenue = $postedTransactions
-            ->where('type', 'INCOME')
-            ->sum('amount');
+        // Calculate totals (independent of each other so expenses show even when revenue = 0)
+        $totalRevenue = $postedTransactions->where('type', 'INCOME')->sum('amount');
+        $totalExpenses = $postedTransactions->where('type', 'EXPENSE')->sum('amount');
 
+        $poolRevenue = $totalRevenue; // All project income is pooled unless income classification exists
         $sharedCosts = $postedTransactions
             ->where('type', 'EXPENSE')
             ->where('classification', 'SHARED')
+            ->sum('amount');
+
+        $landlordOnlyCosts = $postedTransactions
+            ->where('type', 'EXPENSE')
+            ->where('classification', 'LANDLORD_ONLY')
             ->sum('amount');
 
         $hariOnlyDeductions = $postedTransactions
@@ -100,13 +101,19 @@ class SettlementService
             $hariNet = $hariGross - $hariOnlyDeductions;
         }
 
+        $landlordNet = $landlordGross - $landlordOnlyCosts;
+
         return [
+            'total_revenue' => $totalRevenue,
+            'total_expenses' => $totalExpenses,
             'pool_revenue' => $poolRevenue,
             'shared_costs' => $sharedCosts,
+            'landlord_only_costs' => $landlordOnlyCosts,
             'pool_profit' => $poolProfit,
             'kamdari_amount' => $kamdariAmount,
             'remaining_pool' => $remainingPool,
             'landlord_gross' => $landlordGross,
+            'landlord_net' => $landlordNet,
             'hari_gross' => $hariGross,
             'hari_only_deductions' => $hariOnlyDeductions,
             'hari_net' => $hariNet,

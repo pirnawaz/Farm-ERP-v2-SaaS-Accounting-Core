@@ -145,7 +145,7 @@ export default function SalesPage() {
 
       <div className="bg-white rounded-lg shadow">
         <DataTable
-          data={sales || []}
+          data={(sales ?? []) as Sale[]}
           columns={columns}
           onRowClick={(row) => navigate(`/app/sales/${row.id}`)}
         />

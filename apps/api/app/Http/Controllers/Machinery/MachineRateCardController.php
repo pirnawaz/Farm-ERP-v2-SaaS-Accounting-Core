@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Machinery;
 use App\Http\Controllers\Controller;
 use App\Models\MachineRateCard;
 use App\Models\Machine;
+use App\Models\CropActivityType;
 use App\Services\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -50,7 +51,10 @@ class MachineRateCardController extends Controller
             $query->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
         }
 
-        $rateCards = $query->orderBy('effective_from', 'desc')->orderBy('created_at', 'desc')->get();
+        $rateCards = $query->with(['machine', 'activityType'])
+            ->orderBy('effective_from', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
         return response()->json($rateCards)
             ->header('Cache-Control', 'private, max-age=60')
             ->header('Vary', 'X-Tenant-Id');
@@ -78,6 +82,7 @@ class MachineRateCardController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $rateCard = MachineRateCard::where('id', $id)
             ->where('tenant_id', $tenantId)
+            ->with(['machine', 'activityType'])
             ->firstOrFail();
         return response()->json($rateCard);
     }
@@ -104,6 +109,7 @@ class MachineRateCardController extends Controller
             'applies_to_mode' => ['required', 'string', Rule::in([MachineRateCard::APPLIES_TO_MACHINE, MachineRateCard::APPLIES_TO_MACHINE_TYPE])],
             'machine_id' => ['nullable', 'uuid', 'exists:machines,id'],
             'machine_type' => ['nullable', 'string', 'max:255'],
+            'activity_type_id' => ['nullable', 'uuid', 'exists:crop_activity_types,id'],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
             'rate_unit' => ['required', 'string', Rule::in([MachineRateCard::RATE_UNIT_HOUR, MachineRateCard::RATE_UNIT_KM, MachineRateCard::RATE_UNIT_JOB])],
@@ -134,6 +140,15 @@ class MachineRateCardController extends Controller
                 abort(422, 'machine_type is required when applies_to_mode is MACHINE_TYPE');
             }
             $validated['machine_id'] = null;
+        }
+
+        // Ensure activity_type_id when provided belongs to tenant
+        if (!empty($validated['activity_type_id'])) {
+            CropActivityType::where('id', $validated['activity_type_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        } else {
+            $validated['activity_type_id'] = null;
         }
 
         // Validate cost_plus_percent required for COST_PLUS pricing model

@@ -3,11 +3,12 @@ interface FormFieldProps {
   error?: string;
   required?: boolean;
   children: React.ReactNode;
+  className?: string;
 }
 
-export function FormField({ label, error, required, children }: FormFieldProps) {
+export function FormField({ label, error, required, children, className }: FormFieldProps) {
   return (
-    <div className="mb-4">
+    <div className={className ? `mb-4 ${className}` : 'mb-4'}>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}

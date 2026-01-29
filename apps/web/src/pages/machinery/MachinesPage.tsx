@@ -24,7 +24,7 @@ export default function MachinesPage() {
     name: '',
     machine_type: '',
     ownership_type: '',
-    status: '',
+    is_active: true,
     meter_unit: 'HOURS',
     opening_meter: 0,
     notes: null,
@@ -35,7 +35,7 @@ export default function MachinesPage() {
     { header: 'Name', accessor: 'name' },
     { header: 'Type', accessor: 'machine_type' },
     { header: 'Ownership', accessor: 'ownership_type' },
-    { header: 'Status', accessor: 'status' },
+    { header: 'Active', accessor: (r) => (r.is_active ? 'Yes' : 'No') },
     { header: 'Meter Unit', accessor: 'meter_unit' },
     {
       header: 'Actions',
@@ -49,7 +49,7 @@ export default function MachinesPage() {
               name: r.name,
               machine_type: r.machine_type,
               ownership_type: r.ownership_type,
-              status: r.status,
+              is_active: r.is_active ?? true,
               meter_unit: r.meter_unit,
               opening_meter: parseFloat(r.opening_meter) || 0,
               notes: r.notes || null,
@@ -65,22 +65,31 @@ export default function MachinesPage() {
   ];
 
   const handleCreate = async () => {
-    if (!form.code.trim() || !form.name.trim() || !form.machine_type || !form.ownership_type || !form.status) return;
-    await createM.mutateAsync(form);
+    if (!form.name.trim() || !form.machine_type || !form.ownership_type) return;
+    const payload: CreateMachinePayload = {
+      code: form.code?.trim() || undefined,
+      name: form.name.trim(),
+      machine_type: form.machine_type,
+      ownership_type: form.ownership_type,
+      is_active: form.is_active ?? true,
+      meter_unit: form.meter_unit,
+      opening_meter: parseFloat(String(form.opening_meter)) || 0,
+      notes: form.notes,
+    };
+    await createM.mutateAsync(payload);
     setShowModal(false);
     resetForm();
   };
 
   const handleUpdate = async () => {
-    if (!editingMachine || !form.code.trim() || !form.name.trim() || !form.machine_type || !form.ownership_type || !form.status) return;
+    if (!editingMachine || !form.name.trim() || !form.machine_type || !form.ownership_type) return;
     const payload: UpdateMachinePayload = {
-      code: form.code,
-      name: form.name,
+      name: form.name.trim(),
       machine_type: form.machine_type,
       ownership_type: form.ownership_type,
-      status: form.status,
+      is_active: form.is_active ?? true,
       meter_unit: form.meter_unit,
-      opening_meter: form.opening_meter,
+      opening_meter: parseFloat(String(form.opening_meter)) || 0,
       notes: form.notes,
     };
     await updateM.mutateAsync({ id: editingMachine.id, payload });
@@ -101,7 +110,7 @@ export default function MachinesPage() {
       name: '',
       machine_type: '',
       ownership_type: '',
-      status: '',
+      is_active: true,
       meter_unit: 'HOURS',
       opening_meter: 0,
       notes: null,
@@ -125,12 +134,14 @@ export default function MachinesPage() {
       </div>
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingMachine ? 'Edit Machine' : 'New Machine'}>
         <div className="space-y-4">
-          <FormField label="Code" required>
+          <FormField label="Code">
             <input
-              value={form.code}
+              value={form.code ?? ''}
               onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
               className="w-full px-3 py-2 border rounded"
-              placeholder="Enter machine code"
+              placeholder="Auto-generated if blank"
+              readOnly={!!editingMachine}
+              disabled={!!editingMachine}
             />
           </FormField>
           <FormField label="Name" required>
@@ -157,13 +168,15 @@ export default function MachinesPage() {
               placeholder="e.g., Owned, Leased"
             />
           </FormField>
-          <FormField label="Status" required>
-            <input
-              value={form.status}
-              onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-              className="w-full px-3 py-2 border rounded"
-              placeholder="e.g., Active, Inactive, Maintenance"
-            />
+          <FormField label="Active">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.is_active ?? true}
+                onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
+              />
+              <span>Active</span>
+            </label>
           </FormField>
           <FormField label="Meter Unit" required>
             <select
@@ -180,8 +193,8 @@ export default function MachinesPage() {
               type="number"
               step="0.01"
               min="0"
-              value={form.opening_meter || ''}
-              onChange={e => setForm(f => ({ ...f, opening_meter: e.target.value ? parseFloat(e.target.value) : 0 }))}
+              value={form.opening_meter === '' || form.opening_meter == null ? '' : String(form.opening_meter)}
+              onChange={e => setForm(f => ({ ...f, opening_meter: e.target.value as unknown as number }))}
               className="w-full px-3 py-2 border rounded"
               placeholder="0.00"
             />
@@ -200,7 +213,7 @@ export default function MachinesPage() {
             {editingMachine ? (
               <button
                 onClick={handleUpdate}
-                disabled={!form.code.trim() || !form.name.trim() || !form.machine_type || !form.ownership_type || !form.status || updateM.isPending}
+                disabled={!form.name.trim() || !form.machine_type || !form.ownership_type || updateM.isPending}
                 className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {updateM.isPending ? 'Updating...' : 'Update'}
@@ -208,7 +221,7 @@ export default function MachinesPage() {
             ) : (
               <button
                 onClick={handleCreate}
-                disabled={!form.code.trim() || !form.name.trim() || !form.machine_type || !form.ownership_type || !form.status || createM.isPending}
+                disabled={!form.name.trim() || !form.machine_type || !form.ownership_type || createM.isPending}
                 className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {createM.isPending ? 'Creating...' : 'Create'}
