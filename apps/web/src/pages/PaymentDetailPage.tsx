@@ -160,7 +160,7 @@ export default function PaymentDetailPage() {
                           to={`/app/sales/${alloc.sale_id}`}
                           className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                         >
-                          {alloc.sale?.sale_no || `Sale ${alloc.sale_id.substring(0, 8)}`}
+                          {alloc.sale?.sale_no || (alloc.sale_id ? `Sale ${alloc.sale_id.substring(0, 8)}` : 'N/A')}
                         </Link>
                         <span className="text-xs text-gray-500 ml-2">
                           ({alloc.allocation_date})

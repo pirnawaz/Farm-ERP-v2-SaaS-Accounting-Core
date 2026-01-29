@@ -104,7 +104,7 @@ export default function SaleDetailPage() {
           <div>
             <dl>
               <dt>Invoice No:</dt>
-              <dd>{sale.sale_no || sale.id.substring(0, 8)}</dd>
+              <dd>{sale.sale_no || (sale.id ? sale.id.substring(0, 8) : 'N/A')}</dd>
               <dt>Date:</dt>
               <dd>{formatDate(sale.posting_date)}</dd>
               {sale.due_date && (

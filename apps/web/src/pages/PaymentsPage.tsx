@@ -4,6 +4,7 @@ import { usePayments } from '../hooks/usePayments';
 import { useParties } from '../hooks/useParties';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import type { Payment } from '../types';

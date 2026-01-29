@@ -183,7 +183,7 @@ function ProjectPLPage() {
                         return (
                           <tr key={`${row.project_id}-${row.currency_code}`}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {project?.name || row.project_id.substring(0, 8) + '...'}
+                              {project?.name || (row.project_id ? row.project_id.substring(0, 8) + '...' : 'N/A')}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {row.currency_code}
@@ -262,7 +262,7 @@ function ProjectPLPage() {
                       return (
                         <tr key={`${row.project_id}-${row.currency_code}`}>
                           <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                            {project?.name || row.project_id.substring(0, 8) + '...'}
+                            {project?.name || (row.project_id ? row.project_id.substring(0, 8) + '...' : 'N/A')}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {row.currency_code}

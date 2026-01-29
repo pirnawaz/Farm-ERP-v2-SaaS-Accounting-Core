@@ -246,7 +246,7 @@ function GeneralLedgerPage() {
                             to={`/posting-groups/${row.posting_group_id}`}
                             className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                           >
-                            {row.posting_group_id.substring(0, 8)}...
+                            {row.posting_group_id ? row.posting_group_id.substring(0, 8) + '...' : 'N/A'}
                           </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
@@ -327,7 +327,7 @@ function GeneralLedgerPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {row.posting_group_id.substring(0, 8)}...
+                        {row.posting_group_id ? row.posting_group_id.substring(0, 8) + '...' : 'N/A'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 text-right">
                         <span className="tabular-nums">{formatMoney(row.debit)}</span>
