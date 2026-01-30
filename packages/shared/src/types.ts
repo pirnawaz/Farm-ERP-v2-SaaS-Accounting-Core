@@ -187,3 +187,19 @@ export interface UpdateTenantModulesPayload {
 export interface TenantModulesResponse {
   modules: TenantModuleItem[]
 }
+
+// Reconciliation report (read-only confidence checks)
+export type ReconciliationCheckStatus = 'PASS' | 'WARN' | 'FAIL'
+
+export interface ReconciliationCheck {
+  key: string
+  title: string
+  status: ReconciliationCheckStatus
+  summary: string
+  details: Record<string, unknown>
+}
+
+export interface ReconciliationResponse {
+  checks: ReconciliationCheck[]
+  generated_at: string
+}

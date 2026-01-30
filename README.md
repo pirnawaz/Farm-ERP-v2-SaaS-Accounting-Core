@@ -32,7 +32,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 
 - **Multi-tenant SaaS** — Tenant isolation, platform admin, and tenant-level modules
 - **Roles** — `platform_admin`, `tenant_admin`, `accountant`, `operator`
-- **Land & Projects** — Land parcels, crop cycles, land allocations (owner and Hari), projects, project rules
+- **Land & Projects** — Land parcels, crop cycles (close/reopen with preview), land allocations (owner and Hari), projects, project rules
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
 - **Treasury** — Payments, advances, allocation preview and posting
 - **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
@@ -45,8 +45,9 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
 - **Accounting Guards** — Immutability protection for posted transactions, balanced posting validation
 - **Audit Logs** — Transaction audit trail for posted operations
-- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports; CSV export with Terrava-branded filenames; print-friendly layouts
-- **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, ledger reconciliation for audit and debugging
+- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, party ledger, party summary, role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); CSV export with Terrava-branded filenames; print-friendly layouts
+- **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
+- **Crop Cycle Close** — Close crop cycle with preview; crop-cycle-based settlements (preview and post); accounting corrections and guards
 - **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
@@ -205,7 +206,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Users**       | `apiResource('users')`                                                   |
 | **Parties**     | `apiResource('parties')`, `.../balances`, `.../statement`, `.../receivables/open-sales` |
 | **Land**        | `apiResource('land-parcels')`, `.../documents`                           |
-| **Crop cycles** | `apiResource('crop-cycles')`, `.../close`, `.../open`                    |
+| **Crop cycles** | `apiResource('crop-cycles')`, `.../close-preview`, `.../close`, `.../reopen`, `.../open` |
 | **Land allocations** | `apiResource('land-allocations')`                                   |
 | **Projects**    | `apiResource('projects')`, `POST /projects/from-allocation`              |
 | **Project rules**| `GET/PUT /projects/{id}/rules`                                           |
@@ -220,7 +221,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Crop Ops**    | `v1/crop-ops/activity-types` (CRUD); `v1/crop-ops/activities` (timeline, CRUD, `.../post`, `.../reverse`); `v1/crop-ops/harvests` (CRUD, lines, `.../post`, `.../reverse`) |
 | **Machinery**   | `v1/machinery/machines` (CRUD); `v1/machinery/maintenance-types` (CRUD); `v1/machinery/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/rate-cards` (CRUD); `v1/machinery/charges` (list, show); `v1/machinery/maintenance-jobs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/reports/profitability` |
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
-| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `yield` |
+| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `yield`, `party-ledger`, `party-summary`, `role-ageing`, `crop-cycle-distribution`, `settlement-statement`, `cost-per-unit`, `sales-margin`; `reports/reconciliation/project`, `reports/reconciliation/crop-cycle`, `reports/reconciliation/supplier-ap` |
 | **Reconciliation** | `GET /reconciliation/project/{id}`, `GET /reconciliation/supplier/{party_id}` |
 | **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
 
@@ -235,12 +236,12 @@ The web app includes pages (and routes) for:
 - **Dashboard**, **Health**
 - **Daily book entries**, **Operational transactions**
 - **Parties**, **Sales**, **Payments**, **Advances**
-- **Land parcels**, **Land allocations**, **Crop cycles**, **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based and sales-based), **Harvests**
+- **Land parcels**, **Land allocations**, **Crop cycles** (with close/reopen and detail), **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based, sales-based, crop-cycle-based), **Harvests**
 - **Inventory:** items, stores, categories, UOMs, GRNs, issues (with allocation configuration), transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Machinery:** machines, work logs, rate cards, charges, maintenance jobs and types, profitability reports (when `machinery` module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
-- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin; CSV export functionality; print-friendly layouts
+- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin, party ledger, party summary, role ageing, crop cycle distribution, settlement statement; reconciliation dashboard; CSV export functionality; print-friendly layouts
 - **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform:** tenants (platform admin)

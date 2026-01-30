@@ -16,20 +16,135 @@ use App\Models\CropCycle;
 use App\Models\Sale;
 use App\Models\ShareRule;
 use App\Models\ShareRuleLine;
+use App\Services\Accounting\PostValidationService;
+use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class SettlementService
 {
+    /** Source types that contribute to project profit (operational + reversals; exclude settlement postings). */
+    private const OPERATIONAL_SOURCE_TYPES = [
+        'INVENTORY_ISSUE', 'INVENTORY_GRN', 'LABOUR_WORK_LOG', 'MACHINE_WORK_LOG',
+        'MACHINE_MAINTENANCE_JOB', 'MACHINERY_CHARGE', 'CROP_ACTIVITY', 'OPERATIONAL',
+        'SALE', 'HARVEST', 'REVERSAL',
+    ];
+
     public function __construct(
         private SystemAccountService $accountService,
+        private PartyAccountService $partyAccountService,
         private SystemPartyService $partyService,
-        private PartyFinancialSourceService $financialSourceService
+        private PartyFinancialSourceService $financialSourceService,
+        private PostValidationService $postValidationService,
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
-     * Preview settlement calculations for a project.
-     * 
+     * Compute project profit from ledger entries (canonical truth).
+     * Only income and expense accounts; only posting_groups that have allocation_rows for this project;
+     * exclude settlement posting groups.
+     *
+     * @return array{total_revenue: float, total_expenses: float, pool_profit: float}
+     */
+    public function getProjectProfitFromLedger(string $projectId, string $tenantId, string $upToDate): array
+    {
+        $pgIds = PostingGroup::where('tenant_id', $tenantId)
+            ->where('posting_date', '<=', $upToDate)
+            ->whereIn('source_type', self::OPERATIONAL_SOURCE_TYPES)
+            ->whereExists(function ($q) use ($projectId) {
+                $q->select(DB::raw(1))
+                    ->from('allocation_rows')
+                    ->whereColumn('allocation_rows.posting_group_id', 'posting_groups.id')
+                    ->where('allocation_rows.project_id', $projectId);
+            })
+            ->pluck('id');
+
+        if ($pgIds->isEmpty()) {
+            return [
+                'total_revenue' => 0.0,
+                'total_expenses' => 0.0,
+                'pool_profit' => 0.0,
+            ];
+        }
+
+        $rows = DB::table('ledger_entries')
+            ->join('accounts', 'accounts.id', '=', 'ledger_entries.account_id')
+            ->where('ledger_entries.tenant_id', $tenantId)
+            ->whereIn('ledger_entries.posting_group_id', $pgIds)
+            ->whereIn('accounts.type', ['income', 'expense'])
+            ->selectRaw("
+                SUM(CASE WHEN accounts.type = 'income' THEN (ledger_entries.credit_amount - ledger_entries.debit_amount) ELSE 0 END) AS revenue,
+                SUM(CASE WHEN accounts.type = 'expense' THEN (ledger_entries.debit_amount - ledger_entries.credit_amount) ELSE 0 END) AS expenses
+            ")
+            ->first();
+
+        $totalRevenue = (float) ($rows->revenue ?? 0);
+        $totalExpenses = (float) ($rows->expenses ?? 0);
+        $poolProfit = $totalRevenue - $totalExpenses;
+
+        return [
+            'total_revenue' => $totalRevenue,
+            'total_expenses' => $totalExpenses,
+            'pool_profit' => $poolProfit,
+        ];
+    }
+
+    /**
+     * Same as getProjectProfitFromLedger but excludes COGS expense accounts.
+     * Used for settlement-vs-OT reconciliation so pool totals match OT (OT has no separate COGS line).
+     *
+     * @return array{total_revenue: float, total_expenses: float, pool_profit: float}
+     */
+    public function getProjectProfitFromLedgerExcludingCOGS(string $projectId, string $tenantId, string $upToDate): array
+    {
+        $pgIds = PostingGroup::where('tenant_id', $tenantId)
+            ->where('posting_date', '<=', $upToDate)
+            ->whereIn('source_type', self::OPERATIONAL_SOURCE_TYPES)
+            ->whereExists(function ($q) use ($projectId) {
+                $q->select(DB::raw(1))
+                    ->from('allocation_rows')
+                    ->whereColumn('allocation_rows.posting_group_id', 'posting_groups.id')
+                    ->where('allocation_rows.project_id', $projectId);
+            })
+            ->pluck('id');
+
+        if ($pgIds->isEmpty()) {
+            return [
+                'total_revenue' => 0.0,
+                'total_expenses' => 0.0,
+                'pool_profit' => 0.0,
+            ];
+        }
+
+        $cogsCodes = config('reconciliation.cogs_account_codes', ['COGS_PRODUCE']);
+        $placeholders = implode(',', array_fill(0, count($cogsCodes), '?'));
+
+        $rows = DB::table('ledger_entries')
+            ->join('accounts', 'accounts.id', '=', 'ledger_entries.account_id')
+            ->where('ledger_entries.tenant_id', $tenantId)
+            ->whereIn('ledger_entries.posting_group_id', $pgIds)
+            ->whereIn('accounts.type', ['income', 'expense'])
+            ->whereRaw("accounts.code NOT IN ({$placeholders})", $cogsCodes)
+            ->selectRaw("
+                SUM(CASE WHEN accounts.type = 'income' THEN (ledger_entries.credit_amount - ledger_entries.debit_amount) ELSE 0 END) AS revenue,
+                SUM(CASE WHEN accounts.type = 'expense' THEN (ledger_entries.debit_amount - ledger_entries.credit_amount) ELSE 0 END) AS expenses
+            ")
+            ->first();
+
+        $totalRevenue = (float) ($rows->revenue ?? 0);
+        $totalExpenses = (float) ($rows->expenses ?? 0);
+        $poolProfit = $totalRevenue - $totalExpenses;
+
+        return [
+            'total_revenue' => $totalRevenue,
+            'total_expenses' => $totalExpenses,
+            'pool_profit' => $poolProfit,
+        ];
+    }
+
+    /**
+     * Preview settlement calculations for a project (canonical ledger-based).
+     *
      * @param string $projectId
      * @param string $tenantId
      * @param string|null $upToDate YYYY-MM-DD format, defaults to today
@@ -47,75 +162,44 @@ class SettlementService
             throw new \Exception('Project rules not found');
         }
 
-        // Check if project is owner-operated (no HARI party or hari_pct is 0)
-        $isOwnerOperated = $projectRule->profit_split_hari_pct == 0 || 
-                          ($project->party && !in_array('HARI', $project->party->party_types ?? []));
+        $isOwnerOperated = $projectRule->profit_split_hari_pct == 0 ||
+            ($project->party && !in_array('HARI', $project->party->party_types ?? []));
 
-        $upToDateObj = $upToDate ? Carbon::parse($upToDate) : Carbon::today();
+        $upToDateStr = $upToDate ? Carbon::parse($upToDate)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
 
-        // Get all posted transactions for this project up to up_to_date.
-        // "Posted" = OT has status POSTED and posting_group_id set, with that PG's posting_date <= up_to_date.
-        // Includes OTs from OPERATIONAL (manual), INVENTORY_ISSUE, and LABOUR_WORK_LOG.
-        $postedTransactions = OperationalTransaction::where('operational_transactions.tenant_id', $tenantId)
-            ->where('operational_transactions.project_id', $projectId)
-            ->where('operational_transactions.status', 'POSTED')
-            ->whereNotNull('operational_transactions.posting_group_id')
-            ->join('posting_groups', 'operational_transactions.posting_group_id', '=', 'posting_groups.id')
-            ->where('posting_groups.posting_date', '<=', $upToDateObj->format('Y-m-d'))
-            ->select('operational_transactions.*')
-            ->get();
+        // Canonical profit from ledger (income/expense only)
+        $ledger = $this->getProjectProfitFromLedger($projectId, $tenantId, $upToDateStr);
+        $poolProfit = $ledger['pool_profit'];
+        $totalRevenue = $ledger['total_revenue'];
+        $totalExpenses = $ledger['total_expenses'];
 
-        // Calculate totals (independent of each other so expenses show even when revenue = 0)
-        $totalRevenue = $postedTransactions->where('type', 'INCOME')->sum('amount');
-        $totalExpenses = $postedTransactions->where('type', 'EXPENSE')->sum('amount');
-
-        $poolRevenue = $totalRevenue; // All project income is pooled unless income classification exists
-        $sharedCosts = $postedTransactions
-            ->where('type', 'EXPENSE')
-            ->where('classification', 'SHARED')
-            ->sum('amount');
-
-        $landlordOnlyCosts = $postedTransactions
-            ->where('type', 'EXPENSE')
-            ->where('classification', 'LANDLORD_ONLY')
-            ->sum('amount');
-
-        $hariOnlyDeductions = $postedTransactions
-            ->where('type', 'EXPENSE')
-            ->where('classification', 'HARI_ONLY')
-            ->sum('amount');
-
-        // Apply Decision D math
-        $poolProfit = $poolRevenue - $sharedCosts;
+        // Apply Decision D: kamdari first, then split remainder
         $kamdariAmount = $poolProfit * ($projectRule->kamdari_pct / 100);
         $remainingPool = $poolProfit - $kamdariAmount;
-        
+
         if ($isOwnerOperated) {
-            // Owner-operated: 100% to landlord, 0% to HARI
             $landlordGross = $remainingPool;
-            $hariGross = 0;
-            $hariNet = 0;
+            $hariGross = 0.0;
+            $hariNet = 0.0;
         } else {
             $landlordGross = $remainingPool * ($projectRule->profit_split_landlord_pct / 100);
             $hariGross = $remainingPool * ($projectRule->profit_split_hari_pct / 100);
-            $hariNet = $hariGross - $hariOnlyDeductions;
+            $hariNet = $hariGross; // No separate hari_only deduction; expense already in ledger
         }
-
-        $landlordNet = $landlordGross - $landlordOnlyCosts;
 
         return [
             'total_revenue' => $totalRevenue,
             'total_expenses' => $totalExpenses,
-            'pool_revenue' => $poolRevenue,
-            'shared_costs' => $sharedCosts,
-            'landlord_only_costs' => $landlordOnlyCosts,
+            'pool_revenue' => $totalRevenue,
+            'shared_costs' => 0.0, // Legacy key; not used when using ledger
+            'landlord_only_costs' => 0.0,
             'pool_profit' => $poolProfit,
             'kamdari_amount' => $kamdariAmount,
             'remaining_pool' => $remainingPool,
             'landlord_gross' => $landlordGross,
-            'landlord_net' => $landlordNet,
+            'landlord_net' => $landlordGross,
             'hari_gross' => $hariGross,
-            'hari_only_deductions' => $hariOnlyDeductions,
+            'hari_only_deductions' => 0.0,
             'hari_net' => $hariNet,
         ];
     }
@@ -230,14 +314,11 @@ class SettlementService
             $isOwnerOperated = $projectRule->profit_split_hari_pct == 0 || 
                               ($project->party && !in_array('HARI', $project->party->party_types ?? []));
 
-            // Verify crop cycle is OPEN
+            $this->guard->ensureCropCycleOpenForProject($projectId, $tenantId);
+
             $cropCycle = CropCycle::where('id', $project->crop_cycle_id)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
-
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post settlement to a closed crop cycle');
-            }
 
             // Ensure landlord party exists
             $landlordParty = $this->partyService->ensureSystemLandlordParty($tenantId);
@@ -280,23 +361,19 @@ class SettlementService
                 throw new \Exception('Advance offset is not applicable for owner-operated projects');
             }
 
-            // Get system accounts
-            $profitDistributionAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION');
-            $payableLandlordAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
-            $payableHariAccount = null;
-            $advanceHariAccount = null;
+            // Settlement uses PROFIT_DISTRIBUTION_CLEARING and PARTY_CONTROL_* only (never in operational postings)
+            $clearingAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION_CLEARING');
+            $partyControlLandlord = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'LANDLORD');
+            $partyControlHari = null;
             if (!$isOwnerOperated) {
-                $payableHariAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
-                if ($offsetAmount > 0) {
-                    $advanceHariAccount = $this->accountService->getByCode($tenantId, 'ADVANCE_HARI');
-                }
+                $partyControlHari = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'HARI');
             }
-            $payableKamdarAccount = null;
+            $partyControlKamdar = null;
             if ($projectRule->kamdar_party_id && $calculations['kamdari_amount'] > 0) {
                 try {
-                    $payableKamdarAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_KAMDAR');
+                    $partyControlKamdar = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'KAMDAR');
                 } catch (\Exception $e) {
-                    // Account might not exist, that's okay if kamdari_amount is 0
+                    // Account might not exist
                 }
             }
 
@@ -333,15 +410,33 @@ class SettlementService
                 'kamdari_order' => $projectRule->kamdari_order,
             ];
 
+            // Only create allocation rows and ledger entries for non-negative distribution (loss = 0 distribution)
+            $landlordGross = max(0, $calculations['landlord_gross']);
+            $hariNet = max(0, $calculations['hari_net']);
+            $kamdariAmount = max(0, $calculations['kamdari_amount']);
+            $totalDistribution = $landlordGross + $hariNet + $kamdariAmount;
+
+            if ($totalDistribution < 0.01) {
+                throw new \Exception('No profit to distribute; settlement has no positive distribution amount to post.');
+            }
+
+            // When advance offset applies: post net amounts only (no self-offsetting entries)
+            $effectiveTotalDistribution = $totalDistribution;
+            $effectiveHariCredit = $hariNet;
+            if ($offsetAmount > 0 && !$isOwnerOperated) {
+                $effectiveTotalDistribution = $totalDistribution - $offsetAmount;
+                $effectiveHariCredit = $hariNet - $offsetAmount;
+            }
+
             // KAMDARI allocation (if applicable)
-            if ($projectRule->kamdar_party_id && $calculations['kamdari_amount'] > 0) {
+            if ($projectRule->kamdar_party_id && $kamdariAmount > 0) {
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
                     'project_id' => $projectId,
                     'party_id' => $projectRule->kamdar_party_id,
                     'allocation_type' => 'KAMDARI',
-                    'amount' => $calculations['kamdari_amount'],
+                    'amount' => $kamdariAmount,
                     'rule_snapshot' => $ruleSnapshot,
                 ]);
             }
@@ -353,19 +448,19 @@ class SettlementService
                 'project_id' => $projectId,
                 'party_id' => $landlordParty->id,
                 'allocation_type' => 'POOL_SHARE',
-                'amount' => $calculations['landlord_gross'],
+                'amount' => $landlordGross,
                 'rule_snapshot' => $ruleSnapshot,
             ]);
 
             // POOL_SHARE for hari (only if not owner-operated)
-            if (!$isOwnerOperated && $calculations['hari_net'] > 0) {
+            if (!$isOwnerOperated && $hariNet > 0) {
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
                     'project_id' => $projectId,
                     'party_id' => $project->party_id,
                     'allocation_type' => 'POOL_SHARE',
-                    'amount' => $calculations['hari_net'],
+                    'amount' => $hariNet,
                     'rule_snapshot' => $ruleSnapshot,
                 ]);
             }
@@ -383,45 +478,50 @@ class SettlementService
                 ]);
             }
 
-            // Create ledger entries per Decision D
-            // Dr PROFIT_DISTRIBUTION = (landlord_gross + hari_net + kamdari_amount)
-            $totalDistribution = $calculations['landlord_gross'] + $calculations['hari_net'] + $calculations['kamdari_amount'];
+            $ledgerLines = [
+                ['account_id' => $clearingAccount->id],
+                ['account_id' => $partyControlLandlord->id],
+            ];
+            if (!$isOwnerOperated && $effectiveHariCredit > 0) {
+                $ledgerLines[] = ['account_id' => $partyControlHari->id];
+            }
+            if ($partyControlKamdar && $kamdariAmount > 0) {
+                $ledgerLines[] = ['account_id' => $partyControlKamdar->id];
+            }
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, $ledgerLines);
 
+            // Create ledger entries: Dr PROFIT_DISTRIBUTION_CLEARING, Cr PARTY_CONTROL_* (credit = we owe them)
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
-                'account_id' => $profitDistributionAccount->id,
-                'debit_amount' => $totalDistribution,
+                'account_id' => $clearingAccount->id,
+                'debit_amount' => $effectiveTotalDistribution,
                 'credit_amount' => 0,
                 'currency_code' => 'GBP',
             ]);
 
-            // Cr PAYABLE_LANDLORD
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
-                'account_id' => $payableLandlordAccount->id,
+                'account_id' => $partyControlLandlord->id,
                 'debit_amount' => 0,
-                'credit_amount' => $calculations['landlord_gross'],
+                'credit_amount' => $landlordGross,
                 'currency_code' => 'GBP',
             ]);
 
-            // Cr PAYABLE_HARI (full amount, will be reduced by offset if applicable, only if not owner-operated)
-            if (!$isOwnerOperated && $calculations['hari_net'] > 0) {
+            if (!$isOwnerOperated && $effectiveHariCredit > 0) {
                 LedgerEntry::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
-                    'account_id' => $payableHariAccount->id,
+                    'account_id' => $partyControlHari->id,
                     'debit_amount' => 0,
-                    'credit_amount' => $calculations['hari_net'],
+                    'credit_amount' => $effectiveHariCredit,
                     'currency_code' => 'GBP',
                 ]);
             }
 
-            // Handle offset if applicable (only for HARI projects)
+            // Record advance offset for audit only (no self-offsetting ledger entries)
             if ($offsetAmount > 0 && !$isOwnerOperated) {
-                // Create offset allocation rows for audit trail
-                // Allocation Row A: Settlement advance offset (reduce Hari payable)
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
@@ -434,8 +534,6 @@ class SettlementService
                         'description' => 'Settlement advance offset (reduce Hari payable)',
                     ]),
                 ]);
-
-                // Allocation Row B: Settlement advance recovery (reduce Hari advance)
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
@@ -448,28 +546,6 @@ class SettlementService
                         'description' => 'Settlement advance recovery (reduce Hari advance)',
                     ]),
                 ]);
-
-                // Ledger entry: Debit PAYABLE_HARI (reduces what we owe the Hari)
-                LedgerEntry::create([
-                    'tenant_id' => $tenantId,
-                    'posting_group_id' => $postingGroup->id,
-                    'account_id' => $payableHariAccount->id,
-                    'debit_amount' => $offsetAmount,
-                    'credit_amount' => 0,
-                    'currency_code' => 'GBP',
-                ]);
-
-                // Ledger entry: Credit ADVANCE_HARI (reduces what Hari owes us / reduces receivable)
-                LedgerEntry::create([
-                    'tenant_id' => $tenantId,
-                    'posting_group_id' => $postingGroup->id,
-                    'account_id' => $advanceHariAccount->id,
-                    'debit_amount' => 0,
-                    'credit_amount' => $offsetAmount,
-                    'currency_code' => 'GBP',
-                ]);
-
-                // Create settlement_offsets record
                 SettlementOffset::create([
                     'tenant_id' => $tenantId,
                     'settlement_id' => $settlement->id,
@@ -480,14 +556,13 @@ class SettlementService
                 ]);
             }
 
-            // Cr PAYABLE_KAMDAR (if applicable)
-            if ($payableKamdarAccount && $calculations['kamdari_amount'] > 0) {
+            if ($partyControlKamdar && $kamdariAmount > 0) {
                 LedgerEntry::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
-                    'account_id' => $payableKamdarAccount->id,
+                    'account_id' => $partyControlKamdar->id,
                     'debit_amount' => 0,
-                    'credit_amount' => $calculations['kamdari_amount'],
+                    'credit_amount' => $kamdariAmount,
                     'currency_code' => 'GBP',
                 ]);
             }
@@ -506,6 +581,170 @@ class SettlementService
                 'settlement' => $settlement->load(['postingGroup', 'offsets']),
                 'posting_group' => $postingGroup->load(['allocationRows', 'ledgerEntries.account']),
             ];
+        });
+    }
+
+    /**
+     * Preview crop cycle settlement: aggregate profit from all projects in the cycle (ledger-based).
+     *
+     * @return array{total_revenue: float, total_expenses: float, pool_profit: float, landlord_gross: float, hari_net: float, kamdari_amount: float, projects: array}
+     */
+    public function previewCropCycleSettlement(string $cropCycleId, string $tenantId, string $upToDate): array
+    {
+        $this->guard->ensureCropCycleOpen($cropCycleId, $tenantId);
+
+        $cropCycle = CropCycle::where('id', $cropCycleId)->where('tenant_id', $tenantId)->firstOrFail();
+        $projects = Project::where('crop_cycle_id', $cropCycleId)->where('tenant_id', $tenantId)->with('party')->get();
+        $landlordParty = $this->partyService->ensureSystemLandlordParty($tenantId);
+
+        $totalRevenue = 0.0;
+        $totalExpenses = 0.0;
+        $landlordGross = 0.0;
+        $hariNet = 0.0;
+        $kamdariAmount = 0.0;
+        $projectSummaries = [];
+
+        foreach ($projects as $project) {
+            $rule = ProjectRule::where('project_id', $project->id)->first();
+            if (!$rule) {
+                continue;
+            }
+            $ledger = $this->getProjectProfitFromLedger($project->id, $tenantId, $upToDate);
+            $poolProfit = $ledger['pool_profit'];
+            $totalRevenue += $ledger['total_revenue'];
+            $totalExpenses += $ledger['total_expenses'];
+
+            $isOwnerOperated = $rule->profit_split_hari_pct == 0 ||
+                ($project->party && !in_array('HARI', $project->party->party_types ?? []));
+            $kamdari = $poolProfit * ($rule->kamdari_pct / 100);
+            $remaining = $poolProfit - $kamdari;
+            $kamdariAmount += $kamdari;
+
+            if ($isOwnerOperated) {
+                $landlordGross += $remaining;
+                $projectSummaries[] = ['project_id' => $project->id, 'landlord_gross' => $remaining, 'hari_net' => 0.0, 'kamdari_amount' => $kamdari];
+            } else {
+                $lg = $remaining * ($rule->profit_split_landlord_pct / 100);
+                $hn = $remaining * ($rule->profit_split_hari_pct / 100);
+                $landlordGross += $lg;
+                $hariNet += $hn;
+                $projectSummaries[] = ['project_id' => $project->id, 'landlord_gross' => $lg, 'hari_net' => $hn, 'kamdari_amount' => $kamdari];
+            }
+        }
+
+        return [
+            'total_revenue' => $totalRevenue,
+            'total_expenses' => $totalExpenses,
+            'pool_profit' => $totalRevenue - $totalExpenses,
+            'landlord_gross' => $landlordGross,
+            'hari_net' => $hariNet,
+            'kamdari_amount' => $kamdariAmount,
+            'projects' => $projectSummaries,
+        ];
+    }
+
+    /**
+     * Post one settlement for the entire crop cycle (one PostingGroup, idempotent by idempotency_key).
+     *
+     * @param string $cropCycleId
+     * @param string $tenantId
+     * @param string $postingDate YYYY-MM-DD
+     * @param string $idempotencyKey
+     * @return array{posting_group: PostingGroup}
+     */
+    public function settleCropCycle(string $cropCycleId, string $tenantId, string $postingDate, string $idempotencyKey): array
+    {
+        return DB::transaction(function () use ($cropCycleId, $tenantId, $postingDate, $idempotencyKey) {
+            $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $idempotencyKey)->first();
+            if ($existing) {
+                return ['posting_group' => $existing->load(['allocationRows', 'ledgerEntries.account'])];
+            }
+
+            $this->guard->ensureCropCycleOpen($cropCycleId, $tenantId);
+
+            $cropCycle = CropCycle::where('id', $cropCycleId)->where('tenant_id', $tenantId)->firstOrFail();
+            $upToDate = Carbon::parse($postingDate)->format('Y-m-d');
+            $preview = $this->previewCropCycleSettlement($cropCycleId, $tenantId, $upToDate);
+            $totalDistribution = $preview['landlord_gross'] + $preview['hari_net'] + $preview['kamdari_amount'];
+
+            if (abs($totalDistribution) < 0.01) {
+                throw new \Exception('No distribution amount to post for this crop cycle as of the given date');
+            }
+
+            $clearingAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION_CLEARING');
+            $partyControlLandlord = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'LANDLORD');
+            $partyControlHari = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'HARI');
+            $partyControlKamdar = null;
+            try {
+                $partyControlKamdar = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'KAMDAR');
+            } catch (\Exception $e) {
+            }
+
+            $postingGroup = PostingGroup::create([
+                'tenant_id' => $tenantId,
+                'crop_cycle_id' => $cropCycleId,
+                'source_type' => 'CROP_CYCLE_SETTLEMENT',
+                'source_id' => $cropCycleId,
+                'posting_date' => $upToDate,
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+            $cropCycleLedgerLines = [
+                ['account_id' => $clearingAccount->id],
+                ['account_id' => $partyControlLandlord->id],
+            ];
+            if ($preview['hari_net'] > 0.01) {
+                $cropCycleLedgerLines[] = ['account_id' => $partyControlHari->id];
+            }
+            if ($partyControlKamdar && $preview['kamdari_amount'] > 0.01) {
+                $cropCycleLedgerLines[] = ['account_id' => $partyControlKamdar->id];
+            }
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, $cropCycleLedgerLines);
+
+            LedgerEntry::create([
+                'tenant_id' => $tenantId,
+                'posting_group_id' => $postingGroup->id,
+                'account_id' => $clearingAccount->id,
+                'debit_amount' => $totalDistribution,
+                'credit_amount' => 0,
+                'currency_code' => 'GBP',
+            ]);
+            LedgerEntry::create([
+                'tenant_id' => $tenantId,
+                'posting_group_id' => $postingGroup->id,
+                'account_id' => $partyControlLandlord->id,
+                'debit_amount' => 0,
+                'credit_amount' => $preview['landlord_gross'],
+                'currency_code' => 'GBP',
+            ]);
+            if ($preview['hari_net'] > 0.01) {
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $partyControlHari->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $preview['hari_net'],
+                    'currency_code' => 'GBP',
+                ]);
+            }
+            if ($partyControlKamdar && $preview['kamdari_amount'] > 0.01) {
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $partyControlKamdar->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $preview['kamdari_amount'],
+                    'currency_code' => 'GBP',
+                ]);
+            }
+
+            $totalDebits = LedgerEntry::where('posting_group_id', $postingGroup->id)->sum('debit_amount');
+            $totalCredits = LedgerEntry::where('posting_group_id', $postingGroup->id)->sum('credit_amount');
+            if (abs($totalDebits - $totalCredits) > 0.01) {
+                throw new \Exception('Debits and credits do not balance');
+            }
+
+            return ['posting_group' => $postingGroup->load(['allocationRows', 'ledgerEntries.account'])];
         });
     }
 
@@ -668,9 +907,18 @@ class SettlementService
             // Generate settlement number
             $settlementNo = $data['settlement_no'] ?? $this->generateSettlementNo($tenantId);
 
-            // Create settlement
+            // Create settlement (project_id optional for sales-based; posting_group_id set on post)
+            // Legacy columns (pool_revenue, etc.) are NOT NULL in schema; use 0 for sales-based DRAFT
             $settlement = Settlement::create([
                 'tenant_id' => $tenantId,
+                'project_id' => $data['project_id'] ?? $sales->first()?->project_id,
+                'pool_revenue' => 0,
+                'shared_costs' => 0,
+                'pool_profit' => 0,
+                'kamdari_amount' => 0,
+                'landlord_share' => 0,
+                'hari_share' => 0,
+                'hari_only_deductions' => 0,
                 'settlement_no' => $settlementNo,
                 'share_rule_id' => $data['share_rule_id'],
                 'crop_cycle_id' => $data['crop_cycle_id'] ?? null,
@@ -715,6 +963,17 @@ class SettlementService
     public function post(Settlement $settlement, string $postingDate): array
     {
         return DB::transaction(function () use ($settlement, $postingDate) {
+            // Idempotent: already posted -> return existing result
+            if ($settlement->status === 'POSTED' && $settlement->posting_group_id) {
+                $postingGroup = PostingGroup::with(['allocationRows', 'ledgerEntries.account'])->find($settlement->posting_group_id);
+                if ($postingGroup) {
+                    return [
+                        'settlement' => $settlement->fresh(['postingGroup', 'lines.party']),
+                        'posting_group' => $postingGroup,
+                    ];
+                }
+            }
+
             // Assert status is DRAFT
             if ($settlement->status !== 'DRAFT') {
                 throw new \Exception('Settlement must be in DRAFT status to post');
@@ -724,12 +983,8 @@ class SettlementService
             $saleIds = $settlement->sales->pluck('id')->toArray();
             $this->checkSalesAlreadySettled($saleIds, $settlement->tenant_id);
 
-            // Verify crop cycle is OPEN if applicable
             if ($settlement->crop_cycle_id) {
-                $cropCycle = CropCycle::findOrFail($settlement->crop_cycle_id);
-                if ($cropCycle->status !== 'OPEN') {
-                    throw new \Exception('Cannot post settlement to a closed crop cycle');
-                }
+                $this->guard->ensureCropCycleOpen($settlement->crop_cycle_id, $settlement->tenant_id);
             }
 
             // Create idempotency key
@@ -763,15 +1018,8 @@ class SettlementService
                 'idempotency_key' => $idempotencyKey,
             ]);
 
-            // Get accounts
-            // Use PROFIT_DISTRIBUTION as settlement clearing (same as project settlements)
-            // Note: SETTLEMENT_CLEARING account should be added to SystemAccountsSeeder in future
-            try {
-                $settlementClearingAccount = $this->accountService->getByCode($settlement->tenant_id, 'SETTLEMENT_CLEARING');
-            } catch (\Exception $e) {
-                // Fallback to PROFIT_DISTRIBUTION if SETTLEMENT_CLEARING doesn't exist
-                $settlementClearingAccount = $this->accountService->getByCode($settlement->tenant_id, 'PROFIT_DISTRIBUTION');
-            }
+            // Settlement uses PROFIT_DISTRIBUTION_CLEARING only (same as project/crop cycle settlements)
+            $settlementClearingAccount = $this->accountService->getByCode($settlement->tenant_id, 'PROFIT_DISTRIBUTION_CLEARING');
             
             // Use AP (Accounts Payable) as generic payable account
             // Note: ACCOUNTS_PAYABLE account should be added to SystemAccountsSeeder in future
@@ -781,6 +1029,11 @@ class SettlementService
                 // Fallback to AP if ACCOUNTS_PAYABLE doesn't exist
                 $accountsPayableAccount = $this->accountService->getByCode($settlement->tenant_id, 'AP');
             }
+
+            $this->postValidationService->validateNoDeprecatedAccounts($settlement->tenant_id, [
+                ['account_id' => $settlementClearingAccount->id],
+                ['account_id' => $accountsPayableAccount->id],
+            ]);
 
             // Create allocation rows and ledger entries for each settlement line
             $totalDistribution = 0;
@@ -868,12 +1121,8 @@ class SettlementService
                 throw new \Exception('Settlement has no posting group to reverse');
             }
 
-            // Verify crop cycle is OPEN if applicable
             if ($settlement->crop_cycle_id) {
-                $cropCycle = CropCycle::findOrFail($settlement->crop_cycle_id);
-                if ($cropCycle->status !== 'OPEN') {
-                    throw new \Exception('Cannot reverse settlement in a closed crop cycle');
-                }
+                $this->guard->ensureCropCycleOpen($settlement->crop_cycle_id, $settlement->tenant_id);
             }
 
             // Use ReversalService to reverse the posting group

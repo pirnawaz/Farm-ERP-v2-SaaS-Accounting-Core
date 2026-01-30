@@ -6,13 +6,15 @@ use App\Models\PostingGroup;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Accounting\Rules\DailyBookEntryRuleResolver;
+use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ReversalService
 {
     public function __construct(
-        private DailyBookEntryRuleResolver $ruleResolver = new DailyBookEntryRuleResolver()
+        private DailyBookEntryRuleResolver $ruleResolver = new DailyBookEntryRuleResolver(),
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
@@ -45,12 +47,8 @@ class ReversalService
                 throw new \InvalidArgumentException('Cannot reverse a reversal posting group');
             }
 
-            // Ensure crop cycle is OPEN (skip when crop_cycle_id is null, e.g. INVENTORY_GRN)
             if ($originalPostingGroup->crop_cycle_id !== null) {
-                $cropCycle = $originalPostingGroup->cropCycle;
-                if (!$cropCycle || $cropCycle->status !== 'OPEN') {
-                    throw new \Exception('Cannot reverse: crop cycle is closed');
-                }
+                $this->guard->ensureCropCycleOpen($originalPostingGroup->crop_cycle_id, $tenantId);
             }
 
             // Check if reversal already exists for this posting_date (idempotency)

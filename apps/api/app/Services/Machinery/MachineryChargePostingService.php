@@ -7,8 +7,9 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
 use App\Models\CropCycle;
-use App\Services\SystemAccountService;
+use App\Services\OperationalPostingGuard;
 use App\Services\ReversalService;
+use App\Services\SystemAccountService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -18,7 +19,8 @@ class MachineryChargePostingService
 
     public function __construct(
         private SystemAccountService $accountService,
-        private ReversalService $reversalService
+        private ReversalService $reversalService,
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
@@ -58,12 +60,9 @@ class MachineryChargePostingService
                 throw new \Exception('Crop cycle and project are required for posting a machinery charge.');
             }
 
-            // Validate crop cycle
-            $cropCycle = CropCycle::where('id', $charge->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post machinery charge: crop cycle is closed.');
-            }
+            $this->guard->ensureCropCycleOpen($charge->crop_cycle_id, $tenantId);
 
+            $cropCycle = CropCycle::where('id', $charge->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
             if ($cropCycle->start_date && $postingDateObj < $cropCycle->start_date->format('Y-m-d')) {
                 throw new \Exception('Posting date is before crop cycle start date.');
@@ -178,11 +177,7 @@ class MachineryChargePostingService
                 throw new \Exception('Charge has no posting group to reverse.');
             }
 
-            // Validate crop cycle
-            $cropCycle = CropCycle::where('id', $charge->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot reverse: crop cycle is closed.');
-            }
+            $this->guard->ensureCropCycleOpen($charge->crop_cycle_id, $tenantId);
 
             // Use ReversalService to reverse the posting group
             $reversalPostingGroup = $this->reversalService->reversePostingGroup(

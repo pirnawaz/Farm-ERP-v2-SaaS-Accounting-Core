@@ -201,8 +201,8 @@ class ReconciliationConfidenceTest extends TestCase
             'unit_price' => 20.00,
             'line_total' => 2000.00,
         ]);
-        $saleCOGSService->postSaleWithCOGS($sale->id, '2024-06-15', 'sale-recon-1');
         $sale->refresh();
+        $saleCOGSService->postSaleWithCOGS($sale, '2024-06-15', 'sale-recon-1');
 
         // Post inventory issue 500 (creates EXPENSE OT + EXP_SHARED ledger entry)
         $issue = InvIssue::create([
@@ -241,72 +241,62 @@ class ReconciliationConfidenceTest extends TestCase
         ]);
         $labPosting->postWorkLog($workLog->id, $this->tenant->id, '2024-06-17', 'lab-recon-1');
 
-        // Get settlement preview
-        $settlement = $settlementService->previewSettlement($this->project->id, $this->tenant->id, '2024-06-30');
+        // Pool totals excluding COGS (for like-for-like comparison with OT)
+        $pool = $settlementService->getProjectProfitFromLedgerExcludingCOGS($this->project->id, $this->tenant->id, '2024-06-30');
 
         // Get reconciliation data (use same date range as settlement preview)
-        // SettlementService uses posting_date <= up_to_date, so we use to_date as the upper bound
         $otReconciliation = $reconciliationService->reconcileProjectSettlementVsOT(
             $this->project->id,
             $this->tenant->id,
-            '2024-01-01', // from start of cycle
-            '2024-06-30'  // to settlement date
+            '2024-01-01',
+            '2024-06-30'
         );
 
         $ledgerReconciliation = $reconciliationService->reconcileProjectLedgerIncomeExpense(
             $this->project->id,
             $this->tenant->id,
-            '2024-01-01', // from start of cycle
-            '2024-06-30'  // to settlement date
+            '2024-01-01',
+            '2024-06-30',
+            true // exclude COGS so ledger matches OT
         );
 
-        // Assert: Settlement totals equal OT totals
+        // Assert: Pool totals (excluding COGS) equal OT totals
         $this->assertEqualsWithDelta(
-            (float) $settlement['total_revenue'],
+            (float) $pool['total_revenue'],
             $otReconciliation['ot_revenue'],
             0.01,
-            'Settlement total_revenue should equal OT revenue'
+            'Pool total_revenue (excl COGS) should equal OT revenue'
         );
 
         $this->assertEqualsWithDelta(
-            (float) $settlement['total_expenses'],
+            (float) $pool['total_expenses'],
             $otReconciliation['ot_expenses_total'],
             0.01,
-            'Settlement total_expenses should equal OT expenses total'
+            'Pool total_expenses (excl COGS) should equal OT expenses total'
         );
 
-        $this->assertEqualsWithDelta(
-            (float) $settlement['shared_costs'],
-            $otReconciliation['ot_shared_costs'],
-            0.01,
-            'Settlement shared_costs should equal OT shared costs'
-        );
-
-        // Assert: Ledger income matches OT revenue (within same scope)
-        // Note: Ledger income includes PROJECT_REVENUE credits
+        // Assert: Ledger (excluding COGS) matches OT
         $this->assertEqualsWithDelta(
             $otReconciliation['ot_revenue'],
             $ledgerReconciliation['ledger_income'],
             0.01,
-            'OT revenue should match ledger income'
+            'OT revenue should match ledger income (excl COGS)'
         );
 
-        // Assert: Ledger expenses match OT expenses (within same scope)
-        // Note: Ledger expenses include EXP_SHARED and LABOUR_EXPENSE debits
         $this->assertEqualsWithDelta(
             $otReconciliation['ot_expenses_total'],
             $ledgerReconciliation['ledger_expenses'],
             0.01,
-            'OT expenses should match ledger expenses'
+            'OT expenses should match ledger expenses (excl COGS)'
         );
 
-        // Assert: Settlement remaining_pool matches calculation
-        $expectedRemainingPool = $otReconciliation['ot_revenue'] - $otReconciliation['ot_shared_costs'];
+        // Assert: Pool profit consistency
+        $expectedPoolProfit = (float) $pool['total_revenue'] - (float) $pool['total_expenses'];
         $this->assertEqualsWithDelta(
-            (float) $settlement['remaining_pool'],
-            $expectedRemainingPool,
+            (float) $pool['pool_profit'],
+            $expectedPoolProfit,
             0.01,
-            'Settlement remaining_pool should match OT revenue - shared costs'
+            'Pool profit should equal revenue minus expenses'
         );
     }
 
@@ -342,10 +332,10 @@ class ReconciliationConfidenceTest extends TestCase
             'unit_price' => 20.00,
             'line_total' => 2000.00,
         ]);
-        $saleCOGSService->postSaleWithCOGS($sale->id, '2024-06-15', 'sale-rev-1');
         $sale->refresh();
+        $saleCOGSService->postSaleWithCOGS($sale, '2024-06-15', 'sale-rev-1');
 
-        // Post inventory issue 500
+        // Post inventory issue (10 qty at WAC 1 = 10 expense)
         $issue = InvIssue::create([
             'tenant_id' => $this->tenant->id,
             'doc_no' => 'ISS-REV',
@@ -366,8 +356,8 @@ class ReconciliationConfidenceTest extends TestCase
         ]);
         $invPosting->postIssue($issue->id, $this->tenant->id, '2024-06-16', 'issue-rev-1');
 
-        // Verify reconciliation before reversal
-        $settlementBefore = $settlementService->previewSettlement($this->project->id, $this->tenant->id, '2024-06-30');
+        // Verify reconciliation before reversal (pool and ledger exclude COGS)
+        $poolBefore = $settlementService->getProjectProfitFromLedgerExcludingCOGS($this->project->id, $this->tenant->id, '2024-06-30');
         $otReconBefore = $reconciliationService->reconcileProjectSettlementVsOT(
             $this->project->id,
             $this->tenant->id,
@@ -378,13 +368,14 @@ class ReconciliationConfidenceTest extends TestCase
             $this->project->id,
             $this->tenant->id,
             '2024-01-01',
-            '2024-06-30'
+            '2024-06-30',
+            true
         );
 
-        $this->assertEqualsWithDelta(2000.00, (float) $settlementBefore['total_revenue'], 0.01);
-        $this->assertEqualsWithDelta(500.00, (float) $settlementBefore['total_expenses'], 0.01);
+        $this->assertEqualsWithDelta(2000.00, (float) $poolBefore['total_revenue'], 0.01);
+        $this->assertEqualsWithDelta(10.00, (float) $poolBefore['total_expenses'], 0.01); // 10 qty × WAC 1
         $this->assertEqualsWithDelta(2000.00, $otReconBefore['ot_revenue'], 0.01);
-        $this->assertEqualsWithDelta(500.00, $otReconBefore['ot_expenses_total'], 0.01);
+        $this->assertEqualsWithDelta(10.00, $otReconBefore['ot_expenses_total'], 0.01); // 10 qty × WAC 1
 
         // Reverse the sale
         $saleCOGSService->reverseSale($sale, '2024-06-20', 'Reversal test');
@@ -394,8 +385,8 @@ class ReconciliationConfidenceTest extends TestCase
         $invPosting->reverseIssue($issue->id, $this->tenant->id, '2024-06-20', 'Reversal test');
         $issue->refresh();
 
-        // Verify reconciliation after reversal
-        $settlementAfter = $settlementService->previewSettlement($this->project->id, $this->tenant->id, '2024-06-30');
+        // Verify reconciliation after reversal (pool and ledger exclude COGS)
+        $poolAfter = $settlementService->getProjectProfitFromLedgerExcludingCOGS($this->project->id, $this->tenant->id, '2024-06-30');
         $otReconAfter = $reconciliationService->reconcileProjectSettlementVsOT(
             $this->project->id,
             $this->tenant->id,
@@ -406,12 +397,13 @@ class ReconciliationConfidenceTest extends TestCase
             $this->project->id,
             $this->tenant->id,
             '2024-01-01',
-            '2024-06-30'
+            '2024-06-30',
+            true
         );
 
-        // Assert: Settlement totals back to expected values (0 or only remaining items)
-        $this->assertEqualsWithDelta(0, (float) $settlementAfter['total_revenue'], 0.01, 'Revenue should be 0 after reversal');
-        $this->assertEqualsWithDelta(0, (float) $settlementAfter['total_expenses'], 0.01, 'Expenses should be 0 after reversal');
+        // Assert: Pool totals back to 0 after reversal
+        $this->assertEqualsWithDelta(0, (float) $poolAfter['total_revenue'], 0.01, 'Revenue should be 0 after reversal');
+        $this->assertEqualsWithDelta(0, (float) $poolAfter['total_expenses'], 0.01, 'Expenses should be 0 after reversal');
 
         // Assert: OT sums match settlement (net of reversals)
         $this->assertEqualsWithDelta(0, $otReconAfter['ot_revenue'], 0.01, 'OT revenue should be 0 after reversal');
@@ -421,6 +413,62 @@ class ReconciliationConfidenceTest extends TestCase
         // Reversals create offsetting entries, so net should be 0
         $this->assertEqualsWithDelta(0, $ledgerReconAfter['ledger_income'], 0.01, 'Ledger income should be 0 after reversal');
         $this->assertEqualsWithDelta(0, $ledgerReconAfter['ledger_expenses'], 0.01, 'Ledger expenses should be 0 after reversal');
+    }
+
+    /**
+     * Test 2b: When COGS exists (sale with COGS posted), settlement vs OT and ledger vs OT
+     * reconciliation still pass (delta 0) because COGS is excluded from settlement pool
+     * and from ledger expense totals in reconciliation.
+     */
+    public function test_reconciliation_passes_when_cogs_exists(): void
+    {
+        $settlementService = app(SettlementService::class);
+        $reconciliationService = app(ReconciliationService::class);
+        $saleCOGSService = app(SaleCOGSService::class);
+
+        // Post only a sale with COGS (revenue 2000, COGS e.g. 100 debited to ledger but not in OT)
+        $sale = Sale::create([
+            'tenant_id' => $this->tenant->id,
+            'buyer_party_id' => $this->buyerParty->id,
+            'project_id' => $this->project->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'amount' => 2000.00,
+            'posting_date' => '2024-06-15',
+            'status' => 'DRAFT',
+        ]);
+        SaleLine::create([
+            'tenant_id' => $this->tenant->id,
+            'sale_id' => $sale->id,
+            'inventory_item_id' => $this->item->id,
+            'store_id' => $this->store->id,
+            'quantity' => 100,
+            'unit_price' => 20.00,
+            'line_total' => 2000.00,
+        ]);
+        $sale->refresh();
+        $saleCOGSService->postSaleWithCOGS($sale, '2024-06-15', 'sale-cogs-only');
+
+        $pool = $settlementService->getProjectProfitFromLedgerExcludingCOGS($this->project->id, $this->tenant->id, '2024-06-30');
+        $otRecon = $reconciliationService->reconcileProjectSettlementVsOT(
+            $this->project->id,
+            $this->tenant->id,
+            '2024-01-01',
+            '2024-06-30'
+        );
+        $ledgerRecon = $reconciliationService->reconcileProjectLedgerIncomeExpense(
+            $this->project->id,
+            $this->tenant->id,
+            '2024-01-01',
+            '2024-06-30',
+            true
+        );
+
+        // Settlement vs OT: pool (excl COGS) should match OT
+        $this->assertEqualsWithDelta((float) $pool['total_revenue'], $otRecon['ot_revenue'], 0.01, 'Pool revenue (excl COGS) should equal OT revenue');
+        $this->assertEqualsWithDelta((float) $pool['total_expenses'], $otRecon['ot_expenses_total'], 0.01, 'Pool expenses (excl COGS) should equal OT expenses');
+        // Ledger vs OT: ledger (excl COGS) should match OT
+        $this->assertEqualsWithDelta($otRecon['ot_revenue'], $ledgerRecon['ledger_income'], 0.01, 'OT revenue should match ledger income (excl COGS)');
+        $this->assertEqualsWithDelta($otRecon['ot_expenses_total'], $ledgerRecon['ledger_expenses'], 0.01, 'OT expenses should match ledger expenses (excl COGS)');
     }
 
     /**

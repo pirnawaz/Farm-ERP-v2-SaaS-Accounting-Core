@@ -10,7 +10,6 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Models\Sale;
 use App\Models\SaleLine;
-use App\Models\SaleInventoryAllocation;
 use App\Models\ShareRule;
 use App\Models\ShareRuleLine;
 use App\Models\Settlement;
@@ -20,10 +19,17 @@ use App\Models\PostingGroup;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\Account;
+use App\Models\InvUom;
+use App\Models\InvItemCategory;
+use App\Models\InvItem;
+use App\Models\InvStore;
+use App\Models\InvGrn;
+use App\Models\InvGrnLine;
 use App\Services\TenantContext;
 use App\Services\SettlementService;
 use App\Services\ShareRuleService;
 use App\Services\SaleCOGSService;
+use App\Services\InventoryPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -56,6 +62,17 @@ class SettlementTest extends TestCase
         }
     }
 
+    private function enableInventory(Tenant $tenant): void
+    {
+        $m = Module::where('key', 'inventory')->first();
+        if ($m) {
+            TenantModule::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'module_id' => $m->id],
+                ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
+            );
+        }
+    }
+
     private function headers(string $role = 'accountant'): array
     {
         return [
@@ -68,6 +85,9 @@ class SettlementTest extends TestCase
     private CropCycle $cropCycle;
     private Party $landlordParty;
     private Party $growerParty;
+    private InvItem $invItem;
+    private InvStore $invStore;
+    private Project $project;
     private Account $settlementClearingAccount;
     private Account $accountsPayableAccount;
 
@@ -81,6 +101,7 @@ class SettlementTest extends TestCase
         SystemAccountsSeeder::runForTenant($this->tenant->id);
         $this->enableSettlements($this->tenant);
         $this->enableARSales($this->tenant);
+        $this->enableInventory($this->tenant);
 
         $this->cropCycle = CropCycle::create([
             'tenant_id' => $this->tenant->id,
@@ -102,7 +123,49 @@ class SettlementTest extends TestCase
             'party_types' => ['GROWER'],
         ]);
 
-        // Create settlement accounts if they don't exist
+        $uom = InvUom::create(['tenant_id' => $this->tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
+        $cat = InvItemCategory::create(['tenant_id' => $this->tenant->id, 'name' => 'Produce']);
+        $this->invItem = InvItem::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Item',
+            'uom_id' => $uom->id,
+            'category_id' => $cat->id,
+            'valuation_method' => 'WAC',
+            'is_active' => true,
+        ]);
+        $this->invStore = InvStore::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Main Store',
+            'type' => 'MAIN',
+            'is_active' => true,
+        ]);
+
+        $grn = InvGrn::create([
+            'tenant_id' => $this->tenant->id,
+            'doc_no' => 'GRN-1',
+            'store_id' => $this->invStore->id,
+            'doc_date' => '2024-06-01',
+            'status' => 'DRAFT',
+        ]);
+        InvGrnLine::create([
+            'tenant_id' => $this->tenant->id,
+            'grn_id' => $grn->id,
+            'item_id' => $this->invItem->id,
+            'qty' => 200,
+            'unit_cost' => 6.00,
+            'line_total' => 1200.00,
+        ]);
+        app(InventoryPostingService::class)->postGRN($grn->id, $this->tenant->id, '2024-06-01', 'grn-1');
+
+        $this->project = Project::create([
+            'tenant_id' => $this->tenant->id,
+            'party_id' => $this->landlordParty->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'name' => 'Test Project',
+            'status' => 'ACTIVE',
+        ]);
+
+        // Create settlement accounts if they don't exist (clearing = equity per DB constraint)
         $this->settlementClearingAccount = Account::firstOrCreate(
             [
                 'tenant_id' => $this->tenant->id,
@@ -110,7 +173,7 @@ class SettlementTest extends TestCase
             ],
             [
                 'name' => 'Settlement Clearing',
-                'type' => 'EXPENSE',
+                'type' => 'equity',
             ]
         );
 
@@ -121,7 +184,7 @@ class SettlementTest extends TestCase
             ],
             [
                 'name' => 'Accounts Payable',
-                'type' => 'LIABILITY',
+                'type' => 'liability',
             ]
         );
     }
@@ -138,6 +201,7 @@ class SettlementTest extends TestCase
             'tenant_id' => $this->tenant->id,
             'buyer_party_id' => $buyerParty->id,
             'crop_cycle_id' => $this->cropCycle->id,
+            'project_id' => $this->project->id,
             'amount' => $revenue,
             'posting_date' => '2024-06-01',
             'status' => 'DRAFT',
@@ -146,31 +210,14 @@ class SettlementTest extends TestCase
         SaleLine::create([
             'tenant_id' => $this->tenant->id,
             'sale_id' => $sale->id,
-            'inventory_item_id' => '00000000-0000-0000-0000-000000000001',
-            'store_id' => '00000000-0000-0000-0000-000000000001',
+            'inventory_item_id' => $this->invItem->id,
+            'store_id' => $this->invStore->id,
             'quantity' => 100,
             'unit_price' => $revenue / 100,
             'line_total' => $revenue,
         ]);
 
-        // Post the sale
-        $saleCOGSService = app(SaleCOGSService::class);
-        $saleCOGSService->postSaleWithCOGS($sale->id, '2024-06-01', 'test-key-' . uniqid());
-
-        // Manually create inventory allocation for COGS
-        SaleInventoryAllocation::create([
-            'tenant_id' => $this->tenant->id,
-            'sale_id' => $sale->id,
-            'sale_line_id' => $sale->lines->first()->id,
-            'inventory_item_id' => '00000000-0000-0000-0000-000000000001',
-            'crop_cycle_id' => $this->cropCycle->id,
-            'store_id' => '00000000-0000-0000-0000-000000000001',
-            'quantity' => 100,
-            'unit_cost' => $cogs / 100,
-            'total_cost' => $cogs,
-            'costing_method' => 'WAC',
-            'posting_group_id' => $sale->posting_group_id,
-        ]);
+        app(SaleCOGSService::class)->postSaleWithCOGS($sale, '2024-06-01', 'test-key-' . uniqid());
 
         return $sale->fresh();
     }
@@ -527,5 +574,97 @@ class SettlementTest extends TestCase
                 ],
             ],
         ]);
+    }
+
+    /** DRAFT sales-based settlement may have posting_group_id NULL (guardrail allows it). */
+    public function test_draft_sales_based_settlement_may_have_null_posting_group_id(): void
+    {
+        $sale = $this->createPostedSale(1000.00, 600.00);
+        $shareRule = $this->createShareRule();
+        $settlementService = app(SettlementService::class);
+
+        $settlement = $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'from_date' => '2024-01-01',
+            'to_date' => '2024-12-31',
+        ]);
+
+        $this->assertEquals('DRAFT', $settlement->status);
+        $this->assertNull($settlement->posting_group_id);
+    }
+
+    /** Posting sets status POSTED and posting_group_id (guardrail requires NOT NULL when POSTED). */
+    public function test_post_sets_posting_group_id(): void
+    {
+        $sale = $this->createPostedSale(1000.00, 600.00);
+        $shareRule = $this->createShareRule();
+        $settlementService = app(SettlementService::class);
+
+        $settlement = $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'from_date' => '2024-01-01',
+            'to_date' => '2024-12-31',
+        ]);
+        $result = $settlementService->post($settlement, '2024-06-15');
+
+        $settlement->refresh();
+        $this->assertEquals('POSTED', $settlement->status);
+        $this->assertNotNull($settlement->posting_group_id);
+        $this->assertNotNull($result['posting_group']);
+    }
+
+    /** DB CHECK constraint rejects status POSTED with posting_group_id NULL. */
+    public function test_constraint_rejects_posted_with_null_posting_group_id(): void
+    {
+        $sale = $this->createPostedSale(1000.00, 600.00);
+        $shareRule = $this->createShareRule();
+        $settlementService = app(SettlementService::class);
+
+        $settlement = $settlementService->create([
+            'tenant_id' => $this->tenant->id,
+            'sale_ids' => [$sale->id],
+            'share_rule_id' => $shareRule->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'from_date' => '2024-01-01',
+            'to_date' => '2024-12-31',
+        ]);
+        $this->assertNull($settlement->posting_group_id);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        DB::table('settlements')
+            ->where('id', $settlement->id)
+            ->update(['status' => 'POSTED', 'posting_group_id' => null]);
+    }
+
+    private function createShareRule(): ShareRule
+    {
+        $shareRule = ShareRule::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Rule',
+            'applies_to' => 'CROP_CYCLE',
+            'basis' => 'MARGIN',
+            'effective_from' => '2024-01-01',
+            'is_active' => true,
+            'version' => 1,
+        ]);
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->landlordParty->id,
+            'percentage' => 70.00,
+            'role' => 'LANDLORD',
+        ]);
+        ShareRuleLine::create([
+            'share_rule_id' => $shareRule->id,
+            'party_id' => $this->growerParty->id,
+            'percentage' => 30.00,
+            'role' => 'GROWER',
+        ]);
+        return $shareRule;
     }
 }

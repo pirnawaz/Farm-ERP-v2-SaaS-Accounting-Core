@@ -7,6 +7,7 @@ use App\Models\AllocationRow;
 use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -14,7 +15,9 @@ class MachineryPostingService
 {
     private const SOURCE_TYPE = 'MACHINE_WORK_LOG';
 
-    public function __construct() {}
+    public function __construct(
+        private OperationalPostingGuard $guard
+    ) {}
 
     /**
      * Post a machine work log. Idempotent via idempotency_key or (source_type, source_id).
@@ -50,11 +53,9 @@ class MachineryPostingService
                 throw new \Exception('Crop cycle and project are required for posting a machine work log.');
             }
 
-            $cropCycle = CropCycle::where('id', $workLog->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post machine work log: crop cycle is closed.');
-            }
+            $this->guard->ensureCropCycleOpen($workLog->crop_cycle_id, $tenantId);
 
+            $cropCycle = CropCycle::where('id', $workLog->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
             if ($cropCycle->start_date && $postingDateObj < $cropCycle->start_date->format('Y-m-d')) {
                 throw new \Exception('Posting date is before crop cycle start date.');
@@ -139,10 +140,7 @@ class MachineryPostingService
                 throw new \Exception('Work log has no posting group to reverse.');
             }
 
-            $cropCycle = CropCycle::where('id', $workLog->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot reverse: crop cycle is closed.');
-            }
+            $this->guard->ensureCropCycleOpen($workLog->crop_cycle_id, $tenantId);
 
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
 

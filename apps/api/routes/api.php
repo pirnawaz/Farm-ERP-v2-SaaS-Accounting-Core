@@ -94,7 +94,9 @@ Route::middleware(['role:tenant_admin,accountant', 'require_module:land'])->grou
 // Crop Cycles (tenant_admin, accountant)
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::apiResource('crop-cycles', CropCycleController::class);
+    Route::get('crop-cycles/{id}/close-preview', [CropCycleController::class, 'closePreview']);
     Route::post('crop-cycles/{id}/close', [CropCycleController::class, 'close'])->middleware('role:tenant_admin');
+    Route::post('crop-cycles/{id}/reopen', [CropCycleController::class, 'reopen'])->middleware('role:tenant_admin');
     Route::post('crop-cycles/{id}/open', [CropCycleController::class, 'open'])->middleware('role:tenant_admin');
 });
 
@@ -140,6 +142,9 @@ Route::middleware(['role:tenant_admin,accountant', 'require_module:settlements']
     Route::apiResource('settlements', SettlementController::class)->except(['update', 'destroy']);
     Route::post('settlements/{id}/post', [SettlementController::class, 'postSettlement']);
     Route::post('settlements/{id}/reverse', [SettlementController::class, 'reverse']);
+    // Crop cycle settlements (ledger-based, one PostingGroup per cycle)
+    Route::post('settlements/crop-cycles/{id}/preview', [SettlementController::class, 'cropCyclePreview']);
+    Route::post('settlements/crop-cycles/{id}/post', [SettlementController::class, 'cropCyclePost']);
 });
 
 // Payments (tenant_admin, accountant, operator) — requires treasury_payments module
@@ -338,7 +343,13 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/cost-per-unit', [ReportController::class, 'costPerUnit']);
     Route::get('reports/sales-margin', [ReportController::class, 'salesMargin']);
     Route::get('reports/settlement-statement', [ReportController::class, 'settlementStatement']);
+    Route::get('reports/party-ledger', [ReportController::class, 'partyLedger']);
+    Route::get('reports/party-summary', [ReportController::class, 'partySummary']);
+    Route::get('reports/role-ageing', [ReportController::class, 'roleAgeing']);
     Route::get('reports/crop-cycle-distribution', [ReportController::class, 'cropCycleDistribution']);
+    Route::get('reports/reconciliation/project', [ReportController::class, 'reconciliationProject']);
+    Route::get('reports/reconciliation/crop-cycle', [ReportController::class, 'reconciliationCropCycle']);
+    Route::get('reports/reconciliation/supplier-ap', [ReportController::class, 'reconciliationSupplierAp']);
 });
 
 // Reconciliation (tenant_admin, accountant) — read-only audit/debugging endpoints

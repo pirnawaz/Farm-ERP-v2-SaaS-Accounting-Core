@@ -53,10 +53,31 @@ export function useDeleteCropCycle() {
   });
 }
 
+export function useClosePreviewCropCycle(id: string) {
+  return useQuery({
+    queryKey: ['crop-cycles', id, 'close-preview'],
+    queryFn: () => cropCyclesApi.closePreview(id),
+    enabled: !!id,
+    staleTime: 0,
+  });
+}
+
 export function useCloseCropCycle() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => cropCyclesApi.close(id),
+    mutationFn: ({ id, note }: { id: string; note?: string }) => cropCyclesApi.close(id, { note }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['crop-cycles'] });
+      queryClient.invalidateQueries({ queryKey: ['crop-cycles', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['crop-cycles', variables.id, 'close-preview'] });
+    },
+  });
+}
+
+export function useReopenCropCycle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => cropCyclesApi.reopen(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['crop-cycles'] });
       queryClient.invalidateQueries({ queryKey: ['crop-cycles', id] });

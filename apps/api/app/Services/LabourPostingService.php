@@ -10,6 +10,7 @@ use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
+use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -17,7 +18,8 @@ class LabourPostingService
 {
     public function __construct(
         private SystemAccountService $accountService,
-        private ReversalService $reversalService
+        private ReversalService $reversalService,
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
@@ -43,11 +45,9 @@ class LabourPostingService
                 throw new \Exception('Crop cycle and project are required for posting a work log.');
             }
 
-            $cropCycle = CropCycle::where('id', $workLog->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post work log: crop cycle is closed.');
-            }
+            $this->guard->ensureCropCycleOpenForProject($workLog->project_id, $tenantId);
 
+            $cropCycle = CropCycle::where('id', $workLog->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
             if ($cropCycle->start_date && $postingDateObj < $cropCycle->start_date->format('Y-m-d')) {
                 throw new \Exception('Posting date is before crop cycle start date.');

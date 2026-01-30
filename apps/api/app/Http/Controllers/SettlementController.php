@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\Settlement;
 use App\Http\Requests\PostSettlementRequest;
@@ -236,6 +237,60 @@ class SettlementController extends Controller
             ]);
             
             return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * POST /api/settlements/crop-cycles/{id}/preview
+     * Preview crop cycle settlement (ledger-based).
+     */
+    public function cropCyclePreview(Request $request, string $id): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        CropCycle::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+        $upToDate = $request->input('up_to_date', now()->format('Y-m-d'));
+        $validator = Validator::make(['up_to_date' => $upToDate], ['up_to_date' => ['required', 'date']]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        try {
+            $preview = $this->settlementService->previewCropCycleSettlement($id, $tenantId, $upToDate);
+            return response()->json($preview);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * POST /api/settlements/crop-cycles/{id}/post
+     * Post one settlement for the crop cycle (requires posting_date and idempotency_key).
+     */
+    public function cropCyclePost(Request $request, string $id): JsonResponse
+    {
+        $this->authorizePosting($request);
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'posting_date' => ['required', 'date'],
+            'idempotency_key' => ['required', 'string', 'max:255'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        CropCycle::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+        try {
+            $result = $this->settlementService->settleCropCycle(
+                $id,
+                $tenantId,
+                $request->posting_date,
+                $request->idempotency_key
+            );
+            $this->logAudit($request, 'CropCycleSettlement', $id, 'POST', [
+                'posting_date' => $request->posting_date,
+                'posting_group_id' => $result['posting_group']->id ?? null,
+            ]);
+            return response()->json($result, 201);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
         }

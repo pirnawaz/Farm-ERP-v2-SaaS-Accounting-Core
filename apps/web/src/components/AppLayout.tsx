@@ -89,6 +89,10 @@ const navigationGroups: NavigationGroup[] = [
       { name: 'Cashbook', href: '/app/reports/cashbook', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'AR Ageing', href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
       { name: 'Sales Margin', href: '/app/reports/sales-margin', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Party Ledger', href: '/app/reports/party-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Role Summary', href: '/app/reports/party-summary', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Role Ageing', href: '/app/reports/role-ageing', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Reconciliation Dashboard', href: '/app/reports/reconciliation-dashboard', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
     ],
   },
   {

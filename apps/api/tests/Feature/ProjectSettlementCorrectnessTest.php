@@ -190,12 +190,9 @@ class ProjectSettlementCorrectnessTest extends TestCase
 
         $this->assertEquals(0, (float) $preview['total_revenue']);
         $this->assertGreaterThan(0, (float) $preview['total_expenses']);
-        $this->assertGreaterThan(0, (float) $preview['shared_costs']);
         $this->assertArrayHasKey('total_revenue', $preview);
         $this->assertArrayHasKey('total_expenses', $preview);
-        $this->assertArrayHasKey('shared_costs', $preview);
-        $this->assertArrayHasKey('landlord_only_costs', $preview);
-        $this->assertArrayHasKey('hari_only_deductions', $preview);
+        $this->assertArrayHasKey('pool_profit', $preview);
     }
 
     public function test_classification_mapping_landlord_only_and_hari_only(): void
@@ -240,11 +237,10 @@ class ProjectSettlementCorrectnessTest extends TestCase
         ]);
         $invPosting->postIssue($hariOnlyIssue->id, $this->tenant->id, '2024-06-16', 'issue-hari');
 
+        // Ledger-based: operational posting records full expense for each issue (no netting). FARMER 100 + HARI 50 = 150.
         $preview = $settlementService->previewSettlement($this->project->id, $this->tenant->id, '2024-06-30');
-
-        $this->assertEqualsWithDelta(100.00, (float) $preview['landlord_only_costs'], 0.01);
-        $this->assertEqualsWithDelta(50.00, (float) $preview['hari_only_deductions'], 0.01);
-        $this->assertEqualsWithDelta(0, (float) $preview['shared_costs'], 0.01);
+        $this->assertEqualsWithDelta(150.00, (float) $preview['total_expenses'], 0.01);
+        $this->assertEqualsWithDelta(-150.00, (float) $preview['pool_profit'], 0.01);
     }
 
     public function test_reversal_unwinds_settlement(): void
@@ -273,13 +269,12 @@ class ProjectSettlementCorrectnessTest extends TestCase
         $invPosting->postIssue($issue->id, $this->tenant->id, '2024-06-15', 'issue-rev');
 
         $previewBefore = $settlementService->previewSettlement($this->project->id, $this->tenant->id, '2024-06-30');
-        $this->assertEqualsWithDelta(100.00, (float) $previewBefore['shared_costs'], 0.01);
+        // Operational posting records full expense (no netting). SHARED issue 2 qty = 100.
         $this->assertEqualsWithDelta(100.00, (float) $previewBefore['total_expenses'], 0.01);
 
         $invPosting->reverseIssue($issue->id, $this->tenant->id, '2024-06-20', 'Reversal test');
 
         $previewAfter = $settlementService->previewSettlement($this->project->id, $this->tenant->id, '2024-06-30');
-        $this->assertEqualsWithDelta(0, (float) $previewAfter['shared_costs'], 0.01);
         $this->assertEqualsWithDelta(0, (float) $previewAfter['total_expenses'], 0.01);
     }
 
@@ -321,3 +316,4 @@ class ProjectSettlementCorrectnessTest extends TestCase
         $this->assertEqualsWithDelta(0, (float) $preview['hari_gross'], 0.01);
     }
 }
+

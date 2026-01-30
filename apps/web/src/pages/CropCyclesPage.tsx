@@ -28,10 +28,11 @@ export default function CropCyclesPage() {
 
   const handleClose = async (id: string) => {
     try {
-      await closeMutation.mutateAsync(id);
+      await closeMutation.mutateAsync({ id });
       toast.success('Crop cycle closed successfully');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to close crop cycle');
+      const msg = error?.response?.data?.message ?? error.message ?? 'Failed to close crop cycle';
+      toast.error(msg);
     }
   };
 
@@ -62,7 +63,14 @@ export default function CropCyclesPage() {
   };
 
   const columns: Column<CropCycle>[] = [
-    { header: 'Name', accessor: 'name' },
+    {
+      header: 'Name',
+      accessor: (row) => (
+        <Link to={`/app/crop-cycles/${row.id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a] font-medium">
+          {row.name}
+        </Link>
+      ),
+    },
     { header: 'Crop Type', accessor: 'crop_type' },
     { header: 'Start Date', accessor: 'start_date' },
     { header: 'End Date', accessor: (r) => r.end_date ?? '—' },

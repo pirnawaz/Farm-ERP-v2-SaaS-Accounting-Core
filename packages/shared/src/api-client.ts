@@ -223,4 +223,31 @@ export const apiClient = {
     const query = buildQueryString(params)
     return request<import('./types').AccountBalanceRow[]>(`/api/reports/account-balances${query}`)
   },
+
+  reconcileProject: (params: {
+    project_id: string
+    from: string
+    to: string
+  }) => {
+    const query = buildQueryString(params)
+    return request<import('./types').ReconciliationResponse>(`/api/reports/reconciliation/project${query}`)
+  },
+
+  reconcileCropCycle: (params: {
+    crop_cycle_id: string
+    from: string
+    to: string
+  }) => {
+    const query = buildQueryString(params)
+    return request<import('./types').ReconciliationResponse>(`/api/reports/reconciliation/crop-cycle${query}`)
+  },
+
+  reconcileSupplierAp: (params: {
+    party_id: string
+    from: string
+    to: string
+  }) => {
+    const query = buildQueryString(params)
+    return request<import('./types').ReconciliationResponse>(`/api/reports/reconciliation/supplier-ap${query}`)
+  },
 }

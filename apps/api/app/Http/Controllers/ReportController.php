@@ -4,7 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Services\TenantContext;
 use App\Services\SettlementService;
+use App\Services\ReconciliationService;
 use App\Services\SaleARService;
+use App\Services\PartyAccountService;
+use App\Services\PartyLedgerService;
+use App\Services\PartySummaryService;
+use App\Services\RoleAgeingService;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
 use App\Models\Settlement;
@@ -21,6 +26,13 @@ use Carbon\Carbon;
 
 class ReportController extends Controller
 {
+    private const RECONCILIATION_TOLERANCE = 0.01;
+
+    public function __construct(
+        private ReconciliationService $reconciliationService,
+        private SettlementService $settlementService
+    ) {}
+
     /**
      * GET /api/reports/trial-balance
      * Returns trial balance by account for a date range
@@ -234,26 +246,33 @@ class ReportController extends Controller
         $to = $request->input('to');
         $projectId = $request->input('project_id');
         
-        // Use direct query with new column names
+        // CTE avoids duplicating ledger amounts when a posting_group has multiple allocation_rows (same project).
+        // Only income/expense accounts; exclude clearing and party control from P&L.
         $query = "
+            WITH project_allocations AS (
+                SELECT DISTINCT posting_group_id, project_id
+                FROM allocation_rows
+                WHERE tenant_id = :tenant_id
+            )
             SELECT
-                ar.project_id,
+                pa.project_id,
                 le.currency_code,
                 SUM(CASE WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount) ELSE 0 END) AS income,
                 SUM(CASE WHEN a.type = 'expense' THEN (le.debit_amount - le.credit_amount) ELSE 0 END) AS expenses,
                 SUM(
-                    CASE 
+                    CASE
                         WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount)
                         WHEN a.type = 'expense' THEN -(le.debit_amount - le.credit_amount)
-                        ELSE 0 
+                        ELSE 0
                     END
                 ) AS net_profit
             FROM ledger_entries le
             JOIN accounts a ON a.id = le.account_id
             JOIN posting_groups pg ON pg.id = le.posting_group_id
-            JOIN allocation_rows ar ON ar.posting_group_id = pg.id
+            JOIN project_allocations pa ON pa.posting_group_id = pg.id
             WHERE le.tenant_id = :tenant_id
                 AND pg.posting_date BETWEEN :from AND :to
+                AND a.type IN ('income', 'expense')
         ";
         
         $params = [
@@ -263,12 +282,12 @@ class ReportController extends Controller
         ];
         
         if ($projectId) {
-            $query .= " AND project_id = :project_id";
+            $query .= " AND pa.project_id = :project_id";
             $params['project_id'] = $projectId;
         }
         
-        $query .= " GROUP BY project_id, currency_code
-                    ORDER BY project_id";
+        $query .= " GROUP BY pa.project_id, le.currency_code
+                    ORDER BY pa.project_id";
         
         $results = DB::select($query, $params);
         
@@ -307,29 +326,35 @@ class ReportController extends Controller
         $to = $request->input('to');
         $cropCycleId = $request->input('crop_cycle_id');
         
-        // Use direct query with new column names
+        // CTE avoids duplicating ledger amounts; only income/expense accounts.
         $query = "
+            WITH project_allocations AS (
+                SELECT DISTINCT ar.posting_group_id, p.crop_cycle_id
+                FROM allocation_rows ar
+                JOIN projects p ON p.id = ar.project_id
+                WHERE ar.tenant_id = :tenant_id
+            )
             SELECT
-                cc.id AS crop_cycle_id,
+                pa.crop_cycle_id AS crop_cycle_id,
                 cc.name AS crop_cycle_name,
                 le.currency_code,
                 SUM(CASE WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount) ELSE 0 END) AS income,
                 SUM(CASE WHEN a.type = 'expense' THEN (le.debit_amount - le.credit_amount) ELSE 0 END) AS expenses,
                 SUM(
-                    CASE 
+                    CASE
                         WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount)
                         WHEN a.type = 'expense' THEN -(le.debit_amount - le.credit_amount)
-                        ELSE 0 
+                        ELSE 0
                     END
                 ) AS net_profit
             FROM ledger_entries le
             JOIN accounts a ON a.id = le.account_id
             JOIN posting_groups pg ON pg.id = le.posting_group_id
-            JOIN allocation_rows ar ON ar.posting_group_id = pg.id
-            JOIN projects p ON p.id = ar.project_id
-            JOIN crop_cycles cc ON cc.id = p.crop_cycle_id
+            JOIN project_allocations pa ON pa.posting_group_id = pg.id
+            JOIN crop_cycles cc ON cc.id = pa.crop_cycle_id
             WHERE le.tenant_id = :tenant_id
                 AND pg.posting_date BETWEEN :from AND :to
+                AND a.type IN ('income', 'expense')
         ";
         
         $params = [
@@ -339,12 +364,12 @@ class ReportController extends Controller
         ];
         
         if ($cropCycleId) {
-            $query .= " AND cc.id = :crop_cycle_id";
+            $query .= " AND pa.crop_cycle_id = :crop_cycle_id";
             $params['crop_cycle_id'] = $cropCycleId;
         }
         
-        $query .= " GROUP BY cc.id, cc.name, le.currency_code
-                    ORDER BY cc.id";
+        $query .= " GROUP BY pa.crop_cycle_id, cc.name, le.currency_code
+                    ORDER BY pa.crop_cycle_id";
         
         $results = DB::select($query, $params);
         
@@ -1144,6 +1169,130 @@ class ReportController extends Controller
     }
 
     /**
+     * GET /api/reports/party-ledger
+     * Returns party ledger (PARTY_CONTROL_* as single source of truth) with opening/closing balance and running balance rows.
+     * Query params: party_id (required), from (required), to (required), project_id (optional), crop_cycle_id (optional)
+     */
+    public function partyLedger(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'party_id' => ['required', 'uuid', 'exists:parties,id'],
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'project_id' => ['nullable', 'uuid'],
+            'crop_cycle_id' => ['nullable', 'uuid'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $partyId = $request->input('party_id');
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $projectId = $request->input('project_id');
+        $cropCycleId = $request->input('crop_cycle_id');
+
+        // Ensure party belongs to tenant
+        $party = Party::where('id', $partyId)->where('tenant_id', $tenantId)->firstOrFail();
+
+        $partyAccountService = app(PartyAccountService::class);
+        $controlAccount = $partyAccountService->getPartyControlAccount($tenantId, $party->id);
+
+        $partyLedgerService = app(PartyLedgerService::class);
+        $result = $partyLedgerService->getLedger(
+            $tenantId,
+            $controlAccount->id,
+            $from,
+            $to,
+            $projectId ?: null,
+            $cropCycleId ?: null
+        );
+
+        return response()->json([
+            'opening_balance' => $result['opening_balance'],
+            'closing_balance' => $result['closing_balance'],
+            'rows' => $result['rows'],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/party-summary
+     * Returns one row per party (Hari/Landlord/Kamdar) with opening, period movement, closing from PARTY_CONTROL_* only.
+     * Query params: from (required), to (required), role (optional), project_id (optional), crop_cycle_id (optional)
+     */
+    public function partySummary(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'role' => ['nullable', 'string', 'in:HARI,LANDLORD,KAMDAR'],
+            'project_id' => ['nullable', 'uuid'],
+            'crop_cycle_id' => ['nullable', 'uuid'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $role = $request->input('role');
+        $projectId = $request->input('project_id');
+        $cropCycleId = $request->input('crop_cycle_id');
+
+        $service = app(PartySummaryService::class);
+        $result = $service->getSummary(
+            $tenantId,
+            $from,
+            $to,
+            $role ?: null,
+            $projectId ?: null,
+            $cropCycleId ?: null
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * GET /api/reports/role-ageing
+     * Returns role-level ageing buckets (0-30, 31-60, 61-90, 90+ days) from PARTY_CONTROL_* ledger entries.
+     * Query params: as_of (required, YYYY-MM-DD), project_id (optional), crop_cycle_id (optional)
+     */
+    public function roleAgeing(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+            'project_id' => ['nullable', 'uuid'],
+            'crop_cycle_id' => ['nullable', 'uuid'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $asOf = $request->input('as_of');
+        $projectId = $request->input('project_id');
+        $cropCycleId = $request->input('crop_cycle_id');
+
+        $service = app(RoleAgeingService::class);
+        $result = $service->getAgeing(
+            $tenantId,
+            $asOf,
+            $projectId ?: null,
+            $cropCycleId ?: null
+        );
+
+        return response()->json($result);
+    }
+
+    /**
      * GET /api/reports/crop-cycle-distribution
      * Returns margin distribution by party for a crop cycle
      * Query params: crop_cycle_id (required)
@@ -1209,5 +1358,256 @@ class ReportController extends Controller
                 'percentage' => $totalMargin > 0 ? round(((float) $d->total_amount / $totalMargin) * 100, 2) : 0,
             ]),
         ]);
+    }
+
+    /**
+     * GET /api/reports/reconciliation/project
+     * Read-only reconciliation checks for a project (settlement vs OT, ledger vs OT).
+     * Query: project_id (required), from (required), to (required).
+     */
+    public function reconciliationProject(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|uuid|exists:projects,id',
+            'from' => 'required|date|date_format:Y-m-d',
+            'to' => 'required|date|date_format:Y-m-d|after_or_equal:from',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $projectId = $request->input('project_id');
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $checks = [];
+
+        // Check 1: Settlement vs OT (pool totals excluding COGS so like-for-like with OT)
+        try {
+            $settlement = $this->settlementService->getProjectProfitFromLedgerExcludingCOGS($projectId, $tenantId, $to);
+            $ot = $this->reconciliationService->reconcileProjectSettlementVsOT($projectId, $tenantId, $from, $to);
+            $revenueDelta = (float) $settlement['total_revenue'] - $ot['ot_revenue'];
+            $expensesDelta = (float) $settlement['total_expenses'] - $ot['ot_expenses_total'];
+            $pass = abs($revenueDelta) < self::RECONCILIATION_TOLERANCE && abs($expensesDelta) < self::RECONCILIATION_TOLERANCE;
+            $checks[] = $this->buildReconciliationCheck(
+                'settlement_vs_ot',
+                'Settlement vs Operational Transactions',
+                $pass ? 'PASS' : 'FAIL',
+                $pass ? 'Delta: Rs 0' : sprintf('Revenue delta: %.2f; Expenses delta: %.2f', $revenueDelta, $expensesDelta),
+                [
+                    'settlement_total_revenue' => (float) $settlement['total_revenue'],
+                    'settlement_total_expenses' => (float) $settlement['total_expenses'],
+                    'ot_revenue' => $ot['ot_revenue'],
+                    'ot_expenses_total' => $ot['ot_expenses_total'],
+                    'revenue_delta' => $revenueDelta,
+                    'expenses_delta' => $expensesDelta,
+                ]
+            );
+        } catch (\Throwable $e) {
+            $checks[] = $this->buildReconciliationCheck('settlement_vs_ot', 'Settlement vs Operational Transactions', 'FAIL', $e->getMessage(), ['error' => $e->getMessage()]);
+        }
+
+        // Check 2: Ledger vs OT (exclude COGS so ledger matches OT)
+        try {
+            $ledger = $this->reconciliationService->reconcileProjectLedgerIncomeExpense($projectId, $tenantId, $from, $to, true);
+            $ot = $this->reconciliationService->reconcileProjectSettlementVsOT($projectId, $tenantId, $from, $to);
+            $incomeDelta = $ledger['ledger_income'] - $ot['ot_revenue'];
+            $expensesDelta = $ledger['ledger_expenses'] - $ot['ot_expenses_total'];
+            $pass = abs($incomeDelta) < self::RECONCILIATION_TOLERANCE && abs($expensesDelta) < self::RECONCILIATION_TOLERANCE;
+            $checks[] = $this->buildReconciliationCheck(
+                'ledger_vs_ot',
+                'Ledger income/expense vs OT',
+                $pass ? 'PASS' : 'FAIL',
+                $pass ? 'Delta: Rs 0' : sprintf('Income delta: %.2f; Expenses delta: %.2f', $incomeDelta, $expensesDelta),
+                [
+                    'ledger_income' => $ledger['ledger_income'],
+                    'ledger_expenses' => $ledger['ledger_expenses'],
+                    'ot_revenue' => $ot['ot_revenue'],
+                    'ot_expenses_total' => $ot['ot_expenses_total'],
+                    'income_delta' => $incomeDelta,
+                    'expenses_delta' => $expensesDelta,
+                ]
+            );
+        } catch (\Throwable $e) {
+            $checks[] = $this->buildReconciliationCheck('ledger_vs_ot', 'Ledger income/expense vs OT', 'FAIL', $e->getMessage(), ['error' => $e->getMessage()]);
+        }
+
+        return response()->json([
+            'checks' => $checks,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/reconciliation/crop-cycle
+     * Read-only reconciliation checks for a crop cycle (aggregate of projects).
+     * Query: crop_cycle_id (required), from (required), to (required).
+     */
+    public function reconciliationCropCycle(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'crop_cycle_id' => 'required|uuid|exists:crop_cycles,id',
+            'from' => 'required|date|date_format:Y-m-d',
+            'to' => 'required|date|date_format:Y-m-d|after_or_equal:from',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $cropCycleId = $request->input('crop_cycle_id');
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $checks = [];
+
+        $projectIds = Project::where('crop_cycle_id', $cropCycleId)->where('tenant_id', $tenantId)->pluck('id')->toArray();
+        if (empty($projectIds)) {
+            $checks[] = $this->buildReconciliationCheck('crop_cycle_scope', 'Crop cycle scope', 'WARN', 'No projects in this crop cycle', ['project_count' => 0]);
+            return response()->json(['checks' => $checks, 'generated_at' => now()->toIso8601String()]);
+        }
+
+        // Settlement totals (excluding COGS) = sum of getProjectProfitFromLedgerExcludingCOGS per project
+        $settlementRevenue = 0.0;
+        $settlementExpenses = 0.0;
+        foreach ($projectIds as $pid) {
+            try {
+                $pool = $this->settlementService->getProjectProfitFromLedgerExcludingCOGS($pid, $tenantId, $to);
+                $settlementRevenue += (float) $pool['total_revenue'];
+                $settlementExpenses += (float) $pool['total_expenses'];
+            } catch (\Throwable $e) {
+                $checks[] = $this->buildReconciliationCheck('settlement_vs_ot', 'Settlement vs OT (crop cycle)', 'FAIL', $e->getMessage(), ['error' => $e->getMessage()]);
+                return response()->json(['checks' => $checks, 'generated_at' => now()->toIso8601String()]);
+            }
+        }
+
+        // Check 1: Settlement vs OT (aggregate)
+        try {
+            $ot = $this->reconciliationService->reconcileCropCycleSettlementVsOT($cropCycleId, $tenantId, $from, $to);
+            $revenueDelta = $settlementRevenue - $ot['ot_revenue'];
+            $expensesDelta = $settlementExpenses - $ot['ot_expenses_total'];
+            $pass = abs($revenueDelta) < self::RECONCILIATION_TOLERANCE && abs($expensesDelta) < self::RECONCILIATION_TOLERANCE;
+            $checks[] = $this->buildReconciliationCheck(
+                'settlement_vs_ot',
+                'Settlement vs OT (crop cycle)',
+                $pass ? 'PASS' : 'FAIL',
+                $pass ? 'Delta: Rs 0' : sprintf('Revenue delta: %.2f; Expenses delta: %.2f', $revenueDelta, $expensesDelta),
+                [
+                    'settlement_total_revenue' => $settlementRevenue,
+                    'settlement_total_expenses' => $settlementExpenses,
+                    'ot_revenue' => $ot['ot_revenue'],
+                    'ot_expenses_total' => $ot['ot_expenses_total'],
+                    'revenue_delta' => $revenueDelta,
+                    'expenses_delta' => $expensesDelta,
+                ]
+            );
+        } catch (\Throwable $e) {
+            $checks[] = $this->buildReconciliationCheck('settlement_vs_ot', 'Settlement vs OT (crop cycle)', 'FAIL', $e->getMessage(), ['error' => $e->getMessage()]);
+        }
+
+        // Check 2: Ledger vs OT (aggregate, exclude COGS)
+        try {
+            $ledger = $this->reconciliationService->reconcileCropCycleLedgerIncomeExpense($cropCycleId, $tenantId, $from, $to, true);
+            $ot = $this->reconciliationService->reconcileCropCycleSettlementVsOT($cropCycleId, $tenantId, $from, $to);
+            $incomeDelta = $ledger['ledger_income'] - $ot['ot_revenue'];
+            $expensesDelta = $ledger['ledger_expenses'] - $ot['ot_expenses_total'];
+            $pass = abs($incomeDelta) < self::RECONCILIATION_TOLERANCE && abs($expensesDelta) < self::RECONCILIATION_TOLERANCE;
+            $checks[] = $this->buildReconciliationCheck(
+                'ledger_vs_ot',
+                'Ledger vs OT (crop cycle)',
+                $pass ? 'PASS' : 'FAIL',
+                $pass ? 'Delta: Rs 0' : sprintf('Income delta: %.2f; Expenses delta: %.2f', $incomeDelta, $expensesDelta),
+                [
+                    'ledger_income' => $ledger['ledger_income'],
+                    'ledger_expenses' => $ledger['ledger_expenses'],
+                    'ot_revenue' => $ot['ot_revenue'],
+                    'ot_expenses_total' => $ot['ot_expenses_total'],
+                    'income_delta' => $incomeDelta,
+                    'expenses_delta' => $expensesDelta,
+                ]
+            );
+        } catch (\Throwable $e) {
+            $checks[] = $this->buildReconciliationCheck('ledger_vs_ot', 'Ledger vs OT (crop cycle)', 'FAIL', $e->getMessage(), ['error' => $e->getMessage()]);
+        }
+
+        return response()->json([
+            'checks' => $checks,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/reconciliation/supplier-ap
+     * Read-only supplier AP reconciliation for one party.
+     * Query: party_id (required), from (required), to (required).
+     */
+    public function reconciliationSupplierAp(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'party_id' => 'required|uuid|exists:parties,id',
+            'from' => 'required|date|date_format:Y-m-d',
+            'to' => 'required|date|date_format:Y-m-d|after_or_equal:from',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $partyId = $request->input('party_id');
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $checks = [];
+
+        try {
+            $ap = $this->reconciliationService->reconcileSupplierAP($partyId, $tenantId, $from, $to);
+            $delta = $ap['net_supplier_outstanding'] - $ap['ap_ledger_movement'];
+            $attributable = $ap['reconciliation_status'] === 'ATTRIBUTABLE';
+            $pass = $attributable && abs($delta) < self::RECONCILIATION_TOLERANCE;
+            $warn = !$attributable;
+            $status = $pass ? 'PASS' : ($warn ? 'WARN' : 'FAIL');
+            $summary = $warn ? 'AP not fully attributable to ledger' : ($pass ? 'Delta: Rs 0' : sprintf('Delta: %.2f', $delta));
+            $checks[] = $this->buildReconciliationCheck(
+                'supplier_ap',
+                'Supplier AP reconciliation',
+                $status,
+                $summary,
+                [
+                    'supplier_outstanding' => $ap['supplier_outstanding'],
+                    'payment_outstanding' => $ap['payment_outstanding'],
+                    'net_supplier_outstanding' => $ap['net_supplier_outstanding'],
+                    'ap_ledger_movement' => $ap['ap_ledger_movement'],
+                    'reconciliation_status' => $ap['reconciliation_status'],
+                    'notes' => $ap['notes'],
+                    'delta' => $delta,
+                ]
+            );
+        } catch (\Throwable $e) {
+            $checks[] = $this->buildReconciliationCheck('supplier_ap', 'Supplier AP reconciliation', 'FAIL', $e->getMessage(), ['error' => $e->getMessage()]);
+        }
+
+        return response()->json([
+            'checks' => $checks,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @return array{key: string, title: string, status: string, summary: string, details: array<string, mixed>}
+     */
+    private function buildReconciliationCheck(string $key, string $title, string $status, string $summary, array $details): array
+    {
+        return [
+            'key' => $key,
+            'title' => $title,
+            'status' => $status,
+            'summary' => $summary,
+            'details' => $details,
+        ];
     }
 }

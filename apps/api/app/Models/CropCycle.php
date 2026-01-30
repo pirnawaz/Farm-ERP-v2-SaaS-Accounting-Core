@@ -17,12 +17,16 @@ class CropCycle extends Model
         'start_date',
         'end_date',
         'status',
+        'closed_at',
+        'closed_by_user_id',
+        'close_note',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
         'status' => 'string',
+        'closed_at' => 'datetime',
         'created_at' => 'datetime',
     ];
 
@@ -49,5 +53,10 @@ class CropCycle extends Model
     public function postingGroups(): HasMany
     {
         return $this->hasMany(PostingGroup::class);
+    }
+
+    public function closedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by_user_id');
     }
 }

@@ -8,13 +8,17 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Services\Accounting\PostValidationService;
+use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 
 class PostingService
 {
     public function __construct(
         private SystemAccountService $accountService,
-        private SystemPartyService $partyService
+        private SystemPartyService $partyService,
+        private PostValidationService $postValidationService,
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
@@ -64,14 +68,11 @@ class PostingService
                 throw new \Exception('Crop cycle ID is required for posting');
             }
 
-            // Verify crop cycle exists and is OPEN
+            $this->guard->ensureCropCycleOpen($cropCycleId, $tenantId);
+
             $cropCycle = CropCycle::where('id', $cropCycleId)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
-
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post to a closed crop cycle');
-            }
 
             // Validate posting_date is within crop cycle range (if dates are set)
             $postingDateObj = \Carbon\Carbon::parse($postingDate);
@@ -88,6 +89,15 @@ class PostingService
             $expSharedAccount = $this->accountService->getByCode($tenantId, 'EXP_SHARED');
             $expHariOnlyAccount = $this->accountService->getByCode($tenantId, 'EXP_HARI_ONLY');
             $expFarmOverheadAccount = $this->accountService->getByCode($tenantId, 'EXP_FARM_OVERHEAD');
+
+            $ledgerLines = [
+                ['account_id' => $cashAccount->id],
+                ['account_id' => $projectRevenueAccount->id],
+                ['account_id' => $expSharedAccount->id],
+                ['account_id' => $expHariOnlyAccount->id],
+                ['account_id' => $expFarmOverheadAccount->id],
+            ];
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, $ledgerLines);
 
             // Create posting group
             $postingGroup = PostingGroup::create([

@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\CropCycle;
+use App\Services\CropCycleCloseService;
 use App\Services\TenantContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CropCycleController extends Controller
 {
+    public function __construct(
+        private CropCycleCloseService $closeService
+    ) {}
     public function index(Request $request)
     {
         $tenantId = TenantContext::getTenantId($request);
@@ -92,15 +97,38 @@ class CropCycleController extends Controller
         return response()->json(null, 204);
     }
 
-    public function close(Request $request, string $id)
+    public function closePreview(Request $request, string $id): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
 
-        $cycle = CropCycle::where('id', $id)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        CropCycle::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
 
-        $cycle->update(['status' => 'CLOSED']);
+        $preview = $this->closeService->previewClose($id, $tenantId);
+
+        return response()->json($preview);
+    }
+
+    public function close(Request $request, string $id): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $request->validate([
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $userId = $request->user()?->id;
+        $note = $request->input('note');
+
+        $cycle = $this->closeService->close($id, $tenantId, $userId, $note);
+
+        return response()->json($cycle);
+    }
+
+    public function reopen(Request $request, string $id): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $cycle = $this->closeService->reopen($id, $tenantId);
 
         return response()->json($cycle);
     }

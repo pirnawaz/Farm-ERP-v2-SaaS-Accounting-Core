@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import LandParcelsPage from './pages/LandParcelsPage';
 import LandParcelDetailPage from './pages/LandParcelDetailPage';
 import CropCyclesPage from './pages/CropCyclesPage';
+import CropCycleDetailPage from './pages/CropCycleDetailPage';
 import PartiesPage from './pages/PartiesPage';
 import PartyDetailPage from './pages/PartyDetailPage';
 import LandAllocationsPage from './pages/LandAllocationsPage';
@@ -80,6 +81,10 @@ import AccountBalancesPage from './pages/AccountBalancesPage';
 import CashbookPage from './pages/CashbookPage';
 import ARAgeingPage from './pages/ARAgeingPage';
 import SalesMarginPage from './pages/SalesMarginPage';
+import PartyLedgerPage from './pages/PartyLedgerPage';
+import PartySummaryPage from './pages/PartySummaryPage';
+import RoleAgeingPage from './pages/RoleAgeingPage';
+import ReconciliationDashboardPage from './pages/ReconciliationDashboardPage';
 import LocalisationSettingsPage from './pages/LocalisationSettingsPage';
 import ModuleTogglePage from './pages/ModuleTogglePage';
 import AdminFarmProfilePage from './pages/AdminFarmProfilePage';
@@ -124,6 +129,7 @@ function App() {
         <Route path="land" element={<ModuleProtectedRoute requiredModule="land"><LandParcelsPage /></ModuleProtectedRoute>} />
         <Route path="land/:id" element={<ModuleProtectedRoute requiredModule="land"><LandParcelDetailPage /></ModuleProtectedRoute>} />
         <Route path="crop-cycles" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCyclesPage /></ModuleProtectedRoute>} />
+        <Route path="crop-cycles/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCycleDetailPage /></ModuleProtectedRoute>} />
         <Route path="parties" element={<PartiesPage />} />
         <Route path="parties/:id" element={<PartyDetailPage />} />
         <Route path="allocations" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><LandAllocationsPage /></ModuleProtectedRoute>} />
@@ -204,6 +210,10 @@ function App() {
         <Route path="reports/cashbook" element={<ModuleProtectedRoute requiredModule="reports"><CashbookPage /></ModuleProtectedRoute>} />
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />
         <Route path="reports/sales-margin" element={<ModuleProtectedRoute requiredModule="reports"><SalesMarginPage /></ModuleProtectedRoute>} />
+        <Route path="reports/party-ledger" element={<ModuleProtectedRoute requiredModule="reports"><PartyLedgerPage /></ModuleProtectedRoute>} />
+        <Route path="reports/party-summary" element={<ModuleProtectedRoute requiredModule="reports"><PartySummaryPage /></ModuleProtectedRoute>} />
+        <Route path="reports/role-ageing" element={<ModuleProtectedRoute requiredModule="reports"><RoleAgeingPage /></ModuleProtectedRoute>} />
+        <Route path="reports/reconciliation-dashboard" element={<ModuleProtectedRoute requiredModule="reports"><ReconciliationDashboardPage /></ModuleProtectedRoute>} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />
         <Route path="admin/farm" element={<AdminFarmProfilePage />} />
         <Route path="admin/users" element={<AdminUsersPage />} />

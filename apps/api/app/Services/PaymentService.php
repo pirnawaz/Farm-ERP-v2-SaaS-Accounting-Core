@@ -12,7 +12,10 @@ use App\Models\Settlement;
 use App\Models\Project;
 use App\Models\CropCycle;
 use App\Models\AllocationRow;
+use App\Services\OperationalPostingGuard;
+use App\Services\PartyAccountService;
 use App\Services\SaleARService;
+use App\Services\Accounting\PostValidationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -21,7 +24,9 @@ class PaymentService
 {
     public function __construct(
         private SystemAccountService $accountService,
-        private SaleARService $arService
+        private PartyAccountService $partyAccountService,
+        private SaleARService $arService,
+        private PostValidationService $postValidationService
     ) {}
 
     /**
@@ -110,14 +115,7 @@ class PaymentService
                     ->firstOrFail();
                 $finalCropCycleId = $project->crop_cycle_id;
 
-                // Verify crop cycle is OPEN
-                $cropCycle = CropCycle::where('id', $finalCropCycleId)
-                    ->where('tenant_id', $tenantId)
-                    ->firstOrFail();
-
-                if ($cropCycle->status !== 'OPEN') {
-                    throw new \Exception('Cannot post payment to a closed crop cycle');
-                }
+                $this->guard->ensureCropCycleOpen($finalCropCycleId, $tenantId);
             } else {
                 // No settlement, require crop_cycle_id parameter
                 if (!$cropCycleId) {
@@ -126,15 +124,12 @@ class PaymentService
 
                 $finalCropCycleId = $cropCycleId;
 
-                // Verify crop cycle exists and is OPEN
-                $cropCycle = CropCycle::where('id', $finalCropCycleId)
-                    ->where('tenant_id', $tenantId)
-                    ->firstOrFail();
-
-                if ($cropCycle->status !== 'OPEN') {
-                    throw new \Exception('Cannot post payment to a closed crop cycle');
-                }
+                $this->guard->ensureCropCycleOpen($finalCropCycleId, $tenantId);
             }
+
+            $cropCycle = CropCycle::where('id', $finalCropCycleId)
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
 
             // Validate Payment OUT (non-WAGES) does not exceed outstanding payable
             $isWages = $payment->direction === 'OUT' && (string) ($payment->purpose ?? '') === 'WAGES';
@@ -150,27 +145,41 @@ class PaymentService
                 }
             }
 
-            // Determine payable/debit account for Payment OUT
+            // Determine payable/debit account for Payment OUT (use PARTY_CONTROL_* for party balances)
             $payableAccount = null;
             if ($isWages) {
                 $payableAccount = $this->accountService->getByCode($tenantId, 'WAGES_PAYABLE');
             } else {
                 $partyTypes = $party->party_types ?? [];
                 if (in_array('HARI', $partyTypes)) {
-                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
+                    $payableAccount = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'HARI');
                 } elseif (in_array('KAMDAR', $partyTypes)) {
-                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_KAMDAR');
+                    $payableAccount = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'KAMDAR');
                 } elseif (in_array('LANDLORD', $partyTypes)) {
-                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
+                    $payableAccount = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'LANDLORD');
                 } elseif (in_array('VENDOR', $partyTypes) && $payment->direction === 'OUT') {
                     $payableAccount = $this->accountService->getByCode($tenantId, 'AP');
                 } else {
-                    $payableAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_LANDLORD');
+                    $payableAccount = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'LANDLORD');
                 }
             }
 
             // Get CASH account
             $cashAccount = $this->accountService->getByCode($tenantId, 'CASH');
+
+            $ledgerLines = [
+                ['account_id' => $payableAccount->id],
+                ['account_id' => $cashAccount->id],
+            ];
+            $arAccount = null;
+            if ($payment->direction === 'IN') {
+                $arAccount = $this->accountService->getByCode($tenantId, 'AR');
+                $ledgerLines = [
+                    ['account_id' => $cashAccount->id],
+                    ['account_id' => $arAccount->id],
+                ];
+            }
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, $ledgerLines);
 
             // Create posting group
             $postingGroup = PostingGroup::create([

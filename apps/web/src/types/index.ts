@@ -142,7 +142,23 @@ export interface CropCycle {
   start_date: string;
   end_date?: string;
   status: CropCycleStatus;
+  closed_at?: string | null;
+  closed_by_user_id?: string | null;
+  close_note?: string | null;
   created_at: string;
+}
+
+export interface CropCycleClosePreview {
+  status: string;
+  has_posted_settlement: boolean;
+  reconciliation_summary: { pass: number; warn: number; fail: number; checks?: Array<{ key: string; status: string; summary: string }> };
+  reconciliation?: {
+    from: string;
+    to: string;
+    counts: { pass: number; warn: number; fail: number };
+    checks: Array<{ key: string; title: string; status: string; summary: string }>;
+  };
+  blocking_reasons: string[];
 }
 
 // Land Allocation
@@ -1365,6 +1381,67 @@ export interface GeneralLedgerResponse {
     per_page: number;
     total: number;
     last_page: number;
+  };
+}
+
+export interface PartyLedgerRow {
+  posting_date: string;
+  posting_group_id: string;
+  source_type: string;
+  source_id: string;
+  description: string | null;
+  project_id: string | null;
+  crop_cycle_id: string | null;
+  debit: number;
+  credit: number;
+  running_balance: number;
+}
+
+export interface PartyLedgerResponse {
+  opening_balance: number;
+  closing_balance: number;
+  rows: PartyLedgerRow[];
+}
+
+export interface PartySummaryRow {
+  party_id: string;
+  party_name: string;
+  role: string;
+  opening_balance: number;
+  period_movement: number;
+  closing_balance: number;
+}
+
+export interface PartySummaryResponse {
+  from: string;
+  to: string;
+  rows: PartySummaryRow[];
+  totals: {
+    opening_balance: number;
+    period_movement: number;
+    closing_balance: number;
+  };
+}
+
+export interface RoleAgeingRow {
+  role: string;
+  label: string;
+  bucket_0_30: number;
+  bucket_31_60: number;
+  bucket_61_90: number;
+  bucket_90_plus: number;
+  total_balance: number;
+}
+
+export interface RoleAgeingResponse {
+  as_of: string;
+  rows: RoleAgeingRow[];
+  totals: {
+    bucket_0_30: number;
+    bucket_31_60: number;
+    bucket_61_90: number;
+    bucket_90_plus: number;
+    total_balance: number;
   };
 }
 

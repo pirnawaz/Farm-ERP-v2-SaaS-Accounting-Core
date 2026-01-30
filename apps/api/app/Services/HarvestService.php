@@ -7,6 +7,7 @@ use App\Models\HarvestLine;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\PostingGroup;
+use App\Services\OperationalPostingGuard;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\InvStockMovement;
@@ -18,7 +19,8 @@ class HarvestService
     public function __construct(
         private SystemAccountService $accountService,
         private InventoryStockService $stockService,
-        private ReversalService $reversalService
+        private ReversalService $reversalService,
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
@@ -33,14 +35,11 @@ class HarvestService
             $cropCycleId = $data['crop_cycle_id'];
             $projectId = $data['project_id'];
 
-            // Validate crop cycle exists and is OPEN
+            $this->guard->ensureCropCycleOpen($cropCycleId, $tenantId);
+
             $cropCycle = CropCycle::where('id', $cropCycleId)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
-
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot create harvest: crop cycle is closed.');
-            }
 
             $project = Project::where('id', $projectId)
                 ->where('tenant_id', $tenantId)
@@ -77,12 +76,9 @@ class HarvestService
                 throw new \Exception('Only DRAFT harvests can be updated.');
             }
 
-            // Validate crop cycle still OPEN
-            $cropCycle = $harvest->cropCycle;
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot update harvest: crop cycle is closed.');
-            }
+            $this->guard->ensureCropCycleOpenForProject($harvest->project_id, $harvest->tenant_id);
 
+            $cropCycle = $harvest->cropCycle;
             $update = [
                 'harvest_no' => $data['harvest_no'] ?? $harvest->harvest_no,
                 'harvest_date' => $data['harvest_date'] ?? $harvest->harvest_date,
@@ -324,10 +320,9 @@ class HarvestService
             }
 
             // Validate crop cycle OPEN
+            $this->guard->ensureCropCycleOpenForProject($harvest->project_id, $harvest->tenant_id);
+
             $cropCycle = $harvest->cropCycle;
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post harvest: crop cycle is closed.');
-            }
 
             // Validate posting_date
             $postingDate = $payload['posting_date'] ?? null;
@@ -474,11 +469,9 @@ class HarvestService
 
             $reversalDateObj = Carbon::parse($reversalDate)->format('Y-m-d');
 
-            // Validate crop cycle OPEN
+            $this->guard->ensureCropCycleOpenForProject($harvest->project_id, $harvest->tenant_id);
+
             $cropCycle = $harvest->cropCycle;
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot reverse harvest: crop cycle is closed.');
-            }
 
             // Validate reversal_date within crop cycle range
             if ($cropCycle->start_date && $reversalDateObj < $cropCycle->start_date->format('Y-m-d')) {

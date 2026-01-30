@@ -8,13 +8,18 @@ use App\Models\PostingGroup;
 use App\Models\LedgerEntry;
 use App\Models\CropCycle;
 use App\Models\AllocationRow;
+use App\Services\Accounting\PostValidationService;
+use App\Services\OperationalPostingGuard;
+use App\Services\PartyAccountService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class AdvanceService
 {
     public function __construct(
-        private SystemAccountService $accountService
+        private SystemAccountService $accountService,
+        private PartyAccountService $partyAccountService,
+        private PostValidationService $postValidationService
     ) {}
 
     /**
@@ -93,35 +98,35 @@ class AdvanceService
                 $finalCropCycleId = $cropCycleId;
             }
 
-            // Verify crop cycle exists and is OPEN
+            $this->guard->ensureCropCycleOpen($finalCropCycleId, $tenantId);
+
             $cropCycle = CropCycle::where('id', $finalCropCycleId)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
 
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post advance to a closed crop cycle');
-            }
-
-            // Determine advance asset account based on type
-            $advanceAccountCode = null;
+            // Use PARTY_CONTROL_* for party advances; other types use dedicated accounts
+            $advanceAccount = null;
             switch ($advance->type) {
                 case 'HARI_ADVANCE':
-                    $advanceAccountCode = 'ADVANCE_HARI';
+                    $advanceAccount = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'HARI');
                     break;
                 case 'VENDOR_ADVANCE':
-                    $advanceAccountCode = 'ADVANCE_VENDOR';
+                    $advanceAccount = $this->accountService->getByCode($tenantId, 'ADVANCE_VENDOR');
                     break;
                 case 'LOAN':
-                    $advanceAccountCode = 'LOAN_RECEIVABLE';
+                    $advanceAccount = $this->accountService->getByCode($tenantId, 'LOAN_RECEIVABLE');
                     break;
                 default:
                     throw new \Exception("Invalid advance type: {$advance->type}");
             }
 
-            $advanceAccount = $this->accountService->getByCode($tenantId, $advanceAccountCode);
-
             // Get CASH account (for now, always use CASH - method field can be used for reporting)
             $cashAccount = $this->accountService->getByCode($tenantId, 'CASH');
+
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, [
+                ['account_id' => $advanceAccount->id],
+                ['account_id' => $cashAccount->id],
+            ]);
 
             // Create posting group
             $postingGroup = PostingGroup::create([

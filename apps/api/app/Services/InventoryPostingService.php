@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Account;
 use App\Models\InvAdjustment;
 use App\Models\InvAdjustmentLine;
 use App\Models\InvGrn;
@@ -18,6 +17,8 @@ use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
+use App\Services\Accounting\PostValidationService;
+use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -28,7 +29,9 @@ class InventoryPostingService
         private ReversalService $reversalService,
         private InventoryStockService $stockService,
         private InventoryAllocationResolver $allocationResolver,
-        private SystemPartyService $partyService
+        private SystemPartyService $partyService,
+        private PostValidationService $postValidationService,
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
@@ -86,6 +89,11 @@ class InventoryPostingService
             $creditAccount = $grn->supplier_party_id
                 ? $this->accountService->getByCode($tenantId, 'AP')
                 : $this->accountService->getByCode($tenantId, 'CASH');
+
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, [
+                ['account_id' => $inventoryAccount->id],
+                ['account_id' => $creditAccount->id],
+            ]);
 
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
@@ -154,11 +162,9 @@ class InventoryPostingService
                 throw new \Exception('allocation_mode is not properly configured. Check hari_id, sharing_rule_id, or percentage fields.');
             }
 
-            $cropCycle = CropCycle::where('id', $issue->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post issue: crop cycle is closed.');
-            }
+            $this->guard->ensureCropCycleOpenForProject($issue->project_id, $tenantId);
 
+            $cropCycle = CropCycle::where('id', $issue->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
             if ($cropCycle->start_date && $postingDateObj < $cropCycle->start_date->format('Y-m-d')) {
                 throw new \Exception('Posting date is before crop cycle start date.');
@@ -207,15 +213,16 @@ class InventoryPostingService
                 $line->update(['unit_cost_snapshot' => $wac, 'line_total' => $lineTotal]);
             }
 
-            // Get accounts
-            // Account usage rules:
-            // - DUE_FROM_HARI (Asset) → shared expenses only (receivable from Hari)
-            // - PAYABLE_HARI (Liability) → profit share / settlements only
-            // - PROFIT_DISTRIBUTION (Equity) → settlements only, never for expenses
+            // Get accounts. Operational posting only: Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS.
+            // No PARTY_CONTROL_* or PROFIT_DISTRIBUTION_CLEARING — distribution happens only via explicit settlement.
             $inputsExpenseAccount = $this->accountService->getByCode($tenantId, 'INPUTS_EXPENSE');
             $inventoryAccount = $this->accountService->getByCode($tenantId, 'INVENTORY_INPUTS');
 
-            // Create base ledger entries: Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, [
+                ['account_id' => $inputsExpenseAccount->id],
+                ['account_id' => $inventoryAccount->id],
+            ]);
+
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
@@ -233,12 +240,10 @@ class InventoryPostingService
                 'currency_code' => 'GBP',
             ]);
 
-            // Get landlord party (used in multiple allocation modes)
             $landlordParty = $this->partyService->ensureSystemLandlordParty($tenantId);
             $ruleSnapshot = ['source' => 'inv_issue', 'cost_type' => 'INVENTORY_INPUT'];
 
             if ($issue->allocation_mode === 'HARI_ONLY') {
-                // 100% to Hari
                 $hariPartyId = $issue->hari_id;
                 if (!$hariPartyId) {
                     throw new \Exception('hari_id is required for HARI_ONLY allocation_mode');
@@ -256,27 +261,6 @@ class InventoryPostingService
                         'allocation_mode' => 'HARI_ONLY',
                         'hari_id' => $hariPartyId,
                     ]),
-                ]);
-
-                // HARI_ONLY: Hari owes the full amount (payable)
-                // Dr PAYABLE_HARI (Hari owes), Cr PROFIT_DISTRIBUTION (clearing)
-                $payableHariAccount = $this->accountService->getByCode($tenantId, 'PAYABLE_HARI');
-                $clearingAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION');
-                LedgerEntry::create([
-                    'tenant_id' => $tenantId,
-                    'posting_group_id' => $postingGroup->id,
-                    'account_id' => $payableHariAccount->id,
-                    'debit_amount' => (string) $totalValue,
-                    'credit_amount' => 0,
-                    'currency_code' => 'GBP',
-                ]);
-                LedgerEntry::create([
-                    'tenant_id' => $tenantId,
-                    'posting_group_id' => $postingGroup->id,
-                    'account_id' => $clearingAccount->id,
-                    'debit_amount' => 0,
-                    'credit_amount' => (string) $totalValue,
-                    'currency_code' => 'GBP',
                 ]);
 
             } elseif ($issue->allocation_mode === 'FARMER_ONLY') {
@@ -338,52 +322,6 @@ class InventoryPostingService
                         'hari_share_amount' => (string) $hariShare,
                     ]),
                 ]);
-
-                // SHARED expenses: Hari owes his share (receivable), reduce landlord expense
-                // Correct accounting: Dr DUE_FROM_HARI (hari_share), Cr INPUTS_EXPENSE (hari_share)
-                // This reduces the expense to landlord's share and creates a receivable from Hari
-                // NO profit distribution accounts should be used for expenses
-                if ($hariShare > 0.01) {
-                    // Ensure DUE_FROM_HARI account exists (create if missing for backward compatibility)
-                    try {
-                        $dueFromHariAccount = $this->accountService->getByCode($tenantId, 'DUE_FROM_HARI');
-                    } catch (\Exception $e) {
-                        // Account doesn't exist, create it
-                        $dueFromHariAccount = Account::create([
-                            'tenant_id' => $tenantId,
-                            'code' => 'DUE_FROM_HARI',
-                            'name' => 'Due from Hari',
-                            'type' => 'asset',
-                            'is_system' => true,
-                        ]);
-                    }
-                    
-                    // Validate: Ensure we're not using profit distribution for expenses
-                    $profitDistributionAccount = $this->accountService->getByCode($tenantId, 'PROFIT_DISTRIBUTION');
-                    if ($dueFromHariAccount->id === $profitDistributionAccount->id) {
-                        throw new \Exception('DUE_FROM_HARI account must not be the same as PROFIT_DISTRIBUTION account');
-                    }
-                    
-                    LedgerEntry::create([
-                        'tenant_id' => $tenantId,
-                        'posting_group_id' => $postingGroup->id,
-                        'account_id' => $dueFromHariAccount->id,
-                        'debit_amount' => (string) $hariShare,
-                        'credit_amount' => 0,
-                        'currency_code' => 'GBP',
-                    ]);
-                    LedgerEntry::create([
-                        'tenant_id' => $tenantId,
-                        'posting_group_id' => $postingGroup->id,
-                        'account_id' => $inputsExpenseAccount->id,
-                        'debit_amount' => 0,
-                        'credit_amount' => (string) $hariShare,
-                        'currency_code' => 'GBP',
-                    ]);
-                }
-                
-                // Landlord's share: Already recorded in INPUTS_EXPENSE (net after Hari share reduction)
-                // No additional entries needed - the expense is already reduced to landlord's share
             }
 
             // Verify debits == credits
@@ -690,6 +628,11 @@ class InventoryPostingService
 
             $inventoryAccount = $this->accountService->getByCode($tenantId, 'INVENTORY_INPUTS');
             $varianceAccount = $this->accountService->getByCode($tenantId, 'STOCK_VARIANCE');
+
+            $this->postValidationService->validateNoDeprecatedAccounts($tenantId, [
+                ['account_id' => $inventoryAccount->id],
+                ['account_id' => $varianceAccount->id],
+            ]);
 
             foreach ($adj->lines as $line) {
                 InvItem::where('id', $line->item_id)->where('tenant_id', $tenantId)->firstOrFail();

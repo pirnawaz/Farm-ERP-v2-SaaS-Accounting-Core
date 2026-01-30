@@ -8,6 +8,7 @@ use App\Models\SaleInventoryAllocation;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\PostingGroup;
+use App\Services\OperationalPostingGuard;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\InvStockMovement;
@@ -21,7 +22,8 @@ class SaleCOGSService
     public function __construct(
         private SystemAccountService $accountService,
         private InventoryStockService $stockService,
-        private ReversalService $reversalService
+        private ReversalService $reversalService,
+        private OperationalPostingGuard $guard
     ) {}
 
     /**
@@ -107,14 +109,10 @@ class SaleCOGSService
 
         // Validate crop cycle if set
         if ($sale->crop_cycle_id) {
+            $this->guard->ensureCropCycleOpen($sale->crop_cycle_id, $sale->tenant_id);
             $cropCycle = CropCycle::where('id', $sale->crop_cycle_id)
                 ->where('tenant_id', $sale->tenant_id)
                 ->firstOrFail();
-
-            if ($cropCycle->status !== 'OPEN') {
-                throw new \Exception('Cannot post sale: crop cycle is closed.');
-            }
-
             $postingDateObj = Carbon::parse($postingDate);
             if ($cropCycle->start_date && $postingDateObj->lt($cropCycle->start_date)) {
                 throw new \Exception('Posting date must be within crop cycle start date.');
@@ -122,6 +120,9 @@ class SaleCOGSService
             if ($cropCycle->end_date && $postingDateObj->gt($cropCycle->end_date)) {
                 throw new \Exception('Posting date must be within crop cycle end date.');
             }
+        }
+        if ($sale->project_id) {
+            $this->guard->ensureCropCycleOpenForProject($sale->project_id, $sale->tenant_id);
         }
     }
 
@@ -395,13 +396,10 @@ class SaleCOGSService
 
             // Validate crop cycle if set
             if ($sale->crop_cycle_id) {
+                $this->guard->ensureCropCycleOpen($sale->crop_cycle_id, $sale->tenant_id);
                 $cropCycle = CropCycle::where('id', $sale->crop_cycle_id)
                     ->where('tenant_id', $sale->tenant_id)
                     ->firstOrFail();
-
-                if ($cropCycle->status !== 'OPEN') {
-                    throw new \Exception('Cannot reverse sale: crop cycle is closed.');
-                }
 
                 if ($cropCycle->start_date && $reversalDateObj < $cropCycle->start_date->format('Y-m-d')) {
                     throw new \Exception('Reversal date is before crop cycle start date.');

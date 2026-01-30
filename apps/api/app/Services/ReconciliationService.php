@@ -7,6 +7,7 @@ use App\Models\PostingGroup;
 use App\Models\LedgerEntry;
 use App\Models\AllocationRow;
 use App\Models\Account;
+use App\Models\Project;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -102,25 +103,36 @@ class ReconciliationService
      * Reconcile project ledger income and expense totals.
      * Computes totals from ledger entries for income and expense accounts
      * linked to the project via AllocationRows.
-     * 
-     * @param string $projectId
-     * @param string $tenantId
-     * @param string $fromDate YYYY-MM-DD format
-     * @param string $toDate YYYY-MM-DD format
+     *
+     * @param bool $excludeCogs When true, exclude COGS account codes (config reconciliation.cogs_account_codes)
+     *                         so reconciliation matches OT (OT has no separate COGS line).
      * @return array
      */
     public function reconcileProjectLedgerIncomeExpense(
         string $projectId,
         string $tenantId,
         string $fromDate,
-        string $toDate
+        string $toDate,
+        bool $excludeCogs = false
     ): array {
         $fromDateObj = Carbon::parse($fromDate);
         $toDateObj = Carbon::parse($toDate);
 
-        // Use same query pattern as ReportController::projectPL but scoped to single project
-        // and exclude reversed posting groups
+        $cogsCodes = $excludeCogs ? (config('reconciliation.cogs_account_codes', ['COGS_PRODUCE']) ?: []) : [];
+        $excludeClause = '';
+        if (!empty($cogsCodes)) {
+            $placeholders = implode(',', array_fill(0, count($cogsCodes), '?'));
+            $excludeClause = " AND a.code NOT IN ({$placeholders})";
+        }
+
+        // Use same pattern as ReportController::projectPL: CTE with DISTINCT posting_group_id to avoid
+        // double-counting when a posting_group has multiple allocation_rows for the same project.
         $query = "
+            WITH project_pg AS (
+                SELECT DISTINCT posting_group_id
+                FROM allocation_rows
+                WHERE tenant_id = ? AND project_id = ?
+            )
             SELECT
                 le.currency_code,
                 SUM(CASE WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount) ELSE 0 END) AS income,
@@ -135,27 +147,21 @@ class ReconciliationService
             FROM ledger_entries le
             JOIN accounts a ON a.id = le.account_id
             JOIN posting_groups pg ON pg.id = le.posting_group_id
-            JOIN allocation_rows ar ON ar.posting_group_id = pg.id
-            WHERE le.tenant_id = :tenant_id
-                AND ar.project_id = :project_id
-                AND pg.posting_date >= :from_date
-                AND pg.posting_date <= :to_date
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM posting_groups rev
-                    WHERE rev.reversal_of_posting_group_id = pg.id
-                )
+            JOIN project_pg ON project_pg.posting_group_id = pg.id
+            WHERE le.tenant_id = ?
+                AND pg.posting_date >= ?
+                AND pg.posting_date <= ?
+                {$excludeClause}
             GROUP BY le.currency_code
         ";
 
-        $results = DB::select($query, [
-            'tenant_id' => $tenantId,
-            'project_id' => $projectId,
-            'from_date' => $fromDateObj->format('Y-m-d'),
-            'to_date' => $toDateObj->format('Y-m-d'),
-        ]);
+        $bindings = array_merge(
+            [$tenantId, $projectId, $tenantId, $fromDateObj->format('Y-m-d'), $toDateObj->format('Y-m-d')],
+            $cogsCodes
+        );
+        $results = DB::select($query, $bindings);
 
-        // Aggregate across currencies (typically just GBP)
+        // Aggregate across currencies (typically just GBP). Reversals are included so (credit - debit) nets.
         $ledgerIncome = 0;
         $ledgerExpenses = 0;
         $ledgerNet = 0;
@@ -230,7 +236,7 @@ class ReconciliationService
             // and see if we can trace to ledger entries.
             
             // Get posting groups for this party's SUPPLIER_AP allocations in date range
-            $postingGroupIds = AllocationRow::where('tenant_id', $tenantId)
+            $postingGroupIds = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
                 ->where('party_id', $partyId)
                 ->where('allocation_type', 'SUPPLIER_AP')
                 ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
@@ -283,6 +289,157 @@ class ReconciliationService
                 'from' => $fromDate,
                 'to' => $toDate,
             ],
+        ];
+    }
+
+    /**
+     * Reconcile crop cycle: aggregate OT totals for all projects in the cycle.
+     * Sums results of reconcileProjectSettlementVsOT across projects.
+     *
+     * @param string $cropCycleId
+     * @param string $tenantId
+     * @param string $fromDate YYYY-MM-DD
+     * @param string $toDate YYYY-MM-DD
+     * @return array
+     */
+    public function reconcileCropCycleSettlementVsOT(
+        string $cropCycleId,
+        string $tenantId,
+        string $fromDate,
+        string $toDate
+    ): array {
+        $projectIds = Project::where('crop_cycle_id', $cropCycleId)
+            ->where('tenant_id', $tenantId)
+            ->pluck('id')
+            ->toArray();
+
+        if (empty($projectIds)) {
+            return [
+                'ot_revenue' => 0.0,
+                'ot_expenses_total' => 0.0,
+                'ot_shared_costs' => 0.0,
+                'ot_landlord_only_costs' => 0.0,
+                'ot_hari_only_costs' => 0.0,
+                'ot_income_count' => 0,
+                'ot_expense_count' => 0,
+                'date_range' => ['from' => $fromDate, 'to' => $toDate],
+            ];
+        }
+
+        $toDateObj = Carbon::parse($toDate);
+        $postedTransactions = OperationalTransaction::where('operational_transactions.tenant_id', $tenantId)
+            ->whereIn('operational_transactions.project_id', $projectIds)
+            ->where('operational_transactions.status', 'POSTED')
+            ->whereNotNull('operational_transactions.posting_group_id')
+            ->join('posting_groups', 'operational_transactions.posting_group_id', '=', 'posting_groups.id')
+            ->where('posting_groups.posting_date', '<=', $toDateObj->format('Y-m-d'))
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('posting_groups as rev')
+                    ->whereColumn('rev.reversal_of_posting_group_id', 'posting_groups.id');
+            })
+            ->select('operational_transactions.*')
+            ->get();
+
+        $otRevenue = $postedTransactions->where('type', 'INCOME')->sum('amount');
+        $otExpensesTotal = $postedTransactions->where('type', 'EXPENSE')->sum('amount');
+        $otSharedCosts = $postedTransactions->where('type', 'EXPENSE')->where('classification', 'SHARED')->sum('amount');
+        $otLandlordOnlyCosts = $postedTransactions->where('type', 'EXPENSE')->where('classification', 'LANDLORD_ONLY')->sum('amount');
+        $otHariOnlyCosts = $postedTransactions->where('type', 'EXPENSE')->where('classification', 'HARI_ONLY')->sum('amount');
+
+        return [
+            'ot_revenue' => (float) $otRevenue,
+            'ot_expenses_total' => (float) $otExpensesTotal,
+            'ot_shared_costs' => (float) $otSharedCosts,
+            'ot_landlord_only_costs' => (float) $otLandlordOnlyCosts,
+            'ot_hari_only_costs' => (float) $otHariOnlyCosts,
+            'ot_income_count' => $postedTransactions->where('type', 'INCOME')->count(),
+            'ot_expense_count' => $postedTransactions->where('type', 'EXPENSE')->count(),
+            'date_range' => ['from' => $fromDate, 'to' => $toDate],
+        ];
+    }
+
+    /**
+     * Reconcile crop cycle: aggregate ledger income/expense for all projects in the cycle.
+     *
+     * @param bool $excludeCogs When true, exclude COGS account codes for settlement reconciliation.
+     * @return array
+     */
+    public function reconcileCropCycleLedgerIncomeExpense(
+        string $cropCycleId,
+        string $tenantId,
+        string $fromDate,
+        string $toDate,
+        bool $excludeCogs = false
+    ): array {
+        $fromDateObj = Carbon::parse($fromDate);
+        $toDateObj = Carbon::parse($toDate);
+
+        $cogsCodes = $excludeCogs ? (config('reconciliation.cogs_account_codes', ['COGS_PRODUCE']) ?: []) : [];
+        $excludeClause = '';
+        if (!empty($cogsCodes)) {
+            $placeholders = implode(',', array_fill(0, count($cogsCodes), '?'));
+            $excludeClause = " AND a.code NOT IN ({$placeholders})";
+        }
+
+        // CTE with DISTINCT posting_group_id per crop cycle to avoid double-counting.
+        $query = "
+            WITH crop_cycle_pg AS (
+                SELECT DISTINCT ar.posting_group_id
+                FROM allocation_rows ar
+                JOIN projects p ON p.id = ar.project_id AND p.tenant_id = ? AND p.crop_cycle_id = ?
+                WHERE ar.tenant_id = ?
+            )
+            SELECT
+                le.currency_code,
+                SUM(CASE WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount) ELSE 0 END) AS income,
+                SUM(CASE WHEN a.type = 'expense' THEN (le.debit_amount - le.credit_amount) ELSE 0 END) AS expenses,
+                SUM(
+                    CASE
+                        WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount)
+                        WHEN a.type = 'expense' THEN -(le.debit_amount - le.credit_amount)
+                        ELSE 0
+                    END
+                ) AS net_profit
+            FROM ledger_entries le
+            JOIN accounts a ON a.id = le.account_id
+            JOIN posting_groups pg ON pg.id = le.posting_group_id
+            JOIN crop_cycle_pg ON crop_cycle_pg.posting_group_id = pg.id
+            WHERE le.tenant_id = ?
+                AND pg.posting_date >= ?
+                AND pg.posting_date <= ?
+                {$excludeClause}
+            GROUP BY le.currency_code
+        ";
+
+        $bindings = array_merge(
+            [$tenantId, $cropCycleId, $tenantId, $tenantId, $fromDateObj->format('Y-m-d'), $toDateObj->format('Y-m-d')],
+            $cogsCodes
+        );
+        $results = DB::select($query, $bindings);
+
+        $ledgerIncome = 0;
+        $ledgerExpenses = 0;
+        $ledgerNet = 0;
+        foreach ($results as $row) {
+            $ledgerIncome += (float) $row->income;
+            $ledgerExpenses += (float) $row->expenses;
+            $ledgerNet += (float) $row->net_profit;
+        }
+
+        return [
+            'ledger_income' => $ledgerIncome,
+            'ledger_expenses' => $ledgerExpenses,
+            'ledger_net' => $ledgerNet,
+            'currency_breakdown' => array_map(function ($row) {
+                return [
+                    'currency_code' => $row->currency_code,
+                    'income' => (float) $row->income,
+                    'expenses' => (float) $row->expenses,
+                    'net_profit' => (float) $row->net_profit,
+                ];
+            }, $results),
+            'date_range' => ['from' => $fromDate, 'to' => $toDate],
         ];
     }
 }

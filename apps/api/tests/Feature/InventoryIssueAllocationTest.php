@@ -145,7 +145,7 @@ class InventoryIssueAllocationTest extends TestCase
         $this->assertCount(0, $allocationRows, 'GRN should not create allocation rows');
     }
 
-    public function test_issue_with_hari_only_creates_allocation_and_settlement(): void
+    public function test_issue_with_hari_only_creates_allocation_operational_ledger_only(): void
     {
         $issue = InvIssue::create([
             'tenant_id' => $this->tenant->id,
@@ -168,26 +168,31 @@ class InventoryIssueAllocationTest extends TestCase
         $postingService = app(InventoryPostingService::class);
         $postingGroup = $postingService->postIssue($issue->id, $this->tenant->id, '2024-06-15', 'issue-1');
 
-        // Verify AllocationRow created
         $allocationRows = AllocationRow::where('posting_group_id', $postingGroup->id)->get();
         $this->assertCount(1, $allocationRows);
         $allocationRow = $allocationRows->first();
         $this->assertEquals('HARI_ONLY', $allocationRow->allocation_type);
         $this->assertEquals($this->hariParty->id, $allocationRow->party_id);
-        $this->assertEquals('100.00', $allocationRow->amount); // 2 * 50
+        $this->assertEquals('100.00', $allocationRow->amount);
 
-        // Verify ledger entries are balanced
         $ledgerEntries = LedgerEntry::where('posting_group_id', $postingGroup->id)->get();
         $totalDebits = $ledgerEntries->sum('debit_amount');
         $totalCredits = $ledgerEntries->sum('credit_amount');
         $this->assertEquals($totalDebits, $totalCredits);
 
-        // Verify settlement balance entries exist (PAYABLE_HARI and clearing)
-        // NOTE: HARI_ONLY mode correctly uses PAYABLE_HARI because Hari pays 100% of the expense
-        $payableHariEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'PAYABLE_HARI';
-        });
-        $this->assertGreaterThan(0, $payableHariEntries->count(), 'HARI_ONLY should create PAYABLE_HARI (Hari pays 100%)');
+        // Inventory Issue: operational only — Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS. No party control or settlement.
+        $this->assertCount(2, $ledgerEntries, 'Inventory Issue must create exactly 2 ledger entries');
+        $inputsExpenseDebit = $ledgerEntries->filter(fn ($e) => $e->account->code === 'INPUTS_EXPENSE')->sum('debit_amount');
+        $inventoryCredit = $ledgerEntries->filter(fn ($e) => $e->account->code === 'INVENTORY_INPUTS')->sum('credit_amount');
+        $this->assertEquals('100.00', $inputsExpenseDebit, 'Expense must equal full issued inventory cost');
+        $this->assertEquals('100.00', $inventoryCredit);
+
+        $partyControlEntries = $ledgerEntries->filter(fn ($e) => str_starts_with($e->account->code ?? '', 'PARTY_CONTROL_'));
+        $this->assertCount(0, $partyControlEntries, 'Inventory Issue must NOT post to PARTY_CONTROL_*');
+        $profitDistributionEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION');
+        $this->assertCount(0, $profitDistributionEntries, 'Inventory Issue must NOT use PROFIT_DISTRIBUTION');
+        $clearingEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION_CLEARING');
+        $this->assertCount(0, $clearingEntries, 'Inventory Issue must NOT use PROFIT_DISTRIBUTION_CLEARING');
     }
 
     public function test_issue_with_farmer_only_creates_landlord_allocation(): void
@@ -256,45 +261,24 @@ class InventoryIssueAllocationTest extends TestCase
         $this->assertEquals('60.00', $landlordRow->amount); // 100 * 60%
         $this->assertEquals('40.00', $hariRow->amount); // 100 * 40%
 
-        // Verify ledger entries are balanced
         $ledgerEntries = LedgerEntry::where('posting_group_id', $postingGroup->id)->get();
         $totalDebits = $ledgerEntries->sum('debit_amount');
         $totalCredits = $ledgerEntries->sum('credit_amount');
         $this->assertEquals($totalDebits, $totalCredits);
 
-        // Verify correct accounting for shared expenses:
-        // 1. DUE_FROM_HARI entry exists with hari_share amount
-        $dueFromHariEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'DUE_FROM_HARI';
-        });
-        $this->assertCount(1, $dueFromHariEntries, 'DUE_FROM_HARI entry should exist');
-        $dueFromHariEntry = $dueFromHariEntries->first();
-        $this->assertEquals('40.00', $dueFromHariEntry->debit_amount);
-        $this->assertEquals('0', $dueFromHariEntry->credit_amount);
+        // Inventory Issue: operational only — Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS. No party control or settlement.
+        $this->assertCount(2, $ledgerEntries, 'Inventory Issue must create exactly 2 ledger entries');
+        $inputsExpenseDebit = $ledgerEntries->filter(fn ($e) => $e->account->code === 'INPUTS_EXPENSE')->sum('debit_amount');
+        $inventoryCredit = $ledgerEntries->filter(fn ($e) => $e->account->code === 'INVENTORY_INPUTS')->sum('credit_amount');
+        $this->assertEquals('100.00', $inputsExpenseDebit, 'Expense must equal full issued cost');
+        $this->assertEquals('100.00', $inventoryCredit);
 
-        // 2. INPUTS_EXPENSE has credit entry for hari_share (reducing expense)
-        $inputsExpenseEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'INPUTS_EXPENSE';
-        });
-        $this->assertCount(2, $inputsExpenseEntries, 'INPUTS_EXPENSE should have debit (full) and credit (hari share) entries');
-        $inputsExpenseDebit = $inputsExpenseEntries->sum('debit_amount');
-        $inputsExpenseCredit = $inputsExpenseEntries->sum('credit_amount');
-        $this->assertEquals('100.00', $inputsExpenseDebit, 'Full expense should be debited');
-        $this->assertEquals('40.00', $inputsExpenseCredit, 'Hari share should be credited (reducing expense)');
-        $netExpense = (float) $inputsExpenseDebit - (float) $inputsExpenseCredit;
-        $this->assertEquals(60.00, $netExpense, 'Net expense should equal landlord share');
-
-        // 3. No PROFIT_DISTRIBUTION entries
-        $profitDistributionEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'PROFIT_DISTRIBUTION';
-        });
-        $this->assertCount(0, $profitDistributionEntries, 'PROFIT_DISTRIBUTION should not be used for expenses');
-
-        // 4. No PAYABLE_HARI entries for SHARED mode
-        $payableHariEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'PAYABLE_HARI';
-        });
-        $this->assertCount(0, $payableHariEntries, 'PAYABLE_HARI should not be used for shared expenses');
+        $partyControlEntries = $ledgerEntries->filter(fn ($e) => str_starts_with($e->account->code ?? '', 'PARTY_CONTROL_'));
+        $this->assertCount(0, $partyControlEntries, 'Inventory Issue must NOT post to PARTY_CONTROL_*');
+        $profitDistributionEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION');
+        $this->assertCount(0, $profitDistributionEntries, 'PROFIT_DISTRIBUTION should not be used');
+        $clearingEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION_CLEARING');
+        $this->assertCount(0, $clearingEntries, 'PROFIT_DISTRIBUTION_CLEARING must NOT be used for Inventory Issue');
     }
 
     public function test_issue_with_shared_and_explicit_percentages(): void
@@ -329,9 +313,9 @@ class InventoryIssueAllocationTest extends TestCase
         $this->assertEquals('30.00', $hariRow->amount); // 100 * 30%
     }
 
-    public function test_shared_inventory_expense_creates_receivable_not_payable(): void
+    public function test_shared_inventory_expense_operational_ledger_only(): void
     {
-        // This test specifically verifies the accounting fix: shared expenses create DUE_FROM_HARI, not PAYABLE_HARI
+        // Inventory Issue (any allocation mode): only Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS. No party control or settlement.
         $issue = InvIssue::create([
             'tenant_id' => $this->tenant->id,
             'doc_no' => 'ISS-SHARED-TEST',
@@ -348,48 +332,31 @@ class InventoryIssueAllocationTest extends TestCase
             'tenant_id' => $this->tenant->id,
             'issue_id' => $issue->id,
             'item_id' => $this->item->id,
-            'qty' => 2, // Total value = 100.00
+            'qty' => 2,
         ]);
 
         $postingService = app(InventoryPostingService::class);
         $postingGroup = $postingService->postIssue($issue->id, $this->tenant->id, '2024-06-15', 'shared-test');
 
-        $ledgerEntries = LedgerEntry::where('posting_group_id', $postingGroup->id)
-            ->with('account')
-            ->get();
+        $ledgerEntries = LedgerEntry::where('posting_group_id', $postingGroup->id)->with('account')->get();
 
-        // Verify DUE_FROM_HARI is created (receivable)
-        $dueFromHariEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'DUE_FROM_HARI';
-        });
-        $this->assertCount(1, $dueFromHariEntries, 'DUE_FROM_HARI should be created for shared expenses');
-        $this->assertEquals('30.00', $dueFromHariEntries->first()->debit_amount, 'DUE_FROM_HARI should equal hari share');
+        $this->assertCount(2, $ledgerEntries);
+        $inputsExpenseDebit = $ledgerEntries->filter(fn ($e) => $e->account->code === 'INPUTS_EXPENSE')->sum('debit_amount');
+        $this->assertEquals('100.00', $inputsExpenseDebit, 'Expense must equal full issued inventory cost');
 
-        // Verify INPUTS_EXPENSE is reduced
-        $inputsExpenseEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'INPUTS_EXPENSE';
-        });
-        $inputsExpenseDebit = $inputsExpenseEntries->sum('debit_amount');
-        $inputsExpenseCredit = $inputsExpenseEntries->sum('credit_amount');
-        $netExpense = (float) $inputsExpenseDebit - (float) $inputsExpenseCredit;
-        $this->assertEquals(70.00, $netExpense, 'Net expense should equal landlord share (70%)');
-
-        // Verify no PAYABLE_HARI
-        $payableHariEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'PAYABLE_HARI';
-        });
-        $this->assertCount(0, $payableHariEntries, 'PAYABLE_HARI should NOT be created for shared expenses');
-
-        // Verify no PROFIT_DISTRIBUTION
-        $profitDistributionEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'PROFIT_DISTRIBUTION';
-        });
-        $this->assertCount(0, $profitDistributionEntries, 'PROFIT_DISTRIBUTION should NOT be used for expenses');
+        $partyControlEntries = $ledgerEntries->filter(fn ($e) => str_starts_with($e->account->code ?? '', 'PARTY_CONTROL_'));
+        $this->assertCount(0, $partyControlEntries, 'Inventory Issue must NOT post to PARTY_CONTROL_*');
+        $payableHariEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PAYABLE_HARI');
+        $this->assertCount(0, $payableHariEntries);
+        $profitDistributionEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION');
+        $this->assertCount(0, $profitDistributionEntries);
+        $clearingEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION_CLEARING');
+        $this->assertCount(0, $clearingEntries, 'Inventory Issue must NOT use PROFIT_DISTRIBUTION_CLEARING');
     }
 
-    public function test_hari_only_inventory_expense_still_creates_payable(): void
+    public function test_hari_only_inventory_expense_operational_ledger_only(): void
     {
-        // Verify HARI_ONLY mode still creates PAYABLE_HARI (unchanged behavior - this is correct)
+        // Inventory Issue: only Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS. No PARTY_CONTROL_*, no PROFIT_DISTRIBUTION_CLEARING.
         $issue = InvIssue::create([
             'tenant_id' => $this->tenant->id,
             'doc_no' => 'ISS-HARI-ONLY-TEST',
@@ -405,28 +372,24 @@ class InventoryIssueAllocationTest extends TestCase
             'tenant_id' => $this->tenant->id,
             'issue_id' => $issue->id,
             'item_id' => $this->item->id,
-            'qty' => 2, // Total value = 100.00
+            'qty' => 2,
         ]);
 
         $postingService = app(InventoryPostingService::class);
         $postingGroup = $postingService->postIssue($issue->id, $this->tenant->id, '2024-06-15', 'hari-only-test');
 
-        $ledgerEntries = LedgerEntry::where('posting_group_id', $postingGroup->id)
-            ->with('account')
-            ->get();
+        $ledgerEntries = LedgerEntry::where('posting_group_id', $postingGroup->id)->with('account')->get();
 
-        // Verify PAYABLE_HARI is created (correct for HARI_ONLY)
-        $payableHariEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'PAYABLE_HARI';
-        });
-        $this->assertCount(1, $payableHariEntries, 'HARI_ONLY should create PAYABLE_HARI');
-        $this->assertEquals('100.00', $payableHariEntries->first()->debit_amount);
+        $partyControlEntries = $ledgerEntries->filter(fn ($e) => str_starts_with($e->account->code ?? '', 'PARTY_CONTROL_'));
+        $this->assertCount(0, $partyControlEntries, 'Inventory Issue must NOT create ledger entries to PARTY_CONTROL_*');
+        $clearingEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION_CLEARING');
+        $this->assertCount(0, $clearingEntries, 'Inventory Issue must NOT use PROFIT_DISTRIBUTION_CLEARING');
+        $profitDistributionEntries = $ledgerEntries->filter(fn ($e) => $e->account->code === 'PROFIT_DISTRIBUTION');
+        $this->assertCount(0, $profitDistributionEntries);
 
-        // Verify no DUE_FROM_HARI (not used for HARI_ONLY)
-        $dueFromHariEntries = $ledgerEntries->filter(function ($e) {
-            return $e->account->code === 'DUE_FROM_HARI';
-        });
-        $this->assertCount(0, $dueFromHariEntries, 'DUE_FROM_HARI should NOT be used for HARI_ONLY');
+        $inputsExpenseDebit = $ledgerEntries->filter(fn ($e) => $e->account->code === 'INPUTS_EXPENSE')->sum('debit_amount');
+        $this->assertEquals('100.00', $inputsExpenseDebit, 'Expense must equal full issued inventory cost');
+        $this->assertCount(2, $ledgerEntries, 'Only Dr INPUTS_EXPENSE, Cr INVENTORY_INPUTS');
     }
 
     public function test_issue_with_shared_and_share_rule(): void
