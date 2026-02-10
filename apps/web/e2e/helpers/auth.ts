@@ -1,5 +1,5 @@
 import { Page } from '@playwright/test';
-import { setAuthContext } from './headers';
+import { setAuthContext, addAuthContextInitScript } from './headers';
 import { expectAppShellVisible } from './asserts';
 import { gotoLogin } from './nav';
 import { getDefaultTenantId } from './data';
@@ -37,10 +37,17 @@ const ROLE_LANDING_ROUTES: Record<UserRole, string> = {
 };
 
 /**
- * Set API auth cookie via dev-only endpoint so E2E requests are authenticated (cookie-based).
- * Parses Set-Cookie from response and adds cookie to page context for the API origin.
+ * Set API auth cookie via dev-only endpoint; inject for BOTH BASE_URL and API_URL origins
+ * so transaction pages work whether the frontend uses Vite proxy (/api on :3000) or direct API (:8000).
  */
-async function setAuthCookieViaApi(page: Page, apiUrl: string, tenantId: string, role: UserRole, userId: string): Promise<void> {
+async function setAuthCookieViaApi(
+  page: Page,
+  apiUrl: string,
+  baseUrl: string,
+  tenantId: string,
+  role: UserRole,
+  userId: string
+): Promise<void> {
   const res = await fetch(`${apiUrl}/api/dev/e2e/auth-cookie`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -58,20 +65,19 @@ async function setAuthCookieViaApi(page: Page, apiUrl: string, tenantId: string,
   if (!match) {
     throw new Error('E2E auth-cookie: could not parse farm_erp_auth_token from Set-Cookie.');
   }
-  const hostname = new URL(apiUrl).hostname;
+  const value = match[1].trim();
+  const apiOrigin = apiUrl.replace(/\/$/, '');
+  const baseOrigin = baseUrl.replace(/\/$/, '');
   await page.context().addCookies([
-    {
-      name: 'farm_erp_auth_token',
-      value: match[1].trim(),
-      domain: hostname,
-      path: '/',
-    },
+    { name: 'farm_erp_auth_token', value, url: baseOrigin },
+    { name: 'farm_erp_auth_token', value, url: apiOrigin },
   ]);
 }
 
 /**
- * DEV-mode auth bypass: set localStorage, set API auth cookie via dev endpoint, then go to role landing route.
- * Requires seed state with user IDs so the auth-cookie endpoint can set the cookie.
+ * DEV-mode auth bypass: set tenant/role/user in localStorage before any load (addInitScript),
+ * set auth cookie for both BASE_URL and API_URL origins, then go straight to role landing route.
+ * Works whether the frontend calls API via Vite proxy (/api on :3000) or direct API_URL (:8000).
  */
 export async function loginDev(page: Page, options: LoginDevOptions): Promise<void> {
   const userId = options.seed[ROLE_USER_ID_KEYS[options.role]] as string | undefined;
@@ -81,17 +87,17 @@ export async function loginDev(page: Page, options: LoginDevOptions): Promise<vo
     );
   }
 
-  const apiUrl = process.env.API_URL || 'http://localhost:8000';
-  await setAuthCookieViaApi(page, apiUrl, options.tenantId, options.role, userId);
-
-  await page.goto('/');
   const tenantIdForStorage = options.role === 'platform_admin' ? '' : options.tenantId;
-  await setAuthContext(page, {
+  await addAuthContextInitScript(page, {
     tenantId: tenantIdForStorage,
     userRole: options.role,
     userId,
   });
-  await page.reload();
+
+  const apiUrl = process.env.API_URL || 'http://localhost:8000';
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  await setAuthCookieViaApi(page, apiUrl, baseUrl, options.tenantId, options.role, userId);
+
   const landingRoute = ROLE_LANDING_ROUTES[options.role];
   await page.goto(landingRoute);
   await expectAppShellVisible(page);

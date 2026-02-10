@@ -42,7 +42,7 @@ class Tenant extends Model
 
     /**
      * Whether the given module key is enabled for this tenant.
-     * If no tenant_module row exists: core modules are enabled, non-core are disabled.
+     * Core modules are always enabled. For non-core, if no tenant_module row exists they are disabled.
      */
     public function isModuleEnabled(string $key): bool
     {
@@ -50,10 +50,13 @@ class Tenant extends Model
         if (!$module) {
             return false;
         }
+        if ($module->is_core) {
+            return true;
+        }
         $tm = TenantModule::where('tenant_id', $this->id)->where('module_id', $module->id)->first();
         if ($tm) {
             return $tm->status === 'ENABLED';
         }
-        return $module->is_core;
+        return false;
     }
 }

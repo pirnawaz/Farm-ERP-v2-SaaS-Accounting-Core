@@ -24,6 +24,8 @@ if (fs.existsSync(envPath)) {
   }
 }
 
+const baseURL = process.env.BASE_URL || 'http://localhost:3000';
+
 export default defineConfig({
   testDir: path.resolve(__dirname, 'e2e'),
   globalSetup: path.join(__dirname, 'e2e', 'globalSetup.ts'),
@@ -36,12 +38,18 @@ export default defineConfig({
     ['list'],
   ],
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
   timeout: 90_000,
   expect: { timeout: 15_000 },
+  webServer: {
+    command: 'npm run dev:e2e',
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

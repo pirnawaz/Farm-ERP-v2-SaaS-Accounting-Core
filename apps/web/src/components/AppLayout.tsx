@@ -218,10 +218,12 @@ export function AppLayout() {
                 if (group.items.length === 1) {
                   const item = group.items[0];
                   const isActive = location.pathname === item.href;
+                  const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
                   return (
                     <Link
                       key={item.name}
                       to={item.href}
+                      data-testid={navTestId}
                       className={`${
                         isActive
                           ? 'bg-[#E6ECEA] text-[#1F6F5C]'
@@ -258,10 +260,12 @@ export function AppLayout() {
                       <div className="ml-4 mt-1 space-y-1">
                         {group.items.map((item) => {
                           const isActive = location.pathname === item.href;
+                          const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
                           return (
                             <Link
                               key={item.name}
                               to={item.href}
+                              data-testid={navTestId}
                               className={`${
                                 isActive
                                   ? 'bg-[#E6ECEA] text-[#1F6F5C]'
@@ -311,10 +315,12 @@ export function AppLayout() {
                   if (group.items.length === 1) {
                     const item = group.items[0];
                     const isActive = location.pathname === item.href;
+                    const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
                     return (
                       <Link
                         key={item.name}
                         to={item.href}
+                        data-testid={navTestId}
                         onClick={() => setSidebarOpen(false)}
                         className={`${
                           isActive
@@ -352,10 +358,12 @@ export function AppLayout() {
                         <div className="ml-4 mt-1 space-y-1">
                           {group.items.map((item) => {
                             const isActive = location.pathname === item.href;
+                            const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
                             return (
                               <Link
                                 key={item.name}
                                 to={item.href}
+                                data-testid={navTestId}
                                 onClick={() => setSidebarOpen(false)}
                                 className={`${
                                   isActive

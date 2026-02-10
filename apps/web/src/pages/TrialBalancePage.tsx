@@ -73,7 +73,7 @@ function TrialBalancePage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center no-print">
-        <h2 className="text-2xl font-bold">Trial Balance</h2>
+        <h2 className="text-2xl font-bold" data-testid="report-heading-trial-balance">Trial Balance</h2>
         <div className="flex gap-2">
           <button
             onClick={() => window.print()}

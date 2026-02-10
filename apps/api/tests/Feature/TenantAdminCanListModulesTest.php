@@ -24,13 +24,22 @@ class TenantAdminCanListModulesTest extends TestCase
         $this->assertIsArray($data['modules']);
 
         $keys = array_column($data['modules'], 'key');
-        $this->assertContains('accounting_core', $keys);
+        $coreKeys = ['accounting_core', 'projects_crop_cycles', 'reports', 'treasury_payments'];
+        foreach ($coreKeys as $key) {
+            $this->assertContains($key, $keys);
+        }
 
-        $accountingCore = collect($data['modules'])->firstWhere('key', 'accounting_core');
-        $this->assertNotNull($accountingCore);
-        $this->assertTrue($accountingCore['enabled']);
-        $this->assertEquals('ENABLED', $accountingCore['status']);
-        $this->assertTrue($accountingCore['is_core']);
+        foreach ($coreKeys as $key) {
+            $module = collect($data['modules'])->firstWhere('key', $key);
+            $this->assertNotNull($module, "Core module {$key} should be in list");
+            $this->assertTrue($module['enabled'], "Core module {$key} should be enabled");
+            $this->assertEquals('ENABLED', $module['status']);
+            $this->assertTrue($module['is_core'], "Module {$key} should be core");
+        }
+
+        $land = collect($data['modules'])->firstWhere('key', 'land');
+        $this->assertNotNull($land);
+        $this->assertFalse($land['is_core'], 'land should not be core');
 
         foreach ($data['modules'] as $m) {
             $this->assertArrayHasKey('key', $m);

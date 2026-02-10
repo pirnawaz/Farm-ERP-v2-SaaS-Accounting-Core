@@ -75,6 +75,7 @@ Route::prefix('dev')->middleware('dev')->group(function () {
     Route::post('e2e/seed', [DevE2ESeedController::class, 'seed']);
     Route::get('e2e/seed-state', [DevE2ESeedController::class, 'seedState']);
     Route::post('e2e/auth-cookie', [DevE2ESeedController::class, 'authCookie']);
+    Route::get('e2e/accounting-artifacts', [DevE2ESeedController::class, 'accountingArtifacts']);
 });
 
 // Users (tenant_admin only)

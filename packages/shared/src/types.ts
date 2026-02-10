@@ -167,8 +167,10 @@ export type ModuleKey =
   | 'settlements'
   | 'reports'
   | 'inventory'
+  | 'labour'
   | 'machinery'
   | 'loans'
+  | 'crop_ops'
 
 export interface TenantModuleItem {
   key: string

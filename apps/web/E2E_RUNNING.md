@@ -11,6 +11,9 @@ The E2E suite **verifies that core accounting rules are respected** in the appli
 - Posting requires a valid date and creates a posting group and ledger entries.
 - Posting into a **closed** crop cycle is rejected (error message; status stays DRAFT).
 - Reversals create a new posting group and leave the original immutable.
+- **Module gating**: Tenant module state is set via API (not UI); nav hidden, routes redirect, and API returns 403 when a module is disabled (see `e2e/modules/module-gating.spec.ts` and `e2e/contracts/modules.contract.ts`).
+- **Accounting invariant**: DRAFT payment has no posting group; after POST, posting group exists, ledger is balanced, and trial balance updates (see `e2e/accounting/accounting-invariants.spec.ts`).
+- **Module Toggles UI**: One smoke test covers the Admin → Module Toggles screen (core disabled, save and persist); all other tests use API/db for module state (see `e2e/admin/module-toggles.spec.ts`).
 
 **When a test fails:** Playwright captures **screenshots and videos** for the failing step. After the run, open the HTML report to see exactly what the app showed when the assertion failed:
 
@@ -79,9 +82,13 @@ Reports are under `apps/web/playwright-report/` (and `test-results/` for traces/
 
 ## Prerequisites
 
-- **Web app** running at `BASE_URL` (default `http://localhost:3000`).
-- **API** running at `API_URL` (default `http://localhost:8000`).
+- **You do NOT need to run the web app manually.** `npm run e2e` starts it automatically via Playwright’s `webServer`: it runs `npm run dev:e2e` (Vite with `--mode e2e --port 3000 --strictPort`), waits until the app is ready, then runs tests. The app loads `.env.e2e` so `VITE_API_URL=http://localhost:8000` is applied and the browser calls `http://localhost:8000/api/...` (not the proxy on 3000).
+- **API** must be running at `API_URL` (default `http://localhost:8000`) before you run E2E.
 - For **deterministic E2E**: API must have `APP_DEBUG=true` so dev routes are enabled. `globalSetup` calls `POST /api/dev/e2e/seed` (unauthenticated); the API seeds an E2E tenant, OPEN crop cycle, project, and operational records (DRAFT, POSTED, reversal-ready), then returns IDs. `globalSetup` writes these to `apps/web/e2e/.seed-state.json` (this file is gitignored). Tests that depend on seed data (e.g. `30-accounting-core.spec.ts`) read `.seed-state.json` and skip with a clear message if the file is missing (e.g. seed failed or API was down).
+
+### Web server (automatic)
+
+Playwright’s `webServer` in `playwright.config.ts` runs `npm run dev:e2e` before tests. That starts Vite with `--mode e2e --port 3000 --strictPort`, which loads `.env.e2e` and sets `VITE_API_URL`, so the app in the browser hits `http://localhost:8000/api/...`. When not in CI, `reuseExistingServer: true` is used, so if you already have the E2E dev server running on 3000, Playwright will reuse it. Ensure `.env.e2e` contains `VITE_API_URL=http://localhost:8000` (see `.env.e2e.example`).
 
 ## Adding data-testid hooks
 

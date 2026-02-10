@@ -58,7 +58,7 @@ export default function ModuleTogglePage() {
   }
 
   return (
-    <div>
+    <div data-testid="module-toggles-page">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Module Toggles</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -75,12 +75,13 @@ export default function ModuleTogglePage() {
               <li
                 key={m.key}
                 className="px-4 py-3 flex items-center justify-between gap-4"
+                data-testid={`module-row-${m.key}`}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-gray-900">{m.name}</span>
                     {m.is_core && (
-                      <span className="px-2 py-0.5 text-xs rounded bg-amber-100 text-amber-800">
+                      <span className="px-2 py-0.5 text-xs rounded bg-amber-100 text-amber-800" data-testid="module-badge-core">
                         Core
                       </span>
                     )}
@@ -95,6 +96,7 @@ export default function ModuleTogglePage() {
                     role="switch"
                     aria-checked={enabled}
                     disabled={!canToggle}
+                    data-testid={`module-toggle-${m.key}`}
                     onClick={() => handleToggle(m.key, m.is_core, enabled)}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
                       enabled ? 'bg-[#1F6F5C]' : 'bg-gray-200'
@@ -116,6 +118,7 @@ export default function ModuleTogglePage() {
             type="button"
             onClick={handleSave}
             disabled={updateMutation.isPending}
+            data-testid="module-toggles-save"
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {updateMutation.isPending ? 'Saving...' : 'Save'}

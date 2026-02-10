@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Dev;
 
 use App\Http\Controllers\Controller;
+use App\Models\LedgerEntry;
+use App\Models\PostingGroup;
 use App\Models\User;
 use App\Services\Dev\E2ESeedService;
 use Illuminate\Http\JsonResponse;
@@ -106,5 +108,56 @@ class DevE2ESeedController extends Controller
         );
 
         return response()->json(['ok' => true])->cookie($cookie);
+    }
+
+    /**
+     * GET /api/dev/e2e/accounting-artifacts
+     * Test-only: return posting group and ledger balance for a source (e.g. Payment).
+     * Query: tenant_id (required), source_type (e.g. ADJUSTMENT), source_id (uuid).
+     * Only available when APP_ENV=testing or local (dev middleware).
+     */
+    public function accountingArtifacts(Request $request): JsonResponse
+    {
+        $tenantId = $request->query('tenant_id');
+        $sourceType = $request->query('source_type');
+        $sourceId = $request->query('source_id');
+
+        if (!$tenantId || !\Illuminate\Support\Str::isUuid($tenantId)) {
+            return response()->json(['error' => 'Valid tenant_id required'], 422);
+        }
+        if (!$sourceType || !$sourceId || !\Illuminate\Support\Str::isUuid($sourceId)) {
+            return response()->json(['error' => 'Valid source_type and source_id required'], 422);
+        }
+
+        $pg = PostingGroup::where('tenant_id', $tenantId)
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->first();
+
+        if (!$pg) {
+            return response()->json([
+                'posting_group_id' => null,
+                'ledger_entry_count' => 0,
+                'total_debit' => '0',
+                'total_credit' => '0',
+                'balanced' => true,
+            ]);
+        }
+
+        $totals = LedgerEntry::where('posting_group_id', $pg->id)
+            ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(debit_amount), 0) as total_debit, COALESCE(SUM(credit_amount), 0) as total_credit')
+            ->first();
+
+        $totalDebit = (string) $totals->total_debit;
+        $totalCredit = (string) $totals->total_credit;
+        $balanced = abs((float) $totalDebit - (float) $totalCredit) < 0.01;
+
+        return response()->json([
+            'posting_group_id' => $pg->id,
+            'ledger_entry_count' => (int) $totals->cnt,
+            'total_debit' => $totalDebit,
+            'total_credit' => $totalCredit,
+            'balanced' => $balanced,
+        ]);
     }
 }

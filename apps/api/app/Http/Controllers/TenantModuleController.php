@@ -29,12 +29,15 @@ class TenantModuleController extends Controller
 
         $items = $modules->map(function (Module $m) use ($pivots) {
             $pivot = $pivots->get($m->id);
-            if ($pivot) {
+            if ($m->is_core) {
+                $enabled = true;
+                $status = 'ENABLED';
+            } elseif ($pivot) {
                 $enabled = $pivot->status === 'ENABLED';
                 $status = $pivot->status;
             } else {
-                $enabled = $m->is_core;
-                $status = $m->is_core ? 'ENABLED' : 'DISABLED';
+                $enabled = false;
+                $status = 'DISABLED';
             }
             return [
                 'key' => $m->key,
