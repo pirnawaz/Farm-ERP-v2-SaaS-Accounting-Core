@@ -49,7 +49,7 @@ function PostingGroupDetailPage() {
       )
       setShowReverseModal(false)
       setReverseReason('')
-      navigate(`/posting-groups/${reversal.id}`)
+      navigate(`/app/posting-groups/${reversal.id}`)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to reverse posting group')
     } finally {
@@ -85,11 +85,13 @@ function PostingGroupDetailPage() {
       </div>
 
       {/* Posting Group Info */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow p-6" data-testid="posting-group-panel">
         <div className="flex justify-between items-start mb-4">
           <h3 className="text-lg font-semibold">Posting Group Information</h3>
           {postingGroup.source_type !== 'REVERSAL' && (
             <button
+              type="button"
+              data-testid="create-correction-btn"
               onClick={() => setShowReverseModal(true)}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
@@ -124,7 +126,7 @@ function PostingGroupDetailPage() {
                 <dt className="text-sm font-medium text-gray-500">Reversal Of</dt>
                 <dd className="mt-1 text-sm text-gray-900">
                   <Link
-                    to={`/posting-groups/${postingGroup.reversal_of_posting_group_id}`}
+                    to={`/app/posting-groups/${postingGroup.reversal_of_posting_group_id}`}
                     className="text-[#1F6F5C] hover:underline"
                   >
                     {postingGroup.reversal_of_posting_group_id}
@@ -143,7 +145,7 @@ function PostingGroupDetailPage() {
       </div>
 
       {/* Allocation Rows */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-hidden" data-testid="allocation-rows-table">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold">Allocation Rows</h3>
         </div>
@@ -209,7 +211,7 @@ function PostingGroupDetailPage() {
       </div>
 
       {/* Ledger Entries */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-hidden" data-testid="ledger-entries-table">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold">Ledger Entries</h3>
         </div>

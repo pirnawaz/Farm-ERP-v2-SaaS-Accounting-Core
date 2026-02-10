@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { GeneralLedgerLine, Project, Account, apiClient } from '@farm-erp/shared'
 import { exportToCSV } from '../utils/csvExport'
 import { useFormatting } from '../hooks/useFormatting'
 import { PrintableReport } from '../components/print/PrintableReport'
 
+const defaultFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
+const defaultTo = new Date().toISOString().split('T')[0]
+
 function GeneralLedgerPage() {
+  const [searchParams] = useSearchParams()
   const { formatMoney, formatDate } = useFormatting()
   const [data, setData] = useState<GeneralLedgerLine[]>([])
   const [pagination, setPagination] = useState({ page: 1, per_page: 50, total: 0, last_page: 1 })
@@ -13,15 +17,29 @@ function GeneralLedgerPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
+  const fromParam = searchParams.get('from') ?? defaultFrom
+  const toParam = searchParams.get('to') ?? defaultTo
+  const projectIdParam = searchParams.get('project_id') ?? ''
+
   const [filters, setFilters] = useState({
-    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+    from: fromParam,
+    to: toParam,
     account_id: '',
-    project_id: '',
+    project_id: projectIdParam,
     page: 1,
     per_page: 50,
   })
+
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      from: fromParam,
+      to: toParam,
+      project_id: projectIdParam,
+      page: 1,
+    }))
+  }, [fromParam, toParam, projectIdParam])
 
   useEffect(() => {
     const fetchOptions = async () => {

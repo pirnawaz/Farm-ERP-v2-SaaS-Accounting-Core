@@ -7,6 +7,7 @@ import {
   type RateCardFilters,
   type ChargeFilters,
   type MaintenanceJobFilters,
+  type MachineryServiceFilters,
   type ProfitabilityReportFilters,
 } from '../api/machinery';
 import type {
@@ -26,6 +27,10 @@ import type {
   UpdateMachineMaintenanceJobPayload,
   PostMachineMaintenanceJobRequest,
   ReverseMachineMaintenanceJobRequest,
+  CreateMachineryServicePayload,
+  UpdateMachineryServicePayload,
+  PostMachineryServiceRequest,
+  ReverseMachineryServiceRequest,
 } from '../types';
 import toast from 'react-hot-toast';
 
@@ -443,6 +448,78 @@ export function useReverseMaintenanceJob() {
       toast.success('Maintenance job reversed');
     },
     onError: (e: unknown) => toast.error(err(e) || 'Failed to reverse maintenance job'),
+  });
+}
+
+// Machinery Services
+export function useMachineryServicesQuery(f?: MachineryServiceFilters) {
+  return useQuery({
+    queryKey: ['machinery', 'machinery-services', f],
+    queryFn: () => machineryApi.machineryServices.list(f),
+    staleTime: 20 * 1000,
+    gcTime: 2 * 60 * 1000,
+  });
+}
+
+export function useMachineryServiceQuery(id: string) {
+  return useQuery({
+    queryKey: ['machinery', 'machinery-services', id],
+    queryFn: () => machineryApi.machineryServices.get(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateMachineryService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: CreateMachineryServicePayload) => machineryApi.machineryServices.create(p),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['machinery', 'machinery-services'] });
+      toast.success('Service created');
+    },
+    onError: (e: unknown) => toast.error(err(e) || 'Failed to create service'),
+  });
+}
+
+export function useUpdateMachineryService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateMachineryServicePayload }) =>
+      machineryApi.machineryServices.update(id, payload),
+    onSuccess: (_, v) => {
+      qc.invalidateQueries({ queryKey: ['machinery', 'machinery-services'] });
+      qc.invalidateQueries({ queryKey: ['machinery', 'machinery-services', v.id] });
+      toast.success('Service updated');
+    },
+    onError: (e: unknown) => toast.error(err(e) || 'Failed to update service'),
+  });
+}
+
+export function usePostMachineryService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: PostMachineryServiceRequest }) =>
+      machineryApi.machineryServices.post(id, payload),
+    onSuccess: (_, v) => {
+      qc.invalidateQueries({ queryKey: ['machinery', 'machinery-services'] });
+      qc.invalidateQueries({ queryKey: ['machinery', 'machinery-services', v.id] });
+      toast.success('Service posted');
+    },
+    onError: (e: unknown) => toast.error(err(e) || 'Failed to post service'),
+  });
+}
+
+export function useReverseMachineryService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ReverseMachineryServiceRequest }) =>
+      machineryApi.machineryServices.reverse(id, payload),
+    onSuccess: (_, v) => {
+      qc.invalidateQueries({ queryKey: ['machinery', 'machinery-services'] });
+      qc.invalidateQueries({ queryKey: ['machinery', 'machinery-services', v.id] });
+      toast.success('Service reversed');
+    },
+    onError: (e: unknown) => toast.error(err(e) || 'Failed to reverse service'),
   });
 }
 

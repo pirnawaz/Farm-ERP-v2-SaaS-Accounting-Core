@@ -272,11 +272,10 @@ class MachineMaintenanceJobPostingTest extends TestCase
             $reversalCreditTotal += (float) $entry->credit_amount;
         }
 
-        // Combined totals should net to zero
-        $netDebit = $originalDebitTotal + $reversalDebitTotal;
-        $netCredit = $originalCreditTotal + $reversalCreditTotal;
-        $this->assertEqualsWithDelta(0, $netDebit, 0.01);
-        $this->assertEqualsWithDelta(0, $netCredit, 0.01);
+        // Combined ledger is balanced (reversal swaps debit/credit so total debits = total credits)
+        $totalDebits = $originalDebitTotal + $reversalDebitTotal;
+        $totalCredits = $originalCreditTotal + $reversalCreditTotal;
+        $this->assertEqualsWithDelta($totalDebits, $totalCredits, 0.01, 'Ledger should remain balanced after reversal');
     }
 
     public function test_post_without_vendor_uses_accrued_expenses(): void
@@ -301,7 +300,7 @@ class MachineMaintenanceJobPostingTest extends TestCase
         $postingDate = '2024-06-15';
         $job = $this->createDraftJob($tenant, $machine, null); // No vendor party
 
-        // Post job
+        // Post job (service uses INTERNAL party fallback when no vendor)
         $post = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->postJson("/api/v1/machinery/maintenance-jobs/{$job->id}/post", [
@@ -311,6 +310,13 @@ class MachineMaintenanceJobPostingTest extends TestCase
         $post->assertStatus(201);
 
         $pgId = $post->json('posting_group')['id'];
+
+        // Allocation row must use an INTERNAL party (deterministic fallback, not arbitrary tenant party)
+        $allocationRow = AllocationRow::where('posting_group_id', $pgId)->first();
+        $this->assertNotNull($allocationRow);
+        $party = Party::find($allocationRow->party_id);
+        $this->assertNotNull($party);
+        $this->assertContains('INTERNAL', $party->party_types ?? [], 'Allocation row party must be INTERNAL when no vendor');
 
         // Check that ACCRUED_EXPENSES is used (not AP)
         $entries = LedgerEntry::where('posting_group_id', $pgId)->get();

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import { useSettlementPreview, usePostSettlement, useSettlementOffsetPreview } from '../hooks/useSettlement';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
+import { useFormatting } from '../hooks/useFormatting';
 import { settlementPreviewSchema, settlementPostSchema } from '../validation/settlementSchema';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
+import type { SettlementPreview } from '../types';
 
 export default function SettlementPage() {
   const { data: projects } = useProjects();
@@ -15,8 +18,10 @@ export default function SettlementPage() {
   const { canSettle } = useRole();
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [upToDate, setUpToDate] = useState(new Date().toISOString().split('T')[0]);
-  const [preview, setPreview] = useState<any>(null);
+  const [preview, setPreview] = useState<SettlementPreview | null>(null);
+  const [expensesSectionExpanded, setExpensesSectionExpanded] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
+  const { formatMoney } = useFormatting();
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
   const [idempotencyKey] = useState(uuidv4());
   const [applyAdvanceOffset, setApplyAdvanceOffset] = useState(false);
@@ -104,6 +109,7 @@ export default function SettlementPage() {
       );
       setShowPostModal(false);
       setPreview(null);
+      setExpensesSectionExpanded(false);
       setApplyAdvanceOffset(false);
       setAdvanceOffsetAmount('');
     } catch (error: any) {
@@ -169,70 +175,175 @@ export default function SettlementPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Total Revenue</dt>
-                <dd className="text-xl font-semibold text-gray-900">
-                  {typeof preview.total_revenue === 'number' ? Number(preview.total_revenue).toFixed(2) : preview.total_revenue}
+                <dd className="text-xl font-semibold text-gray-900 tabular-nums">
+                  {formatMoney(preview.total_revenue)}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Total Expenses</dt>
-                <dd className="text-xl font-semibold text-gray-900">
-                  {typeof preview.total_expenses === 'number' ? Number(preview.total_expenses).toFixed(2) : preview.total_expenses}
+                <dt className="text-sm font-medium text-gray-500">Total expenses (including party-only)</dt>
+                <dd className="text-xl font-semibold text-gray-900 tabular-nums">
+                  {formatMoney(preview.total_expenses)}
                 </dd>
+                {(preview.expenses_included ?? preview.expenses_considered) && (
+                  <div className="mt-2">
+                    <Link
+                      to={`/app/reports/general-ledger?from=${encodeURIComponent((preview.expenses_included ?? preview.expenses_considered)!.from)}&to=${encodeURIComponent((preview.expenses_included ?? preview.expenses_considered)!.to)}&project_id=${encodeURIComponent(selectedProjectId)}`}
+                      className="text-sm text-[#1F6F5C] hover:underline font-medium"
+                    >
+                      View expense postings →
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
+
+            {(preview.expenses_included ?? preview.expenses_considered) && (
+              <div className="border-b pb-4">
+                <h3 className="text-sm font-medium text-[#2D3A3A] mb-2">Expenses included in this settlement</h3>
+                {preview.expenses_included ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-baseline text-sm">
+                      <span className="text-gray-600">Total:</span>
+                      <span className="font-semibold text-gray-900 tabular-nums">{formatMoney(preview.expenses_included.total_expenses)}</span>
+                    </div>
+                    <div className="text-gray-500 text-xs mb-2">
+                      {preview.expenses_included.posting_groups_count} posting(s) included
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-[#E6ECEA]/50 rounded-md p-3">
+                        <div className="text-xs font-medium text-gray-500 mb-1">Pool (shared)</div>
+                        <div className="font-semibold tabular-nums">{formatMoney(preview.expenses_included.shared_pool_expenses)}</div>
+                        {preview.expenses_included.breakdown.pool.length > 0 && (
+                          <ul className="mt-1 space-y-0.5 text-xs text-gray-700">
+                            {preview.expenses_included.breakdown.pool.slice(0, 4).map((line, i) => (
+                              <li key={i} className="flex justify-between"><span className="truncate pr-1">{line.label}</span><span className="shrink-0">{formatMoney(line.amount)}</span></li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className="bg-[#E6ECEA]/50 rounded-md p-3">
+                        <div className="text-xs font-medium text-gray-500 mb-1">Hari-only</div>
+                        <div className="font-semibold tabular-nums">{formatMoney(preview.expenses_included.hari_only_deductions)}</div>
+                        {preview.expenses_included.breakdown.hari_only.length > 0 && (
+                          <ul className="mt-1 space-y-0.5 text-xs text-gray-700">
+                            {preview.expenses_included.breakdown.hari_only.slice(0, 4).map((line, i) => (
+                              <li key={i} className="flex justify-between"><span className="truncate pr-1">{line.label}</span><span className="shrink-0">{formatMoney(line.amount)}</span></li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className="bg-[#E6ECEA]/50 rounded-md p-3">
+                        <div className="text-xs font-medium text-gray-500 mb-1">Landlord-only</div>
+                        <div className="font-semibold tabular-nums">{formatMoney(preview.expenses_included.landlord_only_costs)}</div>
+                        {preview.expenses_included.breakdown.landlord_only.length > 0 && (
+                          <ul className="mt-1 space-y-0.5 text-xs text-gray-700">
+                            {preview.expenses_included.breakdown.landlord_only.slice(0, 4).map((line, i) => (
+                              <li key={i} className="flex justify-between"><span className="truncate pr-1">{line.label}</span><span className="shrink-0">{formatMoney(line.amount)}</span></li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-[#E6ECEA]/50 rounded-md p-3 text-sm">
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-gray-600">Total:</span>
+                      <span className="font-semibold text-gray-900 tabular-nums">{formatMoney(preview.expenses_considered!.total)}</span>
+                    </div>
+                    <div className="text-gray-500 text-xs mb-2">
+                      {preview.expenses_considered!.posting_groups_count} posting(s) included
+                    </div>
+                    {preview.expenses_considered!.lines.length > 0 && (
+                      <div className="space-y-1">
+                        {(expensesSectionExpanded ? preview.expenses_considered!.lines : preview.expenses_considered!.lines.slice(0, 6)).map((line, i) => (
+                          <div key={i} className="flex justify-between tabular-nums">
+                            <span className="text-gray-700 truncate pr-2">{line.label}</span>
+                            <span className="text-gray-900 font-medium shrink-0">{formatMoney(line.amount)}</span>
+                          </div>
+                        ))}
+                        {preview.expenses_considered!.lines.length > 6 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpensesSectionExpanded((e) => !e)}
+                            className="text-[#1F6F5C] text-xs font-medium hover:underline mt-1"
+                          >
+                            {expensesSectionExpanded ? 'Show less' : `Show all ${preview.expenses_considered!.lines.length} lines`}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">Cost breakdown</h3>
+              <p className="text-xs text-gray-500 mb-2" title={preview.adjustments_explainer}>
+                Posted expenses by scope (pool / party-only). These are settlement-time adjustments. Posted expenses are shown above.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Shared costs</dt>
-                  <dd className="text-lg font-semibold text-gray-900">{preview.shared_costs}</dd>
+                  <dt className="text-sm font-medium text-gray-500">Pool (shared) expenses</dt>
+                  <dd className="text-lg font-semibold text-gray-900">
+                    {(preview.shared_pool_expenses ?? preview.shared_costs) === 0 || (preview.shared_pool_expenses ?? preview.shared_costs) === '0' ? 'None' : formatMoney(preview.shared_pool_expenses ?? preview.shared_costs)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Landlord-only costs</dt>
                   <dd className="text-lg font-semibold text-gray-900">
-                    {typeof preview.landlord_only_costs === 'number' ? Number(preview.landlord_only_costs).toFixed(2) : preview.landlord_only_costs ?? '0'}
+                    {(preview.landlord_only_costs === 0 || preview.landlord_only_costs === '0') ? 'None' : formatMoney(preview.landlord_only_costs)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Hari-only deductions</dt>
-                  <dd className="text-lg font-semibold text-gray-900">{preview.hari_only_deductions}</dd>
+                  <dd className="text-lg font-semibold text-gray-900">
+                    {(preview.hari_only_deductions === 0 || preview.hari_only_deductions === '0') ? 'None' : formatMoney(preview.hari_only_deductions)}
+                  </dd>
                 </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Pool Revenue</dt>
-                <dd className="text-lg font-semibold text-gray-900">{preview.pool_revenue}</dd>
+                <dd className="text-lg font-semibold text-gray-900 tabular-nums">{formatMoney(preview.pool_revenue)}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Pool Profit</dt>
-                <dd className="text-lg font-semibold text-gray-900">{preview.pool_profit}</dd>
+                <dd className="text-lg font-semibold text-gray-900 tabular-nums">{formatMoney(preview.pool_profit)}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Kamdari Amount</dt>
-                <dd className="text-lg font-semibold text-gray-900">{preview.kamdari_amount}</dd>
+                <dd className="text-lg font-semibold text-gray-900 tabular-nums">{formatMoney(preview.kamdari_amount)}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Landlord Gross</dt>
-                <dd className="text-lg font-semibold text-gray-900">{preview.landlord_gross}</dd>
+                <dd className="text-lg font-semibold text-gray-900 tabular-nums">{formatMoney(preview.landlord_gross)}</dd>
               </div>
               {preview.landlord_net != null && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Landlord Net</dt>
-                  <dd className="text-lg font-semibold text-gray-900">
-                    {typeof preview.landlord_net === 'number' ? Number(preview.landlord_net).toFixed(2) : preview.landlord_net}
-                  </dd>
+                  <dd className="text-lg font-semibold text-gray-900 tabular-nums">{formatMoney(preview.landlord_net)}</dd>
                 </div>
               )}
               <div>
                 <dt className="text-sm font-medium text-gray-500">HARI Gross</dt>
-                <dd className="text-lg font-semibold text-gray-900">{preview.hari_gross}</dd>
+                <dd className="text-lg font-semibold text-gray-900 tabular-nums">{formatMoney(preview.hari_gross)}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">HARI Net</dt>
-                <dd className="text-lg font-semibold text-gray-900">{preview.hari_net}</dd>
+                <dd className="text-lg font-semibold text-gray-900 tabular-nums">{formatMoney(preview.hari_net)}</dd>
               </div>
             </div>
+            {(preview.hari_deficit != null && preview.hari_deficit > 0) && (
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+                <p className="text-sm font-medium text-amber-800">
+                  Hari deficit of {formatMoney(String(preview.hari_deficit))} — this will be offset against advances or carried forward.
+                </p>
+                <p className="text-xs text-amber-700 mt-1">No AR is auto-created; settlement posting is not blocked unless policy requires.</p>
+              </div>
+            )}
           </div>
         </div>
       )}

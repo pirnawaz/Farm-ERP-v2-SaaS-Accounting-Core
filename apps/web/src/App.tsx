@@ -72,6 +72,9 @@ import MachineryWorkLogsPage from './pages/machinery/WorkLogsPage';
 import MachineryWorkLogFormPage from './pages/machinery/WorkLogFormPage';
 import MachineryWorkLogDetailPage from './pages/machinery/WorkLogDetailPage';
 import MachineryProfitabilityPage from './pages/machinery/MachineryProfitabilityPage';
+import MachineryServicesPage from './pages/machinery/MachineryServicesPage';
+import MachineryServiceFormPage from './pages/machinery/MachineryServiceFormPage';
+import MachineryServiceDetailPage from './pages/machinery/MachineryServiceDetailPage';
 import ReportsPage from './pages/ReportsPage';
 import TrialBalancePage from './pages/TrialBalancePage';
 import GeneralLedgerPage from './pages/GeneralLedgerPage';
@@ -92,6 +95,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminRolesPage from './pages/AdminRolesPage';
 import PlatformTenantsPage from './pages/PlatformTenantsPage';
 import PlatformTenantDetailPage from './pages/platform/PlatformTenantDetailPage';
+import PostingGroupDetailPage from './pages/PostingGroupDetailPage';
 import { ModulesProvider } from './contexts/ModulesContext';
 import { PlatformLayout } from './components/PlatformLayout';
 import { PlatformAdminRoute } from './components/PlatformAdminRoute';
@@ -194,6 +198,10 @@ function App() {
         <Route path="machinery/machines" element={<ModuleProtectedRoute requiredModule="machinery"><MachinesPage /></ModuleProtectedRoute>} />
         <Route path="machinery/maintenance-types" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceTypesPage /></ModuleProtectedRoute>} />
         <Route path="machinery/rate-cards" element={<ModuleProtectedRoute requiredModule="machinery"><RateCardsPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/services" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryServicesPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/services/new" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryServiceFormPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/services/:id" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryServiceDetailPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/services/:id/edit" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryServiceFormPage /></ModuleProtectedRoute>} />
         <Route path="machinery/charges" element={<ModuleProtectedRoute requiredModule="machinery"><ChargesPage /></ModuleProtectedRoute>} />
         <Route path="machinery/charges/:id" element={<ModuleProtectedRoute requiredModule="machinery"><ChargeDetailPage /></ModuleProtectedRoute>} />
         <Route path="machinery/maintenance-jobs" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceJobsPage /></ModuleProtectedRoute>} />
@@ -214,6 +222,7 @@ function App() {
         <Route path="reports/party-summary" element={<ModuleProtectedRoute requiredModule="reports"><PartySummaryPage /></ModuleProtectedRoute>} />
         <Route path="reports/role-ageing" element={<ModuleProtectedRoute requiredModule="reports"><RoleAgeingPage /></ModuleProtectedRoute>} />
         <Route path="reports/reconciliation-dashboard" element={<ModuleProtectedRoute requiredModule="reports"><ReconciliationDashboardPage /></ModuleProtectedRoute>} />
+        <Route path="posting-groups/:id" element={<PostingGroupDetailPage />} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />
         <Route path="admin/farm" element={<AdminFarmProfilePage />} />
         <Route path="admin/users" element={<AdminUsersPage />} />

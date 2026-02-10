@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\PostingGroup;
+use App\Services\ReversalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PostingGroupController extends Controller
 {
+    public function __construct(
+        private readonly ReversalService $reversalService
+    ) {}
+
     public function show(Request $request, string $id): JsonResponse
     {
         $tenantId = $request->attributes->get('tenant_id');
@@ -64,8 +69,7 @@ class PostingGroupController extends Controller
         }
         
         try {
-            $reversalService = new \App\Services\ReversalService();
-            $reversalPostingGroup = $reversalService->reversePostingGroup(
+            $reversalPostingGroup = $this->reversalService->reversePostingGroup(
                 $id,
                 $tenantId,
                 $request->input('posting_date'),

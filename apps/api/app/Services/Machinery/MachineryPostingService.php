@@ -83,6 +83,9 @@ class MachineryPostingService
                 'idempotency_key' => $key,
             ]);
 
+            $poolScope = $workLog->pool_scope ?? MachineWorkLog::POOL_SCOPE_SHARED;
+            $allocationScope = $poolScope === MachineWorkLog::POOL_SCOPE_HARI_ONLY ? 'HARI_ONLY' : 'SHARED';
+
             // Create exactly one AllocationRow for usage
             AllocationRow::create([
                 'tenant_id' => $tenantId,
@@ -90,6 +93,7 @@ class MachineryPostingService
                 'project_id' => $workLog->project_id,
                 'party_id' => $project->party_id,
                 'allocation_type' => 'MACHINERY_USAGE',
+                'allocation_scope' => $allocationScope,
                 'amount' => null,
                 'quantity' => (string) $workLog->usage_qty,
                 'unit' => $workLog->machine->meter_unit,
@@ -98,7 +102,7 @@ class MachineryPostingService
                     'machine_work_log_id' => $workLog->id,
                     'meter_start' => $workLog->meter_start,
                     'meter_end' => $workLog->meter_end,
-                    'pool_scope' => $workLog->pool_scope ?? MachineWorkLog::POOL_SCOPE_SHARED,
+                    'pool_scope' => $poolScope,
                 ],
             ]);
 

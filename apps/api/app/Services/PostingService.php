@@ -88,6 +88,7 @@ class PostingService
             $projectRevenueAccount = $this->accountService->getByCode($tenantId, 'PROJECT_REVENUE');
             $expSharedAccount = $this->accountService->getByCode($tenantId, 'EXP_SHARED');
             $expHariOnlyAccount = $this->accountService->getByCode($tenantId, 'EXP_HARI_ONLY');
+            $expLandlordOnlyAccount = $this->accountService->getByCode($tenantId, 'EXP_LANDLORD_ONLY');
             $expFarmOverheadAccount = $this->accountService->getByCode($tenantId, 'EXP_FARM_OVERHEAD');
 
             $ledgerLines = [
@@ -95,6 +96,7 @@ class PostingService
                 ['account_id' => $projectRevenueAccount->id],
                 ['account_id' => $expSharedAccount->id],
                 ['account_id' => $expHariOnlyAccount->id],
+                ['account_id' => $expLandlordOnlyAccount->id],
                 ['account_id' => $expFarmOverheadAccount->id],
             ];
             $this->postValidationService->validateNoDeprecatedAccounts($tenantId, $ledgerLines);
@@ -126,15 +128,15 @@ class PostingService
                 }
             }
 
-            // Create allocation row based on classification
+            // Create allocation row based on classification; allocation_scope drives settlement expense buckets
             $allocationType = null;
+            $allocationScope = null;
             $partyId = null;
             $ruleSnapshot = [];
 
             if ($transaction->classification === 'SHARED') {
                 $allocationType = 'POOL_SHARE';
-                // For SHARED transactions, use project's party_id as placeholder
-                // The actual split will be calculated during settlement
+                $allocationScope = 'SHARED';
                 $project = Project::where('id', $projectId)
                     ->where('tenant_id', $tenantId)
                     ->firstOrFail();
@@ -142,13 +144,21 @@ class PostingService
                 $ruleSnapshot = ['classification' => 'SHARED'];
             } elseif ($transaction->classification === 'HARI_ONLY') {
                 $allocationType = 'HARI_ONLY';
+                $allocationScope = 'HARI_ONLY';
                 $project = Project::where('id', $projectId)
                     ->where('tenant_id', $tenantId)
                     ->firstOrFail();
                 $partyId = $project->party_id;
                 $ruleSnapshot = ['classification' => 'HARI_ONLY'];
+            } elseif ($transaction->classification === 'LANDLORD_ONLY') {
+                $allocationType = 'LANDLORD_ONLY';
+                $allocationScope = 'LANDLORD_ONLY';
+                $landlordParty = $this->partyService->ensureSystemLandlordParty($tenantId);
+                $partyId = $landlordParty->id;
+                $ruleSnapshot = ['classification' => 'LANDLORD_ONLY'];
             } elseif ($transaction->classification === 'FARM_OVERHEAD') {
                 $allocationType = 'HARI_ONLY'; // Use HARI_ONLY type for farm overhead
+                $allocationScope = 'HARI_ONLY';
                 $landlordParty = $this->partyService->ensureSystemLandlordParty($tenantId);
                 $partyId = $landlordParty->id;
                 $ruleSnapshot = ['classification' => 'FARM_OVERHEAD'];
@@ -160,6 +170,7 @@ class PostingService
                 'project_id' => $projectId,
                 'party_id' => $partyId,
                 'allocation_type' => $allocationType,
+                'allocation_scope' => $allocationScope,
                 'amount' => $transaction->amount,
                 'rule_snapshot' => $ruleSnapshot,
             ]);
@@ -191,6 +202,8 @@ class PostingService
                     $expenseAccount = $expSharedAccount;
                 } elseif ($transaction->classification === 'HARI_ONLY') {
                     $expenseAccount = $expHariOnlyAccount;
+                } elseif ($transaction->classification === 'LANDLORD_ONLY') {
+                    $expenseAccount = $expLandlordOnlyAccount;
                 } elseif ($transaction->classification === 'FARM_OVERHEAD') {
                     $expenseAccount = $expFarmOverheadAccount;
                 }

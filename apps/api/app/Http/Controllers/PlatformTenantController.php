@@ -192,6 +192,7 @@ class PlatformTenantController extends Controller
             ['code' => 'PROJECT_REVENUE', 'name' => 'Project Revenue', 'type' => 'income'],
             ['code' => 'EXP_SHARED', 'name' => 'Shared Project Expense', 'type' => 'expense'],
             ['code' => 'EXP_HARI_ONLY', 'name' => 'Hari-only Project Expense', 'type' => 'expense'],
+            ['code' => 'EXP_LANDLORD_ONLY', 'name' => 'Landlord-only Project Expense', 'type' => 'expense'],
             ['code' => 'EXP_FARM_OVERHEAD', 'name' => 'Farm Overhead Expense', 'type' => 'expense'],
             ['code' => 'EXP_KAMDARI', 'name' => 'Kamdari Expense', 'type' => 'expense'],
             ['code' => 'PROFIT_DISTRIBUTION', 'name' => 'Profit Distribution / Settlement Clearing', 'type' => 'equity'],

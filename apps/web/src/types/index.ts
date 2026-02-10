@@ -223,10 +223,15 @@ export interface OperationalTransaction {
   transaction_date: string;
   amount: string;
   classification: TransactionClassification;
+  posting_group_id?: string | null;
   created_by?: string;
   created_at: string;
   project?: Project;
   crop_cycle?: CropCycle;
+  /** Legacy: expense classified as HARI_ONLY/LANDLORD_ONLY but posted as SHARED. */
+  posting_scope_mismatch?: boolean;
+  posting_scope_mismatch_reason?: string | null;
+  correction_posting_group_id?: string | null;
 }
 
 export interface PostTransactionRequest {
@@ -241,6 +246,7 @@ export interface AllocationRow {
   project_id?: string;
   party_id: string;
   allocation_type: string;
+  allocation_scope?: 'SHARED' | 'HARI_ONLY' | 'LANDLORD_ONLY' | null;
   amount: string;
   machine_id?: string;
   rule_snapshot?: any;
@@ -260,11 +266,42 @@ export interface PostingGroup {
 }
 
 // Settlement
+export interface ExpensesConsideredLine {
+  label: string;
+  amount: number;
+}
+
+export interface ExpensesConsidered {
+  total: number;
+  from: string;
+  to: string;
+  posting_groups_count: number;
+  lines: ExpensesConsideredLine[];
+}
+
+export interface ExpensesIncludedBreakdown {
+  pool: ExpensesConsideredLine[];
+  hari_only: ExpensesConsideredLine[];
+  landlord_only: ExpensesConsideredLine[];
+}
+
+export interface ExpensesIncluded {
+  from: string;
+  to: string;
+  total_expenses: number;
+  shared_pool_expenses: number;
+  hari_only_deductions: number;
+  landlord_only_costs: number;
+  posting_groups_count: number;
+  breakdown: ExpensesIncludedBreakdown;
+}
+
 export interface SettlementPreview {
   total_revenue: string | number;
   total_expenses: string | number;
   pool_revenue: string;
   shared_costs: string;
+  shared_pool_expenses?: string | number;
   landlord_only_costs: string | number;
   pool_profit: string;
   kamdari_amount: string;
@@ -274,6 +311,16 @@ export interface SettlementPreview {
   hari_gross: string;
   hari_only_deductions: string;
   hari_net: string;
+  /** Absolute value when hari_net < 0 (Hari owes); 0 otherwise. */
+  hari_deficit?: number;
+  /** PAYABLE = Hari owes; RECEIVABLE = Hari is owed; SETTLED = zero. */
+  hari_position?: 'PAYABLE' | 'RECEIVABLE' | 'SETTLED';
+  /** Read-only summary of expenses included in Total Expenses (for UX). */
+  expenses_considered?: ExpensesConsidered;
+  /** Expenses by scope (pool / hari_only / landlord_only) for settlement UX. */
+  expenses_included?: ExpensesIncluded;
+  has_settlement_adjustments?: boolean;
+  adjustments_explainer?: string;
 }
 
 export interface PostSettlementRequest {
@@ -893,6 +940,76 @@ export interface ReverseMachineMaintenanceJobRequest {
 export interface PostMachineMaintenanceJobResult {
   posting_group: PostingGroup;
   job: MachineMaintenanceJob;
+}
+
+// Machinery Services (internal service posted to project with allocation_scope SHARED | HARI_ONLY)
+export type MachineryServiceStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+export type MachineryServiceAllocationScope = 'SHARED' | 'HARI_ONLY';
+
+export interface MachineryService {
+  id: string;
+  tenant_id: string;
+  machine_id: string;
+  project_id: string;
+  rate_card_id: string;
+  quantity: string;
+  amount: string;
+  allocation_scope: MachineryServiceAllocationScope;
+  in_kind_item_id?: string | null;
+  in_kind_rate_per_unit?: string | null;
+  in_kind_quantity?: string | null;
+  in_kind_store_id?: string | null;
+  in_kind_inventory_issue_id?: string | null;
+  posting_date?: string | null;
+  status: MachineryServiceStatus;
+  posting_group_id?: string | null;
+  reversal_posting_group_id?: string | null;
+  posted_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  machine?: Machine;
+  project?: Project;
+  rate_card?: MachineRateCard;
+  posting_group?: PostingGroup;
+  reversal_posting_group?: PostingGroup;
+  in_kind_item?: InvItem | null;
+  in_kind_store?: InvStore | null;
+  in_kind_inventory_issue?: InvIssue | null;
+}
+
+export interface CreateMachineryServicePayload {
+  machine_id: string;
+  project_id: string;
+  rate_card_id: string;
+  quantity: number;
+  allocation_scope: MachineryServiceAllocationScope;
+  in_kind_item_id?: string | null;
+  in_kind_rate_per_unit?: number | null;
+  in_kind_store_id?: string | null;
+}
+
+export interface UpdateMachineryServicePayload {
+  rate_card_id?: string;
+  quantity?: number;
+  allocation_scope?: MachineryServiceAllocationScope;
+  in_kind_item_id?: string | null;
+  in_kind_rate_per_unit?: number | null;
+  in_kind_store_id?: string | null;
+}
+
+export interface PostMachineryServiceRequest {
+  posting_date: string;
+  idempotency_key?: string;
+}
+
+export interface ReverseMachineryServiceRequest {
+  posting_date: string;
+  reason?: string | null;
+}
+
+export interface PostMachineryServiceResult {
+  posting_group: PostingGroup;
+  machinery_service: MachineryService;
 }
 
 // Machinery Reports

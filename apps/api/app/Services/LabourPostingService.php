@@ -97,9 +97,10 @@ class LabourPostingService
                 'project_id' => $workLog->project_id,
                 'party_id' => $project->party_id,
                 'allocation_type' => 'POOL_SHARE',
+                'allocation_scope' => 'SHARED',
                 'amount' => (string) $amount,
                 'machine_id' => $workLog->machine_id,
-                'rule_snapshot' => ['source' => 'lab_work_log'],
+                'rule_snapshot' => ['source' => 'lab_work_log', 'classification' => 'SHARED'],
             ]);
 
             OperationalTransaction::create([

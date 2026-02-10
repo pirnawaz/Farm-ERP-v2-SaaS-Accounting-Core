@@ -27,6 +27,12 @@ import type {
   PostMachineMaintenanceJobRequest,
   ReverseMachineMaintenanceJobRequest,
   PostMachineMaintenanceJobResult,
+  MachineryService,
+  CreateMachineryServicePayload,
+  UpdateMachineryServicePayload,
+  PostMachineryServiceRequest,
+  ReverseMachineryServiceRequest,
+  PostMachineryServiceResult,
   MachineryProfitabilityRow,
   MachineryChargesByMachineRow,
   MachineryCostsByMachineRow,
@@ -76,6 +82,14 @@ export interface MaintenanceJobFilters {
   from?: string;
   to?: string;
   vendor_party_id?: string;
+}
+
+export interface MachineryServiceFilters {
+  machine_id?: string;
+  project_id?: string;
+  status?: 'DRAFT' | 'POSTED' | 'REVERSED';
+  from?: string;
+  to?: string;
 }
 
 export interface ProfitabilityReportFilters {
@@ -162,6 +176,19 @@ export const machineryApi = {
       apiClient.post<PostMachineMaintenanceJobResult>(`${BASE}/maintenance-jobs/${id}/post`, payload),
     reverse: (id: string, payload: ReverseMachineMaintenanceJobRequest) =>
       apiClient.post<PostMachineMaintenanceJobResult>(`${BASE}/maintenance-jobs/${id}/reverse`, payload),
+  },
+  machineryServices: {
+    list: (f?: MachineryServiceFilters) =>
+      apiClient.get<MachineryService[]>(`${BASE}/machinery-services${searchParams(f || {})}`),
+    get: (id: string) => apiClient.get<MachineryService>(`${BASE}/machinery-services/${id}`),
+    create: (payload: CreateMachineryServicePayload) =>
+      apiClient.post<MachineryService>(`${BASE}/machinery-services`, payload),
+    update: (id: string, payload: UpdateMachineryServicePayload) =>
+      apiClient.put<MachineryService>(`${BASE}/machinery-services/${id}`, payload),
+    post: (id: string, payload: PostMachineryServiceRequest) =>
+      apiClient.post<PostMachineryServiceResult>(`${BASE}/machinery-services/${id}/post`, payload),
+    reverse: (id: string, payload: ReverseMachineryServiceRequest) =>
+      apiClient.post<PostMachineryServiceResult>(`${BASE}/machinery-services/${id}/reverse`, payload),
   },
   reports: {
     profitability: (f: ProfitabilityReportFilters) =>

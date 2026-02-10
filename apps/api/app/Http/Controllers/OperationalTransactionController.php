@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\OperationalTransaction;
+use App\Models\PostingGroup;
 use App\Models\Project;
+use App\Models\ReclassCorrection;
 use App\Models\CropCycle;
 use App\Http\Requests\PostOperationalTransactionRequest;
 use App\Services\TenantContext;
@@ -132,10 +134,39 @@ class OperationalTransactionController extends Controller
 
         $transaction = OperationalTransaction::where('id', $id)
             ->where('tenant_id', $tenantId)
-            ->with(['project', 'cropCycle'])
+            ->with(['project', 'cropCycle', 'postingGroup.allocationRows'])
             ->firstOrFail();
 
-        return response()->json($transaction);
+        $payload = $transaction->toArray();
+
+        if ($transaction->type === 'EXPENSE' && in_array($transaction->classification, ['HARI_ONLY', 'LANDLORD_ONLY'], true) && $transaction->posting_group_id) {
+            $postingGroup = $transaction->postingGroup;
+            $allocationRows = $postingGroup ? $postingGroup->allocationRows : collect();
+            $allScopesNullOrShared = $allocationRows->isEmpty() || $allocationRows->every(function ($row) {
+                return $row->allocation_scope === null || $row->allocation_scope === 'SHARED';
+            });
+
+            $correctionPgId = ReclassCorrection::where('operational_transaction_id', $transaction->id)->value('posting_group_id');
+            $correctionPg = $correctionPgId ? PostingGroup::find($correctionPgId) : null;
+
+            if ($allScopesNullOrShared && ! $correctionPg) {
+                $payload['posting_scope_mismatch'] = true;
+                $payload['posting_scope_mismatch_reason'] = sprintf(
+                    'Classified as %s but posted as SHARED (legacy). Settlement will treat it as shared unless corrected.',
+                    $transaction->classification
+                );
+            } else {
+                $payload['posting_scope_mismatch'] = false;
+                $payload['posting_scope_mismatch_reason'] = null;
+            }
+            $payload['correction_posting_group_id'] = $correctionPg?->id;
+        } else {
+            $payload['posting_scope_mismatch'] = false;
+            $payload['posting_scope_mismatch_reason'] = null;
+            $payload['correction_posting_group_id'] = null;
+        }
+
+        return response()->json($payload);
     }
 
     public function update(Request $request, string $id)

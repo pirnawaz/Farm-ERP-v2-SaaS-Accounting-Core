@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Tenant;
 use App\Models\Account;
 use App\Models\CropCycle;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -13,7 +12,6 @@ use Database\Seeders\SystemAccountsSeeder;
 
 class BalancedPostingGuardTest extends TestCase
 {
-    use DatabaseMigrations;
 
     private Tenant $tenant;
     private Account $cashAccount;
@@ -118,14 +116,8 @@ class BalancedPostingGuardTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        DB::commit();
-
+        // Do not commit so RefreshDatabase's transaction rollback cleans up (TRUNCATE would
+        // hit "pending trigger events" with deferred triggers).
         $this->assertSame(2, (int) DB::table('ledger_entries')->where('posting_group_id', $pgId)->count());
-
-        // Clear committed data so DatabaseMigrations' migrate:rollback in beforeApplicationDestroyed
-        // can run (some migration down()s assume empty/rewritable tables). TRUNCATE bypasses
-        // the immutability triggers (they fire on DELETE, not TRUNCATE). CASCADE clears
-        // dependent tables (ledger_entries, allocation_rows, settlements, etc.) that reference posting_groups.
-        DB::statement('TRUNCATE posting_groups CASCADE');
     }
 }

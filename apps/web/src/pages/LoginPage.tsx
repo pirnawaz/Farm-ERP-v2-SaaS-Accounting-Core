@@ -269,6 +269,7 @@ export default function LoginPage() {
             </label>
             <select
               id="role"
+              data-testid="role"
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value as UserRole)}
               className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
@@ -283,6 +284,8 @@ export default function LoginPage() {
           {/* CTA Button */}
           <div className="border-t border-gray-200 pt-6">
             <button
+              type="button"
+              data-testid="login-submit"
               onClick={handleContinue}
               disabled={!selectedRole || (!isPlatformAdmin && !selectedTenantId)}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#1F6F5C] hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:opacity-50 disabled:cursor-not-allowed"

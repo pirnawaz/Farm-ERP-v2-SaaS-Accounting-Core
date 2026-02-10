@@ -341,6 +341,14 @@ class DevTenantController extends Controller
             [
                 'id' => (string) Str::uuid(),
                 'tenant_id' => $tenantId,
+                'code' => 'EXP_LANDLORD_ONLY',
+                'name' => 'Landlord-only Project Expense',
+                'type' => 'expense',
+                'is_system' => true,
+            ],
+            [
+                'id' => (string) Str::uuid(),
+                'tenant_id' => $tenantId,
                 'code' => 'EXP_FARM_OVERHEAD',
                 'name' => 'Farm Overhead Expense',
                 'type' => 'expense',

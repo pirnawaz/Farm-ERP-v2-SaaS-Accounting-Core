@@ -70,6 +70,7 @@ const navigationGroups: NavigationGroup[] = [
     name: 'Machinery',
     items: [
       { name: 'Work Logs', href: '/app/machinery/work-logs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+      { name: 'Services', href: '/app/machinery/services', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
       { name: 'Charges', href: '/app/machinery/charges', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
       { name: 'Maintenance Jobs', href: '/app/machinery/maintenance-jobs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
       { name: 'Profitability', href: '/app/machinery/reports/profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
@@ -202,7 +203,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0" data-testid="app-sidebar">
         <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             <div className="flex items-center flex-shrink-0 px-4">

@@ -6,9 +6,11 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  /** Optional data-testid for the root dialog (e.g. posting-date-modal). */
+  testId?: string;
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = 'md', testId }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const hasFocusedForOpen = useRef(false);
@@ -51,6 +53,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
+      {...(testId ? { 'data-testid': testId } : {})}
     >
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div

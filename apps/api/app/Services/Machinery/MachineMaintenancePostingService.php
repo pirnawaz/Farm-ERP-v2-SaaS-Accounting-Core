@@ -5,6 +5,7 @@ namespace App\Services\Machinery;
 use App\Models\MachineMaintenanceJob;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
+use App\Models\Party;
 use App\Models\PostingGroup;
 use App\Services\SystemAccountService;
 use App\Services\ReversalService;
@@ -72,6 +73,25 @@ class MachineMaintenancePostingService
                 'idempotency_key' => $key,
             ]);
 
+            // Resolve party_id for allocation row (NOT NULL): vendor → project party → INTERNAL party (deterministic, audit-friendly)
+            $partyId = $job->vendor_party_id;
+            if ($partyId === null && isset($job->project_id) && $job->project_id !== null) {
+                $project = \App\Models\Project::where('id', $job->project_id)->where('tenant_id', $tenantId)->first();
+                if ($project && $project->party_id !== null) {
+                    $partyId = $project->party_id;
+                }
+            }
+            if ($partyId === null) {
+                $internalParty = Party::where('tenant_id', $tenantId)->whereJsonContains('party_types', 'INTERNAL')->first();
+                if ($internalParty === null) {
+                    $internalParty = Party::firstOrCreate(
+                        ['tenant_id' => $tenantId, 'name' => 'Internal'],
+                        ['party_types' => ['INTERNAL']]
+                    );
+                }
+                $partyId = $internalParty->id;
+            }
+
             // Prepare line summary for rule_snapshot
             $lineSummary = [];
             foreach ($job->lines as $line) {
@@ -87,7 +107,7 @@ class MachineMaintenancePostingService
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
                 'project_id' => null, // Maintenance not tied to a project
-                'party_id' => $job->vendor_party_id, // Vendor party if present
+                'party_id' => $partyId,
                 'allocation_type' => 'MACHINERY_MAINTENANCE',
                 'amount' => (string) $job->total_amount,
                 'quantity' => null,
@@ -163,23 +183,13 @@ class MachineMaintenancePostingService
                 throw new \Exception('Job has no posting group to reverse.');
             }
 
-            // Use ReversalService to reverse the posting group
+            // Use ReversalService to reverse the posting group (ReversalService negates allocation amounts)
             $reversalPostingGroup = $this->reversalService->reversePostingGroup(
                 $originalPostingGroup->id,
                 $tenantId,
                 $postingDate,
                 $reason
             );
-
-            // ReversalService keeps the same amount for allocation rows, but for money allocations
-            // (MACHINERY_MAINTENANCE), we need to negate the amount to net to zero
-            foreach ($reversalPostingGroup->allocationRows as $reversalAllocation) {
-                if ($reversalAllocation->allocation_type === 'MACHINERY_MAINTENANCE' && $reversalAllocation->amount !== null) {
-                    $reversalAllocation->update([
-                        'amount' => (string) (-(float) $reversalAllocation->amount),
-                    ]);
-                }
-            }
 
             // Update job
             $job->update([

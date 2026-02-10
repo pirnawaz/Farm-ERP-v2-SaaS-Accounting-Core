@@ -23,6 +23,7 @@ use App\Http\Controllers\PlatformTenantController;
 use App\Http\Controllers\TenantFarmProfileController;
 use App\Http\Controllers\TenantUserAdminController;
 use App\Http\Controllers\Dev\DevTenantController;
+use App\Http\Controllers\Dev\DevE2ESeedController;
 use App\Http\Controllers\InvItemController;
 use App\Http\Controllers\InvStoreController;
 use App\Http\Controllers\InvUomController;
@@ -46,6 +47,7 @@ use App\Http\Controllers\Machinery\MachineRateCardController;
 use App\Http\Controllers\Machinery\MachineryChargeController;
 use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
 use App\Http\Controllers\Machinery\MachineryReportsController;
+use App\Http\Controllers\Machinery\MachineryServiceController;
 use App\Http\Controllers\ReconciliationController;
 
 Route::get('/health', [HealthController::class, 'index']);
@@ -69,6 +71,10 @@ Route::prefix('dev')->middleware('dev')->group(function () {
     Route::post('tenants/{id}/activate', [DevTenantController::class, 'activate']);
     Route::post('tenants/{id}/bootstrap-accounts', [DevTenantController::class, 'bootstrapAccounts']);
     Route::delete('tenants/{id}', [DevTenantController::class, 'destroy']);
+    // E2E deterministic seed (idempotent)
+    Route::post('e2e/seed', [DevE2ESeedController::class, 'seed']);
+    Route::get('e2e/seed-state', [DevE2ESeedController::class, 'seedState']);
+    Route::post('e2e/auth-cookie', [DevE2ESeedController::class, 'authCookie']);
 });
 
 // Users (tenant_admin only)
@@ -304,6 +310,13 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::put('charges/{id}', [MachineryChargeController::class, 'update']);
         Route::post('charges/{id}/post', [MachineryChargeController::class, 'post'])->middleware('role:tenant_admin,accountant');
         Route::post('charges/{id}/reverse', [MachineryChargeController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        // Internal machinery services (project settlement valuation, no AR/Sales)
+        Route::get('machinery-services', [MachineryServiceController::class, 'index']);
+        Route::post('machinery-services', [MachineryServiceController::class, 'store']);
+        Route::get('machinery-services/{id}', [MachineryServiceController::class, 'show']);
+        Route::put('machinery-services/{id}', [MachineryServiceController::class, 'update']);
+        Route::post('machinery-services/{id}/post', [MachineryServiceController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('machinery-services/{id}/reverse', [MachineryServiceController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
         // Maintenance Jobs
         Route::get('maintenance-jobs', [MachineMaintenanceJobController::class, 'index']);
         Route::post('maintenance-jobs', [MachineMaintenanceJobController::class, 'store']);

@@ -99,6 +99,9 @@ class MachineryChargePostingService
                 ];
             }
 
+            $poolScope = $charge->pool_scope ?? \App\Models\MachineryCharge::POOL_SCOPE_SHARED;
+            $allocationScope = $poolScope === \App\Models\MachineryCharge::POOL_SCOPE_HARI_ONLY ? 'HARI_ONLY' : 'SHARED';
+
             // Create AllocationRow (money allocation)
             AllocationRow::create([
                 'tenant_id' => $tenantId,
@@ -106,6 +109,7 @@ class MachineryChargePostingService
                 'project_id' => $charge->project_id,
                 'party_id' => $charge->landlord_party_id,
                 'allocation_type' => 'MACHINERY_CHARGE',
+                'allocation_scope' => $allocationScope,
                 'amount' => (string) $charge->total_amount,
                 'quantity' => null,
                 'unit' => null,
@@ -179,23 +183,13 @@ class MachineryChargePostingService
 
             $this->guard->ensureCropCycleOpen($charge->crop_cycle_id, $tenantId);
 
-            // Use ReversalService to reverse the posting group
+            // Use ReversalService to reverse the posting group (ReversalService negates allocation amounts)
             $reversalPostingGroup = $this->reversalService->reversePostingGroup(
                 $originalPostingGroup->id,
                 $tenantId,
                 $postingDate,
                 $reason
             );
-
-            // ReversalService keeps the same amount for allocation rows, but for money allocations
-            // (MACHINERY_CHARGE), we need to negate the amount to net to zero
-            foreach ($reversalPostingGroup->allocationRows as $reversalAllocation) {
-                if ($reversalAllocation->allocation_type === 'MACHINERY_CHARGE' && $reversalAllocation->amount !== null) {
-                    $reversalAllocation->update([
-                        'amount' => (string) (-(float) $reversalAllocation->amount),
-                    ]);
-                }
-            }
 
             // Update charge
             $charge->update([

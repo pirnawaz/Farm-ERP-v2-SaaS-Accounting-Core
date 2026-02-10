@@ -78,11 +78,15 @@ class ReversalService
                 'correction_reason' => $reason,
             ]);
 
-            // Create AllocationRows that mirror the original (allocation_type, rule_snapshot with reversal info)
+            // Create AllocationRows that mirror the original, with amount negated so allocation-driven totals net to zero
             foreach ($originalPostingGroup->allocationRows as $originalRow) {
                 $reversalSnapshot = is_array($originalRow->rule_snapshot) ? $originalRow->rule_snapshot : [];
                 $reversalSnapshot['reversal_of'] = $originalPostingGroup->id;
                 $reversalSnapshot['reversal_reason'] = $reason;
+
+                $reversalAmount = $originalRow->amount !== null
+                    ? (string) (-(float) $originalRow->amount)
+                    : null;
 
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
@@ -90,7 +94,11 @@ class ReversalService
                     'project_id' => $originalRow->project_id,
                     'party_id' => $originalRow->party_id,
                     'allocation_type' => $originalRow->allocation_type,
-                    'amount' => $originalRow->amount,
+                    'allocation_scope' => $originalRow->allocation_scope,
+                    'amount' => $reversalAmount,
+                    'quantity' => $originalRow->quantity,
+                    'unit' => $originalRow->unit,
+                    'machine_id' => $originalRow->machine_id,
                     'rule_snapshot' => $reversalSnapshot,
                 ]);
             }

@@ -71,16 +71,21 @@ export default function TransactionDetailPage() {
   }
 
   if (!transaction) {
-    return <div>Transaction not found</div>;
+    return <div data-testid="transaction-detail">Transaction not found</div>;
   }
 
   return (
-    <div>
+    <div data-testid="transaction-detail">
       <div className="mb-6">
         <Link to="/app/transactions" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
           ← Back to Transactions
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">Transaction Details</h1>
+        {id && (
+          <p className="text-sm text-gray-500 mt-1" data-testid="transaction-id">
+            {id}
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -92,9 +97,12 @@ export default function TransactionDetailPage() {
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
             <dd className="text-sm text-gray-900">
-              <span className={`px-2 py-1 rounded text-xs ${
-                transaction.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-              }`}>
+              <span
+                data-testid="status-badge"
+                className={`px-2 py-1 rounded text-xs ${
+                  transaction.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                }`}
+              >
                 {transaction.status}
               </span>
             </dd>
@@ -130,6 +138,34 @@ export default function TransactionDetailPage() {
         </dl>
       </div>
 
+      {transaction.posting_scope_mismatch && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <p className="text-sm text-amber-800">
+            {transaction.posting_scope_mismatch_reason ?? `Classified as ${transaction.classification} but posted as SHARED (legacy). Settlement will treat it as shared unless corrected.`}
+          </p>
+        </div>
+      )}
+      {transaction.posting_group_id && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6" data-testid="posting-group-panel">
+          <p className="text-sm text-gray-700">
+            Posting Group{' '}
+            <Link to={`/app/posting-groups/${transaction.posting_group_id}`} className="font-medium text-[#1F6F5C] hover:underline" data-testid="posting-group-id">
+              {transaction.posting_group_id.substring(0, 8)}...
+            </Link>
+          </p>
+        </div>
+      )}
+      {transaction.correction_posting_group_id && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <p className="text-sm text-green-800">
+            Corrected by Posting Group{' '}
+            <Link to={`/app/posting-groups/${transaction.correction_posting_group_id}`} className="font-medium text-[#1F6F5C] hover:underline">
+              {transaction.correction_posting_group_id.substring(0, 8)}...
+            </Link>
+          </p>
+        </div>
+      )}
+
       {isDraft && (
         <div className="flex space-x-3">
           <Link
@@ -146,6 +182,8 @@ export default function TransactionDetailPage() {
           </button>
           {canPost && (
             <button
+              type="button"
+              data-testid="post-btn"
               onClick={() => setShowPostModal(true)}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
             >
@@ -159,11 +197,13 @@ export default function TransactionDetailPage() {
         isOpen={showPostModal}
         onClose={() => setShowPostModal(false)}
         title="Post Transaction"
+        testId="posting-date-modal"
       >
         <div className="space-y-4">
           <FormField label="Posting Date" required>
             <input
               type="date"
+              data-testid="posting-date-input"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
@@ -179,12 +219,15 @@ export default function TransactionDetailPage() {
           </FormField>
           <div className="flex justify-end space-x-3">
             <button
+              type="button"
               onClick={() => setShowPostModal(false)}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
+              type="button"
+              data-testid="confirm-post"
               onClick={handlePost}
               disabled={postMutation.isPending}
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"

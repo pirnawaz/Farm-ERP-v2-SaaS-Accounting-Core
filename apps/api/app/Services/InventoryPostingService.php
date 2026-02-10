@@ -255,6 +255,7 @@ class InventoryPostingService
                     'project_id' => $issue->project_id,
                     'party_id' => $hariPartyId,
                     'allocation_type' => 'HARI_ONLY',
+                    'allocation_scope' => 'HARI_ONLY',
                     'amount' => (string) $totalValue,
                     'machine_id' => $issue->machine_id,
                     'rule_snapshot' => array_merge($ruleSnapshot, [
@@ -264,13 +265,14 @@ class InventoryPostingService
                 ]);
 
             } elseif ($issue->allocation_mode === 'FARMER_ONLY') {
-                // 100% to Landlord (Farmer)
+                // 100% to Landlord (Farmer) — settlement treats as LANDLORD_ONLY
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
                     'project_id' => $issue->project_id,
                     'party_id' => $landlordParty->id,
-                    'allocation_type' => 'POOL_SHARE',
+                    'allocation_type' => 'LANDLORD_ONLY',
+                    'allocation_scope' => 'LANDLORD_ONLY',
                     'amount' => (string) $totalValue,
                     'machine_id' => $issue->machine_id,
                     'rule_snapshot' => array_merge($ruleSnapshot, [
@@ -294,13 +296,14 @@ class InventoryPostingService
                 $landlordShare = $totalValue * ($resolved['landlord_pct'] / 100);
                 $hariShare = $totalValue * ($resolved['hari_pct'] / 100);
 
-                // Create AllocationRows for both parties
+                // Create AllocationRows for both parties (shared pool expense)
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
                     'project_id' => $issue->project_id,
                     'party_id' => $resolved['landlord_party_id'],
                     'allocation_type' => 'POOL_SHARE',
+                    'allocation_scope' => 'SHARED',
                     'amount' => (string) $landlordShare,
                     'machine_id' => $issue->machine_id,
                     'rule_snapshot' => array_merge($ruleSnapshot, $resolved['rule_snapshot'], [
@@ -315,6 +318,7 @@ class InventoryPostingService
                     'project_id' => $issue->project_id,
                     'party_id' => $resolved['hari_party_id'],
                     'allocation_type' => 'POOL_SHARE',
+                    'allocation_scope' => 'SHARED',
                     'amount' => (string) $hariShare,
                     'machine_id' => $issue->machine_id,
                     'rule_snapshot' => array_merge($ruleSnapshot, $resolved['rule_snapshot'], [

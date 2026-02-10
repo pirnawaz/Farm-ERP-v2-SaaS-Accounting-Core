@@ -16,6 +16,7 @@ class AllocationRow extends Model
         'project_id',
         'party_id',
         'allocation_type',
+        'allocation_scope',
         'amount',
         'quantity',
         'unit',

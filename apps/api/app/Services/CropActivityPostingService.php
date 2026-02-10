@@ -159,6 +159,7 @@ class CropActivityPostingService
                     'project_id' => $activity->project_id,
                     'party_id' => $project->party_id,
                     'allocation_type' => 'POOL_SHARE',
+                    'allocation_scope' => 'SHARED',
                     'amount' => (string) round($totalInputs, 2),
                     'rule_snapshot' => ['source' => 'crop_activity', 'activity_id' => $activity->id, 'cost_type' => 'inputs'],
                 ]);
@@ -187,6 +188,7 @@ class CropActivityPostingService
                     'project_id' => $activity->project_id,
                     'party_id' => $project->party_id,
                     'allocation_type' => 'POOL_SHARE',
+                    'allocation_scope' => 'SHARED',
                     'amount' => (string) round($totalLabour, 2),
                     'rule_snapshot' => ['source' => 'crop_activity', 'activity_id' => $activity->id, 'cost_type' => 'labour'],
                 ]);

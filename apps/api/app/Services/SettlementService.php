@@ -26,7 +26,7 @@ class SettlementService
     /** Source types that contribute to project profit (operational + reversals; exclude settlement postings). */
     private const OPERATIONAL_SOURCE_TYPES = [
         'INVENTORY_ISSUE', 'INVENTORY_GRN', 'LABOUR_WORK_LOG', 'MACHINE_WORK_LOG',
-        'MACHINE_MAINTENANCE_JOB', 'MACHINERY_CHARGE', 'CROP_ACTIVITY', 'OPERATIONAL',
+        'MACHINE_MAINTENANCE_JOB', 'MACHINERY_CHARGE', 'MACHINERY_SERVICE', 'CROP_ACTIVITY', 'OPERATIONAL',
         'SALE', 'HARVEST', 'REVERSAL',
     ];
 
@@ -85,6 +85,77 @@ class SettlementService
         return [
             'total_revenue' => $totalRevenue,
             'total_expenses' => $totalExpenses,
+            'pool_profit' => $poolProfit,
+        ];
+    }
+
+    /**
+     * Get project profit breakdown by allocation scope for settlement.
+     * Pool = revenue - SHARED costs only; HARI_ONLY and LANDLORD_ONLY are reported separately.
+     * Excludes reversed posting groups.
+     *
+     * @return array{total_revenue: float, total_expenses: float, shared_costs: float, hari_only_deductions: float, landlord_only_costs: float, pool_profit: float}
+     */
+    public function getProjectProfitBreakdownByScope(string $projectId, string $tenantId, string $upToDate): array
+    {
+        $pgIds = PostingGroup::where('tenant_id', $tenantId)
+            ->where('posting_date', '<=', $upToDate)
+            ->whereIn('source_type', self::OPERATIONAL_SOURCE_TYPES)
+            ->whereExists(function ($q) use ($projectId) {
+                $q->select(DB::raw(1))
+                    ->from('allocation_rows')
+                    ->whereColumn('allocation_rows.posting_group_id', 'posting_groups.id')
+                    ->where('allocation_rows.project_id', $projectId);
+            })
+            ->pluck('id');
+
+        if ($pgIds->isEmpty()) {
+            return [
+                'total_revenue' => 0.0,
+                'total_expenses' => 0.0,
+                'shared_costs' => 0.0,
+                'hari_only_deductions' => 0.0,
+                'landlord_only_costs' => 0.0,
+                'pool_profit' => 0.0,
+            ];
+        }
+
+        $rows = DB::table('ledger_entries')
+            ->join('accounts', 'accounts.id', '=', 'ledger_entries.account_id')
+            ->where('ledger_entries.tenant_id', $tenantId)
+            ->whereIn('ledger_entries.posting_group_id', $pgIds)
+            ->whereIn('accounts.type', ['income', 'expense'])
+            ->selectRaw("
+                SUM(CASE WHEN accounts.type = 'income' THEN (ledger_entries.credit_amount - ledger_entries.debit_amount) ELSE 0 END) AS revenue,
+                SUM(CASE WHEN accounts.type = 'expense' THEN (ledger_entries.debit_amount - ledger_entries.credit_amount) ELSE 0 END) AS expenses
+            ")
+            ->first();
+
+        $totalRevenue = (float) ($rows->revenue ?? 0);
+        $totalExpenses = (float) ($rows->expenses ?? 0);
+
+        $scopeSums = DB::table('allocation_rows')
+            ->where('tenant_id', $tenantId)
+            ->where('project_id', $projectId)
+            ->whereIn('posting_group_id', $pgIds)
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN allocation_scope = 'SHARED' THEN amount ELSE 0 END), 0) AS shared,
+                COALESCE(SUM(CASE WHEN allocation_scope = 'HARI_ONLY' THEN amount ELSE 0 END), 0) AS hari_only,
+                COALESCE(SUM(CASE WHEN allocation_scope = 'LANDLORD_ONLY' THEN amount ELSE 0 END), 0) AS landlord_only
+            ")
+            ->first();
+
+        $sharedCosts = (float) ($scopeSums->shared ?? 0);
+        $hariOnlyDeductions = (float) ($scopeSums->hari_only ?? 0);
+        $landlordOnlyCosts = (float) ($scopeSums->landlord_only ?? 0);
+        $poolProfit = $totalRevenue - $sharedCosts;
+
+        return [
+            'total_revenue' => $totalRevenue,
+            'total_expenses' => $totalExpenses,
+            'shared_costs' => $sharedCosts,
+            'hari_only_deductions' => $hariOnlyDeductions,
+            'landlord_only_costs' => $landlordOnlyCosts,
             'pool_profit' => $poolProfit,
         ];
     }
@@ -167,11 +238,14 @@ class SettlementService
 
         $upToDateStr = $upToDate ? Carbon::parse($upToDate)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
 
-        // Canonical profit from ledger (income/expense only)
-        $ledger = $this->getProjectProfitFromLedger($projectId, $tenantId, $upToDateStr);
+        // Canonical profit from ledger with scope breakdown (pool = revenue - SHARED only; HARI_ONLY deducted after split)
+        $ledger = $this->getProjectProfitBreakdownByScope($projectId, $tenantId, $upToDateStr);
         $poolProfit = $ledger['pool_profit'];
         $totalRevenue = $ledger['total_revenue'];
         $totalExpenses = $ledger['total_expenses'];
+        $sharedCosts = $ledger['shared_costs'];
+        $hariOnlyDeductions = $ledger['hari_only_deductions'];
+        $landlordOnlyCosts = $ledger['landlord_only_costs'];
 
         // Apply Decision D: kamdari first, then split remainder
         $kamdariAmount = $poolProfit * ($projectRule->kamdari_pct / 100);
@@ -184,23 +258,28 @@ class SettlementService
         } else {
             $landlordGross = $remainingPool * ($projectRule->profit_split_landlord_pct / 100);
             $hariGross = $remainingPool * ($projectRule->profit_split_hari_pct / 100);
-            $hariNet = $hariGross; // No separate hari_only deduction; expense already in ledger
+            $hariNet = $hariGross - $hariOnlyDeductions;
         }
+
+        $hariDeficit = $hariNet < 0 ? (float) abs($hariNet) : 0.0;
+        $hariPosition = $hariNet < 0 ? 'PAYABLE' : ($hariNet > 0 ? 'RECEIVABLE' : 'SETTLED');
 
         return [
             'total_revenue' => $totalRevenue,
             'total_expenses' => $totalExpenses,
             'pool_revenue' => $totalRevenue,
-            'shared_costs' => 0.0, // Legacy key; not used when using ledger
-            'landlord_only_costs' => 0.0,
+            'shared_costs' => $sharedCosts,
+            'landlord_only_costs' => $landlordOnlyCosts,
             'pool_profit' => $poolProfit,
             'kamdari_amount' => $kamdariAmount,
             'remaining_pool' => $remainingPool,
             'landlord_gross' => $landlordGross,
             'landlord_net' => $landlordGross,
             'hari_gross' => $hariGross,
-            'hari_only_deductions' => 0.0,
+            'hari_only_deductions' => $hariOnlyDeductions,
             'hari_net' => $hariNet,
+            'hari_deficit' => $hariDeficit,
+            'hari_position' => $hariPosition,
         ];
     }
 

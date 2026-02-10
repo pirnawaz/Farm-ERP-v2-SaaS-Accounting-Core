@@ -63,6 +63,7 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'PROJECT_REVENUE', 'name' => 'Project Revenue', 'type' => 'income'],
             ['code' => 'EXP_SHARED', 'name' => 'Shared Project Expense', 'type' => 'expense'],
             ['code' => 'EXP_HARI_ONLY', 'name' => 'Hari-only Project Expense', 'type' => 'expense'],
+            ['code' => 'EXP_LANDLORD_ONLY', 'name' => 'Landlord-only Project Expense', 'type' => 'expense'],
             ['code' => 'EXP_FARM_OVERHEAD', 'name' => 'Farm Overhead Expense', 'type' => 'expense'],
             ['code' => 'EXP_KAMDARI', 'name' => 'Kamdari Expense', 'type' => 'expense'],
             ['code' => 'PROFIT_DISTRIBUTION', 'name' => 'Profit Distribution / Settlement Clearing', 'type' => 'equity'],
@@ -81,6 +82,9 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'MACHINERY_SERVICE_EXPENSE', 'name' => 'Machinery Service Expense', 'type' => 'expense'],
             ['code' => 'DUE_TO_LANDLORD', 'name' => 'Due to Landlord', 'type' => 'liability'],
             ['code' => 'ACCRUED_EXPENSES', 'name' => 'Accrued Expenses', 'type' => 'liability'],
+            ['code' => 'EXPENSE_RECLASS_CLEARING', 'name' => 'Expense Reclass Clearing (memo)', 'type' => 'equity'],
+            ['code' => 'EXPENSE_RECLASS_OFFSET', 'name' => 'Expense Reclass Offset (memo)', 'type' => 'equity'],
+            ['code' => 'MACHINERY_INTERNAL_SERVICE_CLEARING', 'name' => 'Machinery Internal Service Clearing', 'type' => 'equity'],
         ];
     }
 }

@@ -9,6 +9,11 @@
   "scripts": {
     "dev:api": "cd apps/api && php artisan serve",
     "dev:web": "cd apps/web && npm run dev",
-    "install:all": "npm install && cd apps/web && npm install && cd ../../packages/shared && npm install"
+    "install:all": "npm install && cd apps/web && npm install && cd ../../packages/shared && npm install",
+    "e2e": "npm -w apps/web run e2e",
+    "e2e:ui": "npm -w apps/web run e2e:ui",
+    "e2e:headed": "npm -w apps/web run e2e:headed",
+    "e2e:report": "npm -w apps/web run e2e:report",
+    "e2e:full": "npm run e2e && npm run e2e:report"
   }
 }
