@@ -26,7 +26,7 @@ class TenantAdminCannotDisableCoreModuleTest extends TestCase
             ]);
 
         $response->assertStatus(422);
-        $response->assertJson(['message' => 'Core modules cannot be disabled.']);
+        $response->assertJson(['error' => 'MODULE_DEPENDENCY', 'message' => 'Core modules cannot be disabled.']);
 
         $get = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'tenant_admin')

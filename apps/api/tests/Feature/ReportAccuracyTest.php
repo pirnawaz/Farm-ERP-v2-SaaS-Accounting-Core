@@ -15,9 +15,12 @@ use App\Models\InvIssue;
 use App\Models\InvIssueLine;
 use App\Models\CropCycle;
 use App\Models\Party;
+use App\Models\AllocationRow;
+use App\Models\OperationalTransaction;
 use App\Models\Project;
 use App\Models\ProjectRule;
 use App\Services\InventoryPostingService;
+use App\Services\PostingService;
 use App\Services\TenantContext;
 use App\Http\Controllers\ReportController;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -208,5 +211,55 @@ class ReportAccuracyTest extends TestCase
         $projectRow = collect($data)->firstWhere('project_id', $this->project->id);
         $this->assertNotNull($projectRow);
         $this->assertEqualsWithDelta(100.00, (float) $projectRow['expenses'], 0.01);
+    }
+
+    /**
+     * FARM_OVERHEAD postings must have allocation_row.project_id = NULL and must NOT appear in project P&L.
+     */
+    public function test_farm_overhead_not_in_project_pl_and_allocation_row_project_id_null(): void
+    {
+        $postingService = app(PostingService::class);
+
+        $sharedTxn = OperationalTransaction::create([
+            'tenant_id' => $this->tenant->id,
+            'project_id' => $this->project->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'type' => 'EXPENSE',
+            'status' => 'DRAFT',
+            'transaction_date' => '2024-06-10',
+            'amount' => 100.00,
+            'classification' => 'SHARED',
+        ]);
+        $postingService->postOperationalTransaction($sharedTxn->id, $this->tenant->id, '2024-06-10', 'idem-shared');
+
+        $overheadTxn = OperationalTransaction::create([
+            'tenant_id' => $this->tenant->id,
+            'project_id' => null,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'type' => 'EXPENSE',
+            'status' => 'DRAFT',
+            'transaction_date' => '2024-06-12',
+            'amount' => 50.00,
+            'classification' => 'FARM_OVERHEAD',
+        ]);
+        $postingService->postOperationalTransaction($overheadTxn->id, $this->tenant->id, '2024-06-12', 'idem-overhead');
+
+        $overheadRow = AllocationRow::where('posting_group_id', $overheadTxn->fresh()->posting_group_id)->first();
+        $this->assertNotNull($overheadRow);
+        $this->assertNull($overheadRow->project_id, 'FARM_OVERHEAD allocation row must have project_id NULL');
+
+        $request = Request::create('/api/reports/project-pl', 'GET', [
+            'from' => '2024-06-01',
+            'to' => '2024-06-30',
+            'project_id' => $this->project->id,
+        ]);
+        $request->attributes->set('tenant_id', $this->tenant->id);
+        $controller = app(ReportController::class);
+        $response = $controller->projectPL($request);
+        $data = json_decode($response->getContent(), true);
+
+        $projectRow = collect($data)->firstWhere('project_id', $this->project->id);
+        $this->assertNotNull($projectRow);
+        $this->assertEqualsWithDelta(100.00, (float) $projectRow['expenses'], 0.01, 'Project P&L must exclude FARM_OVERHEAD (50) and show only SHARED (100)');
     }
 }

@@ -18,10 +18,12 @@ class Tenant extends Model
         'currency_code',
         'locale',
         'timezone',
+        'settings',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'settings' => 'array',
     ];
 
     public function farm(): HasOne

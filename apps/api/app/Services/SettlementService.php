@@ -139,7 +139,7 @@ class SettlementService
             ->where('project_id', $projectId)
             ->whereIn('posting_group_id', $pgIds)
             ->selectRaw("
-                COALESCE(SUM(CASE WHEN allocation_scope = 'SHARED' THEN amount ELSE 0 END), 0) AS shared,
+                COALESCE(SUM(CASE WHEN allocation_scope = 'SHARED' AND allocation_type = 'POOL_SHARE' THEN amount ELSE 0 END), 0) AS shared,
                 COALESCE(SUM(CASE WHEN allocation_scope = 'HARI_ONLY' THEN amount ELSE 0 END), 0) AS hari_only,
                 COALESCE(SUM(CASE WHEN allocation_scope = 'LANDLORD_ONLY' THEN amount ELSE 0 END), 0) AS landlord_only
             ")

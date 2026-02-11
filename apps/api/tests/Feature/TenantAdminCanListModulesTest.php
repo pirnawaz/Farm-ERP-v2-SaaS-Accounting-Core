@@ -40,12 +40,17 @@ class TenantAdminCanListModulesTest extends TestCase
         $land = collect($data['modules'])->firstWhere('key', 'land');
         $this->assertNotNull($land);
         $this->assertFalse($land['is_core'], 'land should not be core');
+        $this->assertTrue($land['enabled'], 'land is effectively enabled when required by core projects_crop_cycles');
+        $this->assertEquals('ENABLED', $land['status']);
+        $this->assertContains('projects_crop_cycles', $land['required_by']);
 
         foreach ($data['modules'] as $m) {
             $this->assertArrayHasKey('key', $m);
             $this->assertArrayHasKey('name', $m);
             $this->assertArrayHasKey('description', $m);
             $this->assertArrayHasKey('is_core', $m);
+            $this->assertArrayHasKey('tier', $m);
+            $this->assertArrayHasKey('required_by', $m);
             $this->assertArrayHasKey('sort_order', $m);
             $this->assertArrayHasKey('enabled', $m);
             $this->assertArrayHasKey('status', $m);

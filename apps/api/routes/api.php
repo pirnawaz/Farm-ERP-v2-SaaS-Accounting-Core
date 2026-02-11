@@ -22,6 +22,7 @@ use App\Http\Controllers\TenantModuleController;
 use App\Http\Controllers\PlatformTenantController;
 use App\Http\Controllers\TenantFarmProfileController;
 use App\Http\Controllers\TenantUserAdminController;
+use App\Http\Controllers\TenantOnboardingController;
 use App\Http\Controllers\Dev\DevTenantController;
 use App\Http\Controllers\Dev\DevE2ESeedController;
 use App\Http\Controllers\InvItemController;
@@ -382,6 +383,8 @@ Route::middleware(['role:tenant_admin'])->group(function () {
     Route::put('settings/tenant', [SettingsController::class, 'update']);
     Route::get('tenant/modules', [TenantModuleController::class, 'index']);
     Route::put('tenant/modules', [TenantModuleController::class, 'update']);
+    Route::get('tenant/onboarding', [TenantOnboardingController::class, 'show']);
+    Route::put('tenant/onboarding', [TenantOnboardingController::class, 'update']);
     Route::get('tenant/farm-profile', [TenantFarmProfileController::class, 'show']);
     Route::post('tenant/farm-profile', [TenantFarmProfileController::class, 'store']);
     Route::put('tenant/farm-profile', [TenantFarmProfileController::class, 'update']);

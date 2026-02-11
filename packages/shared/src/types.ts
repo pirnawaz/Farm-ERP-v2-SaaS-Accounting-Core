@@ -172,14 +172,19 @@ export type ModuleKey =
   | 'loans'
   | 'crop_ops'
 
+export type ModuleTier = 'CORE' | 'CORE_ADJUNCT' | 'OPTIONAL'
+
 export interface TenantModuleItem {
   key: string
   name: string
   description: string | null
   is_core: boolean
+  tier: ModuleTier
   sort_order: number
   enabled: boolean
   status: string
+  /** Enabled module keys that depend on this module (disable blocked if non-empty) */
+  required_by: string[]
 }
 
 export interface UpdateTenantModulesPayload {
@@ -188,6 +193,33 @@ export interface UpdateTenantModulesPayload {
 
 export interface TenantModulesResponse {
   modules: TenantModuleItem[]
+  /** Optional: key -> display name for dependency labels */
+  key_to_name?: Record<string, string>
+}
+
+/** Response from PUT /api/tenant/modules may include which modules were auto-enabled per requested key */
+export interface TenantModulesUpdateResponse extends TenantModulesResponse {
+  /** For each module key that was explicitly enabled, list of dependency keys that were auto-enabled */
+  auto_enabled?: Record<string, string[]>
+}
+
+// Onboarding checklist (tenant_admin first-login flow)
+export type OnboardingStepId =
+  | 'farm_profile'
+  | 'add_land_parcel'
+  | 'create_crop_cycle'
+  | 'create_first_project'
+  | 'add_first_party'
+  | 'post_first_transaction'
+
+export interface OnboardingState {
+  dismissed: boolean
+  steps: Record<OnboardingStepId, boolean>
+}
+
+export interface OnboardingUpdatePayload {
+  dismissed?: boolean
+  steps?: Partial<Record<OnboardingStepId, boolean>>
 }
 
 // Reconciliation report (read-only confidence checks)

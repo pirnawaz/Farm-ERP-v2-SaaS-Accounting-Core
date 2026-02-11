@@ -4,6 +4,7 @@ import { settingsApi, type UpdateTenantSettingsPayload } from '../api/settings';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { useRole } from '../hooks/useRole';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ReopenOnboardingButton } from '../components/OnboardingChecklist';
 import toast from 'react-hot-toast';
 
 const CURRENCIES = [
@@ -200,6 +201,13 @@ export default function LocalisationSettingsPage() {
           <strong>Note:</strong> Changes to these settings will immediately affect how money and dates are displayed throughout the application. No page reload is required.
         </p>
       </div>
+
+      {canEdit && (
+        <div className="mt-6 flex items-center gap-2">
+          <span className="text-sm text-gray-600">Onboarding:</span>
+          <ReopenOnboardingButton />
+        </div>
+      )}
     </div>
   );
 }

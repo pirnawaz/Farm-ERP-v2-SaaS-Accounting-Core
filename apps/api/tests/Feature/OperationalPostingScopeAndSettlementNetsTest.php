@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AllocationRow;
 use App\Models\CropCycle;
 use App\Models\OperationalTransaction;
+use App\Models\PostingGroup;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectRule;
@@ -159,5 +160,39 @@ class OperationalPostingScopeAndSettlementNetsTest extends TestCase
         $this->assertEqualsWithDelta(80.0, $totalExpenses, 0.01);
         $this->assertEqualsWithDelta($shared + $hariOnly + $landlordOnly, $totalExpenses, 0.01,
             'total_expenses must equal shared_pool_expenses + hari_only_deductions + landlord_only_costs');
+    }
+
+    /**
+     * Crop cycle settlement posting creates a posting_group with source_type CROP_CYCLE_SETTLEMENT.
+     * Ensures posting_group_source_type enum includes CROP_CYCLE_SETTLEMENT.
+     */
+    public function test_crop_cycle_settlement_posting_creates_posting_group_with_crop_cycle_settlement_source_type(): void
+    {
+        OperationalTransaction::create([
+            'tenant_id' => $this->tenant->id,
+            'project_id' => $this->project->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'type' => 'INCOME',
+            'status' => 'DRAFT',
+            'transaction_date' => '2024-06-01',
+            'amount' => 300.00,
+            'classification' => 'SHARED',
+        ]);
+        $incomeTxn = OperationalTransaction::where('project_id', $this->project->id)->where('type', 'INCOME')->first();
+        app(PostingService::class)->postOperationalTransaction($incomeTxn->id, $this->tenant->id, '2024-06-01', 'idem-cc-income');
+
+        $this->createAndPostExpense('SHARED', 100.00);
+
+        $settlementService = app(SettlementService::class);
+        $result = $settlementService->settleCropCycle(
+            $this->cropCycle->id,
+            $this->tenant->id,
+            '2024-06-30',
+            'crop-cycle-settlement-idem-1'
+        );
+
+        $postingGroup = $result['posting_group'];
+        $this->assertInstanceOf(PostingGroup::class, $postingGroup);
+        $this->assertEquals('CROP_CYCLE_SETTLEMENT', $postingGroup->source_type);
     }
 }

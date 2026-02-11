@@ -111,22 +111,8 @@ class PostingService
                 'idempotency_key' => $idempotencyKey,
             ]);
 
-            // Determine project_id for allocation rows
-            $projectId = $transaction->project_id;
-            
-            // For FARM_OVERHEAD, allocation_rows still requires project_id
-            // We'll use the first project in the crop cycle as a placeholder
-            // This is a workaround since allocation_rows.project_id is NOT NULL
-            if (!$projectId && $transaction->classification === 'FARM_OVERHEAD') {
-                $firstProject = Project::where('tenant_id', $tenantId)
-                    ->where('crop_cycle_id', $cropCycleId)
-                    ->first();
-                if ($firstProject) {
-                    $projectId = $firstProject->id;
-                } else {
-                    throw new \Exception('Cannot post FARM_OVERHEAD: no projects exist in crop cycle');
-                }
-            }
+            // Determine project_id for allocation rows. FARM_OVERHEAD must not be attributed to a project.
+            $projectId = $transaction->classification === 'FARM_OVERHEAD' ? null : $transaction->project_id;
 
             // Create allocation row based on classification; allocation_scope drives settlement expense buckets
             $allocationType = null;
@@ -135,7 +121,7 @@ class PostingService
             $ruleSnapshot = [];
 
             if ($transaction->classification === 'SHARED') {
-                $allocationType = 'POOL_SHARE';
+                $allocationType = $transaction->type === 'INCOME' ? 'POOL_REVENUE' : 'POOL_SHARE';
                 $allocationScope = 'SHARED';
                 $project = Project::where('id', $projectId)
                     ->where('tenant_id', $tenantId)

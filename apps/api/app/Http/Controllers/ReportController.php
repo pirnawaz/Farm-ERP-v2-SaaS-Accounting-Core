@@ -248,11 +248,13 @@ class ReportController extends Controller
         
         // CTE avoids duplicating ledger amounts when a posting_group has multiple allocation_rows (same project).
         // Only income/expense accounts; exclude clearing and party control from P&L.
+        // Exclude allocation_rows with project_id IS NULL (e.g. FARM_OVERHEAD) so they do not appear in project P&L.
         $query = "
             WITH project_allocations AS (
                 SELECT DISTINCT posting_group_id, project_id
                 FROM allocation_rows
                 WHERE tenant_id = :tenant_id
+                    AND project_id IS NOT NULL
             )
             SELECT
                 pa.project_id,
