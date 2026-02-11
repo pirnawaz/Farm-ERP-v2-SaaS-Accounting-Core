@@ -1,9 +1,9 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../api/reports';
-import type { GeneralLedgerResponse } from '../types';
+import type { GeneralLedgerResponse, TrialBalanceRow } from '../types';
 
 export function useTrialBalance(params: { from: string; to: string }) {
-  return useQuery({
+  return useQuery<TrialBalanceRow[], Error>({
     queryKey: ['reports', 'trial-balance', params],
     queryFn: () => reportsApi.trialBalance(params),
     staleTime: 2 * 60 * 1000, // 2 minutes - date-filtered reports
@@ -24,7 +24,6 @@ export function useGeneralLedger(params: {
     queryFn: () => reportsApi.generalLedger(params),
     staleTime: 2 * 60 * 1000, // 2 minutes - reports are date-filtered, stable for a period
     gcTime: 10 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 

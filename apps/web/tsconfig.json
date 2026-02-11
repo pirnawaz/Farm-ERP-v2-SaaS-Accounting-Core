@@ -17,7 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@farm-erp/shared": ["../../packages/shared/src"],
+      "@farm-erp/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src"],

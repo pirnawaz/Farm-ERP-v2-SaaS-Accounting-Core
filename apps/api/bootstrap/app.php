@@ -7,6 +7,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         \App\Providers\EnvironmentValidationServiceProvider::class,
+        \App\Providers\PerformanceMonitoringServiceProvider::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \App\Http\Middleware\ResolveTenant::class,
             \App\Http\Middleware\EnsureUserEnabled::class,
+            \App\Http\Middleware\LogSlowRequests::class,
         ]);
         
         $middleware->alias([

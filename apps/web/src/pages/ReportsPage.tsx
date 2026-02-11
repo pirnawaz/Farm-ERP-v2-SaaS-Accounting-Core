@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTrialBalance, useGeneralLedger, useProjectStatement } from '../hooks/useReports';
 import { useProjects } from '../hooks/useProjects';
-import { DataTable, type Column } from '../components/DataTable';
+import { DataTable, type Column, type WithId } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useFormatting } from '../hooks/useFormatting';
 import { EmptyState } from '../components/EmptyState';
@@ -34,7 +34,7 @@ export default function ReportsPage() {
   const { data: projectStatement, isLoading: loadingProjectStatement } = useProjectStatement(projectStatementParams);
   const { data: projects } = useProjects();
 
-  const trialBalanceColumns: Column<TrialBalanceRow>[] = [
+  const trialBalanceColumns: Column<WithId<TrialBalanceRow>>[] = [
     { header: 'Account Code', accessor: 'account_code' },
     { header: 'Account Name', accessor: 'account_name' },
     { header: 'Account Type', accessor: 'account_type' },
@@ -44,7 +44,7 @@ export default function ReportsPage() {
     { header: 'Net', accessor: 'net' },
   ];
 
-  const generalLedgerColumns: Column<GeneralLedgerRow>[] = [
+  const generalLedgerColumns: Column<WithId<GeneralLedgerRow>>[] = [
     { header: 'Date', accessor: (row) => formatDate(row.posting_date) },
     { header: 'Account Code', accessor: 'account_code' },
     { header: 'Account Name', accessor: 'account_name' },
@@ -90,7 +90,7 @@ export default function ReportsPage() {
         <div className="bg-white rounded-lg shadow">
           {trialBalance && trialBalance.length > 0 ? (
             <>
-              <DataTable data={trialBalance.map((r, i) => ({ ...r, id: r.account_id || String(i) }))} columns={trialBalanceColumns} />
+              <DataTable<WithId<TrialBalanceRow>> data={trialBalance.map((r, i) => ({ ...r, id: r.account_id || String(i) }))} columns={trialBalanceColumns} />
               <div className="p-4 bg-gray-50 border-t">
                 <div className="grid grid-cols-3 gap-4 text-sm font-medium">
                   <div>Total Debit: <span className="tabular-nums">{formatMoney(totalDebit)}</span></div>
@@ -168,7 +168,7 @@ export default function ReportsPage() {
         <div className="bg-white rounded-lg shadow">
           {generalLedger?.data && generalLedger.data.length > 0 ? (
             <>
-              <DataTable data={generalLedger.data.map((r, i) => ({ ...r, id: r.ledger_entry_id || String(i) }))} columns={generalLedgerColumns} />
+              <DataTable<WithId<GeneralLedgerRow>> data={generalLedger.data.map((r: GeneralLedgerRow, i: number) => ({ ...r, id: r.ledger_entry_id || String(i) }))} columns={generalLedgerColumns} />
               {generalLedger.pagination && (
                 <div className="p-4 bg-gray-50 border-t">
                   <div className="text-sm text-gray-600">

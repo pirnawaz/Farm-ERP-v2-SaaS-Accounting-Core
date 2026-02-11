@@ -2,19 +2,24 @@
   "name": "farm-erp-v2",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
+    "dev": "concurrently -n api,web -c green,blue --kill-others --kill-others-on-fail \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "cd apps/api && php artisan serve",
     "dev:web": "cd apps/web && npm run dev",
-    "dev:web:e2e": "npm -w apps/web run dev:e2e",
-    "install:all": "npm install && cd apps/web && npm install && cd ../../packages/shared && npm install",
-    "e2e": "npm -w apps/web run e2e",
-    "e2e:ui": "npm -w apps/web run e2e:ui",
-    "e2e:headed": "npm -w apps/web run e2e:headed",
-    "e2e:report": "npm -w apps/web run e2e:report",
-    "e2e:full": "npm run e2e && npm run e2e:report"
+    "install:all": "npm install",
+    "build:shared": "npm run build -w @farm-erp/shared",
+    "build:web": "npm run build:shared && npm run build -w @farm-erp/web",
+    "build": "npm run build:web",
+    "typecheck:web": "npm run build:shared && cd apps/web && npx tsc --noEmit",
+    "typecheck": "npm run typecheck:web",
+    "postinstall": "npm run build:shared",
+    "clean:shared": "npx rimraf packages/shared/dist",
+    "clean:web": "npx rimraf apps/web/dist",
+    "clean": "npm run clean:shared && npm run clean:web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "rimraf": "^5.0.10"
   }
 }

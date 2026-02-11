@@ -23,9 +23,10 @@ export default function RateCardsPage() {
   const updateRC = useUpdateRateCard();
   const { hasRole } = useRole();
   const { formatMoney, formatDate } = useFormatting();
+  type FormState = Omit<CreateMachineRateCardPayload, 'base_rate' | 'cost_plus_percent'> & { base_rate: string; cost_plus_percent: string | null };
   const [showModal, setShowModal] = useState(false);
   const [editingRateCard, setEditingRateCard] = useState<MachineRateCard | null>(null);
-  const [form, setForm] = useState<CreateMachineRateCardPayload>({
+  const [form, setForm] = useState<FormState>({
     applies_to_mode: 'MACHINE',
     machine_id: null,
     machine_type: null,
@@ -34,7 +35,7 @@ export default function RateCardsPage() {
     effective_to: null,
     rate_unit: 'HOUR',
     pricing_model: 'FIXED',
-    base_rate: 0,
+    base_rate: '',
     cost_plus_percent: null,
     includes_fuel: true,
     includes_operator: true,
@@ -85,8 +86,8 @@ export default function RateCardsPage() {
               effective_to: r.effective_to || null,
               rate_unit: r.rate_unit,
               pricing_model: r.pricing_model,
-              base_rate: parseFloat(r.base_rate),
-              cost_plus_percent: r.cost_plus_percent ? parseFloat(r.cost_plus_percent) : null,
+              base_rate: r.base_rate != null ? String(r.base_rate) : '',
+              cost_plus_percent: r.cost_plus_percent != null ? String(r.cost_plus_percent) : null,
               includes_fuel: r.includes_fuel,
               includes_operator: r.includes_operator,
               includes_maintenance: r.includes_maintenance,
@@ -161,7 +162,7 @@ export default function RateCardsPage() {
       effective_to: null,
       rate_unit: 'HOUR',
       pricing_model: 'FIXED',
-      base_rate: 0,
+      base_rate: '',
       cost_plus_percent: null,
       includes_fuel: true,
       includes_operator: true,
@@ -293,8 +294,8 @@ export default function RateCardsPage() {
               type="number"
               step="0.01"
               min="0"
-              value={form.base_rate === '' || form.base_rate == null ? '' : String(form.base_rate)}
-              onChange={e => setForm(f => ({ ...f, base_rate: e.target.value as unknown as number }))}
+              value={form.base_rate}
+              onChange={e => setForm(f => ({ ...f, base_rate: e.target.value }))}
               className="w-full px-3 py-2 border rounded"
               placeholder="0.00"
             />
@@ -307,8 +308,8 @@ export default function RateCardsPage() {
                 step="0.01"
                 min="0"
                 max="100"
-                value={form.cost_plus_percent === '' || form.cost_plus_percent == null ? '' : String(form.cost_plus_percent)}
-                onChange={e => setForm(f => ({ ...f, cost_plus_percent: e.target.value === '' ? null : (e.target.value as unknown as number | null) }))}
+                value={form.cost_plus_percent ?? ''}
+                onChange={e => setForm(f => ({ ...f, cost_plus_percent: e.target.value === '' ? null : e.target.value }))}
                 className="w-full px-3 py-2 border rounded"
                 placeholder="0.00"
               />
@@ -367,10 +368,10 @@ export default function RateCardsPage() {
                 disabled={
                   !form.effective_from || 
                   !form.base_rate || 
-                  form.base_rate <= 0 ||
+                  parseFloat(form.base_rate) <= 0 ||
                   (form.applies_to_mode === 'MACHINE' && !form.machine_id) ||
                   (form.applies_to_mode === 'MACHINE_TYPE' && !form.machine_type) ||
-                  (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || form.cost_plus_percent <= 0)) ||
+                  (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || parseFloat(form.cost_plus_percent) <= 0)) ||
                   updateRC.isPending
                 }
                 className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
@@ -383,10 +384,10 @@ export default function RateCardsPage() {
                 disabled={
                   !form.effective_from || 
                   !form.base_rate || 
-                  form.base_rate <= 0 ||
+                  parseFloat(form.base_rate) <= 0 ||
                   (form.applies_to_mode === 'MACHINE' && !form.machine_id) ||
                   (form.applies_to_mode === 'MACHINE_TYPE' && !form.machine_type) ||
-                  (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || form.cost_plus_percent <= 0)) ||
+                  (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || parseFloat(form.cost_plus_percent) <= 0)) ||
                   createRC.isPending
                 }
                 className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"

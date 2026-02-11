@@ -9,12 +9,15 @@ import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
 import toast from 'react-hot-toast';
 
+type ShareRuleFormLine = { party_id: string; percentage: string; role?: string };
+type ShareRuleFormState = Omit<CreateShareRulePayload, 'lines'> & { lines: ShareRuleFormLine[] };
+
 export default function ShareRulesPage() {
   const queryClient = useQueryClient();
   const { hasRole } = useRole();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingRule, setEditingRule] = useState<ShareRule | null>(null);
-  const [formData, setFormData] = useState<CreateShareRulePayload>({
+  const [formData, setFormData] = useState<ShareRuleFormState>({
     name: '',
     applies_to: 'CROP_CYCLE',
     basis: 'MARGIN',
@@ -98,18 +101,18 @@ export default function ShareRulesPage() {
 
   const handleCreate = () => {
     if (!validateForm()) return;
-    const payload = {
+    const payload: CreateShareRulePayload = {
       ...formData,
-      lines: formData.lines.map((l) => ({ ...l, percentage: parseFloat(String(l.percentage)) || 0 })),
+      lines: formData.lines.map((l) => ({ party_id: l.party_id, percentage: parseFloat(String(l.percentage)) || 0, role: l.role })),
     };
     createMutation.mutate(payload);
   };
 
   const handleUpdate = () => {
     if (!editingRule || !validateForm()) return;
-    const payload = {
+    const payload: CreateShareRulePayload = {
       ...formData,
-      lines: formData.lines.map((l) => ({ ...l, percentage: parseFloat(String(l.percentage)) || 0 })),
+      lines: formData.lines.map((l) => ({ party_id: l.party_id, percentage: parseFloat(String(l.percentage)) || 0, role: l.role })),
     };
     updateMutation.mutate({ id: editingRule.id, payload });
   };
@@ -135,7 +138,7 @@ export default function ShareRulesPage() {
   const addLine = () => {
     setFormData({
       ...formData,
-      lines: [...formData.lines, { party_id: '', percentage: '' as unknown as number, role: '' }],
+      lines: [...formData.lines, { party_id: '', percentage: '', role: '' }],
     });
   };
 
@@ -286,7 +289,7 @@ export default function ShareRulesPage() {
                   </select>
                   <input
                     type="number"
-                    value={line.percentage === '' || line.percentage == null ? '' : String(line.percentage)}
+                    value={line.percentage}
                     onChange={(e) => updateLine(index, 'percentage', e.target.value)}
                     className="w-24 border rounded px-3 py-2"
                     placeholder="%"

@@ -328,6 +328,36 @@ Covers tenant isolation, CRUD, validation, and other feature tests.
 | **Shared package errors** | `cd packages/shared && npm run build`; in `apps/web`: `npm install` |
 | **CORS** | `apps/api/config/cors.php`; ensure origin matches frontend (e.g. `http://localhost:3000`) |
 | **Port in use** | Free 8000 (API) and 3000 (web) or change in respective configs |
+| **API slow / performance** | See [Performance monitoring](#performance-monitoring) below. |
+
+### Performance monitoring
+
+The API can log slow SQL queries and slow HTTP requests when enabled. Use this to track down performance issues.
+
+**Steps:**
+
+1. In `apps/api/.env`, enable one or both:
+   ```env
+   PERFORMANCE_SLOW_SQL_ENABLED=true
+   PERFORMANCE_SLOW_SQL_THRESHOLD_MS=1000
+   PERFORMANCE_SLOW_REQUEST_ENABLED=true
+   PERFORMANCE_SLOW_REQUEST_THRESHOLD_MS=3000
+   ```
+2. (Optional) Adjust thresholds or truncation lengths: `PERFORMANCE_BINDINGS_MAX_LENGTH`, `PERFORMANCE_QUERY_PARAMS_MAX_LENGTH`.
+3. Reproduce the slow behaviour, then check `apps/api/storage/logs/laravel.log`.
+
+**Sample log lines:**
+
+- Slow SQL:
+  ```
+  [timestamp] local.WARNING: Slow SQL query detected {"sql":"select * from \"parties\" where \"tenant_id\" = ?","bindings":["00000000-0000-0000-0000-000000000001"],"elapsed_ms":1250,"connection":"pgsql","tenant_id":"00000000-0000-0000-0000-000000000001"}
+  ```
+- Slow request:
+  ```
+  [timestamp] local.WARNING: Slow request detected {"method":"GET","path":"api/parties","status":200,"duration_ms":3500,"query_params":{"page":"1"},"tenant_id":"00000000-0000-0000-0000-000000000001"}
+  ```
+
+Bindings and query param values are truncated so sensitive data is not written in full. Disable with `PERFORMANCE_SLOW_SQL_ENABLED=false` and `PERFORMANCE_SLOW_REQUEST_ENABLED=false` when not needed.
 
 ---
 

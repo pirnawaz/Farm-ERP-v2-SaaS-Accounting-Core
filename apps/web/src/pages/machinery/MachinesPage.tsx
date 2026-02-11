@@ -19,14 +19,15 @@ export default function MachinesPage() {
   const { hasRole } = useRole();
   const [showModal, setShowModal] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
-  const [form, setForm] = useState<CreateMachinePayload>({
+  type FormState = Omit<CreateMachinePayload, 'opening_meter'> & { opening_meter: string };
+  const [form, setForm] = useState<FormState>({
     code: '',
     name: '',
     machine_type: '',
     ownership_type: '',
     is_active: true,
     meter_unit: 'HOURS',
-    opening_meter: 0,
+    opening_meter: '',
     notes: null,
   });
 
@@ -51,7 +52,7 @@ export default function MachinesPage() {
               ownership_type: r.ownership_type,
               is_active: r.is_active ?? true,
               meter_unit: r.meter_unit,
-              opening_meter: parseFloat(r.opening_meter) || 0,
+              opening_meter: r.opening_meter != null && r.opening_meter !== '' ? String(r.opening_meter) : '',
               notes: r.notes || null,
             });
             setShowModal(true);
@@ -73,7 +74,7 @@ export default function MachinesPage() {
       ownership_type: form.ownership_type,
       is_active: form.is_active ?? true,
       meter_unit: form.meter_unit,
-      opening_meter: parseFloat(String(form.opening_meter)) || 0,
+      opening_meter: parseFloat(form.opening_meter) || 0,
       notes: form.notes,
     };
     await createM.mutateAsync(payload);
@@ -89,7 +90,7 @@ export default function MachinesPage() {
       ownership_type: form.ownership_type,
       is_active: form.is_active ?? true,
       meter_unit: form.meter_unit,
-      opening_meter: parseFloat(String(form.opening_meter)) || 0,
+      opening_meter: parseFloat(form.opening_meter) || 0,
       notes: form.notes,
     };
     await updateM.mutateAsync({ id: editingMachine.id, payload });
@@ -112,7 +113,7 @@ export default function MachinesPage() {
       ownership_type: '',
       is_active: true,
       meter_unit: 'HOURS',
-      opening_meter: 0,
+      opening_meter: '',
       notes: null,
     });
   };
@@ -193,8 +194,8 @@ export default function MachinesPage() {
               type="number"
               step="0.01"
               min="0"
-              value={form.opening_meter === '' || form.opening_meter == null ? '' : String(form.opening_meter)}
-              onChange={e => setForm(f => ({ ...f, opening_meter: e.target.value as unknown as number }))}
+              value={form.opening_meter}
+              onChange={e => setForm(f => ({ ...f, opening_meter: e.target.value }))}
               className="w-full px-3 py-2 border rounded"
               placeholder="0.00"
             />

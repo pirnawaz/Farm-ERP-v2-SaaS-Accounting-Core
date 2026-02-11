@@ -49,9 +49,9 @@ export function useOnboardingState(): OnboardingState {
   return {
     showOnboarding,
     steps: {
-      hasProjects: !!hasProjects,
-      hasTransactions: !!hasTransactions,
-      hasReports: !!hasReports,
+      hasProjects: Boolean(hasProjects),
+      hasTransactions: Boolean(hasTransactions),
+      hasReports: Boolean(hasReports),
     },
     isLoading,
   };

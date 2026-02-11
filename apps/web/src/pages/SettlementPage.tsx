@@ -299,7 +299,7 @@ export default function SettlementPage() {
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Hari-only deductions</dt>
                   <dd className="text-lg font-semibold text-gray-900">
-                    {(preview.hari_only_deductions === 0 || preview.hari_only_deductions === '0') ? 'None' : formatMoney(preview.hari_only_deductions)}
+                    {(Number(preview.hari_only_deductions) === 0 ? 'None' : formatMoney(preview.hari_only_deductions))}
                   </dd>
                 </div>
               </div>

@@ -1,6 +1,7 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { harvestsApi, type HarvestFilters } from '../api/harvests';
 import type {
+  Harvest,
   CreateHarvestPayload,
   UpdateHarvestPayload,
   PostHarvestPayload,
@@ -15,12 +16,11 @@ function err(e: unknown): string {
 }
 
 export function useHarvests(f?: HarvestFilters) {
-  return useQuery({
+  return useQuery<Harvest[], Error>({
     queryKey: ['harvests', f],
     queryFn: () => harvestsApi.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 

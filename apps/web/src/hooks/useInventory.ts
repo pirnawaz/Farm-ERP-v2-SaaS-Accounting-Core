@@ -1,6 +1,11 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi, type GrnFilters, type IssueFilters, type TransferFilters, type AdjustmentFilters, type StockOnHandFilters, type StockMovementsFilters } from '../api/inventory';
 import type {
+  InvGrn,
+  InvIssue,
+  InvTransfer,
+  InvAdjustment,
+  InvStockMovement,
   CreateInvGrnPayload,
   UpdateInvGrnPayload,
   PostInvGrnRequest,
@@ -157,12 +162,11 @@ export function useUpdateCategory() {
 
 // GRNs
 export function useGRNs(f?: GrnFilters) {
-  return useQuery({
+  return useQuery<InvGrn[], Error>({
     queryKey: ['inventory', 'grns', f],
     queryFn: () => inventoryApi.grns.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -225,12 +229,11 @@ export function useReverseGRN() {
 
 // Issues
 export function useIssues(f?: IssueFilters) {
-  return useQuery({
+  return useQuery<InvIssue[], Error>({
     queryKey: ['inventory', 'issues', f],
     queryFn: () => inventoryApi.issues.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -293,12 +296,11 @@ export function useReverseIssue() {
 
 // Transfers
 export function useTransfers(f?: TransferFilters) {
-  return useQuery({
+  return useQuery<InvTransfer[], Error>({
     queryKey: ['inventory', 'transfers', f],
     queryFn: () => inventoryApi.transfers.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -358,12 +360,11 @@ export function useReverseTransfer() {
 
 // Adjustments
 export function useAdjustments(f?: AdjustmentFilters) {
-  return useQuery({
+  return useQuery<InvAdjustment[], Error>({
     queryKey: ['inventory', 'adjustments', f],
     queryFn: () => inventoryApi.adjustments.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -432,11 +433,10 @@ export function useStockOnHand(f?: StockOnHandFilters) {
 }
 
 export function useStockMovements(f?: StockMovementsFilters) {
-  return useQuery({
+  return useQuery<InvStockMovement[], Error>({
     queryKey: ['inventory', 'stock', 'movements', f],
     queryFn: () => inventoryApi.stock.movements(f),
     staleTime: 30 * 1000, // 30 seconds - stock movements
     gcTime: 5 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }

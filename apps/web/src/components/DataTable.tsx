@@ -1,5 +1,8 @@
 import { ReactNode, useCallback } from 'react';
 
+/** Use for rows that get a synthetic id via .map(r => ({ ...r, id: ... })) */
+export type WithId<T> = T & { id: string };
+
 export interface Column<T> {
   header: string;
   accessor: keyof T | ((row: T) => ReactNode);

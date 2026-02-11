@@ -1,15 +1,14 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { advancesApi, type AdvanceFilters } from '../api/advances';
-import type { CreateAdvancePayload, PostAdvanceRequest } from '../types';
+import type { Advance, CreateAdvancePayload, PostAdvanceRequest } from '../types';
 import toast from 'react-hot-toast';
 
 export function useAdvances(filters?: AdvanceFilters) {
-  return useQuery({
+  return useQuery<Advance[], Error>({
     queryKey: ['advances', filters],
     queryFn: () => advancesApi.list(filters),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 

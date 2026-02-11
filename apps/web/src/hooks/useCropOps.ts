@@ -1,6 +1,7 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cropOpsApi, type ActivityTypeFilters, type ActivityFilters } from '../api/cropOps';
 import type {
+  CropActivity,
   CreateActivityTypePayload,
   UpdateActivityTypePayload,
   CreateCropActivityPayload,
@@ -50,12 +51,11 @@ export function useUpdateActivityType() {
 }
 
 export function useActivities(f?: ActivityFilters) {
-  return useQuery({
+  return useQuery<CropActivity[], Error>({
     queryKey: ['crop-ops', 'activities', f],
     queryFn: () => cropOpsApi.activities.list(f),
     staleTime: 20 * 1000, // 20 seconds - transactional data
     gcTime: 2 * 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
