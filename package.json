@@ -2,7 +2,10 @@
   "name": "farm-erp-v2",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently -n api,web -c green,blue --kill-others --kill-others-on-fail \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "cd apps/api && php artisan serve",
@@ -16,10 +19,17 @@
     "postinstall": "npm run build:shared",
     "clean:shared": "npx rimraf packages/shared/dist",
     "clean:web": "npx rimraf apps/web/dist",
-    "clean": "npm run clean:shared && npm run clean:web"
+    "clean": "npm run clean:shared && npm run clean:web",
+    "api:e2e": "cd apps/api && php artisan serve --host=127.0.0.1 --port=8000",
+    "web:e2e": "wait-on http://127.0.0.1:8000 && cd apps/web && npm run e2e",
+    "e2e": "concurrently -k -s first -n API,E2E \"npm:api:e2e\" \"npm:web:e2e\"",
+    "e2e:core": "cross-env E2E_PROFILE=core npm run e2e",
+    "e2e:all": "cross-env E2E_PROFILE=all npm run e2e"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
-    "rimraf": "^5.0.10"
+    "cross-env": "^7.0.3",
+    "rimraf": "^5.0.10",
+    "wait-on": "^8.0.1"
   }
 }

@@ -94,10 +94,11 @@ async function request<T>(
         throw new Error(`Server returned HTML instead of JSON (HTTP ${response.status}). This usually indicates a server error. Check the backend logs.`)
       }
       
-      // Try to parse as JSON, fallback to status text
+      // Try to parse as JSON, fallback to status text (prefer message for 5xx to show backend detail)
       try {
         const error = JSON.parse(text)
-        throw new Error(error.error || error.message || `HTTP ${response.status}: ${response.statusText}`)
+        const msg = error.message || error.error || `HTTP ${response.status}: ${response.statusText}`
+        throw new Error(msg)
       } catch (parseError) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}${text ? ` - ${text.substring(0, 100)}` : ''}`)
       }

@@ -21,8 +21,15 @@ class DevTenantController extends Controller
      */
     public function index(): JsonResponse
     {
-        $tenants = Tenant::orderBy('created_at', 'desc')
-            ->get(['id', 'name', 'status', 'created_at']);
+        try {
+            $tenants = Tenant::orderBy('created_at', 'desc')
+                ->get(['id', 'name', 'status', 'created_at']);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'Failed to list tenants',
+                'message' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
 
         return response()->json([
             'tenants' => $tenants->map(function ($tenant) {
@@ -30,7 +37,7 @@ class DevTenantController extends Controller
                     'id' => $tenant->id,
                     'name' => $tenant->name,
                     'status' => $tenant->status,
-                    'created_at' => $tenant->created_at->toIso8601String(),
+                    'created_at' => $tenant->created_at?->toIso8601String() ?? '',
                 ];
             }),
         ]);
@@ -87,7 +94,7 @@ class DevTenantController extends Controller
                 'id' => $tenant->id,
                 'name' => $tenant->name,
                 'status' => $tenant->status,
-                'created_at' => $tenant->created_at->toIso8601String(),
+                'created_at' => $tenant->created_at?->toIso8601String() ?? '',
             ],
         ], 201);
     }
@@ -113,7 +120,7 @@ class DevTenantController extends Controller
                 'id' => $tenant->id,
                 'name' => $tenant->name,
                 'status' => $tenant->status,
-                'created_at' => $tenant->created_at->toIso8601String(),
+                'created_at' => $tenant->created_at?->toIso8601String() ?? '',
             ],
         ]);
     }

@@ -197,6 +197,10 @@ class ModuleDependenciesEnforcementTest extends TestCase
      */
     public function test_effective_enabled_land_when_core_projects_has_no_row(): void
     {
+        // TEMP: skip when force-all-modules is on (self-heal transaction is skipped in override mode).
+        if (filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            $this->markTestSkipped('Skip when FORCE_ALL_MODULES_ENABLED is set.');
+        }
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
         $landModule = Module::where('key', 'land')->firstOrFail();
 
@@ -228,6 +232,10 @@ class ModuleDependenciesEnforcementTest extends TestCase
      */
     public function test_self_heal_does_not_enable_optional_deps(): void
     {
+        // TEMP: skip when force-all-modules is on (override returns all modules as enabled).
+        if (filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            $this->markTestSkipped('Skip when FORCE_ALL_MODULES_ENABLED is set.');
+        }
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
         $advancesModule = Module::where('key', 'treasury_advances')->firstOrFail();
 

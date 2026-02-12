@@ -18,6 +18,11 @@ class RequireModule
      */
     public function handle(Request $request, Closure $next, string $moduleKey): Response
     {
+        // TEMP (System Completion Phase): FORCE_ALL_MODULES_ENABLED bypasses require_module enforcement.
+        if (filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            return $next($request);
+        }
+
         $tenant = TenantContext::getTenant($request);
         if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);

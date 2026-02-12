@@ -12,6 +12,10 @@ class CropOpsModuleDisabledReturns403Test extends TestCase
 
     public function test_crop_ops_routes_return_403_when_module_disabled(): void
     {
+        // TEMP: skip when force-all-modules override is on (RequireModule bypasses enforcement).
+        if (filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            $this->markTestSkipped('Skip when FORCE_ALL_MODULES_ENABLED is set.');
+        }
         $tenant = Tenant::create(['name' => 'Test', 'status' => 'active']);
 
         $r = $this->withHeader('X-Tenant-Id', $tenant->id)

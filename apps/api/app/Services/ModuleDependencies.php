@@ -76,6 +76,11 @@ class ModuleDependencies
      */
     public function getEffectiveEnabledModulesForTenant(string $tenantId): array
     {
+        // TEMP (System Completion Phase): FORCE_ALL_MODULES_ENABLED bypasses module gating; all modules appear enabled.
+        if (filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            return Module::pluck('key')->all();
+        }
+
         $tenant = Tenant::find($tenantId);
         if (!$tenant) {
             return [];

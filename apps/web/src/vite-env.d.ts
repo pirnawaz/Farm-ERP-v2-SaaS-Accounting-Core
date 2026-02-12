@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string
+  readonly VITE_FORCE_ALL_MODULES_ENABLED?: string
 }
 
 interface ImportMeta {

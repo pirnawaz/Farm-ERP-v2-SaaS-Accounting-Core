@@ -133,6 +133,7 @@ export default function LandAllocationsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Land Allocations</h1>
         {canCreate && (
           <button
+            data-testid="new-land-allocation"
             onClick={() => {
               setAllocationMode('OWNER');
               setShowCreateModal(true);

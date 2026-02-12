@@ -38,6 +38,8 @@ class E2ESeedService
             $tenant = $this->resolveTenant($tenantId, $tenantName);
             $tenantId = $tenant->id;
 
+            $this->markOnboardingCompleted($tenant);
+
             $this->ensureBootstrapAccounts($tenantId);
             $userIds = $this->ensureUsersPerRole($tenantId);
 
@@ -133,6 +135,29 @@ class E2ESeedService
             'posted_machinery_service_id' => null,
             'posted_machinery_posting_group_id' => null,
         ];
+    }
+
+    /**
+     * Mark tenant onboarding as completed (dismissed + all steps true) so the app does not block navigation.
+     * Idempotent: safe to run on every seed.
+     */
+    private function markOnboardingCompleted(Tenant $tenant): void
+    {
+        $stepKeys = [
+            'farm_profile',
+            'add_land_parcel',
+            'create_crop_cycle',
+            'create_first_project',
+            'add_first_party',
+            'post_first_transaction',
+        ];
+        $steps = array_fill_keys($stepKeys, true);
+        $settings = $tenant->settings ?? [];
+        $onboarding = $settings['onboarding'] ?? ['dismissed' => false, 'steps' => []];
+        $onboarding['dismissed'] = true;
+        $onboarding['steps'] = array_merge($onboarding['steps'] ?? [], $steps);
+        $settings['onboarding'] = $onboarding;
+        $tenant->update(['settings' => $settings]);
     }
 
     private function resolveTenant(?string $tenantId, string $tenantName): Tenant

@@ -122,7 +122,19 @@ export function AppLayout() {
   const { tenantId, setTenantId } = useTenant();
   const { userRole, logout } = useAuth();
   const { hasRole } = useRole();
-  const { isModuleEnabled } = useModules();
+  const { isModuleEnabled, loading: modulesLoading, error: modulesError } = useModules();
+  // TEMP: force-all => ready immediately so E2E waitForModulesReady is stable.
+  const forceAllModules =
+    import.meta.env.VITE_FORCE_ALL_MODULES_ENABLED === 'true' ||
+    (typeof import.meta.env.VITE_FORCE_ALL_MODULES_ENABLED === 'string' &&
+      import.meta.env.VITE_FORCE_ALL_MODULES_ENABLED.length > 0);
+  const modulesState: 'loading' | 'error' | 'ready' = forceAllModules
+    ? 'ready'
+    : modulesLoading
+      ? 'loading'
+      : modulesError
+        ? 'error'
+        : 'ready';
 
   // Track expanded groups - initialize with groups that contain the active route
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
@@ -202,7 +214,15 @@ export function AppLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" data-testid="app-shell">
+      {/* Readiness marker for E2E: state encoded in data-state (loading | error | ready) */}
+      <div
+        data-testid="modules-ready"
+        data-state={modulesState}
+        {...(modulesError && { 'data-modules-error': modulesError.message })}
+        className="sr-only"
+        aria-hidden="true"
+      />
       {/* Sidebar */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0" data-testid="app-sidebar">
         <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">

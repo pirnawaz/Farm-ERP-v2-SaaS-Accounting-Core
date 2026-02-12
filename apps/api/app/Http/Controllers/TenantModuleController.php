@@ -35,40 +35,43 @@ class TenantModuleController extends Controller
         $effectiveEnabled = $this->moduleDependencies->getEffectiveEnabledModulesForTenant($tenantId);
         $userId = $request->attributes->get('user_id') ?? $request->header('X-User-Id');
 
-        DB::transaction(function () use ($tenantId, $effectiveEnabled, $modules, $userId) {
-            $pivots = TenantModule::where('tenant_id', $tenantId)
-                ->get()
-                ->keyBy('module_id');
-            $modulesByKey = $modules->keyBy('key');
-            foreach ($effectiveEnabled as $key) {
-                $module = $modulesByKey->get($key);
-                if (!$module || $module->is_core) {
-                    continue;
-                }
-                $pivot = $pivots->get($module->id);
-                if ($pivot && $pivot->status === 'ENABLED') {
-                    continue;
-                }
-                $pivot = TenantModule::firstOrCreate(
-                    [
-                        'tenant_id' => $tenantId,
-                        'module_id' => $module->id,
-                    ],
-                    [
+        // TEMP: skip self-heal when force-all-modules so we don't write tenant_modules for every module.
+        if (! filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            DB::transaction(function () use ($tenantId, $effectiveEnabled, $modules, $userId) {
+                $pivots = TenantModule::where('tenant_id', $tenantId)
+                    ->get()
+                    ->keyBy('module_id');
+                $modulesByKey = $modules->keyBy('key');
+                foreach ($effectiveEnabled as $key) {
+                    $module = $modulesByKey->get($key);
+                    if (!$module || $module->is_core) {
+                        continue;
+                    }
+                    $pivot = $pivots->get($module->id);
+                    if ($pivot && $pivot->status === 'ENABLED') {
+                        continue;
+                    }
+                    $pivot = TenantModule::firstOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'module_id' => $module->id,
+                        ],
+                        [
+                            'status' => 'ENABLED',
+                            'enabled_at' => now(),
+                            'disabled_at' => null,
+                            'enabled_by_user_id' => $userId,
+                        ]
+                    );
+                    $pivot->update([
                         'status' => 'ENABLED',
                         'enabled_at' => now(),
                         'disabled_at' => null,
                         'enabled_by_user_id' => $userId,
-                    ]
-                );
-                $pivot->update([
-                    'status' => 'ENABLED',
-                    'enabled_at' => now(),
-                    'disabled_at' => null,
-                    'enabled_by_user_id' => $userId,
-                ]);
-            }
-        });
+                    ]);
+                }
+            });
+        }
 
         $keyToName = $modules->keyBy('key')->map(fn (Module $m) => $m->name)->all();
 

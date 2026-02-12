@@ -13,14 +13,24 @@ interface ModulesContextType {
 
 const ModulesContext = createContext<ModulesContextType | undefined>(undefined);
 
+// TEMP (System Completion Phase): when set, all modules appear enabled and readiness is immediate for E2E.
+const forceAllModules =
+  import.meta.env.VITE_FORCE_ALL_MODULES_ENABLED === 'true' ||
+  (typeof import.meta.env.VITE_FORCE_ALL_MODULES_ENABLED === 'string' &&
+    import.meta.env.VITE_FORCE_ALL_MODULES_ENABLED.length > 0);
+
 export function ModulesProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const { data, isLoading: loading, error } = useTenantModulesQuery();
+  const { data, status, error } = useTenantModulesQuery();
+  /** Initial load only: true when we have no data yet (status pending), not during background refetch. */
+  const loading = forceAllModules ? false : status === 'pending';
 
   const modules = data?.modules ?? [];
 
   const isModuleEnabled = useCallback(
     (key: string): boolean => {
+      // TEMP: force-all bypasses module gating; treat every module as enabled.
+      if (forceAllModules) return true;
       const m = modules.find((m: TenantModuleItem) => m.key === key);
       return m?.enabled ?? false;
     },

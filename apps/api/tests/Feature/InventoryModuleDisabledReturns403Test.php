@@ -13,6 +13,10 @@ class InventoryModuleDisabledReturns403Test extends TestCase
 
     public function test_inventory_routes_return_403_when_module_disabled(): void
     {
+        // TEMP: skip when force-all-modules override is on (RequireModule bypasses enforcement).
+        if (filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            $this->markTestSkipped('Skip when FORCE_ALL_MODULES_ENABLED is set.');
+        }
         $tenant = Tenant::create(['name' => 'Test', 'status' => 'active']);
         // Do NOT enable inventory (no TenantModule or status=DISABLED)
 

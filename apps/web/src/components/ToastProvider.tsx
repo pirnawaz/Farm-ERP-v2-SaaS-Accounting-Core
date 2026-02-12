@@ -2,7 +2,8 @@ import { Toaster } from 'react-hot-toast';
 
 export function ToastProvider() {
   return (
-    <Toaster
+    <div data-testid="toast-container" aria-live="polite">
+      <Toaster
       position="top-right"
       toastOptions={{
         duration: 4000,
@@ -26,5 +27,6 @@ export function ToastProvider() {
         },
       }}
     />
+    </div>
   );
 }

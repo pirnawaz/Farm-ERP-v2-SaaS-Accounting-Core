@@ -38,3 +38,8 @@ apps/api/storage/**
 apps/api/bootstrap/cache/**
 !apps/api/bootstrap/cache/.gitkeep
 .phpunit.result.cache
+
+# Playwright
+apps/web/playwright/.auth/
+**/playwright-report/
+**/test-results/
