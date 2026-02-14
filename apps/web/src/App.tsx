@@ -18,6 +18,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import TransactionDetailPage from './pages/TransactionDetailPage';
 import TransactionFormPage from './pages/TransactionFormPage';
 import SettlementPage from './pages/SettlementPage';
+import SettlementPackPage from './pages/SettlementPackPage';
 import PaymentsPage from './pages/PaymentsPage';
 import PaymentFormPage from './pages/PaymentFormPage';
 import PaymentDetailPage from './pages/PaymentDetailPage';
@@ -145,6 +146,7 @@ function App() {
         <Route path="transactions/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><TransactionDetailPage /></ModuleProtectedRoute>} />
         <Route path="transactions/:id/edit" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><TransactionFormPage /></ModuleProtectedRoute>} />
         <Route path="settlement" element={<ModuleProtectedRoute requiredModule="settlements"><SettlementPage /></ModuleProtectedRoute>} />
+        <Route path="settlement-packs/:id" element={<ModuleProtectedRoute requiredModule="settlements"><SettlementPackPage /></ModuleProtectedRoute>} />
         <Route path="payments" element={<ModuleProtectedRoute requiredModule="treasury_payments"><PaymentsPage /></ModuleProtectedRoute>} />
         <Route path="payments/new" element={<ModuleProtectedRoute requiredModule="treasury_payments"><PaymentFormPage /></ModuleProtectedRoute>} />
         <Route path="payments/:id" element={<ModuleProtectedRoute requiredModule="treasury_payments"><PaymentDetailPage /></ModuleProtectedRoute>} />

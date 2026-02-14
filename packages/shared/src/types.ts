@@ -237,3 +237,37 @@ export interface ReconciliationResponse {
   checks: ReconciliationCheck[]
   generated_at: string
 }
+
+// Settlement Pack (Governance Phase 1)
+export type SettlementPackStatus = 'DRAFT' | 'FINAL'
+
+export interface SettlementPackSummary {
+  total_amount: string
+  row_count: number
+  by_allocation_type: Record<string, string>
+}
+
+export interface SettlementPackRegisterRow {
+  posting_group_id: string
+  posting_date: string
+  source_type: string
+  source_id: string
+  allocation_row_id: string
+  allocation_type: string
+  amount: string
+  party_id: string | null
+}
+
+export interface SettlementPackResponse {
+  id: string
+  tenant_id: string
+  project_id: string
+  project?: { id: string; name: string } | null
+  generated_by_user_id: string | null
+  generated_at: string
+  status: SettlementPackStatus
+  summary_json: SettlementPackSummary
+  register_version: string
+  register_row_count?: number
+  register_rows?: SettlementPackRegisterRow[]
+}

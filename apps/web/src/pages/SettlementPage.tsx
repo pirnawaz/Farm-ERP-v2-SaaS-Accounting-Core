@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
+import { settlementPackApi } from '../api/settlementPack';
 import { useSettlementPreview, usePostSettlement, useSettlementOffsetPreview } from '../hooks/useSettlement';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
@@ -12,11 +13,13 @@ import { v4 as uuidv4 } from 'uuid';
 import type { SettlementPreview } from '../types';
 
 export default function SettlementPage() {
+  const navigate = useNavigate();
   const { data: projects } = useProjects();
   const previewMutation = useSettlementPreview();
   const postMutation = usePostSettlement();
   const { canSettle } = useRole();
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [generatingPack, setGeneratingPack] = useState(false);
   const [upToDate, setUpToDate] = useState(new Date().toISOString().split('T')[0]);
   const [preview, setPreview] = useState<SettlementPreview | null>(null);
   const [expensesSectionExpanded, setExpensesSectionExpanded] = useState(false);
@@ -57,6 +60,23 @@ export default function SettlementPage() {
       } else {
         toast.error(error.message || 'Failed to preview settlement');
       }
+    }
+  };
+
+  const handleGenerateSettlementPack = async () => {
+    if (!selectedProjectId) {
+      toast.error('Select a project first');
+      return;
+    }
+    setGeneratingPack(true);
+    try {
+      const created = await settlementPackApi.generate(selectedProjectId);
+      toast.success('Settlement pack created');
+      navigate(`/app/settlement-packs/${created.id}`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to generate settlement pack');
+    } finally {
+      setGeneratingPack(false);
     }
   };
 
@@ -146,13 +166,21 @@ export default function SettlementPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <button
               onClick={handlePreview}
               disabled={previewMutation.isPending || !selectedProjectId}
-              className="w-full px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {previewMutation.isPending ? 'Loading...' : 'Preview Settlement'}
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateSettlementPack}
+              disabled={generatingPack || !selectedProjectId}
+              className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generatingPack ? 'Generating…' : 'Generate settlement pack'}
             </button>
           </div>
         </div>

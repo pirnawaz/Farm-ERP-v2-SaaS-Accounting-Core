@@ -51,6 +51,7 @@ use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
 use App\Http\Controllers\Machinery\MachineryReportsController;
 use App\Http\Controllers\Machinery\MachineryServiceController;
 use App\Http\Controllers\ReconciliationController;
+use App\Http\Controllers\SettlementPackController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -144,6 +145,9 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
 
 // Settlement (accountant, tenant_admin) — requires settlements module
 Route::middleware(['role:tenant_admin,accountant', 'require_module:settlements'])->group(function () {
+    // Settlement Pack (Governance Phase 1)
+    Route::post('projects/{projectId}/settlement-pack', [SettlementPackController::class, 'generate']);
+    Route::get('settlement-packs/{id}', [SettlementPackController::class, 'show']);
     // Project-based settlements (existing, for backward compatibility)
     Route::post('projects/{id}/settlement/preview', [SettlementController::class, 'preview']);
     Route::get('projects/{id}/settlement/offset-preview', [SettlementController::class, 'offsetPreview']);

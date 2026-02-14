@@ -38,6 +38,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Treasury** — Payments, advances, allocation preview and posting
 - **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
 - **Settlements** — Project-based and sales-based settlements with share rules, preview and posting, reversals
+- **Settlement Pack (Governance)** — Per-project settlement pack generation (idempotent per version), summary totals, and full transaction register; DRAFT/FINAL status; re-generate when not final
 - **Share Rules** — Configurable share rules for crop cycles, projects, and sales (margin or revenue basis)
 - **Harvests** — Harvest tracking with lines, posting to inventory, production allocation, project association
 - **Inventory** — Items, stores, UOMs, categories; GRNs, issues with allocation support (share rules, explicit percentages, project rules), transfers, adjustments; stock on-hand and movements
@@ -214,6 +215,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Share rules**  | `apiResource('share-rules')`                                            |
 | **Operational transactions** | `apiResource('operational-transactions')`, `POST .../post`       |
 | **Settlement**  | `POST /projects/{id}/settlement/preview`, `.../offset-preview`, `.../post`; `GET/POST /settlements`, `GET /settlements/preview`, `POST /settlements/{id}/post`, `POST /settlements/{id}/reverse` |
+| **Settlement Pack** | `POST /api/projects/{projectId}/settlement-pack` (generate, idempotent per project+version), `GET /api/settlement-packs/{id}` (pack + full transaction register) |
 | **Payments**    | `apiResource('payments')`, `.../allocation-preview`, `.../post`           |
 | **Advances**    | `apiResource('advances')`, `.../post`                                    |
 | **Sales**       | `apiResource('sales')`, `.../post`, `.../reverse`                      |
@@ -235,9 +237,9 @@ Exact routes, methods, and middleware are in `apps/api/routes/api.php`.
 The web app includes pages (and routes) for:
 
 - **Dashboard**, **Health**
-- **Daily book entries**, **Operational transactions**
+- **Daily book entries**, **Operational transactions**, **Posting group detail** (`/app/posting-groups/:id`)
 - **Parties**, **Sales**, **Payments**, **Advances**
-- **Land parcels**, **Land allocations**, **Crop cycles** (with close/reopen and detail), **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based, sales-based, crop-cycle-based), **Harvests**
+- **Land parcels**, **Land allocations**, **Crop cycles** (with close/reopen and detail), **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based, sales-based, crop-cycle-based), **Settlement Pack** (view pack at `/app/settlement-packs/:id` with summary, transaction register, re-generate when not FINAL; generate from Settlement page), **Harvests**
 - **Inventory:** items, stores, categories, UOMs, GRNs, issues (with allocation configuration), transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Machinery:** machines, work logs, rate cards, charges, maintenance jobs and types, profitability reports (when `machinery` module enabled)
@@ -283,7 +285,11 @@ Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/
 php artisan test --filter=PlatformAdminTenantAndImpersonation
 ```
 
-Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows).
+Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency):
+
+```bash
+php artisan test tests/Feature/SettlementPackTest.php
+```
 
 ### Frontend E2E (Playwright)
 
@@ -305,6 +311,7 @@ Platform admin flows (tenant list, impersonation) require a profile that logs in
 .
 ├── apps/
 │   ├── api/                    # Laravel API
+│   │   ├── app/Domains/        # Domain logic (e.g. Governance/SettlementPack)
 │   │   ├── app/Http/Controllers/
 │   │   ├── app/Http/Middleware/
 │   │   ├── app/Models/
