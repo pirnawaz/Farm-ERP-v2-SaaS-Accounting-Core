@@ -18,3 +18,8 @@ For local dev and CI you typically set both so that the API returns all modules 
 ### When the flag is off
 
 When `FORCE_ALL_MODULES_ENABLED` / `VITE_FORCE_ALL_MODULES_ENABLED` is false or unset, the normal module system applies: only core and explicitly enabled (plus dependency) modules are effective, and `require_module` middleware enforces access.
+
+## Dev-mode auth performance flags
+
+- **Default behaviour:** In the dev-mode “select farm + role then continue” flow, the app uses the identity stored in localStorage (`farm_erp_user_role`, `farm_erp_tenant_id`, `farm_erp_user_id`) and **does not** call `/api/auth/me` on load when that identity is already present. This avoids repeated 401s and keeps the dashboard responsive.
+- **Optional verification:** Set `VITE_VERIFY_COOKIE_AUTH_IN_DEV=true` in the web app env if you use cookie-based auth in dev and want to verify it once in the background. The app will call `/api/auth/me` once (no retries). For most local dev and Playwright, leave this **false** or unset.

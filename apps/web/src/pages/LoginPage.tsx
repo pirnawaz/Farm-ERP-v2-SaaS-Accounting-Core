@@ -13,7 +13,7 @@ const TENANT_ID_KEY = 'farm_erp_tenant_id';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { setUserRole } = useAuth();
+  const { setUserRole, setDevIdentity } = useAuth();
   const { setTenantId } = useTenant();
   const [selectedRole, setSelectedRole] = useState<UserRole>('operator');
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
@@ -121,7 +121,7 @@ export default function LoginPage() {
     if (isPlatformAdmin) {
       setTenantId('');
       setUserRole('platform_admin');
-      localStorage.removeItem(TENANT_ID_KEY);
+      setDevIdentity({ role: 'platform_admin', tenantId: null });
       navigate('/app/platform/tenants');
       return;
     }
@@ -132,6 +132,7 @@ export default function LoginPage() {
 
     setTenantId(selectedTenantId);
     setUserRole(selectedRole);
+    setDevIdentity({ role: selectedRole, tenantId: selectedTenantId });
     navigate('/app/dashboard');
   };
 

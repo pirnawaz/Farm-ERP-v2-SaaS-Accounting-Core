@@ -77,6 +77,7 @@ async function request<T>(
     headers['X-User-Id'] = userId.trim()
   }
 
+  // No automatic retry on 401/403: auth is handled by the app (AuthProvider); retrying would cause request loops.
   try {
     const response = await fetch(url, {
       ...options,
