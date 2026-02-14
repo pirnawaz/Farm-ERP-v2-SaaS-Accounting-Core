@@ -66,10 +66,19 @@ export interface PlatformTenant {
   id: string;
   name: string;
   status: 'active' | 'suspended';
+  plan_key?: string | null;
   currency_code: string;
   locale: string;
   timezone: string;
   created_at: string;
+}
+
+export interface ImpersonationStatus {
+  impersonating: boolean;
+  target_tenant_id?: string;
+  target_tenant_name?: string;
+  target_user_id?: string | null;
+  target_user_email?: string | null;
 }
 
 export interface CreatePlatformTenantPayload {
@@ -86,6 +95,7 @@ export interface CreatePlatformTenantPayload {
 export interface UpdatePlatformTenantPayload {
   name?: string;
   status?: 'active' | 'suspended';
+  plan_key?: string | null;
   currency_code?: string;
   locale?: string;
   timezone?: string;

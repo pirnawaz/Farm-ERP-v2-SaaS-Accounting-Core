@@ -22,7 +22,7 @@ class LabourModuleDisabledReturns403Test extends TestCase
             ->withHeader('X-User-Role', 'accountant')
             ->getJson('/api/v1/labour/workers');
         $r->assertStatus(403);
-        $this->assertStringContainsString('labour', strtolower($r->json('message') ?? ''));
+        $this->assertStringContainsString('module not enabled', strtolower($r->json('message') ?? (string) $r->getContent()));
 
         $r2 = $this->withHeader('X-Tenant-Id', $tenant->id)->withHeader('X-User-Role', 'accountant')->getJson('/api/v1/labour/work-logs');
         $r2->assertStatus(403);

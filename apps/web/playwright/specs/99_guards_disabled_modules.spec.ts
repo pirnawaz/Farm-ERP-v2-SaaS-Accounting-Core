@@ -60,7 +60,7 @@ test.describe('@core Disabled modules guard (core profile)', () => {
     }
   });
 
-  test('@core disabled module API returns 403', async () => {
+  test('@core disabled module API returns 403 with message "module not enabled"', async () => {
     const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8000';
     const seedPath = path.join(process.cwd(), 'playwright', '.auth', 'seed.json');
     const seed = JSON.parse(fs.readFileSync(seedPath, 'utf-8')) as {
@@ -87,6 +87,13 @@ test.describe('@core Disabled modules guard (core profile)', () => {
           res.status() === 403 || res.status() === 404,
           `Expected 403 or 404 for ${ep}, got ${res.status()}`
         ).toBeTruthy();
+        if (res.status() === 403) {
+          const body = await res.text();
+          expect(
+            body.toLowerCase().includes('module not enabled'),
+            `403 body must contain "module not enabled" for ${ep}, got: ${body}`
+          ).toBeTruthy();
+        }
       }
     } finally {
       await api.dispose();

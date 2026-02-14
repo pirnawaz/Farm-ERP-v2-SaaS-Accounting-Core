@@ -35,13 +35,14 @@ class PlatformTenantController extends Controller
     public function index(): JsonResponse
     {
         $tenants = Tenant::orderBy('created_at', 'desc')
-            ->get(['id', 'name', 'status', 'currency_code', 'locale', 'timezone', 'created_at']);
+            ->get(['id', 'name', 'status', 'plan_key', 'currency_code', 'locale', 'timezone', 'created_at']);
 
         return response()->json([
             'tenants' => $tenants->map(fn ($t) => [
                 'id' => $t->id,
                 'name' => $t->name,
                 'status' => $t->status,
+                'plan_key' => $t->plan_key,
                 'currency_code' => $t->currency_code,
                 'locale' => $t->locale,
                 'timezone' => $t->timezone,
@@ -62,6 +63,7 @@ class PlatformTenantController extends Controller
             'id' => $tenant->id,
             'name' => $tenant->name,
             'status' => $tenant->status,
+            'plan_key' => $tenant->plan_key,
             'currency_code' => $tenant->currency_code,
             'locale' => $tenant->locale,
             'timezone' => $tenant->timezone,
@@ -164,6 +166,7 @@ class PlatformTenantController extends Controller
             'id' => $tenant->id,
             'name' => $tenant->name,
             'status' => $tenant->status,
+            'plan_key' => $tenant->plan_key,
             'currency_code' => $tenant->currency_code,
             'locale' => $tenant->locale,
             'timezone' => $tenant->timezone,

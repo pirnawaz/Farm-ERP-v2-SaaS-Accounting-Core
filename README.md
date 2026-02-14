@@ -31,6 +31,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 ## Features
 
 - **Multi-tenant SaaS** — Tenant isolation, platform admin, and tenant-level modules
+- **Platform admin** — Tenant list, activate/suspend, minimal plan field (no billing), controlled impersonation with audit logging
 - **Roles** — `platform_admin`, `tenant_admin`, `accountant`, `operator`
 - **Land & Projects** — Land parcels, crop cycles (close/reopen with preview), land allocations (owner and Hari), projects, project rules
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
@@ -201,7 +202,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 |-----------------|---------------------------------------------------------------------------|
 | **Health**      | `GET /api/health`                                                        |
 | **Auth**        | `POST /api/auth/login`                                                   |
-| **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`   |
+| **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`; `GET /api/platform/impersonation`, `POST /api/platform/impersonation/start`, `POST /api/platform/impersonation/stop` (platform_admin only, audited) |
 | **Dev**         | `GET/POST /api/dev/tenants`, `POST /api/dev/tenants/{id}/activate`        |
 | **Users**       | `apiResource('users')`                                                   |
 | **Parties**     | `apiResource('parties')`, `.../balances`, `.../statement`, `.../receivables/open-sales` |
@@ -244,7 +245,7 @@ The web app includes pages (and routes) for:
 - **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin, party ledger, party summary, role ageing, crop cycle distribution, settlement statement; reconciliation dashboard; CSV export functionality; print-friendly layouts
 - **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
-- **Platform:** tenants (platform admin)
+- **Platform (platform_admin only):** tenant list at `/app/platform/tenants` (status badge, suspend/activate, plan dropdown, impersonate); impersonation banner in tenant app with “Impersonating: {tenant}” and exit; tenant detail with plan and impersonate
 
 Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `inventory`, `labour`, `machinery`, `crop_ops`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
 
@@ -260,17 +261,41 @@ Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, 
 | `start-servers.bat` / `start-servers.ps1` | Start API and web              |
 | `setup-api.ps1`            | API .env and composer setup               |
 | `scripts/create-test-db.ps1` | Create test DB (see script for target)  |
+| `npm run build`             | Build shared package + web app            |
+| `npm run e2e`               | Start API then run Playwright E2E (uses `E2E_PROFILE` or default) |
+| `npm run e2e:core`          | E2E with profile `core`                   |
+| `npm run e2e:all`           | E2E with profile `all` (e.g. platform admin flows) |
 
 ---
 
 ## Testing
+
+### Backend (Laravel)
 
 ```bash
 cd apps/api
 php artisan test
 ```
 
-Covers tenant isolation, CRUD, validation, and other feature tests.
+Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/activate, impersonation gating and audit), and other feature tests. To run only platform admin and impersonation tests:
+
+```bash
+php artisan test --filter=PlatformAdminTenantAndImpersonation
+```
+
+Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows).
+
+### Frontend E2E (Playwright)
+
+Playwright specs live under `apps/web/playwright/`. Run from repo root:
+
+```bash
+npm run e2e          # starts API, then runs E2E (default profile)
+npm run e2e:core     # E2E with profile "core"
+npm run e2e:all      # E2E with profile "all" (includes platform admin)
+```
+
+Platform admin flows (tenant list, impersonation) require a profile that logs in as `platform_admin` (e.g. set `E2E_PROFILE=all` or use seed that creates a platform admin). Spec: `apps/web/playwright/specs/15_platform_tenant_impersonation.spec.ts`.
 
 ---
 

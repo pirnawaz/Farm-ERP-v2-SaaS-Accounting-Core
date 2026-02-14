@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Tenant;
 use App\Models\Account;
 use App\Models\CropCycle;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -12,6 +13,7 @@ use Database\Seeders\SystemAccountsSeeder;
 
 class BalancedPostingGuardTest extends TestCase
 {
+    use RefreshDatabase;
 
     private Tenant $tenant;
     private Account $cashAccount;
@@ -65,13 +67,22 @@ class BalancedPostingGuardTest extends TestCase
         ]);
 
         try {
-            DB::commit();
+            // Force deferred balance constraint to run (trigger runs at commit; in test we force it here)
+            DB::statement('SET CONSTRAINTS trg_ledger_entries_balanced_posting IMMEDIATE');
             $this->fail('Expected exception from deferred balance trigger');
         } catch (\Throwable $e) {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
-            $this->assertStringContainsString('balanced', strtolower($e->getMessage()));
+            $message = strtolower($e->getMessage());
+            $previous = $e->getPrevious();
+            if ($previous instanceof \Throwable) {
+                $message .= ' ' . strtolower($previous->getMessage());
+            }
+            $this->assertTrue(
+                str_contains($message, 'balanced') || str_contains($message, 'sum(debit)') || str_contains($message, 'sum(credit)') || str_contains($message, 'posting group'),
+                'Expected balance enforcement exception, got: ' . $e->getMessage()
+            );
         }
     }
 

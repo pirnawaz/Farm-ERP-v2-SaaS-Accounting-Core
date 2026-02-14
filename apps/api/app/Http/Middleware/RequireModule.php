@@ -28,7 +28,10 @@ class RequireModule
             return response()->json(['error' => 'Tenant not found'], 404);
         }
         if (!$tenant->isModuleEnabled($moduleKey)) {
-            return response()->json(['message' => "Module {$moduleKey} is not enabled for this tenant."], 403);
+            return response()->json([
+                'message' => 'Module not enabled for this tenant.',
+                'module_key' => $moduleKey,
+            ], 403);
         }
         return $next($request);
     }

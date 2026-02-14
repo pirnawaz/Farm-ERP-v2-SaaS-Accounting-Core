@@ -22,6 +22,6 @@ class CropOpsModuleDisabledReturns403Test extends TestCase
             ->withHeader('X-User-Role', 'accountant')
             ->getJson('/api/v1/crop-ops/activities');
         $r->assertStatus(403);
-        $this->assertStringContainsString('crop_ops', strtolower($r->json('message') ?? ''));
+        $this->assertStringContainsString('module not enabled', strtolower($r->json('message') ?? (string) $r->getContent()));
     }
 }

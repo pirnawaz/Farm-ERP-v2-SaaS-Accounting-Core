@@ -7,6 +7,7 @@ import { useModules } from '../contexts/ModulesContext';
 import { BrandLogo } from './BrandLogo';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingChecklist } from './OnboardingChecklist';
+import { ImpersonationBanner } from './ImpersonationBanner';
 import type { UserRole } from '../types';
 
 type NavigationItem = {
@@ -213,8 +214,11 @@ export function AppLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  const isTenantApp = location.pathname.startsWith('/app') && !location.pathname.startsWith('/app/platform');
+
   return (
     <div className="min-h-screen bg-gray-50" data-testid="app-shell">
+      <ImpersonationBanner enabled={isTenantApp} />
       {/* Readiness marker for E2E: state encoded in data-state (loading | error | ready) */}
       <div
         data-testid="modules-ready"

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { DataTable } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
@@ -9,13 +9,20 @@ import {
   useCreatePlatformTenant,
   useUpdatePlatformTenant,
 } from '../hooks/usePlatformTenants';
+import { useStartImpersonation } from '../hooks/useImpersonation';
+import { useTenant } from '../hooks/useTenant';
 import type { CreatePlatformTenantPayload, UpdatePlatformTenantPayload } from '../types';
 import toast from 'react-hot-toast';
 
+const PLAN_OPTIONS = [{ value: '', label: '—' }, { value: 'starter', label: 'Starter' }, { value: 'growth', label: 'Growth' }, { value: 'enterprise', label: 'Enterprise' }];
+
 export default function PlatformTenantsPage() {
+  const navigate = useNavigate();
+  const { setTenantId } = useTenant();
   const { data, isLoading, error } = usePlatformTenants();
   const createMutation = useCreatePlatformTenant();
   const updateMutation = useUpdatePlatformTenant();
+  const startImpersonation = useStartImpersonation();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -61,31 +68,89 @@ export default function PlatformTenantsPage() {
     }
   };
 
+  const handleImpersonate = async (tenantId: string, tenantName: string) => {
+    try {
+      await startImpersonation.mutateAsync({ tenantId });
+      setTenantId(tenantId);
+      toast.success(`Impersonating ${tenantName}`);
+      navigate('/app/dashboard');
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Failed to start impersonation');
+    }
+  };
+
+  const handleQuickStatus = async (row: (typeof tenants)[0], newStatus: 'active' | 'suspended') => {
+    try {
+      await updateMutation.mutateAsync({ id: row.id, payload: { status: newStatus } });
+      toast.success(`Tenant ${newStatus}`);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Failed to update');
+    }
+  };
+
   const columns = [
     { header: 'Name', accessor: 'name' as const },
-    { header: 'Status', accessor: 'status' as const },
+    {
+      header: 'Status',
+      accessor: (row: (typeof tenants)[0]) => (
+        <span
+          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+            row.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+          }`}
+          data-testid={`tenant-status-${row.id}`}
+        >
+          {row.status}
+        </span>
+      ),
+    },
+    { header: 'Plan', accessor: (row: (typeof tenants)[0]) => row.plan_key || '—' as const },
     { header: 'Currency', accessor: 'currency_code' as const },
     { header: 'Locale', accessor: 'locale' as const },
     { header: 'Timezone', accessor: 'timezone' as const },
     {
       header: 'Actions',
       accessor: (row: (typeof tenants)[0]) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <Link
             to={`/app/platform/tenants/${row.id}`}
             className="text-[#1F6F5C] hover:underline text-sm"
           >
-            View Details
+            View
           </Link>
+          {row.status === 'active' ? (
+            <button
+              type="button"
+              onClick={() => handleQuickStatus(row, 'suspended')}
+              className="text-amber-600 hover:underline text-sm"
+            >
+              Suspend
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleQuickStatus(row, 'active')}
+              className="text-green-600 hover:underline text-sm"
+            >
+              Activate
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
               setEditId(row.id);
-              setEditForm({ name: row.name, status: row.status });
+              setEditForm({ name: row.name, status: row.status, plan_key: row.plan_key ?? undefined });
             }}
             className="text-[#1F6F5C] hover:underline text-sm"
           >
             Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => handleImpersonate(row.id, row.name)}
+            className="text-[#1F6F5C] hover:underline text-sm"
+            data-testid={`impersonate-tenant-${row.id}`}
+          >
+            Impersonate
           </button>
         </div>
       ),
@@ -216,6 +281,17 @@ export default function PlatformTenantsPage() {
             >
               <option value="active">active</option>
               <option value="suspended">suspended</option>
+            </select>
+          </FormField>
+          <FormField label="Plan">
+            <select
+              value={editForm.plan_key ?? ''}
+              onChange={(e) => setEditForm({ ...editForm, plan_key: e.target.value || undefined })}
+              className="w-full border border-gray-300 rounded-md px-3 py-2"
+            >
+              {PLAN_OPTIONS.map((o) => (
+                <option key={o.value || 'none'} value={o.value}>{o.label}</option>
+              ))}
             </select>
           </FormField>
           <div className="flex justify-end gap-2 pt-2">

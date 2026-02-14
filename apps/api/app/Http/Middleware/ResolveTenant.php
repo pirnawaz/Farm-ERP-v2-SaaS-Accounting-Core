@@ -10,6 +10,8 @@ class ResolveTenant
 {
     public function handle(Request $request, Closure $next): Response
     {
+        \App\Services\TenantContext::clear();
+
         // Skip tenant check for health endpoint
         if ($request->is('api/health')) {
             return $next($request);
@@ -40,7 +42,7 @@ class ResolveTenant
             ], 400);
         }
         
-        // Verify tenant exists and is active
+        // Verify tenant exists (active/suspended enforced by EnsureTenantActive)
         $tenant = \App\Models\Tenant::find($tenantId);
         if (!$tenant) {
             return response()->json([
@@ -48,13 +50,7 @@ class ResolveTenant
             ], 404);
         }
 
-        if ($tenant->status !== 'active') {
-            return response()->json([
-                'error' => 'Tenant is not active'
-            ], 403);
-        }
-        
-        // Attach tenant_id to request attributes for use in controllers
+        // Attach tenant_id to request attributes for use in controllers and downstream middleware
         $request->attributes->set('tenant_id', $tenantId);
         
         return $next($request);

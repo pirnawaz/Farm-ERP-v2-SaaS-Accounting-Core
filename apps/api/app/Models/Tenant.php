@@ -12,12 +12,16 @@ class Tenant extends Model
 {
     use HasUuids;
 
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_SUSPENDED = 'suspended';
+
     protected $fillable = [
         'name',
         'status',
         'currency_code',
         'locale',
         'timezone',
+        'plan_key',
         'settings',
     ];
 

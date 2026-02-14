@@ -20,6 +20,7 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TenantModuleController;
 use App\Http\Controllers\PlatformTenantController;
+use App\Http\Controllers\Platform\ImpersonationController;
 use App\Http\Controllers\TenantFarmProfileController;
 use App\Http\Controllers\TenantUserAdminController;
 use App\Http\Controllers\TenantOnboardingController;
@@ -63,6 +64,9 @@ Route::prefix('platform')->middleware(['role:platform_admin'])->group(function (
     Route::post('tenants', [PlatformTenantController::class, 'store']);
     Route::get('tenants/{id}', [PlatformTenantController::class, 'show']);
     Route::put('tenants/{id}', [PlatformTenantController::class, 'update']);
+    Route::get('impersonation', [ImpersonationController::class, 'status']);
+    Route::post('impersonation/start', [ImpersonationController::class, 'start']);
+    Route::post('impersonation/stop', [ImpersonationController::class, 'stop']);
 });
 
 // Dev-only routes (disabled in production)

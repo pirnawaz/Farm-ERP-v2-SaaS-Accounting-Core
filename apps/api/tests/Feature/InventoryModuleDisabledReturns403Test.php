@@ -24,7 +24,7 @@ class InventoryModuleDisabledReturns403Test extends TestCase
             ->withHeader('X-User-Role', 'accountant')
             ->getJson('/api/v1/inventory/items');
         $r->assertStatus(403);
-        $this->assertStringContainsString('inventory', strtolower($r->json('message') ?? ''));
+        $this->assertStringContainsString('module not enabled', strtolower($r->json('message') ?? (string) $r->getContent()));
 
         $r2 = $this->withHeader('X-Tenant-Id', $tenant->id)->withHeader('X-User-Role', 'accountant')->getJson('/api/v1/inventory/transfers');
         $r2->assertStatus(403);

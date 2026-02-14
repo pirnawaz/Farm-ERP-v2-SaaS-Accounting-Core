@@ -5,6 +5,7 @@ export * from './useModules';
 export * from './useFarmProfile';
 export * from './useTenantUsers';
 export * from './usePlatformTenants';
+export * from './useImpersonation';
 export * from './useUsers';
 export * from './useParties';
 export * from './useLandParcels';

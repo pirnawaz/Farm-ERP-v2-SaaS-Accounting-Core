@@ -3,6 +3,7 @@ import type {
   PlatformTenant,
   CreatePlatformTenantPayload,
   UpdatePlatformTenantPayload,
+  ImpersonationStatus,
 } from '../types';
 
 export interface PlatformTenantDetail extends PlatformTenant {
@@ -28,4 +29,16 @@ export const platformApi = {
     apiClient.post<{ tenant: PlatformTenant }>('/api/platform/tenants', payload),
   updateTenant: (id: string, payload: UpdatePlatformTenantPayload) =>
     apiClient.put<PlatformTenant>('/api/platform/tenants/' + id, payload),
+  getImpersonationStatus: () =>
+    apiClient.get<ImpersonationStatus>('/api/platform/impersonation'),
+  startImpersonation: (tenantId: string, userId?: string) =>
+    apiClient.post<{ message: string; target_tenant_id: string; target_user_id?: string }>(
+      '/api/platform/impersonation/start',
+      userId ? { tenant_id: tenantId, user_id: userId } : { tenant_id: tenantId }
+    ),
+  stopImpersonation: (targetTenantId?: string) =>
+    apiClient.post<{ message: string }>(
+      '/api/platform/impersonation/stop',
+      targetTenantId ? { target_tenant_id: targetTenantId } : {}
+    ),
 };

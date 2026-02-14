@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { usePlatformTenant, useUpdatePlatformTenant } from '../../hooks/usePlatformTenants';
+import { useStartImpersonation } from '../../hooks/useImpersonation';
+import { useTenant } from '../../hooks/useTenant';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
@@ -11,8 +13,11 @@ import type { UpdatePlatformTenantPayload } from '../../types';
 
 export default function PlatformTenantDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { setTenantId } = useTenant();
   const { data: tenant, isLoading, error } = usePlatformTenant(id || null);
   const updateMutation = useUpdatePlatformTenant();
+  const startImpersonation = useStartImpersonation();
   const { formatDate } = useFormatting();
 
   const [editOpen, setEditOpen] = useState(false);
@@ -66,16 +71,36 @@ export default function PlatformTenantDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{tenant.name}</h1>
           <p className="text-sm text-gray-500 mt-1">Tenant ID: {tenant.id}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditForm({ name: tenant.name, status: tenant.status });
-            setEditOpen(true);
-          }}
-          className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
-        >
-          Edit tenant
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await startImpersonation.mutateAsync({ tenantId: tenant.id });
+                setTenantId(tenant.id);
+                toast.success(`Impersonating ${tenant.name}`);
+                navigate('/app/dashboard');
+              } catch (e) {
+                toast.error((e as Error)?.message || 'Failed to start impersonation');
+              }
+            }}
+            disabled={startImpersonation.isPending}
+            className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
+            data-testid="impersonate-tenant-detail"
+          >
+            Impersonate
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditForm({ name: tenant.name, status: tenant.status, plan_key: tenant.plan_key ?? undefined });
+              setEditOpen(true);
+            }}
+            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+          >
+            Edit tenant
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -96,6 +121,10 @@ export default function PlatformTenantDetailPage() {
                   {tenant.status}
                 </span>
               </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Plan</dt>
+              <dd className="mt-1 text-sm text-gray-900">{tenant.plan_key || '—'}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Currency</dt>
@@ -177,6 +206,18 @@ export default function PlatformTenantDetailPage() {
             >
               <option value="active">active</option>
               <option value="suspended">suspended</option>
+            </select>
+          </FormField>
+          <FormField label="Plan">
+            <select
+              value={editForm.plan_key ?? tenant.plan_key ?? ''}
+              onChange={(e) => setEditForm({ ...editForm, plan_key: e.target.value || undefined })}
+              className="w-full border border-gray-300 rounded-md px-3 py-2"
+            >
+              <option value="">—</option>
+              <option value="starter">Starter</option>
+              <option value="growth">Growth</option>
+              <option value="enterprise">Enterprise</option>
             </select>
           </FormField>
           <div className="flex justify-end gap-2 pt-2">

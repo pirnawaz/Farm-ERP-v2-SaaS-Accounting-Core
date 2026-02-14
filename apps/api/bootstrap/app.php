@@ -16,8 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Order: ResolveTenant → EnsureTenantActive → EnsureUserEnabled → (route: EnsureModuleLicensed/RequireRole)
         $middleware->api(prepend: [
             \App\Http\Middleware\ResolveTenant::class,
+            \App\Http\Middleware\EnsureTenantActive::class,
             \App\Http\Middleware\EnsureUserEnabled::class,
             \App\Http\Middleware\LogSlowRequests::class,
         ]);
@@ -25,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RequireRole::class,
             'dev' => \App\Http\Middleware\DevOnly::class,
-            'require_module' => \App\Http\Middleware\RequireModule::class,
+            'require_module' => \App\Http\Middleware\RequireModule::class, // EnsureModuleLicensed (route-level)
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
