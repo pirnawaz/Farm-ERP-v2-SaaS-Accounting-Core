@@ -447,6 +447,10 @@ export interface Payment {
   reference?: string;
   status: PaymentStatus;
   posting_group_id?: string;
+  reversal_posting_group_id?: string | null;
+  reversed_at?: string | null;
+  reversed_by?: string | null;
+  reversal_reason?: string | null;
   settlement_id?: string;
   notes?: string;
   purpose?: 'GENERAL' | 'WAGES';
@@ -455,6 +459,11 @@ export interface Payment {
   party?: Party;
   settlement?: Settlement;
   sale_allocations?: SalePaymentAllocation[];
+}
+
+export interface ReversePaymentRequest {
+  posting_date: string;
+  reason?: string;
 }
 
 export interface CreatePaymentPayload {

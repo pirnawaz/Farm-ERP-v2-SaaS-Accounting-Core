@@ -46,6 +46,7 @@ class SystemAccountsSeeder extends Seeder
     {
         return [
             ['code' => 'CASH', 'name' => 'Cash', 'type' => 'asset'],
+            ['code' => 'BANK', 'name' => 'Bank', 'type' => 'asset'],
             ['code' => 'AR', 'name' => 'Accounts Receivable', 'type' => 'asset'],
             ['code' => 'ADVANCE_HARI', 'name' => 'Advance to Hari', 'type' => 'asset'],
             ['code' => 'ADVANCE_VENDOR', 'name' => 'Advance to Vendor', 'type' => 'asset'],

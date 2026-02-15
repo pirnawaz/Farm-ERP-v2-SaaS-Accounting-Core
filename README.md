@@ -36,7 +36,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Land & Projects** — Land parcels, crop cycles (close/reopen with preview), land allocations (owner and Hari), projects, project rules
 - **Land Leases (Maqada)** — Land leases per project/parcel/landlord, accruals (draft/post), posting to DUE_TO_LANDLORD and expense; reversal of posted accruals (new posting group, no mutation); **Landlord Statement** report (ledger-backed, read-only); traceability from accrual to posting group and reversal
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
-- **Treasury** — Payments, advances, allocation preview and posting
+- **Treasury** — Payments (draft/post), advances, allocation preview and posting. Payment posting creates **allocation rows** (type `PAYMENT`, scope `PARTY_ONLY`/`LANDLORD_ONLY`) so landlord statement and settlement views include them; posting group `source_type` is `PAYMENT`. Payment method determines credit account: **CASH** credits CASH, **BANK** credits BANK (system account `BANK` seeded). **Payment reversal**: `POST /api/payments/{id}/reverse` (posting_date, optional reason) creates a reversal posting group (negated ledger entries and allocation row); original posting group is immutable; payment stores `reversal_posting_group_id`, `reversed_at`, `reversed_by`, `reversal_reason`. Reversed payments are excluded from party balance/statement totals.
 - **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
 - **Settlements** — Project-based and sales-based settlements with share rules, preview and posting, reversals
 - **Settlement Pack (Governance)** — Per-project settlement pack generation (idempotent per version), summary totals, and full transaction register; DRAFT/FINAL status; re-generate when not final
@@ -218,7 +218,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Operational transactions** | `apiResource('operational-transactions')`, `POST .../post`       |
 | **Settlement**  | `POST /projects/{id}/settlement/preview`, `.../offset-preview`, `.../post`; `GET/POST /settlements`, `GET /settlements/preview`, `POST /settlements/{id}/post`, `POST /settlements/{id}/reverse` |
 | **Settlement Pack** | `POST /api/projects/{projectId}/settlement-pack` (generate, idempotent per project+version), `GET /api/settlement-packs/{id}` (pack + full transaction register) |
-| **Payments**    | `apiResource('payments')`, `.../allocation-preview`, `.../post`           |
+| **Payments**    | `apiResource('payments')`, `.../allocation-preview`, `.../post`, `.../reverse` (tenant_admin, accountant) |
 | **Advances**    | `apiResource('advances')`, `.../post`                                    |
 | **Sales**       | `apiResource('sales')`, `.../post`, `.../reverse`                      |
 | **Inventory**   | Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; `.../post`, `.../reverse`; `stock/on-hand`, `stock/movements` |
@@ -240,7 +240,7 @@ The web app includes pages (and routes) for:
 
 - **Dashboard**, **Health**
 - **Daily book entries**, **Operational transactions**, **Posting group detail** (`/app/posting-groups/:id`)
-- **Parties**, **Sales**, **Payments**, **Advances**
+- **Parties**, **Sales**, **Payments** (list, detail with Post and **Reverse** for posted payments; reverse modal: posting date, reason), **Advances**
 - **Land parcels**, **Land leases** (when `land_leases` module enabled: list, detail with accruals, post/reverse accruals, view posting group and reversal), **Land allocations**, **Crop cycles** (with close/reopen and detail), **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based, sales-based, crop-cycle-based), **Settlement Pack** (view pack at `/app/settlement-packs/:id` with summary, transaction register, re-generate when not FINAL; generate from Settlement page), **Harvests**
 - **Inventory:** items, stores, categories, UOMs, GRNs, issues (with allocation configuration), transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
@@ -287,13 +287,14 @@ Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/
 php artisan test --filter=PlatformAdminTenantAndImpersonation
 ```
 
-Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), and **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date):
+Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date), and **Payments** (posting creates posting group with `source_type=PAYMENT`, allocation row `PAYMENT`, ledger entries; method BANK credits BANK account; reverse creates reversal posting group and negated allocation row; cannot reverse twice):
 
 ```bash
 php artisan test tests/Feature/SettlementPackTest.php
 php artisan test --filter=LandLeaseAccrualPostingTest
 php artisan test --filter=LandLeaseAccrualReversalTest
 php artisan test --filter=LandlordStatementReportTest
+php artisan test --filter=PaymentTest
 ```
 
 ### Frontend E2E (Playwright)

@@ -23,6 +23,10 @@ class Payment extends Model
         'reference',
         'status',
         'posting_group_id',
+        'reversal_posting_group_id',
+        'reversed_at',
+        'reversed_by',
+        'reversal_reason',
         'settlement_id',
         'notes',
         'purpose',
@@ -33,6 +37,7 @@ class Payment extends Model
         'amount' => 'decimal:2',
         'payment_date' => 'date',
         'posted_at' => 'datetime',
+        'reversed_at' => 'datetime',
         'created_at' => 'datetime',
     ];
 
@@ -49,6 +54,11 @@ class Payment extends Model
     public function postingGroup(): BelongsTo
     {
         return $this->belongsTo(PostingGroup::class);
+    }
+
+    public function reversalPostingGroup(): BelongsTo
+    {
+        return $this->belongsTo(PostingGroup::class, 'reversal_posting_group_id');
     }
 
     public function settlement(): BelongsTo
@@ -83,5 +93,13 @@ class Payment extends Model
     public function scopePosted($query)
     {
         return $query->where('status', 'POSTED');
+    }
+
+    /**
+     * Scope to exclude reversed payments (for balance/statement totals).
+     */
+    public function scopeNotReversed($query)
+    {
+        return $query->whereNull('reversal_posting_group_id');
     }
 }

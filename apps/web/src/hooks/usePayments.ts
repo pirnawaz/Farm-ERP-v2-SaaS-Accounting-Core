@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsApi, type PaymentFilters } from '../api/payments';
-import type { Payment, CreatePaymentPayload, PostPaymentRequest } from '../types';
+import type { Payment, CreatePaymentPayload, PostPaymentRequest, ReversePaymentRequest } from '../types';
 import toast from 'react-hot-toast';
 
 export function usePayments(filters?: PaymentFilters) {
@@ -81,6 +81,25 @@ export function usePostPayment() {
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.error || 'Failed to post payment');
+    },
+  });
+}
+
+export function useReversePayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ReversePaymentRequest }) =>
+      paymentsApi.reverse(id, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payments', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+      toast.success('Payment reversed successfully');
+    },
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message || error?.response?.data?.error || 'Failed to reverse payment';
+      toast.error(msg);
     },
   });
 }

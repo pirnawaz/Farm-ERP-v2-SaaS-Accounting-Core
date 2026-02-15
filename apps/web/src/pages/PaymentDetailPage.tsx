@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { usePayment, useDeletePayment, usePostPayment } from '../hooks/usePayments';
+import { usePayment, useDeletePayment, usePostPayment, useReversePayment } from '../hooks/usePayments';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
@@ -16,17 +16,24 @@ export default function PaymentDetailPage() {
   const { data: payment, isLoading } = usePayment(id || '');
   const deleteMutation = useDeletePayment();
   const postMutation = usePostPayment();
+  const reverseMutation = useReversePayment();
   const { data: cropCycles } = useCropCycles();
   const { hasRole } = useRole();
   const { formatMoney, formatDateTime } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showReverseModal, setShowReverseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reversePostingDate, setReversePostingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reversalReason, setReversalReason] = useState('');
   const [cropCycleId, setCropCycleId] = useState('');
   const [idempotencyKey] = useState(uuidv4());
 
   const isDraft = payment?.status === 'DRAFT';
+  const isPosted = payment?.status === 'POSTED';
+  const isReversed = Boolean(payment?.reversal_posting_group_id);
   const canPost = hasRole(['tenant_admin', 'accountant']);
+  const canReverse = canPost && isPosted && !isReversed;
 
   const handleDelete = async () => {
     if (!id) return;
@@ -52,6 +59,23 @@ export default function PaymentDetailPage() {
         },
       });
       setShowPostModal(false);
+    } catch (error: any) {
+      // Error handled by mutation
+    }
+  };
+
+  const handleReverse = async () => {
+    if (!id) return;
+    try {
+      await reverseMutation.mutateAsync({
+        id,
+        payload: {
+          posting_date: reversePostingDate,
+          reason: reversalReason || undefined,
+        },
+      });
+      setShowReverseModal(false);
+      setReversalReason('');
     } catch (error: any) {
       // Error handled by mutation
     }
@@ -142,6 +166,30 @@ export default function PaymentDetailPage() {
               <dd className="text-sm text-gray-900">{formatDateTime(payment.posted_at)}</dd>
             </div>
           )}
+          {payment.reversal_posting_group_id && (
+            <>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Reversal Posting Group</dt>
+                <dd className="text-sm text-gray-900">
+                  <Link to={`/app/posting-groups/${payment.reversal_posting_group_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
+                    {payment.reversal_posting_group_id}
+                  </Link>
+                </dd>
+              </div>
+              {payment.reversed_at && (
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Reversed At</dt>
+                  <dd className="text-sm text-gray-900">{formatDateTime(payment.reversed_at)}</dd>
+                </div>
+              )}
+              {payment.reversal_reason && (
+                <div className="md:col-span-2">
+                  <dt className="text-sm font-medium text-gray-500">Reversal Reason</dt>
+                  <dd className="text-sm text-gray-900">{payment.reversal_reason}</dd>
+                </div>
+              )}
+            </>
+          )}
           {payment.notes && (
             <div className="md:col-span-2">
               <dt className="text-sm font-medium text-gray-500">Notes</dt>
@@ -176,26 +224,38 @@ export default function PaymentDetailPage() {
         </dl>
       </div>
 
-      {isDraft && (
+      {(isDraft || canReverse) && (
         <div className="bg-white rounded-lg shadow p-6 flex justify-end space-x-4">
-          <Link
-            to={`/app/payments/${id}/edit`}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-          >
-            Edit
-          </Link>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-          >
-            Delete
-          </button>
-          {canPost && (
+          {isDraft && (
+            <>
+              <Link
+                to={`/app/payments/${id}/edit`}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Edit
+              </Link>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Delete
+              </button>
+              {canPost && (
+                <button
+                  onClick={() => setShowPostModal(true)}
+                  className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+                >
+                  Post
+                </button>
+              )}
+            </>
+          )}
+          {canReverse && (
             <button
-              onClick={() => setShowPostModal(true)}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              onClick={() => setShowReverseModal(true)}
+              className="px-4 py-2 border border-amber-600 text-amber-700 rounded-md hover:bg-amber-50"
             >
-              Post
+              Reverse
             </button>
           )}
         </div>
@@ -248,6 +308,46 @@ export default function PaymentDetailPage() {
               className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {postMutation.isPending ? 'Posting...' : 'Post'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title="Reverse Payment">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            This will create a reversal posting group that negates the original ledger entries. The original payment and posting group will not be changed.
+          </p>
+          <FormField label="Posting Date" required>
+            <input
+              type="date"
+              value={reversePostingDate}
+              onChange={(e) => setReversePostingDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
+          </FormField>
+          <FormField label="Reason (optional)">
+            <textarea
+              value={reversalReason}
+              onChange={(e) => setReversalReason(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              placeholder="e.g. Duplicate entry, wrong amount"
+            />
+          </FormField>
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              onClick={() => setShowReverseModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReverse}
+              disabled={reverseMutation.isPending}
+              className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
+            >
+              {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}
             </button>
           </div>
         </div>

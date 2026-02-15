@@ -8,6 +8,7 @@ use App\Models\Settlement;
 use App\Http\Requests\StorePaymentRequest;
 use App\Http\Requests\UpdatePaymentRequest;
 use App\Http\Requests\PostPaymentRequest;
+use App\Http\Requests\ReversePaymentRequest;
 use App\Services\TenantContext;
 use App\Services\PaymentService;
 use Illuminate\Http\Request;
@@ -187,5 +188,36 @@ class PaymentController extends Controller
         ]);
 
         return response()->json($postingGroup, 201);
+    }
+
+    public function reverse(ReversePaymentRequest $request, string $id)
+    {
+        $this->authorizePosting($request);
+        $tenantId = TenantContext::getTenantId($request);
+        $reversedBy = $request->user()?->id;
+
+        try {
+            $reversalPostingGroup = $this->paymentService->reversePayment(
+                $id,
+                $tenantId,
+                $request->posting_date,
+                $request->reason,
+                $reversedBy
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $this->logAudit($request, 'Payment', $id, 'REVERSE', [
+            'posting_date' => $request->posting_date,
+            'reversal_posting_group_id' => $reversalPostingGroup->id,
+        ]);
+
+        return response()->json([
+            'reversal_posting_group' => $reversalPostingGroup,
+            'reversal_posting_group_id' => $reversalPostingGroup->id,
+        ], 201);
     }
 }

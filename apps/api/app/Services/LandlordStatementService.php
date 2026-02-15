@@ -125,6 +125,7 @@ class LandlordStatementService
     {
         return match (strtoupper($sourceType)) {
             'LAND_LEASE_ACCRUAL' => 'Lease rent accrual',
+            'PAYMENT' => 'Payment',
             'REVERSAL' => 'Reversal',
             default => $sourceType,
         };

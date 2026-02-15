@@ -14,6 +14,7 @@ use App\Models\CropCycle;
 use App\Models\AllocationRow;
 use App\Services\OperationalPostingGuard;
 use App\Services\PartyAccountService;
+use App\Services\ReversalService;
 use App\Services\SaleARService;
 use App\Services\Accounting\PostValidationService;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,9 @@ class PaymentService
         private SystemAccountService $accountService,
         private PartyAccountService $partyAccountService,
         private SaleARService $arService,
-        private PostValidationService $postValidationService
+        private PostValidationService $postValidationService,
+        private OperationalPostingGuard $guard,
+        private ReversalService $reversalService
     ) {}
 
     /**
@@ -164,18 +167,21 @@ class PaymentService
                 }
             }
 
-            // Get CASH account
-            $cashAccount = $this->accountService->getByCode($tenantId, 'CASH');
+            // Credit account by method: CASH or BANK
+            $methodCode = strtoupper((string) ($payment->method ?? 'CASH'));
+            $creditAccount = ($methodCode === 'BANK')
+                ? $this->accountService->getByCode($tenantId, 'BANK')
+                : $this->accountService->getByCode($tenantId, 'CASH');
 
             $ledgerLines = [
                 ['account_id' => $payableAccount->id],
-                ['account_id' => $cashAccount->id],
+                ['account_id' => $creditAccount->id],
             ];
             $arAccount = null;
             if ($payment->direction === 'IN') {
                 $arAccount = $this->accountService->getByCode($tenantId, 'AR');
                 $ledgerLines = [
-                    ['account_id' => $cashAccount->id],
+                    ['account_id' => $creditAccount->id],
                     ['account_id' => $arAccount->id],
                 ];
             }
@@ -185,7 +191,7 @@ class PaymentService
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
                 'crop_cycle_id' => $finalCropCycleId,
-                'source_type' => 'ADJUSTMENT',
+                'source_type' => 'PAYMENT',
                 'source_id' => $payment->id,
                 'posting_date' => Carbon::parse($postingDate)->format('Y-m-d'),
                 'idempotency_key' => $idempotencyKey,
@@ -193,7 +199,7 @@ class PaymentService
 
             // Create ledger entries
             if ($payment->direction === 'OUT') {
-                // Dr payable_account, Cr CASH
+                // Dr payable_account, Cr CASH or Cr BANK
                 LedgerEntry::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
@@ -206,7 +212,7 @@ class PaymentService
                 LedgerEntry::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
-                    'account_id' => $cashAccount->id,
+                    'account_id' => $creditAccount->id,
                     'debit_amount' => 0,
                     'credit_amount' => $payment->amount,
                     'currency_code' => 'GBP',
@@ -232,13 +238,13 @@ class PaymentService
                     throw new \Exception("Cannot post Payment IN: Amount ({$payment->amount}) exceeds outstanding receivable balance ({$receivableBalance})");
                 }
                 
-                // Dr CASH, Cr AR (clears receivable)
+                // Dr CASH/BANK, Cr AR (clears receivable)
                 $arAccount = $this->accountService->getByCode($tenantId, 'AR');
 
                 LedgerEntry::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
-                    'account_id' => $cashAccount->id,
+                    'account_id' => $creditAccount->id,
                     'debit_amount' => $payment->amount,
                     'credit_amount' => 0,
                     'currency_code' => 'GBP',
@@ -263,6 +269,24 @@ class PaymentService
             if (abs($totalDebits - $totalCredits) > 0.01) {
                 throw new \Exception('Debits and credits do not balance');
             }
+
+            // AllocationRow so landlord statement / settlement views can include this payment
+            $allocationScope = in_array('LANDLORD', $party->party_types ?? []) ? 'LANDLORD_ONLY' : 'PARTY_ONLY';
+            AllocationRow::create([
+                'tenant_id' => $tenantId,
+                'posting_group_id' => $postingGroup->id,
+                'party_id' => $payment->party_id,
+                'allocation_type' => 'PAYMENT',
+                'allocation_scope' => $allocationScope,
+                'amount' => $payment->amount,
+                'rule_snapshot' => [
+                    'source' => 'treasury',
+                    'payment_id' => $payment->id,
+                    'direction' => $payment->direction,
+                    'method' => $payment->method,
+                    'purpose' => $payment->purpose ?? 'GENERAL',
+                ],
+            ]);
 
             // Update payment status to POSTED
             $payment->update([
@@ -312,6 +336,52 @@ class PaymentService
             // Reload posting group with relationships
             return $postingGroup->fresh(['ledgerEntries.account']);
         });
+    }
+
+    /**
+     * Reverse a posted payment: creates reversal posting group (negated ledger entries and allocation row).
+     * Does not mutate the original posting group or ledger. Idempotent by reversal_posting_group_id.
+     *
+     * @param string $paymentId
+     * @param string $tenantId
+     * @param string $postingDate YYYY-MM-DD
+     * @param string|null $reason
+     * @param string|null $reversedByUserId
+     * @return PostingGroup Reversal posting group
+     */
+    public function reversePayment(
+        string $paymentId,
+        string $tenantId,
+        string $postingDate,
+        ?string $reason = null,
+        ?string $reversedByUserId = null
+    ): PostingGroup {
+        $payment = Payment::where('id', $paymentId)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        if ($payment->status !== 'POSTED') {
+            throw new \InvalidArgumentException('Only posted payments can be reversed');
+        }
+        if ($payment->reversal_posting_group_id !== null) {
+            throw new \InvalidArgumentException('Payment is already reversed');
+        }
+
+        $reversalPostingGroup = $this->reversalService->reversePostingGroup(
+            $payment->posting_group_id,
+            $tenantId,
+            $postingDate,
+            $reason ?? 'Payment reversal'
+        );
+
+        $payment->update([
+            'reversal_posting_group_id' => $reversalPostingGroup->id,
+            'reversed_at' => now(),
+            'reversed_by' => $reversedByUserId,
+            'reversal_reason' => $reason,
+        ]);
+
+        return $reversalPostingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
     }
 
     /**

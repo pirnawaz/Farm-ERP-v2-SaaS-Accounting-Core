@@ -116,7 +116,8 @@ class PartyFinancialSourceService
     ): array {
         $query = Payment::where('tenant_id', $tenantId)
             ->where('party_id', $partyId)
-            ->where('status', 'POSTED');
+            ->where('status', 'POSTED')
+            ->whereNull('reversal_posting_group_id');
 
         if ($from) {
             $query->where('payment_date', '>=', $from);
@@ -186,10 +187,11 @@ class PartyFinancialSourceService
 
         $allocations = $allocationQuery->get();
 
-        // Get payments
+        // Get payments (exclude reversed)
         $paymentQuery = Payment::where('tenant_id', $tenantId)
             ->where('party_id', $partyId)
-            ->where('status', 'POSTED');
+            ->where('status', 'POSTED')
+            ->whereNull('reversal_posting_group_id');
 
         if ($from) {
             $paymentQuery->where('payment_date', '>=', $from);

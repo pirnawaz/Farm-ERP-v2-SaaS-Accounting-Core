@@ -403,3 +403,14 @@ export interface SettlementPackResponse {
   register_row_count?: number
   register_rows?: SettlementPackRegisterRow[]
 }
+
+// Payment reversal (treasury)
+export interface ReversePaymentPayload {
+  posting_date: string
+  reason?: string
+}
+
+export interface ReversePaymentResponse {
+  reversal_posting_group_id: string
+  reversal_posting_group: PostingGroup
+}

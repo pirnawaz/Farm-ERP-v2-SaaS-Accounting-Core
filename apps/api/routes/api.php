@@ -183,6 +183,8 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:trea
     Route::get('payments/allocation-preview', [PaymentController::class, 'allocationPreview']);
     Route::post('payments/{id}/post', [PaymentController::class, 'post'])
         ->middleware('role:tenant_admin,accountant');
+    Route::post('payments/{id}/reverse', [PaymentController::class, 'reverse'])
+        ->middleware('role:tenant_admin,accountant');
 });
 
 // Advances (tenant_admin, accountant, operator) — requires treasury_advances module

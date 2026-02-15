@@ -3,8 +3,10 @@ import type {
   Payment, 
   CreatePaymentPayload,
   PostPaymentRequest,
-  PostingGroup
+  PostingGroup,
+  ReversePaymentRequest,
 } from '../types';
+import type { ReversePaymentResponse } from '@farm-erp/shared';
 
 export interface PaymentFilters {
   status?: string;
@@ -34,6 +36,8 @@ export const paymentsApi = {
   delete: (id: string) => apiClient.delete(`/api/payments/${id}`),
   post: (id: string, payload: PostPaymentRequest) => 
     apiClient.post<PostingGroup>(`/api/payments/${id}/post`, payload),
+  reverse: (id: string, payload: ReversePaymentRequest) =>
+    apiClient.post<ReversePaymentResponse>(`/api/payments/${id}/reverse`, payload),
   getAllocationPreview: (partyId: string, amount: string, postingDate: string) => {
     const params = new URLSearchParams();
     params.append('party_id', partyId);
