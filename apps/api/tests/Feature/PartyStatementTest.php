@@ -12,7 +12,11 @@ use App\Models\Payment;
 use App\Models\Settlement;
 use App\Models\Module;
 use App\Models\TenantModule;
+use App\Models\PostingGroup;
+use App\Models\AllocationRow;
+use App\Services\PartyFinancialSourceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 use Database\Seeders\SystemAccountsSeeder;
 
@@ -495,5 +499,89 @@ class PartyStatementTest extends TestCase
         $this->assertEquals($balances['allocated_payable_total'], $statement['summary']['total_allocations_increasing_balance'], 'Allocated totals must match for date range');
         $this->assertEquals($balances['paid_total'], $statement['summary']['total_payments_out'], 'Paid totals must match for date range');
         $this->assertEquals($balances['outstanding_total'], $statement['summary']['closing_balance_payable'], 'Outstanding totals must match for date range');
+    }
+
+    /**
+     * Active posting group scope: reversed original is excluded, reversal posting group is included.
+     * Reporting (getPostedAllocationTotals) must exclude allocations from reversed posting groups.
+     */
+    public function test_active_posting_group_excludes_reversed_and_includes_reversal(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $party = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Hari',
+            'party_types' => ['HARI'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $party->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+
+        // Original posted posting group (will be reversed)
+        $originalPg = PostingGroup::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'source_type' => 'SETTLEMENT',
+            'source_id' => (string) Str::uuid(),
+            'posting_date' => '2024-06-15',
+        ]);
+        AllocationRow::create([
+            'tenant_id' => $tenant->id,
+            'posting_group_id' => $originalPg->id,
+            'project_id' => $project->id,
+            'party_id' => $party->id,
+            'allocation_type' => 'POOL_SHARE',
+            'amount' => 500.00,
+        ]);
+
+        // Reversal posting group (points to original)
+        $reversalPg = PostingGroup::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'source_type' => 'SETTLEMENT',
+            'source_id' => (string) Str::uuid(),
+            'posting_date' => '2024-06-20',
+            'reversal_of_posting_group_id' => $originalPg->id,
+        ]);
+
+        // scopeActive: original must be excluded (it has a reversal), reversal must be included (it is not reversed)
+        $activeIds = PostingGroup::query()->active()->pluck('id')->toArray();
+        $this->assertNotContains($originalPg->id, $activeIds, 'Reversed original posting group must be excluded from active scope');
+        $this->assertContains($reversalPg->id, $activeIds, 'Reversal posting group (itself not reversed) must be included in active scope');
+
+        // getPostedAllocationTotals must exclude the original's allocation (only allocation is on reversed PG)
+        $service = app(PartyFinancialSourceService::class);
+        $result = $service->getPostedAllocationTotals($party->id, $tenant->id, '2024-01-01', '2024-12-31');
+        $this->assertSame(0.0, (float) $result['total'], 'Allocations from reversed posting group must be excluded from posted totals');
+        $this->assertCount(0, $result['allocations'], 'Allocations list must be empty when only allocation was on reversed posting group');
+
+        // Allocation on the reversal posting group IS included by active filtering (reversals are not excluded)
+        AllocationRow::create([
+            'tenant_id' => $tenant->id,
+            'posting_group_id' => $reversalPg->id,
+            'project_id' => $project->id,
+            'party_id' => $party->id,
+            'allocation_type' => 'POOL_SHARE',
+            'amount' => 100.00,
+        ]);
+        $resultWithReversalAllocation = $service->getPostedAllocationTotals($party->id, $tenant->id, '2024-01-01', '2024-12-31');
+        $this->assertSame(100.0, (float) $resultWithReversalAllocation['total'], 'Allocation on reversal posting group must be included in posted totals');
+        $this->assertCount(1, $resultWithReversalAllocation['allocations'], 'Allocations list must include the reversal posting group allocation');
+        $this->assertTrue(
+            $resultWithReversalAllocation['allocations']->contains('posting_group_id', $reversalPg->id),
+            'Included allocation must be the one on the reversal posting group'
+        );
     }
 }

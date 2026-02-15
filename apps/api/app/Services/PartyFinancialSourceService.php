@@ -8,7 +8,6 @@ use App\Models\Advance;
 use App\Models\Sale;
 use App\Models\PostingGroup;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class PartyFinancialSourceService
@@ -33,6 +32,7 @@ class PartyFinancialSourceService
             ->whereIn('allocation_rows.allocation_type', ['POOL_SHARE', 'KAMDARI'])
             ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
             ->where('posting_groups.source_type', 'SETTLEMENT');
+        PostingGroup::applyActiveOn($query, 'posting_groups');
 
         if ($from) {
             $query->where('posting_groups.posting_date', '>=', $from);
@@ -82,12 +82,8 @@ class PartyFinancialSourceService
             ->where('allocation_rows.party_id', $partyId)
             ->where('allocation_rows.allocation_type', 'SUPPLIER_AP')
             ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
-            ->where('posting_groups.source_type', 'INVENTORY_GRN')
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('posting_groups as rev')
-                    ->whereColumn('rev.reversal_of_posting_group_id', 'posting_groups.id');
-            });
+            ->where('posting_groups.source_type', 'INVENTORY_GRN');
+        PostingGroup::applyActiveOn($sub, 'posting_groups');
 
         if ($from) {
             $sub->where('posting_groups.posting_date', '>=', $from);
@@ -116,8 +112,8 @@ class PartyFinancialSourceService
     ): array {
         $query = Payment::where('tenant_id', $tenantId)
             ->where('party_id', $partyId)
-            ->where('status', 'POSTED')
-            ->whereNull('reversal_posting_group_id');
+            ->posted()
+            ->notReversed();
 
         if ($from) {
             $query->where('payment_date', '>=', $from);
@@ -160,13 +156,14 @@ class PartyFinancialSourceService
         ?string $from = null,
         ?string $to = null
     ): Collection {
-        // Get allocations with project/crop cycle info
+        // Get allocations with project/crop cycle info (active posting groups only)
         $allocationQuery = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
             ->where('allocation_rows.party_id', $partyId)
             ->whereIn('allocation_rows.allocation_type', ['POOL_SHARE', 'KAMDARI'])
             ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
-            ->where('posting_groups.source_type', 'SETTLEMENT')
-            ->join('projects', 'allocation_rows.project_id', '=', 'projects.id')
+            ->where('posting_groups.source_type', 'SETTLEMENT');
+        PostingGroup::applyActiveOn($allocationQuery, 'posting_groups');
+        $allocationQuery->join('projects', 'allocation_rows.project_id', '=', 'projects.id')
             ->join('crop_cycles', 'projects.crop_cycle_id', '=', 'crop_cycles.id')
             ->select(
                 'allocation_rows.*',
@@ -187,11 +184,11 @@ class PartyFinancialSourceService
 
         $allocations = $allocationQuery->get();
 
-        // Get payments (exclude reversed)
+        // Get payments (active: posted and not reversed)
         $paymentQuery = Payment::where('tenant_id', $tenantId)
             ->where('party_id', $partyId)
-            ->where('status', 'POSTED')
-            ->whereNull('reversal_posting_group_id');
+            ->posted()
+            ->notReversed();
 
         if ($from) {
             $paymentQuery->where('payment_date', '>=', $from);
@@ -401,8 +398,9 @@ class PartyFinancialSourceService
         $query = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
             ->where('allocation_rows.party_id', $partyId)
             ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
-            ->where('posting_groups.source_type', 'INVENTORY_ISSUE')
-            ->whereRaw("allocation_rows.rule_snapshot->>'cost_type' = 'INVENTORY_INPUT'");
+            ->where('posting_groups.source_type', 'INVENTORY_ISSUE');
+        PostingGroup::applyActiveOn($query, 'posting_groups');
+        $query->whereRaw("allocation_rows.rule_snapshot->>'cost_type' = 'INVENTORY_INPUT'");
 
         if ($from) {
             $query->where('posting_groups.posting_date', '>=', $from);

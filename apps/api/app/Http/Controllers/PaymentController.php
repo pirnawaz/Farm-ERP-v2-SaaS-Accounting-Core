@@ -11,12 +11,14 @@ use App\Http\Requests\PostPaymentRequest;
 use App\Http\Requests\ReversePaymentRequest;
 use App\Services\TenantContext;
 use App\Services\PaymentService;
+use App\Services\SaleARService;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
     public function __construct(
-        private PaymentService $paymentService
+        private PaymentService $paymentService,
+        private SaleARService $saleARService
     ) {}
 
     public function index(Request $request)
@@ -157,10 +159,75 @@ class PaymentController extends Controller
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        $arService = app(\App\Services\SaleARService::class);
-        $preview = $arService->getAllocationPreview($partyId, $tenantId, $amount, $postingDate);
+        $preview = $this->saleARService->getAllocationPreview($partyId, $tenantId, $amount, $postingDate);
 
         return response()->json($preview);
+    }
+
+    /**
+     * GET /payments/{id}/apply-sales/preview?mode=FIFO|MANUAL
+     * Preview FIFO or manual allocations for a posted Payment IN.
+     */
+    public function applySalesPreview(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $mode = $request->input('mode', 'FIFO');
+        if (!in_array($mode, ['FIFO', 'MANUAL'])) {
+            return response()->json(['error' => 'mode must be FIFO or MANUAL'], 422);
+        }
+
+        try {
+            $preview = $this->saleARService->previewApplyPaymentToSales($tenantId, $id, $mode);
+            return response()->json($preview);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible (must be posted, not reversed, direction IN).'], 404);
+        }
+    }
+
+    /**
+     * POST /payments/{id}/apply-sales
+     * Apply allocations (FIFO or MANUAL). Creates ACTIVE SalePaymentAllocation rows.
+     */
+    public function applySales(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $mode = $request->input('mode', 'FIFO');
+        if (!in_array($mode, ['FIFO', 'MANUAL'])) {
+            return response()->json(['error' => 'mode must be FIFO or MANUAL'], 422);
+        }
+        $allocationDate = $request->input('allocation_date');
+        $allocations = $request->input('allocations');
+        if ($mode === 'MANUAL' && (!is_array($allocations) || count($allocations) === 0)) {
+            return response()->json(['error' => 'allocations array is required for MANUAL mode'], 422);
+        }
+        $createdBy = $request->user()?->id;
+
+        try {
+            $summary = $this->saleARService->applyPaymentToSales($tenantId, $id, $mode, $allocations, $allocationDate, $createdBy);
+            return response()->json($summary);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible.'], 404);
+        }
+    }
+
+    /**
+     * POST /payments/{id}/unapply-sales
+     * Unapply (void) allocations. Body: { "sale_id": "..." } optional; if omitted, unapply all.
+     */
+    public function unapplySales(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $saleId = $request->input('sale_id');
+        $voidedBy = $request->user()?->id;
+
+        try {
+            $summary = $this->saleARService->unapplyPaymentFromSales($tenantId, $id, $saleId, $voidedBy);
+            return response()->json($summary);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible.'], 404);
+        }
     }
 
     public function post(PostPaymentRequest $request, string $id)
@@ -205,7 +272,9 @@ class PaymentController extends Controller
                 $reversedBy
             );
         } catch (\InvalidArgumentException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            $msg = $e->getMessage();
+            $status = str_contains($msg, 'Unapply sales allocations') ? 409 : 422;
+            return response()->json(['message' => $msg], $status);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

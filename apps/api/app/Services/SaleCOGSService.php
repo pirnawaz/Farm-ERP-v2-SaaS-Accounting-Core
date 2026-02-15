@@ -14,6 +14,7 @@ use App\Models\LedgerEntry;
 use App\Models\InvStockMovement;
 use App\Models\InvStockBalance;
 use App\Models\OperationalTransaction;
+use App\Models\SalePaymentAllocation;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -389,6 +390,16 @@ class SaleCOGSService
             // Validate sale status
             if (!$sale->isPosted()) {
                 throw new \Exception('Only POSTED sales can be reversed.');
+            }
+
+            $hasActiveAllocations = SalePaymentAllocation::where('tenant_id', $sale->tenant_id)
+                ->where('sale_id', $sale->id)
+                ->where(function ($q) {
+                    $q->where('status', SalePaymentAllocation::STATUS_ACTIVE)->orWhereNull('status');
+                })
+                ->exists();
+            if ($hasActiveAllocations) {
+                throw new \Exception('Sale has applied receipt allocations. Unapply before reversing the sale.');
             }
 
             // Validate reversal_date

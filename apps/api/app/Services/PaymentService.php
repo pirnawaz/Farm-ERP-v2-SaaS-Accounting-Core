@@ -12,6 +12,7 @@ use App\Models\Settlement;
 use App\Models\Project;
 use App\Models\CropCycle;
 use App\Models\AllocationRow;
+use App\Models\SalePaymentAllocation;
 use App\Services\OperationalPostingGuard;
 use App\Services\PartyAccountService;
 use App\Services\ReversalService;
@@ -367,21 +368,33 @@ class PaymentService
             throw new \InvalidArgumentException('Payment is already reversed');
         }
 
-        $reversalPostingGroup = $this->reversalService->reversePostingGroup(
-            $payment->posting_group_id,
-            $tenantId,
-            $postingDate,
-            $reason ?? 'Payment reversal'
-        );
+        return DB::transaction(function () use ($payment, $paymentId, $tenantId, $postingDate, $reason, $reversedByUserId) {
+            $hasActiveAllocations = SalePaymentAllocation::where('tenant_id', $tenantId)
+                ->where('payment_id', $paymentId)
+                ->where(function ($q) {
+                    $q->where('status', SalePaymentAllocation::STATUS_ACTIVE)->orWhereNull('status');
+                })
+                ->exists();
+            if ($hasActiveAllocations) {
+                throw new \InvalidArgumentException('Payment has applied allocations. Unapply sales allocations before reversing.');
+            }
 
-        $payment->update([
-            'reversal_posting_group_id' => $reversalPostingGroup->id,
-            'reversed_at' => now(),
-            'reversed_by' => $reversedByUserId,
-            'reversal_reason' => $reason,
-        ]);
+            $reversalPostingGroup = $this->reversalService->reversePostingGroup(
+                $payment->posting_group_id,
+                $tenantId,
+                $postingDate,
+                $reason ?? 'Payment reversal'
+            );
 
-        return $reversalPostingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            $payment->update([
+                'reversal_posting_group_id' => $reversalPostingGroup->id,
+                'reversed_at' => now(),
+                'reversed_by' => $reversedByUserId,
+                'reversal_reason' => $reason,
+            ]);
+
+            return $reversalPostingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+        });
     }
 
     /**

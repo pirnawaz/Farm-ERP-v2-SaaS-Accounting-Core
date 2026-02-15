@@ -775,6 +775,21 @@ class ReportController extends Controller
     }
 
     /**
+     * GET /api/ar/aging
+     * AR Aging report: open invoice balances per customer in buckets (auditable, reconciles to open invoices).
+     */
+    public function arAging(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $asOf = $request->input('as_of', Carbon::today()->format('Y-m-d'));
+
+        $arService = app(SaleARService::class);
+        $data = $arService->getARAging($tenantId, $asOf);
+
+        return response()->json($data);
+    }
+
+    /**
      * GET /api/reports/yield
      * Returns yield quantities by crop cycle, optionally grouped by parcel or item
      */

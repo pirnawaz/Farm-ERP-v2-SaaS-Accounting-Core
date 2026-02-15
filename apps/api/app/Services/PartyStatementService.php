@@ -65,13 +65,14 @@ class PartyStatementService
         $allocationData = $financialSourceService->getPostedAllocationTotals($partyId, $tenantId, $from, $to);
         
         // Get allocations with project/crop cycle info (need joins for breakdown)
-        // Include POOL_SHARE, KAMDARI, and ADVANCE_OFFSET allocation types from SETTLEMENT
-        $allocations = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
+        // Include POOL_SHARE, KAMDARI, and ADVANCE_OFFSET allocation types from SETTLEMENT (active posting groups only)
+        $allocationQuery = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
             ->where('allocation_rows.party_id', $partyId)
             ->whereIn('allocation_rows.allocation_type', ['POOL_SHARE', 'KAMDARI', 'ADVANCE_OFFSET'])
             ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
-            ->where('posting_groups.source_type', 'SETTLEMENT')
-            ->whereBetween('posting_groups.posting_date', [$fromDate->format('Y-m-d'), $toDate->format('Y-m-d')])
+            ->where('posting_groups.source_type', 'SETTLEMENT');
+        PostingGroup::applyActiveOn($allocationQuery, 'posting_groups');
+        $allocations = $allocationQuery->whereBetween('posting_groups.posting_date', [$fromDate->format('Y-m-d'), $toDate->format('Y-m-d')])
             ->join('projects', 'allocation_rows.project_id', '=', 'projects.id')
             ->join('crop_cycles', 'projects.crop_cycle_id', '=', 'crop_cycles.id')
             ->select(
@@ -567,5 +568,132 @@ class PartyStatementService
         }
 
         return $lines;
+    }
+
+    /**
+     * Get AR (Accounts Receivable) statement for a party: Sales (invoices) and Payments IN (receipts) only.
+     * Ledger-driven; uses same active semantics as Module 1 (posted + not reversed).
+     * No landlord/settlement-only lines.
+     *
+     * @param string $tenantId
+     * @param string $partyId
+     * @param string $from YYYY-MM-DD
+     * @param string $to YYYY-MM-DD
+     * @return array{party: array, period: array{from: string, to: string}, lines: array, totals: array}
+     */
+    public function getARStatement(string $tenantId, string $partyId, string $from, string $to): array
+    {
+        $party = Party::where('id', $partyId)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        // Opening balance: sales (posted, not reversed) before from minus payments IN (posted, not reversed) before from
+        $openingSales = (float) Sale::where('tenant_id', $tenantId)
+            ->where('buyer_party_id', $partyId)
+            ->where('status', 'POSTED')
+            ->whereNull('reversal_posting_group_id')
+            ->where('posting_date', '<', $from)
+            ->sum('amount');
+        $openingPaymentsIn = (float) Payment::where('tenant_id', $tenantId)
+            ->where('party_id', $partyId)
+            ->posted()
+            ->notReversed()
+            ->where('direction', 'IN')
+            ->where('payment_date', '<', $from)
+            ->sum('amount');
+        $openingBalance = $openingSales - $openingPaymentsIn;
+
+        // Sales in period (posted, not reversed) - AR-relevant only
+        $sales = Sale::where('tenant_id', $tenantId)
+            ->where('buyer_party_id', $partyId)
+            ->where('status', 'POSTED')
+            ->whereNull('reversal_posting_group_id')
+            ->whereBetween('posting_date', [$from, $to])
+            ->orderBy('posting_date')
+            ->orderBy('id')
+            ->get();
+
+        // Payments IN in period (posted, not reversed)
+        $paymentsIn = Payment::where('tenant_id', $tenantId)
+            ->where('party_id', $partyId)
+            ->posted()
+            ->notReversed()
+            ->where('direction', 'IN')
+            ->whereBetween('payment_date', [$from, $to])
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get();
+
+        $rawLines = [];
+        foreach ($sales as $sale) {
+            $date = $sale->posting_date instanceof \Carbon\Carbon
+                ? $sale->posting_date->format('Y-m-d')
+                : $sale->posting_date;
+            $desc = $sale->sale_no ? "Sale {$sale->sale_no}" : "Sale #{$sale->id}";
+            $amount = (float) $sale->amount;
+            $rawLines[] = [
+                'posting_date' => $date,
+                'sort_key' => $date . '_SALE_' . $sale->id,
+                'description' => $desc,
+                'source_type' => 'SALE',
+                'source_id' => $sale->id,
+                'posting_group_id' => $sale->posting_group_id,
+                'debit' => '0.00',
+                'credit' => number_format($amount, 2, '.', ''),
+                'net' => number_format($amount, 2, '.', ''),
+                'debit_val' => 0,
+                'credit_val' => $amount,
+            ];
+        }
+        foreach ($paymentsIn as $payment) {
+            $date = $payment->payment_date->format('Y-m-d');
+            $rawLines[] = [
+                'posting_date' => $date,
+                'sort_key' => $date . '_PAYMENT_' . $payment->id,
+                'description' => 'Payment IN - ' . ($payment->method ?? ''),
+                'source_type' => 'PAYMENT',
+                'source_id' => $payment->id,
+                'posting_group_id' => $payment->posting_group_id,
+                'debit' => number_format((float) $payment->amount, 2, '.', ''),
+                'credit' => '0.00',
+                'net' => number_format(-(float) $payment->amount, 2, '.', ''),
+                'debit_val' => (float) $payment->amount,
+                'credit_val' => 0,
+            ];
+        }
+        usort($rawLines, fn ($a, $b) => strcmp($a['sort_key'], $b['sort_key']));
+
+        $runningBalance = $openingBalance;
+        $debitTotal = 0.0;
+        $creditTotal = 0.0;
+        $lines = [];
+        foreach ($rawLines as $raw) {
+            $runningBalance += $raw['credit_val'] - $raw['debit_val'];
+            $debitTotal += $raw['debit_val'];
+            $creditTotal += $raw['credit_val'];
+            $lines[] = [
+                'posting_date' => $raw['posting_date'],
+                'description' => $raw['description'],
+                'source_type' => $raw['source_type'],
+                'source_id' => $raw['source_id'],
+                'posting_group_id' => $raw['posting_group_id'],
+                'debit' => $raw['debit'],
+                'credit' => $raw['credit'],
+                'net' => $raw['net'],
+                'running_balance' => number_format($runningBalance, 2, '.', ''),
+            ];
+        }
+
+        return [
+            'party' => $party->only(['id', 'name', 'party_types']),
+            'period' => ['from' => $from, 'to' => $to],
+            'lines' => $lines,
+            'totals' => [
+                'debit_total' => number_format($debitTotal, 2, '.', ''),
+                'credit_total' => number_format($creditTotal, 2, '.', ''),
+                'opening_balance' => number_format($openingBalance, 2, '.', ''),
+                'closing_balance' => number_format($runningBalance, 2, '.', ''),
+            ],
+        ];
     }
 }

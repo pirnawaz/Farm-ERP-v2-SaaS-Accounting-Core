@@ -13,6 +13,7 @@ use App\Services\PartyFinancialSourceService;
 use App\Models\AllocationRow;
 use App\Models\Payment;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class PartyController extends Controller
 {
@@ -234,6 +235,28 @@ class PartyController extends Controller
             $to,
             $groupBy
         );
+
+        return response()->json($statement);
+    }
+
+    public function arStatement(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $party = Party::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $to = $request->input('to');
+        $from = $request->input('from');
+        if (!$to) {
+            $to = Carbon::today()->format('Y-m-d');
+        }
+        if (!$from) {
+            $from = Carbon::parse($to)->subYear()->format('Y-m-d');
+        }
+
+        $statement = $this->statementService->getARStatement($tenantId, $id, $from, $to);
 
         return response()->json($statement);
     }

@@ -36,8 +36,8 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Land & Projects** — Land parcels, crop cycles (close/reopen with preview), land allocations (owner and Hari), projects, project rules
 - **Land Leases (Maqada)** — Land leases per project/parcel/landlord, accruals (draft/post), posting to DUE_TO_LANDLORD and expense; reversal of posted accruals (new posting group, no mutation); **Landlord Statement** report (ledger-backed, read-only); traceability from accrual to posting group and reversal
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
-- **Treasury** — Payments (draft/post), advances, allocation preview and posting. Payment posting creates **allocation rows** (type `PAYMENT`, scope `PARTY_ONLY`/`LANDLORD_ONLY`) so landlord statement and settlement views include them; posting group `source_type` is `PAYMENT`. Payment method determines credit account: **CASH** credits CASH, **BANK** credits BANK (system account `BANK` seeded). **Payment reversal**: `POST /api/payments/{id}/reverse` (posting_date, optional reason) creates a reversal posting group (negated ledger entries and allocation row); original posting group is immutable; payment stores `reversal_posting_group_id`, `reversed_at`, `reversed_by`, `reversal_reason`. Reversed payments are excluded from party balance/statement totals.
-- **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
+- **Treasury** — Payments (draft/post), advances, allocation preview and posting. **Apply payment to sales**: `GET payments/{id}/apply-sales/preview` (FIFO or manual), `POST payments/{id}/apply-sales`, `POST payments/{id}/unapply-sales`; creates/voids **sale_payment_allocations** (status ACTIVE/VOID). Payment posting creates **allocation rows** (type `PAYMENT`, scope `PARTY_ONLY`/`LANDLORD_ONLY`) so landlord statement and settlement views include them; posting group `source_type` is `PAYMENT`. Payment method determines credit account: **CASH** credits CASH, **BANK** credits BANK (system account `BANK` seeded). **Payment reversal**: `POST /api/payments/{id}/reverse` (posting_date, optional reason) creates a reversal posting group (negated ledger entries and allocation row); original posting group is immutable; payment stores `reversal_posting_group_id`, `reversed_at`, `reversed_by`, `reversal_reason`. Reversed payments are excluded from party balance/statement totals.
+- **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals. **AR statement** per party (`GET parties/{id}/ar-statement`), **open sales** (`GET parties/{id}/receivables/open-sales`). Apply/unapply creates **SalePaymentAllocation** rows (ACTIVE/VOID); only ACTIVE (or null) allocations count toward open balance. **Reversal guards**: cannot reverse a payment or sale while it has ACTIVE allocations (409 until unapplied/reversed). **AR Aging report** (`GET /ar/aging?as_of=YYYY-MM-DD`): auditable, reconciles to open invoices; buckets per customer (current, 1_30, 31_60, 61_90, 90_plus) and grand totals; uses ACTIVE allocation sums only; excludes reversed sales. Sales margin reports.
 - **Settlements** — Project-based and sales-based settlements with share rules, preview and posting, reversals
 - **Settlement Pack (Governance)** — Per-project settlement pack generation (idempotent per version), summary totals, and full transaction register; DRAFT/FINAL status; re-generate when not final
 - **Share Rules** — Configurable share rules for crop cycles, projects, and sales (margin or revenue basis)
@@ -48,7 +48,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
 - **Accounting Guards** — Immutability protection for posted transactions, balanced posting validation
 - **Audit Logs** — Transaction audit trail for posted operations
-- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, party ledger, party summary, **landlord statement** (Maqada, when `land_leases` module enabled), role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); CSV export with Terrava-branded filenames; print-friendly layouts
+- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, **AR ageing** (including auditable `GET /ar/aging` — open invoice balances per customer with bucket totals and grand totals), yield reports, party ledger, party summary, **landlord statement** (Maqada, when `land_leases` module enabled), role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); CSV export with Terrava-branded filenames; print-friendly layouts
 - **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
 - **Crop Cycle Close** — Close crop cycle with preview; crop-cycle-based settlements (preview and post); accounting corrections and guards
 - **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states
@@ -218,15 +218,16 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Operational transactions** | `apiResource('operational-transactions')`, `POST .../post`       |
 | **Settlement**  | `POST /projects/{id}/settlement/preview`, `.../offset-preview`, `.../post`; `GET/POST /settlements`, `GET /settlements/preview`, `POST /settlements/{id}/post`, `POST /settlements/{id}/reverse` |
 | **Settlement Pack** | `POST /api/projects/{projectId}/settlement-pack` (generate, idempotent per project+version), `GET /api/settlement-packs/{id}` (pack + full transaction register) |
-| **Payments**    | `apiResource('payments')`, `.../allocation-preview`, `.../post`, `.../reverse` (tenant_admin, accountant) |
+| **Payments**    | `apiResource('payments')`, `.../allocation-preview`, `GET .../apply-sales/preview`, `POST .../apply-sales`, `POST .../unapply-sales`, `.../post`, `.../reverse` (tenant_admin, accountant) |
 | **Advances**    | `apiResource('advances')`, `.../post`                                    |
 | **Sales**       | `apiResource('sales')`, `.../post`, `.../reverse`                      |
+| **AR Aging**    | `GET /ar/aging?as_of=YYYY-MM-DD` — open invoice balances per customer (buckets: current, 1_30, 31_60, 61_90, 90_plus), grand totals; ACTIVE allocations only; excludes reversed sales (reports module) |
 | **Inventory**   | Items, stores, UOMs, categories; GRNs, issues, transfers, adjustments; `.../post`, `.../reverse`; `stock/on-hand`, `stock/movements` |
 | **Labour**      | `v1/labour/workers`, `v1/labour/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/labour/payables/outstanding` |
 | **Crop Ops**    | `v1/crop-ops/activity-types` (CRUD); `v1/crop-ops/activities` (timeline, CRUD, `.../post`, `.../reverse`); `v1/crop-ops/harvests` (CRUD, lines, `.../post`, `.../reverse`) |
 | **Machinery**   | `v1/machinery/machines` (CRUD); `v1/machinery/maintenance-types` (CRUD); `v1/machinery/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/rate-cards` (CRUD); `v1/machinery/charges` (list, show); `v1/machinery/maintenance-jobs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/reports/profitability` |
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
-| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `yield`, `party-ledger`, `party-summary`, `landlord-statement` (requires `land_leases`), `role-ageing`, `crop-cycle-distribution`, `settlement-statement`, `cost-per-unit`, `sales-margin`; `reports/reconciliation/project`, `reports/reconciliation/crop-cycle`, `reports/reconciliation/supplier-ap` |
+| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `GET ar/aging` (auditable AR aging), `yield`, `party-ledger`, `party-summary`, `landlord-statement` (requires `land_leases`), `role-ageing`, `crop-cycle-distribution`, `settlement-statement`, `cost-per-unit`, `sales-margin`; `reports/reconciliation/project`, `reports/reconciliation/crop-cycle`, `reports/reconciliation/supplier-ap` |
 | **Reconciliation** | `GET /reconciliation/project/{id}`, `GET /reconciliation/supplier/{party_id}` |
 | **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
 
@@ -287,7 +288,7 @@ Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/
 php artisan test --filter=PlatformAdminTenantAndImpersonation
 ```
 
-Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date), and **Payments** (posting creates posting group with `source_type=PAYMENT`, allocation row `PAYMENT`, ledger entries; method BANK credits BANK account; reverse creates reversal posting group and negated allocation row; cannot reverse twice):
+Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date), **Payments** (posting creates posting group with `source_type=PAYMENT`, allocation row `PAYMENT`, ledger entries; method BANK credits BANK account; reverse creates reversal posting group and negated allocation row; cannot reverse twice), **Payment apply/unapply** (PaymentApplySalesTest: preview FIFO, apply FIFO/manual, unapply voids allocations, reversed sale/payment excluded from open sales), **Reversal guards** (ReversalGuardsTest: cannot reverse payment or sale while ACTIVE allocations exist; 409 until unapplied), **AR Statement** (ARStatementTest), and **AR Aging report** (ARAgingReportTest: buckets per customer and grand totals, apply payment reduces open balance, unapply restores it, reversed sale excluded, default as_of):
 
 ```bash
 php artisan test tests/Feature/SettlementPackTest.php
@@ -295,6 +296,10 @@ php artisan test --filter=LandLeaseAccrualPostingTest
 php artisan test --filter=LandLeaseAccrualReversalTest
 php artisan test --filter=LandlordStatementReportTest
 php artisan test --filter=PaymentTest
+php artisan test tests/Feature/PaymentApplySalesTest.php
+php artisan test tests/Feature/ReversalGuardsTest.php
+php artisan test tests/Feature/ARStatementTest.php
+php artisan test tests/Feature/ARAgingReportTest.php
 ```
 
 ### Frontend E2E (Playwright)

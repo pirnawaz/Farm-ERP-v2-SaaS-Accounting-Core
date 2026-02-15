@@ -96,6 +96,7 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::apiResource('parties', PartyController::class);
     Route::get('parties/{id}/balances', [PartyController::class, 'balances']);
     Route::get('parties/{id}/statement', [PartyController::class, 'statement']);
+    Route::get('parties/{id}/ar-statement', [PartyController::class, 'arStatement']);
     Route::get('parties/{id}/receivables/open-sales', [PartyController::class, 'openSales']);
 });
 
@@ -181,6 +182,9 @@ Route::middleware(['role:tenant_admin,accountant', 'require_module:settlements']
 Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:treasury_payments'])->group(function () {
     Route::apiResource('payments', PaymentController::class);
     Route::get('payments/allocation-preview', [PaymentController::class, 'allocationPreview']);
+    Route::get('payments/{id}/apply-sales/preview', [PaymentController::class, 'applySalesPreview']);
+    Route::post('payments/{id}/apply-sales', [PaymentController::class, 'applySales']);
+    Route::post('payments/{id}/unapply-sales', [PaymentController::class, 'unapplySales']);
     Route::post('payments/{id}/post', [PaymentController::class, 'post'])
         ->middleware('role:tenant_admin,accountant');
     Route::post('payments/{id}/reverse', [PaymentController::class, 'reverse'])
@@ -378,6 +382,7 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/account-balances', [ReportController::class, 'accountBalances']);
     Route::get('reports/cashbook', [ReportController::class, 'cashbook']);
     Route::get('reports/ar-ageing', [ReportController::class, 'arAgeing']);
+    Route::get('ar/aging', [ReportController::class, 'arAging']);
     Route::get('reports/yield', [ReportController::class, 'yield']);
     Route::get('reports/cost-per-unit', [ReportController::class, 'costPerUnit']);
     Route::get('reports/sales-margin', [ReportController::class, 'salesMargin']);

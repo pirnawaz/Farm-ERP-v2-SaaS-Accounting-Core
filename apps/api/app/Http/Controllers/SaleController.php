@@ -18,7 +18,8 @@ use Illuminate\Support\Facades\DB;
 class SaleController extends Controller
 {
     public function __construct(
-        private SaleService $saleService
+        private SaleService $saleService,
+        private SaleCOGSService $cogsService
     ) {}
 
     public function index(Request $request)
@@ -289,7 +290,9 @@ class SaleController extends Controller
                 $request->reason ?? ''
             );
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
+            $msg = $e->getMessage();
+            $status = str_contains($msg, 'Unapply before reversing the sale') ? 409 : 422;
+            return response()->json(['error' => $msg], $status);
         }
 
         // Log audit event

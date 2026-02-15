@@ -12,6 +12,9 @@ class SalePaymentAllocation extends Model
 
     const UPDATED_AT = null;
 
+    public const STATUS_ACTIVE = 'ACTIVE';
+    public const STATUS_VOID = 'VOID';
+
     protected $fillable = [
         'tenant_id',
         'sale_id',
@@ -19,12 +22,17 @@ class SalePaymentAllocation extends Model
         'posting_group_id',
         'allocation_date',
         'amount',
+        'status',
+        'created_by',
+        'voided_by',
+        'voided_at',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'allocation_date' => 'date',
         'created_at' => 'datetime',
+        'voided_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo
@@ -53,5 +61,21 @@ class SalePaymentAllocation extends Model
     public function scopeForTenant($query, string $tenantId)
     {
         return $query->where('tenant_id', $tenantId);
+    }
+
+    /**
+     * Scope: only ACTIVE allocations (count toward applied amount).
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
+
+    /**
+     * Scope: only VOID allocations (excluded from applied amount).
+     */
+    public function scopeVoided($query)
+    {
+        return $query->where('status', self::STATUS_VOID);
     }
 }
