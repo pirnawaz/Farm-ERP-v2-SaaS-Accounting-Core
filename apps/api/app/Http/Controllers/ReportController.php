@@ -10,6 +10,7 @@ use App\Services\PartyAccountService;
 use App\Services\PartyLedgerService;
 use App\Services\PartySummaryService;
 use App\Services\RoleAgeingService;
+use App\Services\LandlordStatementService;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
 use App\Models\Settlement;
@@ -30,7 +31,8 @@ class ReportController extends Controller
 
     public function __construct(
         private ReconciliationService $reconciliationService,
-        private SettlementService $settlementService
+        private SettlementService $settlementService,
+        private LandlordStatementService $landlordStatementService
     ) {}
 
     /**
@@ -1257,6 +1259,33 @@ class ReportController extends Controller
             $cropCycleId ?: null
         );
 
+        return response()->json($result);
+    }
+
+    /**
+     * GET /api/reports/landlord-statement
+     * Ledger-backed statement for DUE_TO_LANDLORD scoped to a party (landlord).
+     * Query params: party_id (required), date_from (required), date_to (required).
+     */
+    public function landlordStatement(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'party_id' => ['required', 'uuid', 'exists:parties,id'],
+            'date_from' => ['required', 'date', 'date_format:Y-m-d'],
+            'date_to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $partyId = $request->input('party_id');
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        $result = $this->landlordStatementService->getStatement($tenantId, $partyId, $dateFrom, $dateTo);
         return response()->json($result);
     }
 

@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class User extends Model
+class User extends Model implements AuthenticatableContract
 {
     use HasUuids;
 
@@ -40,5 +41,34 @@ class User extends Model
     public function createdTransactions(): HasMany
     {
         return $this->hasMany(OperationalTransaction::class, 'created_by');
+    }
+
+    public function getAuthIdentifierName(): string
+    {
+        return 'id';
+    }
+
+    public function getAuthIdentifier(): string
+    {
+        return $this->getKey();
+    }
+
+    public function getAuthPassword(): string
+    {
+        return $this->password ?? '';
+    }
+
+    public function getRememberToken(): ?string
+    {
+        return null;
+    }
+
+    public function setRememberToken($value): void
+    {
+    }
+
+    public function getRememberTokenName(): ?string
+    {
+        return null;
     }
 }

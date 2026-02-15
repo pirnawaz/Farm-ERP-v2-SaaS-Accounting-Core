@@ -26,6 +26,7 @@ class ModulesSeeder extends Seeder
             ['key' => 'machinery', 'name' => 'Machinery', 'description' => 'Machinery: work logs, machines, maintenance types', 'is_core' => false, 'sort_order' => 11],
             ['key' => 'loans', 'name' => 'Loans', 'description' => 'Loans and loan transactions (future)', 'is_core' => false, 'sort_order' => 12],
             ['key' => 'crop_ops', 'name' => 'Crop Operations / Activities', 'description' => 'Activity types, activities, inputs, labour; post consumes stock and accrues wages', 'is_core' => false, 'sort_order' => 13],
+            ['key' => 'land_leases', 'name' => 'Land Lease (Maqada)', 'description' => 'Land lease master records: parcel, project, landlord, rent', 'is_core' => false, 'sort_order' => 14],
         ];
 
         $now = now();

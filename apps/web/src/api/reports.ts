@@ -1,4 +1,5 @@
 import { apiClient } from '@farm-erp/shared';
+import type { LandlordStatementResponse } from '@farm-erp/shared';
 import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse } from '../types';
 
 export const reportsApi = {
@@ -85,6 +86,13 @@ export const reportsApi = {
     if (params.project_id) query.append('project_id', params.project_id);
     if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
     return apiClient.get<RoleAgeingResponse>(`/api/reports/role-ageing?${query.toString()}`);
+  },
+  landlordStatement: (params: { party_id: string; date_from: string; date_to: string }) => {
+    const query = new URLSearchParams();
+    query.append('party_id', params.party_id);
+    query.append('date_from', params.date_from);
+    query.append('date_to', params.date_to);
+    return apiClient.get<LandlordStatementResponse>(`/api/reports/landlord-statement?${query.toString()}`);
   },
   reconcileProject: (params: { project_id: string; from: string; to: string }) =>
     apiClient.reconcileProject(params),

@@ -156,11 +156,143 @@ export interface AccountBalanceRow {
   balance: string
 }
 
+// Land Lease (Maqada) — lease master, no accounting
+export type LandLeaseFrequency = 'MONTHLY'
+
+export interface LandLease {
+  id: string
+  tenant_id: string
+  project_id: string
+  land_parcel_id: string
+  landlord_party_id: string
+  start_date: string
+  end_date: string | null
+  rent_amount: string
+  frequency: LandLeaseFrequency
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  project?: { id: string; name: string }
+  land_parcel?: { id: string; name: string }
+  landlord_party?: { id: string; name: string }
+}
+
+export interface CreateLandLeasePayload {
+  project_id: string
+  land_parcel_id: string
+  landlord_party_id: string
+  start_date: string
+  end_date?: string | null
+  rent_amount: number | string
+  frequency: LandLeaseFrequency
+  notes?: string | null
+}
+
+export interface UpdateLandLeasePayload {
+  project_id?: string
+  land_parcel_id?: string
+  landlord_party_id?: string
+  start_date?: string
+  end_date?: string | null
+  rent_amount?: number | string
+  frequency?: LandLeaseFrequency
+  notes?: string | null
+}
+
+// Land Lease Accruals (Sprint 2 — no accounting posting)
+export type LandLeaseAccrualStatus = 'DRAFT' | 'POSTED'
+
+export interface LandLeaseAccrual {
+  id: string
+  tenant_id: string
+  lease_id: string
+  project_id: string
+  period_start: string
+  period_end: string
+  amount: string
+  memo: string | null
+  status: LandLeaseAccrualStatus
+  posting_group_id: string | null
+  posted_at: string | null
+  posted_by: string | null
+  reversal_posting_group_id: string | null
+  reversed_at: string | null
+  reversed_by: string | null
+  reversal_reason: string | null
+  created_at: string
+  updated_at: string
+  lease?: { id: string; project_id: string }
+  project?: { id: string; name: string }
+}
+
+export interface CreateLandLeaseAccrualPayload {
+  lease_id: string
+  project_id: string
+  period_start: string
+  period_end: string
+  amount: number | string
+  memo?: string | null
+}
+
+export interface UpdateLandLeaseAccrualPayload {
+  period_start?: string
+  period_end?: string
+  amount?: number | string
+  memo?: string | null
+}
+
+export interface PostLandLeaseAccrualPayload {
+  posting_date: string
+}
+
+export interface PostLandLeaseAccrualResponse {
+  accrual: LandLeaseAccrual
+  posting_group_id: string
+  posting_group?: { id: string; posting_date: string; source_type: string; source_id: string }
+}
+
+export interface ReverseLandLeaseAccrualPayload {
+  posting_date: string
+  reason?: string | null
+}
+
+export interface ReverseLandLeaseAccrualResponse {
+  accrual: LandLeaseAccrual
+  reversal_posting_group_id: string
+  reversal_posting_group?: { id: string; posting_date: string; source_type: string; source_id: string }
+}
+
+/** Landlord statement report (ledger-backed) */
+export interface LandlordStatementLine {
+  posting_date: string
+  description: string
+  source_type: string
+  source_id: string
+  posting_group_id: string
+  debit: number
+  credit: number
+  running_balance: number
+  lease_id?: string | null
+  land_parcel_id?: string | null
+  project_id?: string | null
+}
+
+export interface LandlordStatementResponse {
+  party: { id: string; name: string }
+  date_from: string
+  date_to: string
+  opening_balance: number
+  closing_balance: number
+  lines: LandlordStatementLine[]
+}
+
 // Module toggles / feature flags
 export type ModuleKey =
   | 'accounting_core'
   | 'projects_crop_cycles'
   | 'land'
+  | 'land_leases'
   | 'treasury_payments'
   | 'treasury_advances'
   | 'ar_sales'

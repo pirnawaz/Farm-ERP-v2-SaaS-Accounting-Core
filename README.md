@@ -34,6 +34,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Platform admin** — Tenant list, activate/suspend, minimal plan field (no billing), controlled impersonation with audit logging
 - **Roles** — `platform_admin`, `tenant_admin`, `accountant`, `operator`
 - **Land & Projects** — Land parcels, crop cycles (close/reopen with preview), land allocations (owner and Hari), projects, project rules
+- **Land Leases (Maqada)** — Land leases per project/parcel/landlord, accruals (draft/post), posting to DUE_TO_LANDLORD and expense; reversal of posted accruals (new posting group, no mutation); **Landlord Statement** report (ledger-backed, read-only); traceability from accrual to posting group and reversal
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
 - **Treasury** — Payments, advances, allocation preview and posting
 - **AR & Sales** — Sales documents with lines and inventory allocations, posting, reversals, AR ageing, sales margin reports
@@ -47,7 +48,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
 - **Accounting Guards** — Immutability protection for posted transactions, balanced posting validation
 - **Audit Logs** — Transaction audit trail for posted operations
-- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, party ledger, party summary, role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); CSV export with Terrava-branded filenames; print-friendly layouts
+- **Reports** — Trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, party ledger, party summary, **landlord statement** (Maqada, when `land_leases` module enabled), role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); CSV export with Terrava-branded filenames; print-friendly layouts
 - **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
 - **Crop Cycle Close** — Close crop cycle with preview; crop-cycle-based settlements (preview and post); accounting corrections and guards
 - **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states
@@ -208,6 +209,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Users**       | `apiResource('users')`                                                   |
 | **Parties**     | `apiResource('parties')`, `.../balances`, `.../statement`, `.../receivables/open-sales` |
 | **Land**        | `apiResource('land-parcels')`, `.../documents`                           |
+| **Land Leases** | `apiResource('land-leases')`; `GET/POST/PUT/DELETE /land-lease-accruals`, `POST /land-lease-accruals/{id}/post`, `POST /land-lease-accruals/{id}/reverse` (tenant_admin, `land_leases` module) |
 | **Crop cycles** | `apiResource('crop-cycles')`, `.../close-preview`, `.../close`, `.../reopen`, `.../open` |
 | **Land allocations** | `apiResource('land-allocations')`                                   |
 | **Projects**    | `apiResource('projects')`, `POST /projects/from-allocation`              |
@@ -224,7 +226,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Crop Ops**    | `v1/crop-ops/activity-types` (CRUD); `v1/crop-ops/activities` (timeline, CRUD, `.../post`, `.../reverse`); `v1/crop-ops/harvests` (CRUD, lines, `.../post`, `.../reverse`) |
 | **Machinery**   | `v1/machinery/machines` (CRUD); `v1/machinery/maintenance-types` (CRUD); `v1/machinery/work-logs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/rate-cards` (CRUD); `v1/machinery/charges` (list, show); `v1/machinery/maintenance-jobs` (CRUD, `.../post`, `.../reverse`); `v1/machinery/reports/profitability` |
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
-| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `yield`, `party-ledger`, `party-summary`, `role-ageing`, `crop-cycle-distribution`, `settlement-statement`, `cost-per-unit`, `sales-margin`; `reports/reconciliation/project`, `reports/reconciliation/crop-cycle`, `reports/reconciliation/supplier-ap` |
+| **Reports**     | `trial-balance`, `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `yield`, `party-ledger`, `party-summary`, `landlord-statement` (requires `land_leases`), `role-ageing`, `crop-cycle-distribution`, `settlement-statement`, `cost-per-unit`, `sales-margin`; `reports/reconciliation/project`, `reports/reconciliation/crop-cycle`, `reports/reconciliation/supplier-ap` |
 | **Reconciliation** | `GET /reconciliation/project/{id}`, `GET /reconciliation/supplier/{party_id}` |
 | **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
 
@@ -239,17 +241,17 @@ The web app includes pages (and routes) for:
 - **Dashboard**, **Health**
 - **Daily book entries**, **Operational transactions**, **Posting group detail** (`/app/posting-groups/:id`)
 - **Parties**, **Sales**, **Payments**, **Advances**
-- **Land parcels**, **Land allocations**, **Crop cycles** (with close/reopen and detail), **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based, sales-based, crop-cycle-based), **Settlement Pack** (view pack at `/app/settlement-packs/:id` with summary, transaction register, re-generate when not FINAL; generate from Settlement page), **Harvests**
+- **Land parcels**, **Land leases** (when `land_leases` module enabled: list, detail with accruals, post/reverse accruals, view posting group and reversal), **Land allocations**, **Crop cycles** (with close/reopen and detail), **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based, sales-based, crop-cycle-based), **Settlement Pack** (view pack at `/app/settlement-packs/:id` with summary, transaction register, re-generate when not FINAL; generate from Settlement page), **Harvests**
 - **Inventory:** items, stores, categories, UOMs, GRNs, issues (with allocation configuration), transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
 - **Labour:** workers, work logs, payables outstanding (when module enabled)
 - **Machinery:** machines, work logs, rate cards, charges, maintenance jobs and types, profitability reports (when `machinery` module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
-- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin, party ledger, party summary, role ageing, crop cycle distribution, settlement statement; reconciliation dashboard; CSV export functionality; print-friendly layouts
+- **Reports:** trial balance, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, yield reports, sales margin, party ledger, party summary, **landlord statement** (when `land_leases` enabled), role ageing, crop cycle distribution, settlement statement; reconciliation dashboard; CSV export functionality; print-friendly layouts
 - **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform (platform_admin only):** tenant list at `/app/platform/tenants` (status badge, suspend/activate, plan dropdown, impersonate); impersonation banner in tenant app with “Impersonating: {tenant}” and exit; tenant detail with plan and impersonate
 
-Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `inventory`, `labour`, `machinery`, `crop_ops`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
+Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `land_leases`, `inventory`, `labour`, `machinery`, `crop_ops`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
 
 ---
 
@@ -285,10 +287,13 @@ Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/
 php artisan test --filter=PlatformAdminTenantAndImpersonation
 ```
 
-Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency):
+Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), and **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date):
 
 ```bash
 php artisan test tests/Feature/SettlementPackTest.php
+php artisan test --filter=LandLeaseAccrualPostingTest
+php artisan test --filter=LandLeaseAccrualReversalTest
+php artisan test --filter=LandlordStatementReportTest
 ```
 
 ### Frontend E2E (Playwright)

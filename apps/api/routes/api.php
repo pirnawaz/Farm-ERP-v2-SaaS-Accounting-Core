@@ -52,6 +52,8 @@ use App\Http\Controllers\Machinery\MachineryReportsController;
 use App\Http\Controllers\Machinery\MachineryServiceController;
 use App\Http\Controllers\ReconciliationController;
 use App\Http\Controllers\SettlementPackController;
+use App\Domains\Operations\LandLease\LandLeaseController;
+use App\Http\Controllers\LandLeaseAccrualController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -116,6 +118,18 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
 // Land Allocations (tenant_admin, accountant)
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::apiResource('land-allocations', LandAllocationController::class);
+});
+
+// Land Leases / Maqada (tenant_admin only) — requires land_leases module
+Route::middleware(['role:tenant_admin', 'require_module:land_leases'])->group(function () {
+    Route::apiResource('land-leases', LandLeaseController::class);
+    Route::get('land-lease-accruals', [LandLeaseAccrualController::class, 'index']);
+    Route::post('land-lease-accruals', [LandLeaseAccrualController::class, 'store']);
+    Route::get('land-lease-accruals/{id}', [LandLeaseAccrualController::class, 'show']);
+    Route::put('land-lease-accruals/{id}', [LandLeaseAccrualController::class, 'update']);
+    Route::delete('land-lease-accruals/{id}', [LandLeaseAccrualController::class, 'destroy']);
+    Route::post('land-lease-accruals/{id}/post', [LandLeaseAccrualController::class, 'post']);
+    Route::post('land-lease-accruals/{id}/reverse', [LandLeaseAccrualController::class, 'reverse']);
 });
 
 // Projects (tenant_admin, accountant)
@@ -368,6 +382,8 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/settlement-statement', [ReportController::class, 'settlementStatement']);
     Route::get('reports/party-ledger', [ReportController::class, 'partyLedger']);
     Route::get('reports/party-summary', [ReportController::class, 'partySummary']);
+    Route::get('reports/landlord-statement', [ReportController::class, 'landlordStatement'])
+        ->middleware('require_module:land_leases');
     Route::get('reports/role-ageing', [ReportController::class, 'roleAgeing']);
     Route::get('reports/crop-cycle-distribution', [ReportController::class, 'cropCycleDistribution']);
     Route::get('reports/reconciliation/project', [ReportController::class, 'reconciliationProject']);

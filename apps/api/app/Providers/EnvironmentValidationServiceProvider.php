@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Domains\Operations\LandLease\LandLease;
+use App\Domains\Operations\LandLease\LandLeaseAccrual;
+use App\Domains\Operations\LandLease\LandLeasePolicy;
+use App\Policies\LandLeaseAccrualPolicy;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +28,9 @@ class EnvironmentValidationServiceProvider extends ServiceProvider
     {
         $this->validateEnvironment();
         $this->validateDatabaseConnection();
+
+        Gate::policy(LandLease::class, LandLeasePolicy::class);
+        Gate::policy(LandLeaseAccrual::class, LandLeaseAccrualPolicy::class);
     }
 
     /**

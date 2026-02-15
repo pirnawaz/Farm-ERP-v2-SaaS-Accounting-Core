@@ -6,6 +6,9 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import LandParcelsPage from './pages/LandParcelsPage';
 import LandParcelDetailPage from './pages/LandParcelDetailPage';
+import LandLeasesPage from './pages/LandLease/LandLeasesPage';
+import LandLeaseDetailPage from './pages/LandLease/LandLeaseDetailPage';
+import LandlordStatementPage from './pages/LandLease/LandlordStatementPage';
 import CropCyclesPage from './pages/CropCyclesPage';
 import CropCycleDetailPage from './pages/CropCycleDetailPage';
 import PartiesPage from './pages/PartiesPage';
@@ -133,6 +136,8 @@ function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="land" element={<ModuleProtectedRoute requiredModule="land"><LandParcelsPage /></ModuleProtectedRoute>} />
         <Route path="land/:id" element={<ModuleProtectedRoute requiredModule="land"><LandParcelDetailPage /></ModuleProtectedRoute>} />
+        <Route path="land-leases" element={<ModuleProtectedRoute requiredModule="land_leases"><LandLeasesPage /></ModuleProtectedRoute>} />
+        <Route path="land-leases/:id" element={<ModuleProtectedRoute requiredModule="land_leases"><LandLeaseDetailPage /></ModuleProtectedRoute>} />
         <Route path="crop-cycles" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCyclesPage /></ModuleProtectedRoute>} />
         <Route path="crop-cycles/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCycleDetailPage /></ModuleProtectedRoute>} />
         <Route path="parties" element={<PartiesPage />} />
@@ -221,6 +226,7 @@ function App() {
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />
         <Route path="reports/sales-margin" element={<ModuleProtectedRoute requiredModule="reports"><SalesMarginPage /></ModuleProtectedRoute>} />
         <Route path="reports/party-ledger" element={<ModuleProtectedRoute requiredModule="reports"><PartyLedgerPage /></ModuleProtectedRoute>} />
+        <Route path="reports/landlord-statement" element={<ModuleProtectedRoute requiredModule="land_leases"><LandlordStatementPage /></ModuleProtectedRoute>} />
         <Route path="reports/party-summary" element={<ModuleProtectedRoute requiredModule="reports"><PartySummaryPage /></ModuleProtectedRoute>} />
         <Route path="reports/role-ageing" element={<ModuleProtectedRoute requiredModule="reports"><RoleAgeingPage /></ModuleProtectedRoute>} />
         <Route path="reports/reconciliation-dashboard" element={<ModuleProtectedRoute requiredModule="reports"><ReconciliationDashboardPage /></ModuleProtectedRoute>} />
