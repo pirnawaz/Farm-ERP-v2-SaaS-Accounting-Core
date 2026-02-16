@@ -1,9 +1,8 @@
 const TENANT_ID_KEY = 'farm_erp_tenant_id'
 const USER_ROLE_KEY = 'farm_erp_user_role'
 const USER_ID_KEY = 'farm_erp_user_id'
-// In development, use relative URLs to leverage Vite proxy
-// In production, use full URL from env or default
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:8000')
+// Use VITE_API_URL when set; otherwise same-origin '' so Nginx can proxy /api in production
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 function getTenantId(): string | null {
   return localStorage.getItem(TENANT_ID_KEY)

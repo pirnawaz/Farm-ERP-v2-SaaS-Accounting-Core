@@ -58,6 +58,11 @@ class User extends Model implements AuthenticatableContract
         return $this->password ?? '';
     }
 
+    public function getAuthPasswordName(): string
+    {
+        return 'password';
+    }
+
     public function getRememberToken(): ?string
     {
         return null;

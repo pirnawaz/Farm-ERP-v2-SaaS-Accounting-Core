@@ -34,7 +34,7 @@ Create a `.env` file in the `apps/web` directory (or set environment variables):
 VITE_API_URL=http://localhost:8000
 ```
 
-**Note**: The default API URL is `http://localhost:8000` if `VITE_API_URL` is not set.
+**Note**: If `VITE_API_URL` is not set, the app uses same-origin (relative URLs) so Nginx can proxy `/api` in production. Set `VITE_API_URL` for local dev when the API runs on a different port (e.g. 8000).
 
 ### Tenant ID Configuration
 

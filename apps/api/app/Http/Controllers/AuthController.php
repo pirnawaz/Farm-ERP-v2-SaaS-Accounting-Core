@@ -53,8 +53,9 @@ class AuthController extends Controller
             'expires_at' => now()->addDays(7)->timestamp,
         ]));
 
-        // Set httpOnly cookie
-        $cookie = cookie('farm_erp_auth_token', $token, 60 * 24 * 7, '/', null, true, true); // 7 days, httpOnly, secure in production
+        // Set httpOnly cookie; secure only when production or HTTPS (so staging over HTTP works)
+        $secure = config('app.env') === 'production' || str_starts_with(config('app.url'), 'https://');
+        $cookie = cookie('farm_erp_auth_token', $token, 60 * 24 * 7, '/', null, $secure, true); // 7 days, httpOnly=true
 
         return response()->json([
             'user_id' => $user->id,
@@ -70,8 +71,8 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $cookie = cookie()->forget('farm_erp_auth_token');
-        
+        $secure = config('app.env') === 'production' || str_starts_with(config('app.url'), 'https://');
+        $cookie = cookie('farm_erp_auth_token', '', -1, '/', null, $secure, true); // expire, same flags as login
         return response()->json(['message' => 'Logged out successfully'])->cookie($cookie);
     }
 

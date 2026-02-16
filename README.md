@@ -17,6 +17,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - [Quick Start](#quick-start)
 - [Database Setup](#database-setup)
 - [Configuration](#configuration)
+- [Staging / production deployment](#staging--production-deployment)
 - [Running the Application](#running-the-application)
 - [API Overview](#api-overview)
 - [Frontend Modules](#frontend-modules)
@@ -169,17 +170,37 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 
 ### Seed / default tenant
 
-- Seed data in `docs/migrations.sql` includes tenant:  
-  `00000000-0000-0000-0000-000000000001`  
-- The web app uses `X-Tenant-Id` (and/or auth); ensure this tenant exists when testing.
+- **Option A — migrations.sql:** Seed data in `docs/migrations.sql` includes tenant  
+  `00000000-0000-0000-0000-000000000001`.
+- **Option B — Staging seeder (staging/droplet):** From `apps/api` run:
+  ```bash
+  php artisan db:seed --class=StagingSeeder
+  ```
+  This upserts a **Staging** tenant (id `11111111-1111-1111-1111-111111111111`), an admin user with known credentials, then runs `SystemAccountsSeeder` and `ModulesSeeder`. Idempotent (safe to run multiple times).
+  - **Staging login:** Tenant ID `11111111-1111-1111-1111-111111111111`, email `admin@staging.local`, password `StagingAdmin1!` (change in production).
+- The web app uses `X-Tenant-Id` (and/or auth); ensure the chosen tenant exists when testing.
 
 ---
 
 ## Configuration
 
 - **API env:** `apps/api/.env` — app key, DB, Supabase, etc.
+- **Key env vars:**
+  - `APP_ENV` — `local`, `staging`, or `production`; affects auth cookie `secure` flag and validation.
+  - `APP_URL` — Base URL of the API (e.g. `https://api.example.com`). Auth cookie is set `secure=true` only when `APP_ENV=production` or `APP_URL` begins with `https://`, so staging over HTTP works.
+  - `VITE_API_URL` (optional, in `apps/web`) — When set, the frontend uses this as the API base. When unset, the frontend uses same-origin (`''`) so Nginx (or the same host) can proxy `/api` in production.
 - **Web:** `apps/web` reads from API; tenant and auth are applied via shared client / context.
 - **CORS:** Laravel CORS is set for `http://localhost:3000`; adjust in `apps/api/config/cors.php` if needed.
+
+---
+
+## Staging / production deployment
+
+The app is set up for droplet/staging deployment with the following behaviour:
+
+- **Auth cookie:** The login cookie is `secure=true` only when `APP_ENV=production` or `APP_URL` begins with `https://`. Otherwise it is `secure=false` so staging over HTTP works. `httpOnly` stays `true`.
+- **Frontend API base:** When `VITE_API_URL` is not set, the shared API client uses same-origin (`''`), so you can serve the web app and API from the same host and proxy `/api` with Nginx to the Laravel backend. Set `VITE_API_URL` only when the API is on a different origin.
+- **Staging seed:** Run `php artisan db:seed --class=StagingSeeder` from `apps/api` to create/update the Staging tenant and admin user (see [Seed / default tenant](#seed--default-tenant)). Use the documented staging credentials only for staging; change the admin password in production.
 
 ---
 
@@ -273,6 +294,7 @@ Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, 
 | `npm run e2e`               | Start API then run Playwright E2E (uses `E2E_PROFILE` or default) |
 | `npm run e2e:core`          | E2E with profile `core`                   |
 | `npm run e2e:all`           | E2E with profile `all` (e.g. platform admin flows) |
+| `php artisan db:seed --class=StagingSeeder` (from `apps/api`) | Seed/upsert Staging tenant + admin, system accounts, modules |
 
 ---
 
