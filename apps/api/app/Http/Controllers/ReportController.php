@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\TenantContext;
+use App\Domains\Accounting\Reports\FinancialStatementsService;
 use App\Services\SettlementService;
 use App\Services\ReconciliationService;
 use App\Services\SaleARService;
+use App\Services\BillPaymentService;
 use App\Services\PartyAccountService;
 use App\Services\PartyLedgerService;
 use App\Services\PartySummaryService;
@@ -32,7 +34,8 @@ class ReportController extends Controller
     public function __construct(
         private ReconciliationService $reconciliationService,
         private SettlementService $settlementService,
-        private LandlordStatementService $landlordStatementService
+        private LandlordStatementService $landlordStatementService,
+        private FinancialStatementsService $financialStatementsService
     ) {}
 
     /**
@@ -105,6 +108,53 @@ class ReportController extends Controller
             // Return empty array on error instead of 500
             return response()->json([]);
         }
+    }
+
+    /**
+     * GET /api/reports/profit-loss
+     * Profit & Loss (Income Statement) for date range. Read-only from ledger.
+     */
+    public function profitLoss(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+            'compare_from' => 'nullable|date',
+            'compare_to' => 'nullable|date|after_or_equal:compare_from',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $compareFrom = $request->input('compare_from');
+        $compareTo = $request->input('compare_to');
+        if (($compareFrom !== null) !== ($compareTo !== null)) {
+            return response()->json(['errors' => ['compare_from' => ['Both compare_from and compare_to are required for comparison.']]], 422);
+        }
+        $data = $this->financialStatementsService->getProfitLoss($tenantId, $from, $to, $compareFrom, $compareTo);
+        return response()->json($data);
+    }
+
+    /**
+     * GET /api/reports/balance-sheet
+     * Balance Sheet as-of date. Read-only from ledger. Includes equation check.
+     */
+    public function balanceSheet(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'as_of' => 'required|date',
+            'compare_as_of' => 'nullable|date',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $asOf = $request->input('as_of');
+        $compareAsOf = $request->input('compare_as_of');
+        $data = $this->financialStatementsService->getBalanceSheet($tenantId, $asOf, $compareAsOf);
+        return response()->json($data);
     }
     
     /**
@@ -1638,6 +1688,907 @@ class ReportController extends Controller
 
         return response()->json([
             'checks' => $checks,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/ar-control-reconciliation
+     * Auditor-grade AR Control Account Reconciliation: proves open invoice subledger AR == GL AR (as_of),
+     * and explains any delta with unapplied receipts/credits (payments and credit notes post to AR at posting time).
+     */
+    public function arControlReconciliation(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $asOf = $request->input('as_of');
+        $asOfObj = Carbon::parse($asOf);
+
+        // 1) GL AR total: ledger entries for account code AR, posting_date <= as_of
+        $glArRow = DB::selectOne("
+            SELECT COALESCE(SUM(le.debit_amount - le.credit_amount), 0) AS net
+            FROM ledger_entries le
+            JOIN accounts a ON a.id = le.account_id AND a.tenant_id = le.tenant_id
+            JOIN posting_groups pg ON pg.id = le.posting_group_id
+            WHERE pg.tenant_id = :tenant_id
+              AND a.code = 'AR'
+              AND pg.posting_date <= :as_of
+        ", [
+            'tenant_id' => $tenantId,
+            'as_of' => $asOf,
+        ]);
+        $glArTotal = (float) ($glArRow->net ?? 0);
+
+        // 2) Subledger: open invoices only (sale_kind INVOICE or NULL), POSTED, not reversed, posting_date <= as_of
+        //    Allocations reduce invoices only when status ACTIVE and allocation_date <= as_of
+        $subledgerRow = DB::selectOne("
+            SELECT COALESCE(SUM(s.amount - COALESCE(a.allocated, 0)), 0) AS open_total
+            FROM sales s
+            LEFT JOIN (
+                SELECT sale_id, SUM(amount) AS allocated
+                FROM sale_payment_allocations
+                WHERE tenant_id = :tenant_id
+                  AND (status = 'ACTIVE' OR status IS NULL)
+                  AND allocation_date <= :as_of2
+                GROUP BY sale_id
+            ) a ON a.sale_id = s.id
+            WHERE s.tenant_id = :tenant_id2
+              AND (s.sale_kind = 'INVOICE' OR s.sale_kind IS NULL)
+              AND s.status = 'POSTED'
+              AND s.reversal_posting_group_id IS NULL
+              AND s.posting_date <= :as_of3
+              AND (s.amount - COALESCE(a.allocated, 0)) > 0
+        ", [
+            'tenant_id' => $tenantId,
+            'tenant_id2' => $tenantId,
+            'as_of2' => $asOf,
+            'as_of3' => $asOf,
+        ]);
+        $subledgerOpenInvoicesTotal = (float) ($subledgerRow->open_total ?? 0);
+
+        // 3) Unapplied payments (and credit notes): posted payments that hit AR, minus ACTIVE allocations as_of
+        //    Payments IN (CASH/BANK/CREDIT_NOTE) when posted credit AR; include only pg.posting_date <= as_of
+        $unappliedRow = DB::selectOne("
+            SELECT
+                COALESCE(SUM(p.amount), 0) - COALESCE(SUM(alloc.allocated), 0) AS unapplied
+            FROM payments p
+            JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+            LEFT JOIN (
+                SELECT payment_id, SUM(amount) AS allocated
+                FROM sale_payment_allocations
+                WHERE tenant_id = :tenant_id
+                  AND (status = 'ACTIVE' OR status IS NULL)
+                  AND allocation_date <= :as_of_alloc
+                GROUP BY payment_id
+            ) alloc ON alloc.payment_id = p.id
+            WHERE p.tenant_id = :tenant_id2
+              AND p.direction = 'IN'
+              AND p.status = 'POSTED'
+              AND p.reversal_posting_group_id IS NULL
+              AND p.posting_group_id IS NOT NULL
+              AND pg.posting_date <= :as_of_pg
+        ", [
+            'tenant_id' => $tenantId,
+            'tenant_id2' => $tenantId,
+            'as_of_alloc' => $asOf,
+            'as_of_pg' => $asOf,
+        ]);
+        $unappliedPaymentsTotal = (float) ($unappliedRow->unapplied ?? 0);
+
+        $delta = $subledgerOpenInvoicesTotal - $glArTotal;
+        $explainedDelta = $unappliedPaymentsTotal;
+
+        // 4) Open invoices drilldown: limit 200, order by posting_date asc
+        $openInvoices = DB::select("
+            SELECT
+                s.id AS sale_id,
+                s.sale_no AS sale_number,
+                s.buyer_party_id,
+                par.name AS buyer_name,
+                s.posting_date,
+                s.due_date,
+                s.amount AS invoice_total,
+                COALESCE(a.allocated, 0) AS allocated_to_as_of,
+                (s.amount - COALESCE(a.allocated, 0)) AS open_balance_as_of
+            FROM sales s
+            LEFT JOIN parties par ON par.id = s.buyer_party_id AND par.tenant_id = s.tenant_id
+            LEFT JOIN (
+                SELECT sale_id, SUM(amount) AS allocated
+                FROM sale_payment_allocations
+                WHERE tenant_id = :tenant_id
+                  AND (status = 'ACTIVE' OR status IS NULL)
+                  AND allocation_date <= :as_of2
+                GROUP BY sale_id
+            ) a ON a.sale_id = s.id
+            WHERE s.tenant_id = :tenant_id2
+              AND (s.sale_kind = 'INVOICE' OR s.sale_kind IS NULL)
+              AND s.status = 'POSTED'
+              AND s.reversal_posting_group_id IS NULL
+              AND s.posting_date <= :as_of3
+              AND (s.amount - COALESCE(a.allocated, 0)) > 0
+            ORDER BY s.posting_date ASC, s.id ASC
+            LIMIT 200
+        ", [
+            'tenant_id' => $tenantId,
+            'tenant_id2' => $tenantId,
+            'as_of2' => $asOf,
+            'as_of3' => $asOf,
+        ]);
+
+        $openInvoicesList = [];
+        foreach ($openInvoices as $row) {
+            $dueDate = $row->due_date ? Carbon::parse($row->due_date) : Carbon::parse($row->posting_date);
+            $daysOverdue = (int) $dueDate->diffInDays($asOfObj, false);
+            $openInvoicesList[] = [
+                'sale_id' => $row->sale_id,
+                'sale_number' => $row->sale_number,
+                'buyer_party_id' => $row->buyer_party_id,
+                'buyer_name' => $row->buyer_name ?? '',
+                'posting_date' => $row->posting_date,
+                'due_date' => $row->due_date ?? $row->posting_date,
+                'invoice_total' => number_format((float) $row->invoice_total, 2, '.', ''),
+                'allocated_to_as_of' => number_format((float) $row->allocated_to_as_of, 2, '.', ''),
+                'open_balance_as_of' => number_format((float) $row->open_balance_as_of, 2, '.', ''),
+                'days_overdue' => $daysOverdue,
+            ];
+        }
+
+        return response()->json([
+            'as_of' => $asOf,
+            'subledger_open_invoices_total' => round($subledgerOpenInvoicesTotal, 2),
+            'gl_ar_total' => round($glArTotal, 2),
+            'delta' => round($delta, 2),
+            'unapplied_payments_total' => round($unappliedPaymentsTotal, 2),
+            'explained_delta' => round($explainedDelta, 2),
+            'open_invoices' => $openInvoicesList,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/customer-balances
+     * Customer balance report (as-of): per-customer open invoices, unapplied receipts/credits, net balance.
+     * Read-only; invoice-only for open balance; allocation cutoff allocation_date <= as_of; ACTIVE allocations only.
+     */
+    public function customerBalances(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $asOf = $request->input('as_of');
+        $limit = (int) ($request->input('limit', 200));
+        $offset = (int) ($request->input('offset', 0));
+        $search = $request->input('search');
+
+        $params = [
+            'tenant_id' => $tenantId,
+            'as_of' => $asOf,
+            'limit' => $limit + 1,
+            'offset' => $offset,
+        ];
+
+        $searchClause = '';
+        if ($search !== null && $search !== '') {
+            $searchClause = " AND (par.name ILIKE :search OR par.id::text ILIKE :search)";
+            $params['search'] = '%' . $search . '%';
+        }
+
+        $rowsSql = "
+            WITH invoices_agg AS (
+                SELECT s.buyer_party_id,
+                    SUM(s.amount - COALESCE(a.allocated, 0)) AS open_invoices_total
+                FROM sales s
+                LEFT JOIN (
+                    SELECT sale_id, SUM(amount) AS allocated
+                    FROM sale_payment_allocations
+                    WHERE tenant_id = :tenant_id
+                      AND (COALESCE(status, 'ACTIVE') = 'ACTIVE')
+                      AND allocation_date <= :as_of
+                    GROUP BY sale_id
+                ) a ON a.sale_id = s.id
+                WHERE s.tenant_id = :tenant_id
+                  AND (s.sale_kind = 'INVOICE' OR s.sale_kind IS NULL)
+                  AND s.status = 'POSTED'
+                  AND s.reversal_posting_group_id IS NULL
+                  AND s.posting_date <= :as_of
+                  AND (s.amount - COALESCE(a.allocated, 0)) > 0
+                GROUP BY s.buyer_party_id
+            ),
+            payments_agg AS (
+                SELECT p.party_id AS buyer_party_id,
+                    COALESCE(SUM(p.amount), 0) - COALESCE(SUM(alloc.allocated), 0) AS unapplied_total
+                FROM payments p
+                JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+                LEFT JOIN (
+                    SELECT payment_id, SUM(amount) AS allocated
+                    FROM sale_payment_allocations
+                    WHERE tenant_id = :tenant_id
+                      AND (COALESCE(status, 'ACTIVE') = 'ACTIVE')
+                      AND allocation_date <= :as_of
+                    GROUP BY payment_id
+                ) alloc ON alloc.payment_id = p.id
+                WHERE p.tenant_id = :tenant_id
+                  AND p.direction = 'IN'
+                  AND p.status = 'POSTED'
+                  AND p.reversal_posting_group_id IS NULL
+                  AND p.posting_group_id IS NOT NULL
+                  AND pg.posting_date <= :as_of
+                GROUP BY p.party_id
+            ),
+            combined AS (
+                SELECT COALESCE(i.buyer_party_id, pa.buyer_party_id) AS buyer_party_id,
+                    COALESCE(i.open_invoices_total, 0) AS open_invoices_total,
+                    COALESCE(pa.unapplied_total, 0) AS unapplied_total
+                FROM invoices_agg i
+                FULL OUTER JOIN payments_agg pa ON i.buyer_party_id = pa.buyer_party_id
+            )
+            SELECT c.buyer_party_id,
+                par.name AS buyer_name,
+                c.open_invoices_total,
+                c.unapplied_total,
+                (c.open_invoices_total - c.unapplied_total) AS net_balance
+            FROM combined c
+            JOIN parties par ON par.id = c.buyer_party_id AND par.tenant_id = :tenant_id
+            WHERE (c.open_invoices_total != 0 OR c.unapplied_total != 0)
+            {$searchClause}
+            ORDER BY par.name ASC, c.buyer_party_id ASC
+            LIMIT :limit OFFSET :offset
+        ";
+
+        $rows = DB::select($rowsSql, $params);
+
+        $hasMore = false;
+        if (count($rows) > $limit) {
+            $hasMore = true;
+            $rows = array_slice($rows, 0, $limit);
+        }
+
+        $totalsSql = "
+            WITH invoices_agg AS (
+                SELECT s.buyer_party_id, SUM(s.amount - COALESCE(a.allocated, 0)) AS open_invoices_total
+                FROM sales s
+                LEFT JOIN (
+                    SELECT sale_id, SUM(amount) AS allocated FROM sale_payment_allocations
+                    WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                    GROUP BY sale_id
+                ) a ON a.sale_id = s.id
+                WHERE s.tenant_id = :tenant_id AND (s.sale_kind = 'INVOICE' OR s.sale_kind IS NULL)
+                  AND s.status = 'POSTED' AND s.reversal_posting_group_id IS NULL AND s.posting_date <= :as_of
+                  AND (s.amount - COALESCE(a.allocated, 0)) > 0
+                GROUP BY s.buyer_party_id
+            ),
+            payments_agg AS (
+                SELECT p.party_id AS buyer_party_id,
+                    COALESCE(SUM(p.amount), 0) - COALESCE(SUM(alloc.allocated), 0) AS unapplied_total
+                FROM payments p
+                JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+                LEFT JOIN (
+                    SELECT payment_id, SUM(amount) AS allocated FROM sale_payment_allocations
+                    WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                    GROUP BY payment_id
+                ) alloc ON alloc.payment_id = p.id
+                WHERE p.tenant_id = :tenant_id AND p.direction = 'IN' AND p.status = 'POSTED'
+                  AND p.reversal_posting_group_id IS NULL AND p.posting_group_id IS NOT NULL AND pg.posting_date <= :as_of
+                GROUP BY p.party_id
+            ),
+            combined AS (
+                SELECT COALESCE(i.buyer_party_id, pa.buyer_party_id) AS buyer_party_id,
+                    COALESCE(i.open_invoices_total, 0) AS open_invoices_total,
+                    COALESCE(pa.unapplied_total, 0) AS unapplied_total
+                FROM invoices_agg i
+                FULL OUTER JOIN payments_agg pa ON i.buyer_party_id = pa.buyer_party_id
+            )
+            SELECT COALESCE(SUM(open_invoices_total), 0) AS open_invoices_total,
+                   COALESCE(SUM(unapplied_total), 0) AS unapplied_total,
+                   COALESCE(SUM(open_invoices_total - unapplied_total), 0) AS net_balance
+            FROM combined
+            WHERE open_invoices_total != 0 OR unapplied_total != 0
+        ";
+        $totalsRow = DB::selectOne($totalsSql, ['tenant_id' => $tenantId, 'as_of' => $asOf]);
+        $totals = [
+            'open_invoices_total' => round((float) ($totalsRow->open_invoices_total ?? 0), 2),
+            'unapplied_total' => round((float) ($totalsRow->unapplied_total ?? 0), 2),
+            'net_balance' => round((float) ($totalsRow->net_balance ?? 0), 2),
+        ];
+
+        $rowsList = array_map(function ($row) {
+            return [
+                'buyer_party_id' => $row->buyer_party_id,
+                'buyer_name' => $row->buyer_name ?? '',
+                'open_invoices_total' => round((float) $row->open_invoices_total, 2),
+                'unapplied_total' => round((float) $row->unapplied_total, 2),
+                'net_balance' => round((float) $row->net_balance, 2),
+            ];
+        }, $rows);
+
+        return response()->json([
+            'as_of' => $asOf,
+            'rows' => $rowsList,
+            'totals' => $totals,
+            'generated_at' => now()->toIso8601String(),
+            'pagination' => [
+                'limit' => $limit,
+                'offset' => $offset,
+                'has_more' => $hasMore,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/customer-balance-detail
+     * Drilldown for one customer: open_invoices[] and unapplied_instruments[].
+     */
+    public function customerBalanceDetail(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+            'buyer_party_id' => ['required', 'uuid', 'exists:parties,id'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $asOf = $request->input('as_of');
+        $buyerPartyId = $request->input('buyer_party_id');
+        $asOfObj = Carbon::parse($asOf);
+
+        $openInvoices = DB::select("
+            SELECT s.id AS sale_id, s.sale_no AS sale_number, s.buyer_party_id, par.name AS buyer_name,
+                s.posting_date, s.due_date, s.amount AS invoice_total,
+                COALESCE(a.allocated, 0) AS allocated_to_as_of,
+                (s.amount - COALESCE(a.allocated, 0)) AS open_balance_as_of
+            FROM sales s
+            LEFT JOIN parties par ON par.id = s.buyer_party_id AND par.tenant_id = s.tenant_id
+            LEFT JOIN (
+                SELECT sale_id, SUM(amount) AS allocated
+                FROM sale_payment_allocations
+                WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                GROUP BY sale_id
+            ) a ON a.sale_id = s.id
+            WHERE s.tenant_id = :tenant_id AND s.buyer_party_id = :buyer_party_id
+              AND (s.sale_kind = 'INVOICE' OR s.sale_kind IS NULL)
+              AND s.status = 'POSTED' AND s.reversal_posting_group_id IS NULL AND s.posting_date <= :as_of
+              AND (s.amount - COALESCE(a.allocated, 0)) > 0
+            ORDER BY s.posting_date ASC, s.id ASC
+        ", [
+            'tenant_id' => $tenantId,
+            'as_of' => $asOf,
+            'buyer_party_id' => $buyerPartyId,
+        ]);
+
+        $unappliedInstruments = DB::select("
+            SELECT p.id AS payment_id, p.method AS payment_method, pg.posting_date, p.amount,
+                COALESCE(alloc.allocated, 0) AS allocated_to_as_of,
+                (p.amount - COALESCE(alloc.allocated, 0)) AS unapplied_as_of
+            FROM payments p
+            JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+            LEFT JOIN (
+                SELECT payment_id, SUM(amount) AS allocated
+                FROM sale_payment_allocations
+                WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                GROUP BY payment_id
+            ) alloc ON alloc.payment_id = p.id
+            WHERE p.tenant_id = :tenant_id AND p.party_id = :buyer_party_id
+              AND p.direction = 'IN' AND p.status = 'POSTED'
+              AND p.reversal_posting_group_id IS NULL AND p.posting_group_id IS NOT NULL
+              AND pg.posting_date <= :as_of
+              AND (p.amount - COALESCE(alloc.allocated, 0)) > 0
+            ORDER BY pg.posting_date ASC, p.id ASC
+        ", [
+            'tenant_id' => $tenantId,
+            'as_of' => $asOf,
+            'buyer_party_id' => $buyerPartyId,
+        ]);
+
+        $openInvoicesList = array_map(function ($row) use ($asOfObj) {
+            $dueDate = $row->due_date ? Carbon::parse($row->due_date) : Carbon::parse($row->posting_date);
+            $daysOverdue = (int) $dueDate->diffInDays($asOfObj, false);
+            return [
+                'sale_id' => $row->sale_id,
+                'sale_number' => $row->sale_number,
+                'buyer_party_id' => $row->buyer_party_id,
+                'buyer_name' => $row->buyer_name ?? '',
+                'posting_date' => $row->posting_date,
+                'due_date' => $row->due_date ?? $row->posting_date,
+                'invoice_total' => number_format((float) $row->invoice_total, 2, '.', ''),
+                'allocated_to_as_of' => number_format((float) $row->allocated_to_as_of, 2, '.', ''),
+                'open_balance_as_of' => number_format((float) $row->open_balance_as_of, 2, '.', ''),
+                'days_overdue' => $daysOverdue,
+            ];
+        }, $openInvoices);
+
+        $unappliedList = array_map(function ($row) {
+            return [
+                'payment_id' => $row->payment_id,
+                'payment_method' => $row->payment_method,
+                'posting_date' => $row->posting_date,
+                'amount' => number_format((float) $row->amount, 2, '.', ''),
+                'allocated_to_as_of' => number_format((float) $row->allocated_to_as_of, 2, '.', ''),
+                'unapplied_as_of' => number_format((float) $row->unapplied_as_of, 2, '.', ''),
+            ];
+        }, $unappliedInstruments);
+
+        return response()->json([
+            'as_of' => $asOf,
+            'buyer_party_id' => $buyerPartyId,
+            'open_invoices' => $openInvoicesList,
+            'unapplied_instruments' => $unappliedList,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/ap-ageing
+     * Supplier payables ageing (bill-only). GRNs = bills; allocation cutoff allocation_date <= as_of; ACTIVE only.
+     */
+    public function apAgeing(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $asOfDate = $request->input('as_of', Carbon::today()->format('Y-m-d'));
+        $asOfDateObj = Carbon::parse($asOfDate);
+
+        $billPaymentService = app(BillPaymentService::class);
+
+        $suppliers = Party::where('tenant_id', $tenantId)
+            ->whereHas('supplierGrns', function ($q) {
+                $q->where('status', 'POSTED');
+            })
+            ->get();
+
+        $rows = [];
+        $totals = [
+            'total_outstanding' => 0.0,
+            'bucket_0_30' => 0.0,
+            'bucket_31_60' => 0.0,
+            'bucket_61_90' => 0.0,
+            'bucket_90_plus' => 0.0,
+        ];
+
+        foreach ($suppliers as $supplier) {
+            $openBills = $billPaymentService->getSupplierOpenBills($supplier->id, $tenantId, $asOfDate);
+            if (empty($openBills)) {
+                continue;
+            }
+
+            $supplierTotals = [
+                'total_outstanding' => 0.0,
+                'bucket_0_30' => 0.0,
+                'bucket_31_60' => 0.0,
+                'bucket_61_90' => 0.0,
+                'bucket_90_plus' => 0.0,
+            ];
+
+            foreach ($openBills as $bill) {
+                $outstanding = (float) $bill['outstanding'];
+                $dueDate = $bill['due_date'] ?? $bill['posting_date'];
+                $dueDateObj = Carbon::parse($dueDate);
+                $daysOverdue = (int) $asOfDateObj->diffInDays($dueDateObj, false);
+
+                $supplierTotals['total_outstanding'] += $outstanding;
+                if ($daysOverdue <= 30) {
+                    $supplierTotals['bucket_0_30'] += $outstanding;
+                } elseif ($daysOverdue <= 60) {
+                    $supplierTotals['bucket_31_60'] += $outstanding;
+                } elseif ($daysOverdue <= 90) {
+                    $supplierTotals['bucket_61_90'] += $outstanding;
+                } else {
+                    $supplierTotals['bucket_90_plus'] += $outstanding;
+                }
+            }
+
+            if ($supplierTotals['total_outstanding'] > 0) {
+                $rows[] = [
+                    'supplier_party_id' => $supplier->id,
+                    'supplier_name' => $supplier->name,
+                    'total_outstanding' => number_format($supplierTotals['total_outstanding'], 2, '.', ''),
+                    'bucket_0_30' => number_format($supplierTotals['bucket_0_30'], 2, '.', ''),
+                    'bucket_31_60' => number_format($supplierTotals['bucket_31_60'], 2, '.', ''),
+                    'bucket_61_90' => number_format($supplierTotals['bucket_61_90'], 2, '.', ''),
+                    'bucket_90_plus' => number_format($supplierTotals['bucket_90_plus'], 2, '.', ''),
+                ];
+                $totals['total_outstanding'] += $supplierTotals['total_outstanding'];
+                $totals['bucket_0_30'] += $supplierTotals['bucket_0_30'];
+                $totals['bucket_31_60'] += $supplierTotals['bucket_31_60'];
+                $totals['bucket_61_90'] += $supplierTotals['bucket_61_90'];
+                $totals['bucket_90_plus'] += $supplierTotals['bucket_90_plus'];
+            }
+        }
+
+        return response()->json([
+            'as_of' => $asOfDate,
+            'buckets' => ['0-30', '31-60', '61-90', '90+'],
+            'rows' => $rows,
+            'totals' => [
+                'total_outstanding' => number_format($totals['total_outstanding'], 2, '.', ''),
+                'bucket_0_30' => number_format($totals['bucket_0_30'], 2, '.', ''),
+                'bucket_31_60' => number_format($totals['bucket_31_60'], 2, '.', ''),
+                'bucket_61_90' => number_format($totals['bucket_61_90'], 2, '.', ''),
+                'bucket_90_plus' => number_format($totals['bucket_90_plus'], 2, '.', ''),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/ap-control-reconciliation
+     * AP subledger (open bills) vs GL AP control; unapplied supplier payments explain delta.
+     */
+    public function apControlReconciliation(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $asOf = $request->input('as_of');
+
+        $glApRow = DB::selectOne("
+            SELECT COALESCE(SUM(le.credit_amount - le.debit_amount), 0) AS net
+            FROM ledger_entries le
+            JOIN accounts a ON a.id = le.account_id AND a.tenant_id = le.tenant_id
+            JOIN posting_groups pg ON pg.id = le.posting_group_id
+            WHERE pg.tenant_id = :tenant_id AND a.code = 'AP' AND pg.posting_date <= :as_of
+        ", ['tenant_id' => $tenantId, 'as_of' => $asOf]);
+        $glApTotal = (float) ($glApRow->net ?? 0);
+
+        $subledgerRow = DB::selectOne("
+            SELECT COALESCE(SUM(ar.amount - COALESCE(ga.allocated, 0)), 0) AS open_total
+            FROM inv_grns g
+            JOIN allocation_rows ar ON ar.posting_group_id = g.posting_group_id AND ar.tenant_id = g.tenant_id
+                AND ar.allocation_type = 'SUPPLIER_AP'
+            LEFT JOIN (
+                SELECT grn_id, SUM(amount) AS allocated
+                FROM grn_payment_allocations
+                WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of2
+                GROUP BY grn_id
+            ) ga ON ga.grn_id = g.id
+            WHERE g.tenant_id = :tenant_id2 AND g.status = 'POSTED'
+              AND g.posting_date <= :as_of3
+              AND (ar.amount - COALESCE(ga.allocated, 0)) > 0
+        ", [
+            'tenant_id' => $tenantId,
+            'tenant_id2' => $tenantId,
+            'as_of2' => $asOf,
+            'as_of3' => $asOf,
+        ]);
+        $subledgerOpenBillsTotal = (float) ($subledgerRow->open_total ?? 0);
+
+        $unappliedRow = DB::selectOne("
+            SELECT COALESCE(SUM(p.amount), 0) - COALESCE(SUM(alloc.allocated), 0) AS unapplied
+            FROM payments p
+            JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+            LEFT JOIN (
+                SELECT payment_id, SUM(amount) AS allocated
+                FROM grn_payment_allocations
+                WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of_alloc
+                GROUP BY payment_id
+            ) alloc ON alloc.payment_id = p.id
+            WHERE p.tenant_id = :tenant_id2 AND p.direction = 'OUT'
+              AND p.status = 'POSTED' AND (p.reversal_posting_group_id IS NULL AND p.reversed_at IS NULL)
+              AND p.posting_group_id IS NOT NULL AND pg.posting_date <= :as_of_pg
+        ", [
+            'tenant_id' => $tenantId,
+            'tenant_id2' => $tenantId,
+            'as_of_alloc' => $asOf,
+            'as_of_pg' => $asOf,
+        ]);
+        $unappliedSupplierPaymentsTotal = (float) ($unappliedRow->unapplied ?? 0);
+
+        $delta = $subledgerOpenBillsTotal - $glApTotal;
+        $explainedDelta = $unappliedSupplierPaymentsTotal;
+
+        $openBills = DB::select("
+            SELECT g.id AS grn_id, g.doc_no AS bill_number, g.supplier_party_id, par.name AS supplier_name,
+                g.posting_date, g.posting_date AS due_date,
+                ar.amount AS bill_total,
+                COALESCE(ga.allocated, 0) AS allocated_to_as_of,
+                (ar.amount - COALESCE(ga.allocated, 0)) AS open_balance_as_of
+            FROM inv_grns g
+            JOIN allocation_rows ar ON ar.posting_group_id = g.posting_group_id AND ar.tenant_id = g.tenant_id
+                AND ar.allocation_type = 'SUPPLIER_AP'
+            LEFT JOIN parties par ON par.id = g.supplier_party_id AND par.tenant_id = g.tenant_id
+            LEFT JOIN (
+                SELECT grn_id, SUM(amount) AS allocated
+                FROM grn_payment_allocations
+                WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of2
+                GROUP BY grn_id
+            ) ga ON ga.grn_id = g.id
+            WHERE g.tenant_id = :tenant_id2 AND g.status = 'POSTED' AND g.posting_date <= :as_of3
+              AND (ar.amount - COALESCE(ga.allocated, 0)) > 0
+            ORDER BY g.posting_date ASC, g.id ASC
+            LIMIT 200
+        ", [
+            'tenant_id' => $tenantId,
+            'tenant_id2' => $tenantId,
+            'as_of2' => $asOf,
+            'as_of3' => $asOf,
+        ]);
+
+        $openBillsList = array_map(function ($row) {
+            return [
+                'grn_id' => $row->grn_id,
+                'bill_number' => $row->bill_number,
+                'supplier_party_id' => $row->supplier_party_id,
+                'supplier_name' => $row->supplier_name ?? '',
+                'posting_date' => $row->posting_date,
+                'due_date' => $row->due_date,
+                'bill_total' => number_format((float) $row->bill_total, 2, '.', ''),
+                'allocated_to_as_of' => number_format((float) $row->allocated_to_as_of, 2, '.', ''),
+                'open_balance_as_of' => number_format((float) $row->open_balance_as_of, 2, '.', ''),
+            ];
+        }, $openBills);
+
+        return response()->json([
+            'as_of' => $asOf,
+            'subledger_open_bills_total' => round($subledgerOpenBillsTotal, 2),
+            'gl_ap_total' => round($glApTotal, 2),
+            'delta' => round($delta, 2),
+            'unapplied_supplier_payments_total' => round($unappliedSupplierPaymentsTotal, 2),
+            'explained_delta' => round($explainedDelta, 2),
+            'open_bills' => $openBillsList,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/supplier-balances
+     * Per-supplier open bills, unapplied payments, net_balance = open_bills - unapplied (positive = we owe supplier).
+     */
+    public function supplierBalances(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $asOf = $request->input('as_of');
+        $limit = (int) ($request->input('limit', 200));
+        $offset = (int) ($request->input('offset', 0));
+        $search = $request->input('search');
+        $params = [
+            'tenant_id' => $tenantId,
+            'as_of' => $asOf,
+            'limit' => $limit + 1,
+            'offset' => $offset,
+        ];
+        $searchClause = '';
+        if ($search !== null && $search !== '') {
+            $searchClause = " AND (par.name ILIKE :search OR par.id::text ILIKE :search)";
+            $params['search'] = '%' . $search . '%';
+        }
+
+        $rowsSql = "
+            WITH bills_agg AS (
+                SELECT g.supplier_party_id,
+                    SUM(ar.amount - COALESCE(ga.allocated, 0)) AS open_bills_total
+                FROM inv_grns g
+                JOIN allocation_rows ar ON ar.posting_group_id = g.posting_group_id AND ar.tenant_id = g.tenant_id
+                    AND ar.allocation_type = 'SUPPLIER_AP'
+                LEFT JOIN (
+                    SELECT grn_id, SUM(amount) AS allocated
+                    FROM grn_payment_allocations
+                    WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                    GROUP BY grn_id
+                ) ga ON ga.grn_id = g.id
+                WHERE g.tenant_id = :tenant_id AND g.status = 'POSTED' AND g.posting_date <= :as_of
+                  AND (ar.amount - COALESCE(ga.allocated, 0)) > 0
+                GROUP BY g.supplier_party_id
+            ),
+            payments_agg AS (
+                SELECT p.party_id AS supplier_party_id,
+                    COALESCE(SUM(p.amount), 0) - COALESCE(SUM(alloc.allocated), 0) AS unapplied_total
+                FROM payments p
+                JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+                LEFT JOIN (
+                    SELECT payment_id, SUM(amount) AS allocated
+                    FROM grn_payment_allocations
+                    WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                    GROUP BY payment_id
+                ) alloc ON alloc.payment_id = p.id
+                WHERE p.tenant_id = :tenant_id AND p.direction = 'OUT'
+                  AND p.status = 'POSTED' AND p.reversal_posting_group_id IS NULL AND p.reversed_at IS NULL
+                  AND p.posting_group_id IS NOT NULL AND pg.posting_date <= :as_of
+                GROUP BY p.party_id
+            ),
+            combined AS (
+                SELECT COALESCE(b.supplier_party_id, pa.supplier_party_id) AS supplier_party_id,
+                    COALESCE(b.open_bills_total, 0) AS open_bills_total,
+                    COALESCE(pa.unapplied_total, 0) AS unapplied_total
+                FROM bills_agg b
+                FULL OUTER JOIN payments_agg pa ON b.supplier_party_id = pa.supplier_party_id
+            )
+            SELECT c.supplier_party_id, par.name AS supplier_name,
+                c.open_bills_total, c.unapplied_total,
+                (c.open_bills_total - c.unapplied_total) AS net_balance
+            FROM combined c
+            JOIN parties par ON par.id = c.supplier_party_id AND par.tenant_id = :tenant_id
+            WHERE (c.open_bills_total != 0 OR c.unapplied_total != 0)
+            {$searchClause}
+            ORDER BY par.name ASC, c.supplier_party_id ASC
+            LIMIT :limit OFFSET :offset
+        ";
+        $rows = DB::select($rowsSql, $params);
+        $hasMore = false;
+        if (count($rows) > $limit) {
+            $hasMore = true;
+            $rows = array_slice($rows, 0, $limit);
+        }
+        $totalsSql = "
+            WITH bills_agg AS (
+                SELECT g.supplier_party_id, SUM(ar.amount - COALESCE(ga.allocated, 0)) AS open_bills_total
+                FROM inv_grns g
+                JOIN allocation_rows ar ON ar.posting_group_id = g.posting_group_id AND ar.tenant_id = g.tenant_id
+                    AND ar.allocation_type = 'SUPPLIER_AP'
+                LEFT JOIN (SELECT grn_id, SUM(amount) AS allocated FROM grn_payment_allocations
+                    WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                    GROUP BY grn_id) ga ON ga.grn_id = g.id
+                WHERE g.tenant_id = :tenant_id AND g.status = 'POSTED' AND g.posting_date <= :as_of
+                  AND (ar.amount - COALESCE(ga.allocated, 0)) > 0
+                GROUP BY g.supplier_party_id
+            ),
+            payments_agg AS (
+                SELECT p.party_id AS supplier_party_id,
+                    COALESCE(SUM(p.amount), 0) - COALESCE(SUM(alloc.allocated), 0) AS unapplied_total
+                FROM payments p
+                JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+                LEFT JOIN (SELECT payment_id, SUM(amount) AS allocated FROM grn_payment_allocations
+                    WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                    GROUP BY payment_id) alloc ON alloc.payment_id = p.id
+                WHERE p.tenant_id = :tenant_id AND p.direction = 'OUT' AND p.status = 'POSTED'
+                  AND p.reversal_posting_group_id IS NULL AND p.reversed_at IS NULL
+                  AND p.posting_group_id IS NOT NULL AND pg.posting_date <= :as_of
+                GROUP BY p.party_id
+            ),
+            combined AS (
+                SELECT COALESCE(b.supplier_party_id, pa.supplier_party_id) AS supplier_party_id,
+                    COALESCE(b.open_bills_total, 0) AS open_bills_total,
+                    COALESCE(pa.unapplied_total, 0) AS unapplied_total
+                FROM bills_agg b FULL OUTER JOIN payments_agg pa ON b.supplier_party_id = pa.supplier_party_id
+            )
+            SELECT COALESCE(SUM(open_bills_total), 0) AS open_bills_total,
+                   COALESCE(SUM(unapplied_total), 0) AS unapplied_total,
+                   COALESCE(SUM(open_bills_total - unapplied_total), 0) AS net_balance
+            FROM combined WHERE open_bills_total != 0 OR unapplied_total != 0
+        ";
+        $totalsRow = DB::selectOne($totalsSql, ['tenant_id' => $tenantId, 'as_of' => $asOf]);
+        $totals = [
+            'open_bills_total' => round((float) ($totalsRow->open_bills_total ?? 0), 2),
+            'unapplied_total' => round((float) ($totalsRow->unapplied_total ?? 0), 2),
+            'net_balance' => round((float) ($totalsRow->net_balance ?? 0), 2),
+        ];
+        $rowsList = array_map(function ($row) {
+            return [
+                'supplier_party_id' => $row->supplier_party_id,
+                'supplier_name' => $row->supplier_name ?? '',
+                'open_bills_total' => round((float) $row->open_bills_total, 2),
+                'unapplied_total' => round((float) $row->unapplied_total, 2),
+                'net_balance' => round((float) $row->net_balance, 2),
+            ];
+        }, $rows);
+        return response()->json([
+            'as_of' => $asOf,
+            'rows' => $rowsList,
+            'totals' => $totals,
+            'generated_at' => now()->toIso8601String(),
+            'pagination' => ['limit' => $limit, 'offset' => $offset, 'has_more' => $hasMore],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/supplier-balance-detail
+     * Drilldown: open_bills[], unapplied_instruments[] for one supplier.
+     */
+    public function supplierBalanceDetail(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+            'supplier_party_id' => ['required', 'uuid', 'exists:parties,id'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $asOf = $request->input('as_of');
+        $supplierPartyId = $request->input('supplier_party_id');
+
+        $openBills = DB::select("
+            SELECT g.id AS grn_id, g.doc_no AS bill_number, g.supplier_party_id, par.name AS supplier_name,
+                g.posting_date, g.posting_date AS due_date,
+                ar.amount AS bill_total,
+                COALESCE(ga.allocated, 0) AS allocated_to_as_of,
+                (ar.amount - COALESCE(ga.allocated, 0)) AS open_balance_as_of
+            FROM inv_grns g
+            JOIN allocation_rows ar ON ar.posting_group_id = g.posting_group_id AND ar.tenant_id = g.tenant_id
+                AND ar.allocation_type = 'SUPPLIER_AP'
+            LEFT JOIN parties par ON par.id = g.supplier_party_id AND par.tenant_id = g.tenant_id
+            LEFT JOIN (
+                SELECT grn_id, SUM(amount) AS allocated
+                FROM grn_payment_allocations
+                WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                GROUP BY grn_id
+            ) ga ON ga.grn_id = g.id
+            WHERE g.tenant_id = :tenant_id AND g.supplier_party_id = :supplier_party_id
+              AND g.status = 'POSTED' AND g.posting_date <= :as_of
+              AND (ar.amount - COALESCE(ga.allocated, 0)) > 0
+            ORDER BY g.posting_date ASC, g.id ASC
+        ", ['tenant_id' => $tenantId, 'as_of' => $asOf, 'supplier_party_id' => $supplierPartyId]);
+
+        $unappliedInstruments = DB::select("
+            SELECT p.id AS payment_id, p.method AS payment_method, pg.posting_date, p.amount,
+                COALESCE(alloc.allocated, 0) AS allocated_to_as_of,
+                (p.amount - COALESCE(alloc.allocated, 0)) AS unapplied_as_of
+            FROM payments p
+            JOIN posting_groups pg ON pg.id = p.posting_group_id AND pg.tenant_id = p.tenant_id
+            LEFT JOIN (
+                SELECT payment_id, SUM(amount) AS allocated
+                FROM grn_payment_allocations
+                WHERE tenant_id = :tenant_id AND (COALESCE(status, 'ACTIVE') = 'ACTIVE') AND allocation_date <= :as_of
+                GROUP BY payment_id
+            ) alloc ON alloc.payment_id = p.id
+            WHERE p.tenant_id = :tenant_id AND p.party_id = :supplier_party_id
+              AND p.direction = 'OUT' AND p.status = 'POSTED'
+              AND p.reversal_posting_group_id IS NULL AND p.reversed_at IS NULL
+              AND p.posting_group_id IS NOT NULL AND pg.posting_date <= :as_of
+              AND (p.amount - COALESCE(alloc.allocated, 0)) > 0
+            ORDER BY pg.posting_date ASC, p.id ASC
+        ", ['tenant_id' => $tenantId, 'as_of' => $asOf, 'supplier_party_id' => $supplierPartyId]);
+
+        $openBillsList = array_map(function ($row) {
+            return [
+                'grn_id' => $row->grn_id,
+                'bill_number' => $row->bill_number,
+                'supplier_party_id' => $row->supplier_party_id,
+                'supplier_name' => $row->supplier_name ?? '',
+                'posting_date' => $row->posting_date,
+                'due_date' => $row->due_date,
+                'bill_total' => number_format((float) $row->bill_total, 2, '.', ''),
+                'allocated_to_as_of' => number_format((float) $row->allocated_to_as_of, 2, '.', ''),
+                'open_balance_as_of' => number_format((float) $row->open_balance_as_of, 2, '.', ''),
+            ];
+        }, $openBills);
+        $unappliedList = array_map(function ($row) {
+            return [
+                'payment_id' => $row->payment_id,
+                'payment_method' => $row->payment_method,
+                'posting_date' => $row->posting_date,
+                'amount' => number_format((float) $row->amount, 2, '.', ''),
+                'allocated_to_as_of' => number_format((float) $row->allocated_to_as_of, 2, '.', ''),
+                'unapplied_as_of' => number_format((float) $row->unapplied_as_of, 2, '.', ''),
+            ];
+        }, $unappliedInstruments);
+
+        return response()->json([
+            'as_of' => $asOf,
+            'supplier_party_id' => $supplierPartyId,
+            'open_bills' => $openBillsList,
+            'unapplied_instruments' => $unappliedList,
             'generated_at' => now()->toIso8601String(),
         ]);
     }

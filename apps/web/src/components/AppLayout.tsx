@@ -86,6 +86,8 @@ const navigationGroups: NavigationGroup[] = [
     name: 'Reports',
     items: [
       { name: 'Trial Balance', href: '/app/reports/trial-balance', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Profit & Loss', href: '/app/reports/profit-loss', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Balance Sheet', href: '/app/reports/balance-sheet', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'General Ledger', href: '/app/reports/general-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Project P&L', href: '/app/reports/project-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Crop Cycle P&L', href: '/app/reports/crop-cycle-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
@@ -98,6 +100,9 @@ const navigationGroups: NavigationGroup[] = [
       { name: 'Role Summary', href: '/app/reports/party-summary', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Role Ageing', href: '/app/reports/role-ageing', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Reconciliation Dashboard', href: '/app/reports/reconciliation-dashboard', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Bank Reconciliation', href: '/app/reports/bank-reconciliation', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
+      { name: 'General Journal', href: '/app/accounting/journals', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
+      { name: 'Accounting periods', href: '/app/accounting/periods', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
     ],
   },
   {

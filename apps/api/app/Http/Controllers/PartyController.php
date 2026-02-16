@@ -197,10 +197,11 @@ class PartyController extends Controller
 
         return response()->json([
             'party' => $party,
-            'allocated_payable_total' => $balanceSummary['allocated_total'],
+            'allocated_payable_total' => $balanceSummary['open_bills_total'] ?? $balanceSummary['allocated_total'] ?? '0.00',
             'paid_total' => $balanceSummary['paid_total'],
             'outstanding_total' => $balanceSummary['outstanding_total'],
-            'supplier_payable_outstanding' => number_format($supplierPayableFromGrn, 2, '.', ''),
+            'unapplied_supplier_payments_total' => $balanceSummary['unapplied_supplier_payments_total'] ?? '0.00',
+            'supplier_payable_outstanding' => $balanceSummary['outstanding_total'],
             'advance_balance_disbursed' => number_format($advanceBalanceDisbursed, 2, '.', ''),
             'advance_balance_repaid' => number_format($advanceBalanceRepaid, 2, '.', ''),
             'advance_balance_outstanding' => number_format($advanceBalanceOutstanding, 2, '.', ''),

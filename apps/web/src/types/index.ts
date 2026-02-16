@@ -1313,6 +1313,9 @@ export interface SaleInventoryAllocation {
   costing_method: string;
 }
 
+/** Document kind: INVOICE = normal sale (DR AR, CR Revenue); CREDIT_NOTE = credit (DR Revenue, CR AR) */
+export type SaleKind = 'INVOICE' | 'CREDIT_NOTE';
+
 export interface Sale {
   id: string;
   tenant_id: string;
@@ -1325,10 +1328,12 @@ export interface Sale {
   sale_date?: string;
   due_date?: string;
   status: SaleStatus;
+  sale_kind?: SaleKind | null;
   posting_group_id?: string;
   posted_at?: string;
   reversed_at?: string;
   reversal_posting_group_id?: string;
+  credit_note_payment_id?: string | null;
   notes?: string;
   idempotency_key?: string;
   created_at: string;
@@ -1350,6 +1355,7 @@ export interface CreateSalePayload {
   sale_date?: string;
   due_date?: string;
   notes?: string;
+  sale_kind?: SaleKind;
   sale_lines?: SaleLine[];
 }
 
@@ -1518,6 +1524,69 @@ export interface GeneralLedgerResponse {
     total: number;
     last_page: number;
   };
+}
+
+// Financial statements (Profit & Loss, Balance Sheet)
+export interface ProfitLossLine {
+  account_id: string | null;
+  code: string | null;
+  name: string;
+  amount: number;
+  compare_amount?: number;
+  delta?: number;
+}
+
+export interface ProfitLossSection {
+  key: string;
+  label: string;
+  lines: ProfitLossLine[];
+  total: number;
+}
+
+export interface ProfitLossCompare {
+  from: string;
+  to: string;
+  net_profit: number;
+  delta: number;
+}
+
+export interface ProfitLossResponse {
+  from: string;
+  to: string;
+  sections: ProfitLossSection[];
+  net_profit: number;
+  compare?: ProfitLossCompare;
+}
+
+export interface BalanceSheetLine {
+  account_id: string | null;
+  code: string | null;
+  name: string;
+  amount: number;
+}
+
+export interface BalanceSheetSection {
+  lines: BalanceSheetLine[];
+  total: number;
+}
+
+export interface BalanceSheetCompare {
+  as_of: string;
+  assets: BalanceSheetSection;
+  liabilities: BalanceSheetSection;
+  equity: BalanceSheetSection;
+  total_assets: number;
+  total_liabilities: number;
+  total_equity: number;
+}
+
+export interface BalanceSheetResponse {
+  as_of: string;
+  assets: BalanceSheetSection;
+  liabilities: BalanceSheetSection;
+  equity: BalanceSheetSection;
+  checks: { equation_diff: number };
+  compare?: BalanceSheetCompare;
 }
 
 export interface PartyLedgerRow {
@@ -1998,4 +2067,202 @@ export interface PostInvAdjustmentRequest {
 export interface ReverseInvAdjustmentRequest {
   posting_date: string;
   reason: string;
+}
+
+// Bank Reconciliation
+export type BankReconciliationAccountCode = 'BANK' | 'CASH';
+export type BankReconciliationStatus = 'DRAFT' | 'FINALIZED' | 'VOID';
+
+export interface BankReconciliationListItem {
+  id: string;
+  account_id: string;
+  account?: { id: string; code: string; name: string };
+  account_code?: string;
+  statement_date: string;
+  statement_balance: number | string;
+  status: BankReconciliationStatus;
+  notes?: string | null;
+  finalized_at?: string | null;
+  created_at: string;
+}
+
+export interface BankReconciliationLedgerEntryItem {
+  ledger_entry_id: string;
+  posting_date: string;
+  description?: string;
+  debit_amount: number;
+  credit_amount: number;
+  posting_group_id: string;
+  cleared_date?: string;
+}
+
+export interface BankReconciliationStatementSummary {
+  lines_total: number;
+  matched_lines_total: number;
+  unmatched_lines_total: number;
+  matched_ledger_total: number;
+  difference_vs_matched_ledger: number;
+}
+
+export interface BankReconciliationStatementLineItem {
+  id: string;
+  line_date: string;
+  amount: number;
+  description?: string | null;
+  reference?: string | null;
+  is_matched: boolean;
+  matched_ledger_entry_id?: string | null;
+  matched_posting_date?: string | null;
+  matched_amount?: number | null;
+}
+
+export interface BankReconciliationReport {
+  id: string;
+  account_id: string;
+  account_code: string;
+  account_name: string;
+  statement_date: string;
+  statement_balance: number;
+  book_balance: number;
+  cleared_balance: number;
+  uncleared_net: number;
+  difference: number;
+  status: BankReconciliationStatus;
+  notes?: string | null;
+  finalized_at?: string | null;
+  cleared_counts: { cleared: number; uncleared: number };
+  uncleared_debits: BankReconciliationLedgerEntryItem[];
+  uncleared_credits: BankReconciliationLedgerEntryItem[];
+  cleared_entries?: BankReconciliationLedgerEntryItem[];
+  statement?: BankReconciliationStatementSummary;
+  statement_lines?: BankReconciliationStatementLineItem[];
+  generated_at: string;
+}
+
+export interface CreateBankReconciliationPayload {
+  account_code: BankReconciliationAccountCode;
+  statement_date: string;
+  statement_balance: number | string;
+  notes?: string | null;
+}
+
+export interface ClearBankEntriesPayload {
+  ledger_entry_ids: string[];
+  cleared_date?: string | null;
+}
+
+export interface UnclearBankEntriesPayload {
+  ledger_entry_ids: string[];
+  reason?: string | null;
+}
+
+export interface AddStatementLinePayload {
+  line_date: string;
+  amount: number | string;
+  description?: string | null;
+  reference?: string | null;
+}
+
+// General Journal
+export type JournalEntryStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+
+export interface JournalEntryLinePayload {
+  account_id: string;
+  description?: string | null;
+  debit_amount: number | string;
+  credit_amount: number | string;
+}
+
+export interface JournalEntryLine {
+  id: string;
+  tenant_id: string;
+  journal_entry_id: string;
+  account_id: string;
+  description?: string | null;
+  debit_amount: string | number;
+  credit_amount: string | number;
+  account?: { id: string; code: string; name: string; type?: string };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  tenant_id: string;
+  journal_number: string;
+  entry_date: string;
+  memo?: string | null;
+  status: JournalEntryStatus;
+  posting_group_id?: string | null;
+  posted_by?: string | null;
+  posted_at?: string | null;
+  reversed_at?: string | null;
+  reversal_posting_group_id?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  lines?: JournalEntryLine[];
+  posting_group?: { id: string; posting_date: string; source_type: string; source_id: string };
+  reversal_posting_group?: { id: string; posting_date: string; source_type: string; source_id: string };
+  total_debits?: number | string;
+  total_credits?: number | string;
+}
+
+export interface StoreJournalPayload {
+  entry_date: string;
+  memo?: string | null;
+  lines?: JournalEntryLinePayload[];
+}
+
+export interface UpdateJournalPayload {
+  entry_date?: string;
+  memo?: string | null;
+  lines: JournalEntryLinePayload[];
+}
+
+export interface ReverseJournalPayload {
+  reversal_date?: string | null;
+  memo?: string | null;
+}
+
+// Accounting periods
+export type AccountingPeriodStatus = 'OPEN' | 'CLOSED';
+
+export interface AccountingPeriod {
+  id: string;
+  tenant_id: string;
+  period_start: string;
+  period_end: string;
+  name: string;
+  status: AccountingPeriodStatus;
+  closed_by?: string | null;
+  closed_at?: string | null;
+  reopened_by?: string | null;
+  reopened_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountingPeriodEvent {
+  id: string;
+  accounting_period_id: string;
+  event_type: 'CREATED' | 'CLOSED' | 'REOPENED';
+  notes?: string | null;
+  actor_id?: string | null;
+  created_at: string;
+}
+
+export interface StoreAccountingPeriodPayload {
+  period_start: string;
+  period_end: string;
+  name?: string | null;
+}
+
+export interface CloseAccountingPeriodPayload {
+  notes?: string | null;
+}
+
+export interface ReopenAccountingPeriodPayload {
+  notes?: string | null;
 }

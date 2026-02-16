@@ -29,6 +29,7 @@ class UpdateSaleRequest extends FormRequest
             'sale_lines.*.quantity' => ['required_with:sale_lines', 'numeric', 'min:0.001'],
             'sale_lines.*.uom' => ['nullable', 'string', 'max:255'],
             'sale_lines.*.unit_price' => ['required_with:sale_lines', 'numeric', 'min:0.01'],
+            'sale_kind' => ['nullable', 'string', 'in:INVOICE,CREDIT_NOTE'],
         ];
     }
 }

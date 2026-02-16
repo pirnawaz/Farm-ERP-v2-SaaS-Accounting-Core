@@ -49,4 +49,9 @@ class Party extends Model
     {
         return $this->hasMany(Sale::class, 'buyer_party_id');
     }
+
+    public function supplierGrns(): HasMany
+    {
+        return $this->hasMany(InvGrn::class, 'supplier_party_id');
+    }
 }

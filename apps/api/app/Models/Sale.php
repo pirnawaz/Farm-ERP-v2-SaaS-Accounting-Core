@@ -14,6 +14,9 @@ class Sale extends Model
     public $timestamps = true;
     const UPDATED_AT = null; // Table doesn't have updated_at column
 
+    public const SALE_KIND_INVOICE = 'INVOICE';
+    public const SALE_KIND_CREDIT_NOTE = 'CREDIT_NOTE';
+
     protected $fillable = [
         'tenant_id',
         'buyer_party_id',
@@ -25,10 +28,12 @@ class Sale extends Model
         'sale_date',
         'due_date',
         'status',
+        'sale_kind',
         'posting_group_id',
         'posted_at',
         'reversed_at',
         'reversal_posting_group_id',
+        'credit_note_payment_id',
         'notes',
         'idempotency_key',
     ];
@@ -86,6 +91,11 @@ class Sale extends Model
     public function reversalPostingGroup(): BelongsTo
     {
         return $this->belongsTo(PostingGroup::class, 'reversal_posting_group_id');
+    }
+
+    public function creditNotePayment(): BelongsTo
+    {
+        return $this->belongsTo(Payment::class, 'credit_note_payment_id');
     }
 
     /**
@@ -158,5 +168,21 @@ class Sale extends Model
     public function canBeDeleted(): bool
     {
         return $this->status === 'DRAFT';
+    }
+
+    /**
+     * Check if sale is a credit note (document kind).
+     */
+    public function isCreditNote(): bool
+    {
+        return $this->sale_kind === self::SALE_KIND_CREDIT_NOTE;
+    }
+
+    /**
+     * Check if sale is an invoice (document kind).
+     */
+    public function isInvoice(): bool
+    {
+        return $this->sale_kind === self::SALE_KIND_INVOICE || $this->sale_kind === null;
     }
 }

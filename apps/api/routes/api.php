@@ -51,6 +51,10 @@ use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
 use App\Http\Controllers\Machinery\MachineryReportsController;
 use App\Http\Controllers\Machinery\MachineryServiceController;
 use App\Http\Controllers\ReconciliationController;
+use App\Http\Controllers\BankReconciliationController;
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountingPeriodController;
+use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\SettlementPackController;
 use App\Domains\Operations\LandLease\LandLeaseController;
 use App\Http\Controllers\LandLeaseAccrualController;
@@ -185,6 +189,9 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:trea
     Route::get('payments/{id}/apply-sales/preview', [PaymentController::class, 'applySalesPreview']);
     Route::post('payments/{id}/apply-sales', [PaymentController::class, 'applySales']);
     Route::post('payments/{id}/unapply-sales', [PaymentController::class, 'unapplySales']);
+    Route::get('payments/{id}/apply-bills/preview', [PaymentController::class, 'applyBillsPreview']);
+    Route::post('payments/{id}/apply-bills', [PaymentController::class, 'applyBills']);
+    Route::post('payments/{id}/unapply-bills', [PaymentController::class, 'unapplyBills']);
     Route::post('payments/{id}/post', [PaymentController::class, 'post'])
         ->middleware('role:tenant_admin,accountant');
     Route::post('payments/{id}/reverse', [PaymentController::class, 'reverse'])
@@ -204,6 +211,8 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:ar_s
     Route::post('sales/{id}/post', [SaleController::class, 'post'])
         ->middleware('role:tenant_admin,accountant');
     Route::post('sales/{id}/reverse', [SaleController::class, 'reverse'])
+        ->middleware('role:tenant_admin,accountant');
+    Route::post('sales/{id}/apply-to-invoices', [SaleController::class, 'applyToInvoices'])
         ->middleware('role:tenant_admin,accountant');
 });
 
@@ -375,6 +384,8 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
 // Reports (tenant_admin, accountant, operator) — requires reports module
 Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:reports'])->group(function () {
     Route::get('reports/trial-balance', [ReportController::class, 'trialBalance']);
+    Route::get('reports/profit-loss', [ReportController::class, 'profitLoss']);
+    Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet']);
     Route::get('reports/general-ledger', [ReportController::class, 'generalLedger']);
     Route::get('reports/project-statement', [ReportController::class, 'projectStatement']);
     Route::get('reports/project-pl', [ReportController::class, 'projectPL']);
@@ -396,12 +407,59 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/reconciliation/project', [ReportController::class, 'reconciliationProject']);
     Route::get('reports/reconciliation/crop-cycle', [ReportController::class, 'reconciliationCropCycle']);
     Route::get('reports/reconciliation/supplier-ap', [ReportController::class, 'reconciliationSupplierAp']);
+    Route::get('reports/ar-control-reconciliation', [ReportController::class, 'arControlReconciliation']);
+    Route::get('reports/customer-balances', [ReportController::class, 'customerBalances']);
+    Route::get('reports/customer-balance-detail', [ReportController::class, 'customerBalanceDetail']);
+    Route::get('reports/ap-ageing', [ReportController::class, 'apAgeing']);
+    Route::get('reports/ap-control-reconciliation', [ReportController::class, 'apControlReconciliation']);
+    Route::get('reports/supplier-balances', [ReportController::class, 'supplierBalances']);
+    Route::get('reports/supplier-balance-detail', [ReportController::class, 'supplierBalanceDetail']);
 });
 
 // Reconciliation (tenant_admin, accountant) — read-only audit/debugging endpoints
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::get('reconciliation/project/{id}', [ReconciliationController::class, 'projectReconciliation']);
     Route::get('reconciliation/supplier/{party_id}', [ReconciliationController::class, 'supplierAPReconciliation']);
+});
+
+// Bank reconciliation (tenant_admin, accountant) — metadata only, no ledger mutation
+Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::post('bank-reconciliations', [BankReconciliationController::class, 'store']);
+    Route::get('bank-reconciliations', [BankReconciliationController::class, 'index']);
+    Route::get('bank-reconciliations/{id}', [BankReconciliationController::class, 'show']);
+    Route::post('bank-reconciliations/{id}/clear', [BankReconciliationController::class, 'clear']);
+    Route::post('bank-reconciliations/{id}/unclear', [BankReconciliationController::class, 'unclear']);
+    Route::post('bank-reconciliations/{id}/finalize', [BankReconciliationController::class, 'finalize']);
+    // Statement lines (manual entry)
+    Route::post('bank-reconciliations/{id}/statement-lines', [BankReconciliationController::class, 'addStatementLine']);
+    Route::get('bank-reconciliations/{id}/statement-lines', [BankReconciliationController::class, 'listStatementLines']);
+    Route::post('bank-reconciliations/{id}/statement-lines/{lineId}/void', [BankReconciliationController::class, 'voidStatementLine']);
+    Route::post('bank-reconciliations/{id}/statement-lines/{lineId}/match', [BankReconciliationController::class, 'matchStatementLine']);
+    Route::post('bank-reconciliations/{id}/statement-lines/{lineId}/unmatch', [BankReconciliationController::class, 'unmatchStatementLine']);
+});
+
+// Accounts list (for pickers; tenant_admin, accountant)
+Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::get('accounts', [AccountController::class, 'index']);
+});
+
+// Accounting periods (tenant_admin, accountant) — period locking
+Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::get('accounting-periods', [AccountingPeriodController::class, 'index']);
+    Route::post('accounting-periods', [AccountingPeriodController::class, 'store']);
+    Route::post('accounting-periods/{id}/close', [AccountingPeriodController::class, 'close']);
+    Route::post('accounting-periods/{id}/reopen', [AccountingPeriodController::class, 'reopen']);
+    Route::get('accounting-periods/{id}/events', [AccountingPeriodController::class, 'events']);
+});
+
+// General Journal (tenant_admin, accountant) — manual GL entries
+Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::post('journals', [JournalEntryController::class, 'store']);
+    Route::get('journals', [JournalEntryController::class, 'index']);
+    Route::get('journals/{id}', [JournalEntryController::class, 'show']);
+    Route::put('journals/{id}', [JournalEntryController::class, 'update']);
+    Route::post('journals/{id}/post', [JournalEntryController::class, 'post']);
+    Route::post('journals/{id}/reverse', [JournalEntryController::class, 'reverse']);
 });
 
 // Settings (all authenticated users can view, tenant_admin can update)

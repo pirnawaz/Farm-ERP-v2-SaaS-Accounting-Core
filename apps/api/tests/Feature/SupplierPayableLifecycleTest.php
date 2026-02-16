@@ -188,12 +188,30 @@ class SupplierPayableLifecycleTest extends TestCase
             ]);
         $postPaymentResponse->assertStatus(201);
 
+        // Before apply: outstanding = open bills total (1000); unapplied = 400
         $balancesResponse = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->getJson("/api/parties/{$najam->id}/balances");
         $balancesResponse->assertStatus(200);
         $balances = $balancesResponse->json();
-        $this->assertEquals('600.00', $balances['outstanding_total'], 'Outstanding should be 1000 - 400 = 600');
+        $this->assertEquals('1000.00', $balances['outstanding_total'], 'Outstanding is open bills until allocation');
+        $this->assertEquals('400.00', $balances['unapplied_supplier_payments_total'] ?? '0', 'Unapplied payment 400');
+
+        // Apply payment to bill (FIFO); then outstanding = 600
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/payments/{$payment->id}/apply-bills", [
+                'mode' => 'FIFO',
+                'allocation_date' => '2024-06-20',
+            ])
+            ->assertStatus(201);
+
+        $balancesResponse2 = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->getJson("/api/parties/{$najam->id}/balances");
+        $balancesResponse2->assertStatus(200);
+        $balances2 = $balancesResponse2->json();
+        $this->assertEquals('600.00', $balances2['outstanding_total'], 'Outstanding should be 1000 - 400 = 600 after apply');
 
         $statementResponse = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')

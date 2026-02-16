@@ -58,11 +58,14 @@ class SaleARService
         string $tenantId,
         ?string $asOfDate = null
     ): array {
-        // Get all posted, non-reversed sales for buyer
+        // Open sales = posted invoices only (credit notes are instruments, not receivables to collect)
         $sales = Sale::where('tenant_id', $tenantId)
             ->where('buyer_party_id', $buyerPartyId)
             ->where('status', 'POSTED')
             ->whereNull('reversal_posting_group_id')
+            ->where(function ($q) {
+                $q->where('sale_kind', Sale::SALE_KIND_INVOICE)->orWhereNull('sale_kind');
+            })
             ->orderBy('posting_date', 'asc')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -150,10 +153,13 @@ class SaleARService
             $allocations = [];
 
             if ($allocationMode === 'FIFO') {
-                // Get open sales ordered FIFO (query directly for accurate outstanding)
+                // Get open invoices only (credit notes are instruments, not receivables to pay)
                 $sales = Sale::where('tenant_id', $tenantId)
                     ->where('buyer_party_id', $buyerPartyId)
                     ->where('status', 'POSTED')
+                    ->where(function ($q) {
+                        $q->where('sale_kind', Sale::SALE_KIND_INVOICE)->orWhereNull('sale_kind');
+                    })
                     ->orderBy('posting_date', 'asc')
                     ->orderBy('created_at', 'asc')
                     ->get();
@@ -217,11 +223,14 @@ class SaleARService
                         throw new \Exception('Allocation amount must be greater than 0');
                     }
                     
-                    // Verify sale belongs to same buyer and tenant
+                    // Verify sale is an invoice belonging to same buyer and tenant
                     $sale = Sale::where('id', $saleId)
                         ->where('tenant_id', $tenantId)
                         ->where('buyer_party_id', $buyerPartyId)
                         ->where('status', 'POSTED')
+                        ->where(function ($q) {
+                            $q->where('sale_kind', Sale::SALE_KIND_INVOICE)->orWhereNull('sale_kind');
+                        })
                         ->firstOrFail();
                     
                     // Check outstanding
@@ -380,10 +389,14 @@ class SaleARService
      */
     private function getOpenSalesForPayment(string $tenantId, string $buyerPartyId): array
     {
+        // Only invoices; credit notes are applied as instruments, not listed as open sales to pay
         $sales = Sale::where('tenant_id', $tenantId)
             ->where('buyer_party_id', $buyerPartyId)
             ->where('status', 'POSTED')
             ->whereNull('reversal_posting_group_id')
+            ->where(function ($q) {
+                $q->where('sale_kind', Sale::SALE_KIND_INVOICE)->orWhereNull('sale_kind');
+            })
             ->orderBy('posting_date', 'asc')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -603,10 +616,14 @@ class SaleARService
     {
         $asOf = Carbon::parse($asOfDate)->startOfDay();
 
+        // Invoice-centric aging: only INVOICE (or legacy null) sales; credit notes are not aged as open invoices
         $sales = Sale::where('tenant_id', $tenantId)
             ->where('status', 'POSTED')
             ->whereNull('reversal_posting_group_id')
             ->whereNotNull('buyer_party_id')
+            ->where(function ($q) {
+                $q->where('sale_kind', Sale::SALE_KIND_INVOICE)->orWhereNull('sale_kind');
+            })
             ->with('buyerParty:id,name')
             ->get();
 

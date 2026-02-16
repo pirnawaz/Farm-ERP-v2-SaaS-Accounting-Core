@@ -5,10 +5,12 @@ namespace App\Services;
 use App\Models\Sale;
 use App\Models\SaleLine;
 use App\Models\SaleInventoryAllocation;
+use App\Models\Payment;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\PostingGroup;
 use App\Services\OperationalPostingGuard;
+use App\Services\PostingDateGuard;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\InvStockMovement;
@@ -24,7 +26,8 @@ class SaleCOGSService
         private SystemAccountService $accountService,
         private InventoryStockService $stockService,
         private ReversalService $reversalService,
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private PostingDateGuard $postingDateGuard
     ) {}
 
     /**
@@ -193,6 +196,8 @@ class SaleCOGSService
                 throw new \Exception('Sale must have a project_id to be posted for settlement.');
             }
 
+            $this->postingDateGuard->assertPostingDateAllowed($sale->tenant_id, $postingDateObj);
+
             // Create posting group
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $sale->tenant_id,
@@ -262,43 +267,62 @@ class SaleCOGSService
                     ]);
                 }
 
-                // Create stock movement (negative qty/value for sale)
+                $isCreditNote = $sale->isCreditNote();
+                $qtyDelta = $isCreditNote ? (float) $line->quantity : (-(float) $line->quantity);
+                $valueDelta = $isCreditNote ? round($totalCost, 2) : (-round($totalCost, 2));
+
+                // Create stock movement: sale = negative; credit note = positive (add back)
                 $this->stockService->applyMovement(
                     $sale->tenant_id,
                     $postingGroup->id,
                     $line->store_id,
                     $line->inventory_item_id,
                     'SALE',
-                    (string) (-(float) $line->quantity),
-                    (string) (-round($totalCost, 2)),
+                    (string) $qtyDelta,
+                    (string) $valueDelta,
                     (string) round($unitCost, 6),
                     $postingDateObj,
                     'sale',
                     $sale->id
                 );
 
-                // Create LedgerEntry for COGS (debit expense)
+                // COGS/Inventory: invoice = DR COGS, CR Inventory; credit note = CR COGS, DR Inventory
                 if ($totalCost > 0.001) {
-                    LedgerEntry::create([
-                        'tenant_id' => $sale->tenant_id,
-                        'posting_group_id' => $postingGroup->id,
-                        'account_id' => $cogsAccount->id,
-                        'debit_amount' => (string) round($totalCost, 2),
-                        'credit_amount' => 0,
-                        'currency_code' => 'GBP',
-                    ]);
-                }
-
-                // Create LedgerEntry for Inventory (credit asset)
-                if ($totalCost > 0.001) {
-                    LedgerEntry::create([
-                        'tenant_id' => $sale->tenant_id,
-                        'posting_group_id' => $postingGroup->id,
-                        'account_id' => $inventoryAccount->id,
-                        'debit_amount' => 0,
-                        'credit_amount' => (string) round($totalCost, 2),
-                        'currency_code' => 'GBP',
-                    ]);
+                    if ($isCreditNote) {
+                        LedgerEntry::create([
+                            'tenant_id' => $sale->tenant_id,
+                            'posting_group_id' => $postingGroup->id,
+                            'account_id' => $cogsAccount->id,
+                            'debit_amount' => 0,
+                            'credit_amount' => (string) round($totalCost, 2),
+                            'currency_code' => 'GBP',
+                        ]);
+                        LedgerEntry::create([
+                            'tenant_id' => $sale->tenant_id,
+                            'posting_group_id' => $postingGroup->id,
+                            'account_id' => $inventoryAccount->id,
+                            'debit_amount' => (string) round($totalCost, 2),
+                            'credit_amount' => 0,
+                            'currency_code' => 'GBP',
+                        ]);
+                    } else {
+                        LedgerEntry::create([
+                            'tenant_id' => $sale->tenant_id,
+                            'posting_group_id' => $postingGroup->id,
+                            'account_id' => $cogsAccount->id,
+                            'debit_amount' => (string) round($totalCost, 2),
+                            'credit_amount' => 0,
+                            'currency_code' => 'GBP',
+                        ]);
+                        LedgerEntry::create([
+                            'tenant_id' => $sale->tenant_id,
+                            'posting_group_id' => $postingGroup->id,
+                            'account_id' => $inventoryAccount->id,
+                            'debit_amount' => 0,
+                            'credit_amount' => (string) round($totalCost, 2),
+                            'currency_code' => 'GBP',
+                        ]);
+                    }
                 }
             }
 
@@ -318,26 +342,43 @@ class SaleCOGSService
                 ]);
             }
 
-            // Create LedgerEntries for revenue (existing pattern)
-            // Debit: AR
-            LedgerEntry::create([
-                'tenant_id' => $sale->tenant_id,
-                'posting_group_id' => $postingGroup->id,
-                'account_id' => $arAccount->id,
-                'debit_amount' => (string) round($totalRevenue, 2),
-                'credit_amount' => 0,
-                'currency_code' => 'GBP',
-            ]);
-
-            // Credit: Revenue
-            LedgerEntry::create([
-                'tenant_id' => $sale->tenant_id,
-                'posting_group_id' => $postingGroup->id,
-                'account_id' => $revenueAccount->id,
-                'debit_amount' => 0,
-                'credit_amount' => (string) round($totalRevenue, 2),
-                'currency_code' => 'GBP',
-            ]);
+            // Create LedgerEntries for revenue: INVOICE = DR AR, CR Revenue; CREDIT_NOTE = DR Revenue, CR AR
+            $isCreditNote = $sale->isCreditNote();
+            if ($isCreditNote) {
+                LedgerEntry::create([
+                    'tenant_id' => $sale->tenant_id,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $revenueAccount->id,
+                    'debit_amount' => (string) round($totalRevenue, 2),
+                    'credit_amount' => 0,
+                    'currency_code' => 'GBP',
+                ]);
+                LedgerEntry::create([
+                    'tenant_id' => $sale->tenant_id,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $arAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => (string) round($totalRevenue, 2),
+                    'currency_code' => 'GBP',
+                ]);
+            } else {
+                LedgerEntry::create([
+                    'tenant_id' => $sale->tenant_id,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $arAccount->id,
+                    'debit_amount' => (string) round($totalRevenue, 2),
+                    'credit_amount' => 0,
+                    'currency_code' => 'GBP',
+                ]);
+                LedgerEntry::create([
+                    'tenant_id' => $sale->tenant_id,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $revenueAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => (string) round($totalRevenue, 2),
+                    'currency_code' => 'GBP',
+                ]);
+            }
 
             // Verify double-entry balance
             $totalDebits = LedgerEntry::where('posting_group_id', $postingGroup->id)
@@ -349,22 +390,41 @@ class SaleCOGSService
                 throw new \Exception('Debits and credits do not balance.');
             }
 
-            // Create INCOME OT for settlement (idempotent: one per posting group)
-            $existingOt = OperationalTransaction::where('posting_group_id', $postingGroup->id)
-                ->where('type', 'INCOME')
-                ->first();
-            if (!$existingOt) {
-                OperationalTransaction::create([
+            // Create INCOME OT for settlement only for invoices (not credit notes)
+            if (!$isCreditNote) {
+                $existingOt = OperationalTransaction::where('posting_group_id', $postingGroup->id)
+                    ->where('type', 'INCOME')
+                    ->first();
+                if (!$existingOt) {
+                    OperationalTransaction::create([
+                        'tenant_id' => $sale->tenant_id,
+                        'project_id' => $project->id,
+                        'crop_cycle_id' => $finalCropCycleId,
+                        'type' => 'INCOME',
+                        'status' => 'POSTED',
+                        'transaction_date' => $postingDateObj->format('Y-m-d'),
+                        'amount' => (string) round($totalRevenue, 2),
+                        'classification' => 'SHARED',
+                        'posting_group_id' => $postingGroup->id,
+                    ]);
+                }
+            }
+
+            // For credit notes: create synthetic Payment for apply-to-invoice allocations
+            $creditNotePaymentId = null;
+            if ($isCreditNote) {
+                $syntheticPayment = Payment::create([
                     'tenant_id' => $sale->tenant_id,
-                    'project_id' => $project->id,
-                    'crop_cycle_id' => $finalCropCycleId,
-                    'type' => 'INCOME',
-                    'status' => 'POSTED',
-                    'transaction_date' => $postingDateObj->format('Y-m-d'),
+                    'party_id' => $sale->buyer_party_id,
+                    'direction' => 'IN',
                     'amount' => (string) round($totalRevenue, 2),
-                    'classification' => 'SHARED',
+                    'payment_date' => $postingDateObj->format('Y-m-d'),
+                    'method' => 'CREDIT_NOTE',
+                    'status' => 'POSTED',
                     'posting_group_id' => $postingGroup->id,
+                    'posted_at' => now(),
                 ]);
+                $creditNotePaymentId = $syntheticPayment->id;
             }
 
             // Update sale status
@@ -373,6 +433,7 @@ class SaleCOGSService
                 'posting_date' => $postingDateObj->format('Y-m-d'),
                 'posted_at' => now(),
                 'posting_group_id' => $postingGroup->id,
+                'credit_note_payment_id' => $creditNotePaymentId,
             ]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
@@ -392,8 +453,14 @@ class SaleCOGSService
                 throw new \Exception('Only POSTED sales can be reversed.');
             }
 
+            // Block reversal if this sale (invoice) has ACTIVE allocations, or if this credit note was applied to invoices
             $hasActiveAllocations = SalePaymentAllocation::where('tenant_id', $sale->tenant_id)
-                ->where('sale_id', $sale->id)
+                ->where(function ($q) use ($sale) {
+                    $q->where('sale_id', $sale->id);
+                    if ($sale->credit_note_payment_id) {
+                        $q->orWhere('payment_id', $sale->credit_note_payment_id);
+                    }
+                })
                 ->where(function ($q) {
                     $q->where('status', SalePaymentAllocation::STATUS_ACTIVE)->orWhereNull('status');
                 })
@@ -469,6 +536,16 @@ class SaleCOGSService
                         $original->source_id
                     );
                 }
+            }
+
+            // When reversing a credit note, mark synthetic payment as reversed so it is excluded from apply flows
+            if ($sale->credit_note_payment_id) {
+                Payment::where('id', $sale->credit_note_payment_id)
+                    ->where('tenant_id', $sale->tenant_id)
+                    ->update([
+                        'reversed_at' => now(),
+                        'reversal_posting_group_id' => $reversalPostingGroup->id,
+                    ]);
             }
 
             // Update sale

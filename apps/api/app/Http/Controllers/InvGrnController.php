@@ -157,17 +157,20 @@ class InvGrnController extends Controller
     public function reverse(ReverseInvGrnRequest $request, string $id)
     {
         $this->authorizeReversal($request);
-        
+
         $tenantId = TenantContext::getTenantId($request);
-        $pg = $this->postingService->reverseGRN($id, $tenantId, $request->posting_date, $request->reason);
-        
-        // Log audit event
+        try {
+            $pg = $this->postingService->reverseGRN($id, $tenantId, $request->posting_date, $request->reason);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $this->logAudit($request, 'InvGrn', $id, 'REVERSE', [
             'posting_date' => $request->posting_date,
             'reason' => $request->reason,
             'posting_group_id' => $pg->id,
         ]);
-        
+
         return response()->json($pg, 201);
     }
 }

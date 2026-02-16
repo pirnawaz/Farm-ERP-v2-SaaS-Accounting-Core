@@ -7,6 +7,7 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Accounting\Rules\DailyBookEntryRuleResolver;
 use App\Services\OperationalPostingGuard;
+use App\Services\PostingDateGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,7 +15,8 @@ class ReversalService
 {
     public function __construct(
         private DailyBookEntryRuleResolver $ruleResolver = new DailyBookEntryRuleResolver(),
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private PostingDateGuard $postingDateGuard
     ) {}
 
     /**
@@ -66,6 +68,11 @@ class ReversalService
             if (!$postingDateObj) {
                 throw new \InvalidArgumentException('Invalid posting_date format. Expected YYYY-MM-DD');
             }
+
+            $originalPostingDateStr = $originalPostingGroup->posting_date instanceof \Carbon\Carbon
+                ? $originalPostingGroup->posting_date->format('Y-m-d')
+                : \Carbon\Carbon::parse($originalPostingGroup->posting_date)->format('Y-m-d');
+            $this->postingDateGuard->assertReversalDateAllowed($tenantId, $originalPostingDateStr, $postingDateObj->format('Y-m-d'));
 
             // Create new PostingGroup for reversal (crop_cycle_id from original; null allowed for e.g. INVENTORY_GRN)
             $reversalPostingGroup = PostingGroup::create([

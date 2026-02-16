@@ -82,6 +82,8 @@ import MachineryServiceDetailPage from './pages/machinery/MachineryServiceDetail
 import ReportsPage from './pages/ReportsPage';
 import TrialBalancePage from './pages/TrialBalancePage';
 import GeneralLedgerPage from './pages/GeneralLedgerPage';
+import ProfitLossPage from './pages/reports/ProfitLossPage';
+import BalanceSheetPage from './pages/reports/BalanceSheetPage';
 import ProjectPLPage from './pages/ProjectPLPage';
 import CropCyclePLPage from './pages/CropCyclePLPage';
 import AccountBalancesPage from './pages/AccountBalancesPage';
@@ -92,6 +94,12 @@ import PartyLedgerPage from './pages/PartyLedgerPage';
 import PartySummaryPage from './pages/PartySummaryPage';
 import RoleAgeingPage from './pages/RoleAgeingPage';
 import ReconciliationDashboardPage from './pages/ReconciliationDashboardPage';
+import BankReconciliationsPage from './pages/BankReconciliationsPage';
+import BankReconciliationDetailPage from './pages/BankReconciliationDetailPage';
+import JournalsPage from './pages/accounting/JournalsPage';
+import JournalFormPage from './pages/accounting/JournalFormPage';
+import JournalDetailPage from './pages/accounting/JournalDetailPage';
+import AccountingPeriodsPage from './pages/accounting/AccountingPeriodsPage';
 import LocalisationSettingsPage from './pages/LocalisationSettingsPage';
 import ModuleTogglePage from './pages/ModuleTogglePage';
 import AdminFarmProfilePage from './pages/AdminFarmProfilePage';
@@ -218,6 +226,8 @@ function App() {
         <Route path="machinery/reports/profitability" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryProfitabilityPage /></ModuleProtectedRoute>} />
         <Route path="reports" element={<ModuleProtectedRoute requiredModule="reports"><ReportsPage /></ModuleProtectedRoute>} />
         <Route path="reports/trial-balance" element={<ModuleProtectedRoute requiredModule="reports"><TrialBalancePage /></ModuleProtectedRoute>} />
+        <Route path="reports/profit-loss" element={<ModuleProtectedRoute requiredModule="reports"><ProfitLossPage /></ModuleProtectedRoute>} />
+        <Route path="reports/balance-sheet" element={<ModuleProtectedRoute requiredModule="reports"><BalanceSheetPage /></ModuleProtectedRoute>} />
         <Route path="reports/general-ledger" element={<ModuleProtectedRoute requiredModule="reports"><GeneralLedgerPage /></ModuleProtectedRoute>} />
         <Route path="reports/project-pl" element={<ModuleProtectedRoute requiredModule="reports"><ProjectPLPage /></ModuleProtectedRoute>} />
         <Route path="reports/crop-cycle-pl" element={<ModuleProtectedRoute requiredModule="reports"><CropCyclePLPage /></ModuleProtectedRoute>} />
@@ -230,6 +240,13 @@ function App() {
         <Route path="reports/party-summary" element={<ModuleProtectedRoute requiredModule="reports"><PartySummaryPage /></ModuleProtectedRoute>} />
         <Route path="reports/role-ageing" element={<ModuleProtectedRoute requiredModule="reports"><RoleAgeingPage /></ModuleProtectedRoute>} />
         <Route path="reports/reconciliation-dashboard" element={<ModuleProtectedRoute requiredModule="reports"><ReconciliationDashboardPage /></ModuleProtectedRoute>} />
+        <Route path="reports/bank-reconciliation" element={<ModuleProtectedRoute requiredModule="reports"><BankReconciliationsPage /></ModuleProtectedRoute>} />
+        <Route path="reports/bank-reconciliation/:id" element={<ModuleProtectedRoute requiredModule="reports"><BankReconciliationDetailPage /></ModuleProtectedRoute>} />
+        <Route path="accounting/journals" element={<ModuleProtectedRoute requiredModule="reports"><JournalsPage /></ModuleProtectedRoute>} />
+        <Route path="accounting/journals/new" element={<ModuleProtectedRoute requiredModule="reports"><JournalFormPage /></ModuleProtectedRoute>} />
+        <Route path="accounting/journals/:id" element={<ModuleProtectedRoute requiredModule="reports"><JournalDetailPage /></ModuleProtectedRoute>} />
+        <Route path="accounting/journals/:id/edit" element={<ModuleProtectedRoute requiredModule="reports"><JournalFormPage /></ModuleProtectedRoute>} />
+        <Route path="accounting/periods" element={<ModuleProtectedRoute requiredModule="reports"><AccountingPeriodsPage /></ModuleProtectedRoute>} />
         <Route path="posting-groups/:id" element={<PostingGroupDetailPage />} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />
         <Route path="admin/farm" element={<AdminFarmProfilePage />} />

@@ -12,13 +12,15 @@ use App\Http\Requests\ReversePaymentRequest;
 use App\Services\TenantContext;
 use App\Services\PaymentService;
 use App\Services\SaleARService;
+use App\Services\BillPaymentService;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
     public function __construct(
         private PaymentService $paymentService,
-        private SaleARService $saleARService
+        private SaleARService $saleARService,
+        private BillPaymentService $billPaymentService
     ) {}
 
     public function index(Request $request)
@@ -230,6 +232,71 @@ class PaymentController extends Controller
         }
     }
 
+    /**
+     * GET /payments/{id}/apply-bills/preview
+     * Preview apply supplier payment (OUT) to bills. Query: mode=FIFO|MANUAL
+     */
+    public function applyBillsPreview(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $mode = $request->input('mode', 'FIFO');
+        if (!in_array($mode, ['FIFO', 'MANUAL'])) {
+            return response()->json(['error' => 'mode must be FIFO or MANUAL'], 422);
+        }
+        try {
+            $preview = $this->billPaymentService->previewApplyPaymentToBills($tenantId, $id, $mode);
+            return response()->json($preview);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible (must be posted, not reversed, direction OUT).'], 404);
+        }
+    }
+
+    /**
+     * POST /payments/{id}/apply-bills
+     * Apply supplier payment (OUT) to bills. Body: mode, allocation_date?, allocations[] (for MANUAL: grn_id, amount)
+     */
+    public function applyBills(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $mode = $request->input('mode', 'FIFO');
+        if (!in_array($mode, ['FIFO', 'MANUAL'])) {
+            return response()->json(['error' => 'mode must be FIFO or MANUAL'], 422);
+        }
+        $allocationDate = $request->input('allocation_date');
+        $allocations = $request->input('allocations');
+        if ($mode === 'MANUAL' && (!is_array($allocations) || count($allocations) === 0)) {
+            return response()->json(['error' => 'allocations array is required for MANUAL mode'], 422);
+        }
+        $createdBy = $request->user()?->id;
+
+        try {
+            $created = $this->billPaymentService->applyPaymentToBills($tenantId, $id, $mode, $allocations, $allocationDate, $createdBy);
+            return response()->json(['allocations' => $created, 'summary' => $this->billPaymentService->getPaymentAllocationSummary($tenantId, $id)], 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible.'], 404);
+        }
+    }
+
+    /**
+     * POST /payments/{id}/unapply-bills
+     * Unapply (void) bill allocations. Body: { "grn_id": "..." } optional; if omitted, unapply all.
+     */
+    public function unapplyBills(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $grnId = $request->input('grn_id');
+        $voidedBy = $request->user()?->id;
+
+        try {
+            $summary = $this->billPaymentService->unapplyPaymentFromBills($tenantId, $id, $grnId, $voidedBy);
+            return response()->json($summary);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible.'], 404);
+        }
+    }
+
     public function post(PostPaymentRequest $request, string $id)
     {
         $this->authorizePosting($request);
@@ -273,7 +340,7 @@ class PaymentController extends Controller
             );
         } catch (\InvalidArgumentException $e) {
             $msg = $e->getMessage();
-            $status = str_contains($msg, 'Unapply sales allocations') ? 409 : 422;
+            $status = (str_contains($msg, 'Unapply sales allocations') || str_contains($msg, 'Unapply bills')) ? 409 : 422;
             return response()->json(['message' => $msg], $status);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);

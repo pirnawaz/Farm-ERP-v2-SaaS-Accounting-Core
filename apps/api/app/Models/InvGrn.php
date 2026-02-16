@@ -62,6 +62,11 @@ class InvGrn extends Model
         return $this->hasMany(InvGrnLine::class, 'grn_id');
     }
 
+    public function paymentAllocations(): HasMany
+    {
+        return $this->hasMany(GrnPaymentAllocation::class, 'grn_id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'DRAFT';

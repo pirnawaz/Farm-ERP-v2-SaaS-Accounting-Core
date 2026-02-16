@@ -4,12 +4,14 @@ namespace App\Services;
 
 use App\Models\Sale;
 use App\Models\Party;
+use App\Models\Payment;
 use App\Models\PostingGroup;
 use App\Models\LedgerEntry;
 use App\Models\AllocationRow;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
+use App\Services\PostingDateGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -17,7 +19,8 @@ class SaleService
 {
     public function __construct(
         private SystemAccountService $accountService,
-        private SaleCOGSService $cogsService
+        private SaleCOGSService $cogsService,
+        private PostingDateGuard $postingDateGuard
     ) {}
 
     /**
@@ -118,6 +121,8 @@ class SaleService
             $arAccount = $this->accountService->getByCode($tenantId, 'AR');
             $revenueAccount = $this->accountService->getByCode($tenantId, 'PROJECT_REVENUE');
 
+            $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDate));
+
             // Create posting group
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
@@ -127,6 +132,8 @@ class SaleService
                 'posting_date' => Carbon::parse($postingDate)->format('Y-m-d'),
                 'idempotency_key' => $idempotencyKey,
             ]);
+
+            $isCreditNote = $sale->isCreditNote();
 
             // Create allocation row for revenue
             AllocationRow::create([
@@ -138,26 +145,44 @@ class SaleService
                 'amount' => $sale->amount,
             ]);
 
-            // Create ledger entries
-            // Debit: ACCOUNTS_RECEIVABLE (buyer owes us)
-            LedgerEntry::create([
-                'tenant_id' => $tenantId,
-                'posting_group_id' => $postingGroup->id,
-                'account_id' => $arAccount->id,
-                'debit_amount' => $sale->amount,
-                'credit_amount' => 0,
-                'currency_code' => 'GBP',
-            ]);
-
-            // Credit: PROJECT_REVENUE (income already earned)
-            LedgerEntry::create([
-                'tenant_id' => $tenantId,
-                'posting_group_id' => $postingGroup->id,
-                'account_id' => $revenueAccount->id,
-                'debit_amount' => 0,
-                'credit_amount' => $sale->amount,
-                'currency_code' => 'GBP',
-            ]);
+            // Create ledger entries: INVOICE = DR AR / CR Revenue; CREDIT_NOTE = DR Revenue / CR AR
+            if ($isCreditNote) {
+                // Credit note: reduce AR (credit), reduce revenue (debit)
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $revenueAccount->id,
+                    'debit_amount' => $sale->amount,
+                    'credit_amount' => 0,
+                    'currency_code' => 'GBP',
+                ]);
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $arAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $sale->amount,
+                    'currency_code' => 'GBP',
+                ]);
+            } else {
+                // Invoice: DR AR, CR Revenue
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $arAccount->id,
+                    'debit_amount' => $sale->amount,
+                    'credit_amount' => 0,
+                    'currency_code' => 'GBP',
+                ]);
+                LedgerEntry::create([
+                    'tenant_id' => $tenantId,
+                    'posting_group_id' => $postingGroup->id,
+                    'account_id' => $revenueAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $sale->amount,
+                    'currency_code' => 'GBP',
+                ]);
+            }
 
             // Verify debits == credits
             $totalDebits = LedgerEntry::where('posting_group_id', $postingGroup->id)
@@ -169,23 +194,42 @@ class SaleService
                 throw new \Exception('Debits and credits do not balance');
             }
 
-            // Create INCOME OT for settlement (idempotent: one per posting group)
+            // Create INCOME OT for settlement only for invoices (not credit notes)
             $postingDateStr = Carbon::parse($postingDate)->format('Y-m-d');
-            $existingOt = OperationalTransaction::where('posting_group_id', $postingGroup->id)
-                ->where('type', 'INCOME')
-                ->first();
-            if (!$existingOt) {
-                OperationalTransaction::create([
+            if (!$isCreditNote) {
+                $existingOt = OperationalTransaction::where('posting_group_id', $postingGroup->id)
+                    ->where('type', 'INCOME')
+                    ->first();
+                if (!$existingOt) {
+                    OperationalTransaction::create([
+                        'tenant_id' => $tenantId,
+                        'project_id' => $sale->project_id,
+                        'crop_cycle_id' => $finalCropCycleId,
+                        'type' => 'INCOME',
+                        'status' => 'POSTED',
+                        'transaction_date' => $postingDateStr,
+                        'amount' => (string) round((float) $sale->amount, 2),
+                        'classification' => 'SHARED',
+                        'posting_group_id' => $postingGroup->id,
+                    ]);
+                }
+            }
+
+            // For credit notes: create synthetic Payment so it can be applied to invoices via sale_payment_allocations
+            $creditNotePaymentId = null;
+            if ($isCreditNote) {
+                $syntheticPayment = Payment::create([
                     'tenant_id' => $tenantId,
-                    'project_id' => $sale->project_id,
-                    'crop_cycle_id' => $finalCropCycleId,
-                    'type' => 'INCOME',
+                    'party_id' => $sale->buyer_party_id,
+                    'direction' => 'IN',
+                    'amount' => $sale->amount,
+                    'payment_date' => $postingDateStr,
+                    'method' => 'CREDIT_NOTE',
                     'status' => 'POSTED',
-                    'transaction_date' => $postingDateStr,
-                    'amount' => (string) round((float) $sale->amount, 2),
-                    'classification' => 'SHARED',
                     'posting_group_id' => $postingGroup->id,
+                    'posted_at' => now(),
                 ]);
+                $creditNotePaymentId = $syntheticPayment->id;
             }
 
             // Update sale status to POSTED
@@ -193,6 +237,7 @@ class SaleService
                 'status' => 'POSTED',
                 'posting_group_id' => $postingGroup->id,
                 'posted_at' => now(),
+                'credit_note_payment_id' => $creditNotePaymentId,
             ]);
 
             // Reload posting group with relationships

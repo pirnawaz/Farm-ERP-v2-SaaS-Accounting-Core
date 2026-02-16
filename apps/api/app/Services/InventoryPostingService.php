@@ -19,6 +19,7 @@ use App\Models\Project;
 use App\Models\OperationalTransaction;
 use App\Services\Accounting\PostValidationService;
 use App\Services\OperationalPostingGuard;
+use App\Services\PostingDateGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -31,7 +32,8 @@ class InventoryPostingService
         private InventoryAllocationResolver $allocationResolver,
         private SystemPartyService $partyService,
         private PostValidationService $postValidationService,
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private PostingDateGuard $postingDateGuard
     ) {}
 
     /**
@@ -56,6 +58,8 @@ class InventoryPostingService
             foreach ($grn->lines as $line) {
                 InvItem::where('id', $line->item_id)->where('tenant_id', $tenantId)->firstOrFail();
             }
+
+            $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
@@ -174,6 +178,8 @@ class InventoryPostingService
             }
 
             $project = Project::where('id', $issue->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+
+            $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
@@ -378,6 +384,11 @@ class InventoryPostingService
                 throw new \Exception('GRN is already reversed.');
             }
 
+            $billPaymentService = app(BillPaymentService::class);
+            if ($billPaymentService->getGrnActiveAllocationCount($grnId, $tenantId) > 0) {
+                throw new \InvalidArgumentException('GRN has applied payment allocations. Unapply bills before reversing.');
+            }
+
             $reversalPG = $this->reversalService->reversePostingGroup($grn->posting_group_id, $tenantId, $postingDate, $reason);
 
             $existing = InvStockMovement::where('tenant_id', $tenantId)->where('posting_group_id', $reversalPG->id)->exists();
@@ -490,6 +501,8 @@ class InventoryPostingService
 
             InvStore::where('id', $transfer->from_store_id)->where('tenant_id', $tenantId)->firstOrFail();
             InvStore::where('id', $transfer->to_store_id)->where('tenant_id', $tenantId)->firstOrFail();
+
+            $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
@@ -620,6 +633,8 @@ class InventoryPostingService
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
 
             InvStore::where('id', $adj->store_id)->where('tenant_id', $tenantId)->firstOrFail();
+
+            $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,

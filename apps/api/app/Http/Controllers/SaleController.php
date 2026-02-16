@@ -11,6 +11,7 @@ use App\Http\Requests\PostSaleRequest;
 use App\Services\TenantContext;
 use App\Services\SaleService;
 use App\Services\SaleCOGSService;
+use App\Services\SaleARService;
 use App\Models\SaleLine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,8 @@ class SaleController extends Controller
 {
     public function __construct(
         private SaleService $saleService,
-        private SaleCOGSService $cogsService
+        private SaleCOGSService $cogsService,
+        private SaleARService $saleARService
     ) {}
 
     public function index(Request $request)
@@ -107,6 +109,7 @@ class SaleController extends Controller
                 'due_date' => $dueDate,
                 'notes' => $request->notes,
                 'status' => 'DRAFT',
+                'sale_kind' => $request->input('sale_kind', 'INVOICE'),
             ]);
 
             // Create sale lines if provided
@@ -312,5 +315,49 @@ class SaleController extends Controller
             'lines.store',
             'inventoryAllocations'
         ]), 200);
+    }
+
+    /**
+     * POST /sales/{id}/apply-to-invoices
+     * Apply a posted credit note to invoices (uses synthetic payment; creates ACTIVE sale_payment_allocations).
+     * Body: { "allocation_date": "Y-m-d", "allocations": [{"sale_id": "...", "amount": "..."}] }
+     */
+    public function applyToInvoices(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $sale = Sale::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        if (!$sale->isCreditNote() || !$sale->isPosted() || $sale->reversal_posting_group_id) {
+            return response()->json(['error' => 'Sale must be a posted credit note (not reversed).'], 422);
+        }
+        if (!$sale->credit_note_payment_id) {
+            return response()->json(['error' => 'Credit note has no allocation instrument.'], 422);
+        }
+
+        $allocationDate = $request->input('allocation_date');
+        $allocations = $request->input('allocations');
+        if (!is_array($allocations) || count($allocations) === 0) {
+            return response()->json(['error' => 'allocations array is required.'], 422);
+        }
+        $createdBy = $request->user()?->id;
+
+        try {
+            $summary = $this->saleARService->applyPaymentToSales(
+                $tenantId,
+                $sale->credit_note_payment_id,
+                'MANUAL',
+                $allocations,
+                $allocationDate,
+                $createdBy
+            );
+            return response()->json($summary);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Invoice or credit note not found or not eligible.'], 404);
+        }
     }
 }

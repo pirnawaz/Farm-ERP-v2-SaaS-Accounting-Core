@@ -18,6 +18,7 @@ use App\Services\PartyAccountService;
 use App\Services\ReversalService;
 use App\Services\SaleARService;
 use App\Services\Accounting\PostValidationService;
+use App\Services\PostingDateGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -30,7 +31,8 @@ class PaymentService
         private SaleARService $arService,
         private PostValidationService $postValidationService,
         private OperationalPostingGuard $guard,
-        private ReversalService $reversalService
+        private ReversalService $reversalService,
+        private PostingDateGuard $postingDateGuard
     ) {}
 
     /**
@@ -88,6 +90,11 @@ class PaymentService
                 ->where('tenant_id', $tenantId)
                 ->where('status', 'DRAFT')
                 ->firstOrFail();
+
+            // CREDIT_NOTE method payments are synthetic; created only when posting a credit note sale. Do not post via this endpoint.
+            if ($payment->method === 'CREDIT_NOTE') {
+                throw new \Exception('Payments with method CREDIT_NOTE cannot be posted here; they are created when posting a credit note sale.');
+            }
 
             // Load party to determine payable account
             $party = Party::where('id', $payment->party_id)
@@ -187,6 +194,8 @@ class PaymentService
                 ];
             }
             $this->postValidationService->validateNoDeprecatedAccounts($tenantId, $ledgerLines);
+
+            $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDate));
 
             // Create posting group
             $postingGroup = PostingGroup::create([
@@ -369,14 +378,21 @@ class PaymentService
         }
 
         return DB::transaction(function () use ($payment, $paymentId, $tenantId, $postingDate, $reason, $reversedByUserId) {
-            $hasActiveAllocations = SalePaymentAllocation::where('tenant_id', $tenantId)
-                ->where('payment_id', $paymentId)
-                ->where(function ($q) {
-                    $q->where('status', SalePaymentAllocation::STATUS_ACTIVE)->orWhereNull('status');
-                })
-                ->exists();
-            if ($hasActiveAllocations) {
-                throw new \InvalidArgumentException('Payment has applied allocations. Unapply sales allocations before reversing.');
+            if ($payment->direction === 'IN') {
+                $hasActiveAllocations = SalePaymentAllocation::where('tenant_id', $tenantId)
+                    ->where('payment_id', $paymentId)
+                    ->where(function ($q) {
+                        $q->where('status', SalePaymentAllocation::STATUS_ACTIVE)->orWhereNull('status');
+                    })
+                    ->exists();
+                if ($hasActiveAllocations) {
+                    throw new \InvalidArgumentException('Payment has applied allocations. Unapply sales allocations before reversing.');
+                }
+            } else {
+                $billPaymentService = app(BillPaymentService::class);
+                if ($billPaymentService->getPaymentActiveAllocationCount($paymentId, $tenantId) > 0) {
+                    throw new \InvalidArgumentException('Payment has applied bill allocations. Unapply bills before reversing.');
+                }
             }
 
             $reversalPostingGroup = $this->reversalService->reversePostingGroup(
@@ -407,37 +423,28 @@ class PaymentService
      */
     public function getPartyPayableBalance(string $partyId, string $tenantId, ?string $asOfDate = null): array
     {
-        $financialSourceService = app(PartyFinancialSourceService::class);
-        
-        $allocationData = $financialSourceService->getPostedAllocationTotals(
-            $partyId,
-            $tenantId,
-            null,
-            $asOfDate
-        );
-        
-        $supplierAp = $financialSourceService->getSupplierPayableFromGRN(
-            $partyId,
-            $tenantId,
-            null,
-            $asOfDate
-        );
-        
-        $paymentData = $financialSourceService->getPostedPaymentsTotals(
-            $partyId,
-            $tenantId,
-            null,
-            $asOfDate
-        );
+        $billPaymentService = app(BillPaymentService::class);
+        $openBillsTotal = $billPaymentService->getSupplierOpenBillsTotal($partyId, $tenantId, $asOfDate);
 
-        $allocatedTotal = $allocationData['total'] + $supplierAp;
+        $paymentData = app(PartyFinancialSourceService::class)->getPostedPaymentsTotals(
+            $partyId,
+            $tenantId,
+            null,
+            $asOfDate
+        );
         $paidTotal = $paymentData['out'];
-        $outstandingTotal = $allocatedTotal - $paidTotal;
+        $unappliedOut = 0.0;
+        foreach ($paymentData['payments'] ?? [] as $p) {
+            if ($p->direction === 'OUT') {
+                $unappliedOut += $billPaymentService->getPaymentUnappliedAmount($p->id, $tenantId, $asOfDate);
+            }
+        }
 
         return [
-            'allocated_total' => number_format($allocatedTotal, 2, '.', ''),
+            'open_bills_total' => number_format($openBillsTotal, 2, '.', ''),
             'paid_total' => number_format($paidTotal, 2, '.', ''),
-            'outstanding_total' => number_format($outstandingTotal, 2, '.', ''),
+            'unapplied_supplier_payments_total' => number_format($unappliedOut, 2, '.', ''),
+            'outstanding_total' => number_format($openBillsTotal, 2, '.', ''),
         ];
     }
 }

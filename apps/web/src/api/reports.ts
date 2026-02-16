@@ -1,6 +1,6 @@
 import { apiClient } from '@farm-erp/shared';
 import type { LandlordStatementResponse } from '@farm-erp/shared';
-import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse } from '../types';
+import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse, ProfitLossResponse, BalanceSheetResponse } from '../types';
 
 export const reportsApi = {
   trialBalance: (params: { from: string; to: string }) => {
@@ -100,4 +100,20 @@ export const reportsApi = {
     apiClient.reconcileCropCycle(params),
   reconcileSupplierAp: (params: { party_id: string; from: string; to: string }) =>
     apiClient.reconcileSupplierAp(params),
+
+  profitLoss: (params: { from: string; to: string; compare_from?: string; compare_to?: string }) => {
+    const query = new URLSearchParams();
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.compare_from) query.append('compare_from', params.compare_from);
+    if (params.compare_to) query.append('compare_to', params.compare_to);
+    return apiClient.get<ProfitLossResponse>(`/api/reports/profit-loss?${query.toString()}`);
+  },
+
+  balanceSheet: (params: { as_of: string; compare_as_of?: string }) => {
+    const query = new URLSearchParams();
+    query.append('as_of', params.as_of);
+    if (params.compare_as_of) query.append('compare_as_of', params.compare_as_of);
+    return apiClient.get<BalanceSheetResponse>(`/api/reports/balance-sheet?${query.toString()}`);
+  },
 };
