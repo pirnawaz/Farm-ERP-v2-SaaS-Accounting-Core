@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class CropCycle extends Model
 {
@@ -58,5 +59,10 @@ class CropCycle extends Model
     public function closedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by_user_id');
+    }
+
+    public function periodCloseRun(): HasOne
+    {
+        return $this->hasOne(PeriodCloseRun::class);
     }
 }

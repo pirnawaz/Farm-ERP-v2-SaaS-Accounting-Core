@@ -115,6 +115,7 @@ Route::middleware(['role:tenant_admin,accountant', 'require_module:land'])->grou
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::apiResource('crop-cycles', CropCycleController::class);
     Route::get('crop-cycles/{id}/close-preview', [CropCycleController::class, 'closePreview']);
+    Route::get('crop-cycles/{id}/close-run', [CropCycleController::class, 'closeRun']);
     Route::post('crop-cycles/{id}/close', [CropCycleController::class, 'close'])->middleware('role:tenant_admin');
     Route::post('crop-cycles/{id}/reopen', [CropCycleController::class, 'reopen'])->middleware('role:tenant_admin');
     Route::post('crop-cycles/{id}/open', [CropCycleController::class, 'open'])->middleware('role:tenant_admin');
@@ -164,9 +165,16 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
 
 // Settlement (accountant, tenant_admin) — requires settlements module
 Route::middleware(['role:tenant_admin,accountant', 'require_module:settlements'])->group(function () {
-    // Settlement Pack (Governance Phase 1)
+    // Settlement Pack (Governance Phase 1 + v3 PDF export + v4 approval workflow)
     Route::post('projects/{projectId}/settlement-pack', [SettlementPackController::class, 'generate']);
     Route::get('settlement-packs/{id}', [SettlementPackController::class, 'show']);
+    Route::post('settlement-packs/{id}/finalize', [SettlementPackController::class, 'finalize']);
+    Route::post('settlement-packs/{id}/submit-for-approval', [SettlementPackController::class, 'submitForApproval']);
+    Route::post('settlement-packs/{id}/approve', [SettlementPackController::class, 'approve']);
+    Route::post('settlement-packs/{id}/reject', [SettlementPackController::class, 'reject']);
+    Route::post('settlement-packs/{id}/export/pdf', [SettlementPackController::class, 'exportPdf']);
+    Route::get('settlement-packs/{id}/documents', [SettlementPackController::class, 'listDocuments']);
+    Route::get('settlement-packs/{id}/documents/{version}', [SettlementPackController::class, 'getDocument']);
     // Project-based settlements (existing, for backward compatibility)
     Route::post('projects/{id}/settlement/preview', [SettlementController::class, 'preview']);
     Route::get('projects/{id}/settlement/offset-preview', [SettlementController::class, 'offsetPreview']);
@@ -384,6 +392,8 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
 // Reports (tenant_admin, accountant, operator) — requires reports module
 Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:reports'])->group(function () {
     Route::get('reports/trial-balance', [ReportController::class, 'trialBalance']);
+    Route::get('reports/profit-loss/project', [ReportController::class, 'profitLossProject']);
+    Route::get('reports/profit-loss/crop-cycle', [ReportController::class, 'profitLossCropCycle']);
     Route::get('reports/profit-loss', [ReportController::class, 'profitLoss']);
     Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet']);
     Route::get('reports/general-ledger', [ReportController::class, 'generalLedger']);

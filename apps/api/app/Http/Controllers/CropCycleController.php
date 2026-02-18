@@ -2,16 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Domains\Accounting\PeriodClose\PeriodCloseService;
 use App\Models\CropCycle;
 use App\Services\CropCycleCloseService;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CropCycleController extends Controller
 {
     public function __construct(
-        private CropCycleCloseService $closeService
+        private CropCycleCloseService $closeService,
+        private PeriodCloseService $periodCloseService
     ) {}
     public function index(Request $request)
     {
@@ -113,15 +116,43 @@ class CropCycleController extends Controller
         $tenantId = TenantContext::getTenantId($request);
 
         $request->validate([
+            'as_of' => ['nullable', 'date', 'date_format:Y-m-d'],
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $userId = $request->user()?->id;
-        $note = $request->input('note');
+        $asOf = $request->input('as_of');
 
-        $cycle = $this->closeService->close($id, $tenantId, $userId, $note);
+        try {
+            $result = $this->periodCloseService->closeCropCycle($tenantId, $id, $userId, $asOf);
+        } catch (\InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['crop_cycle' => [$e->getMessage()]])->status(422);
+        }
 
-        return response()->json($cycle);
+        $run = $result['close_run'];
+        return response()->json([
+            'crop_cycle_id' => $result['crop_cycle']->id,
+            'status' => $result['crop_cycle']->status,
+            'posting_group_id' => $result['posting_group_id'],
+            'net_profit' => $result['net_profit'],
+            'closed_at' => $result['closed_at'],
+            'closed_by_user_id' => $result['closed_by_user_id'],
+        ]);
+    }
+
+    public function closeRun(Request $request, string $id): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        CropCycle::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+
+        $run = $this->periodCloseService->getCloseRun($tenantId, $id);
+
+        if (!$run) {
+            return response()->json(['message' => 'No close run for this crop cycle.'], 404);
+        }
+
+        return response()->json($run->load(['postingGroup']));
     }
 
     public function reopen(Request $request, string $id): JsonResponse

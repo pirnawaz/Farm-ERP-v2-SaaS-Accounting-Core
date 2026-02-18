@@ -68,6 +68,10 @@ class PostingService
                 throw new \Exception('Crop cycle ID is required for posting');
             }
 
+            if ($transaction->project_id) {
+                $this->guard->ensureProjectNotClosed($transaction->project_id, $tenantId);
+            }
+
             $this->guard->ensureCropCycleOpen($cropCycleId, $tenantId);
 
             $cropCycle = CropCycle::where('id', $cropCycleId)

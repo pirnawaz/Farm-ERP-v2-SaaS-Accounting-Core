@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Services\TenantContext;
 use App\Domains\Accounting\Reports\FinancialStatementsService;
+use App\Domains\Reporting\TrialBalanceService;
+use App\Domains\Reporting\GeneralLedgerService;
+use App\Domains\Reporting\ProfitLossService;
+use App\Domains\Reporting\BalanceSheetService;
 use App\Services\SettlementService;
 use App\Services\ReconciliationService;
 use App\Services\SaleARService;
@@ -35,79 +39,39 @@ class ReportController extends Controller
         private ReconciliationService $reconciliationService,
         private SettlementService $settlementService,
         private LandlordStatementService $landlordStatementService,
-        private FinancialStatementsService $financialStatementsService
+        private FinancialStatementsService $financialStatementsService,
+        private TrialBalanceService $trialBalanceService,
+        private GeneralLedgerService $generalLedgerService,
+        private ProfitLossService $profitLossService,
+        private BalanceSheetService $balanceSheetService
     ) {}
 
     /**
      * GET /api/reports/trial-balance
-     * Returns trial balance by account for a date range
-     * Trial Balance is a global ledger report, not project-scoped
+     * Returns trial balance by account as-of a date. Optional filters: project_id, crop_cycle_id.
      */
     public function trialBalance(Request $request): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
-        
+
         $validator = Validator::make($request->all(), [
-            'from' => 'required|date',
-            'to' => 'required|date|after_or_equal:from',
+            'as_of' => 'required|date',
+            'project_id' => 'nullable|uuid',
+            'crop_cycle_id' => 'nullable|uuid',
         ]);
-        
+
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
-        
-        $from = $request->input('from');
-        $to = $request->input('to');
-        
-        // Use direct query with new column names
-        // Trial Balance is global - ignore project_id entirely
-        $query = "
-            SELECT
-                a.id AS account_id,
-                a.code AS account_code,
-                a.name AS account_name,
-                a.type AS account_type,
-                le.currency_code,
-                COALESCE(SUM(le.debit_amount), 0) AS total_debit,
-                COALESCE(SUM(le.credit_amount), 0) AS total_credit,
-                COALESCE(SUM(le.debit_amount - le.credit_amount), 0) AS net
-            FROM ledger_entries le
-            JOIN accounts a ON a.id = le.account_id
-            JOIN posting_groups pg ON pg.id = le.posting_group_id
-            WHERE pg.tenant_id = :tenant_id
-                AND pg.posting_date BETWEEN :from AND :to
-            GROUP BY a.id, a.code, a.name, a.type, le.currency_code
-            ORDER BY a.code
-        ";
-        
-        $params = [
-            'tenant_id' => $tenantId,
-            'from' => $from,
-            'to' => $to,
-        ];
-        
-        try {
-            $results = DB::select($query, $params);
-            
-            // Convert stdClass to array for JSON response
-            $rows = array_map(function ($row) {
-                return [
-                    'account_id' => $row->account_id,
-                    'account_code' => $row->account_code,
-                    'account_name' => $row->account_name,
-                    'account_type' => $row->account_type,
-                    'currency_code' => $row->currency_code,
-                    'total_debit' => (string) $row->total_debit,
-                    'total_credit' => (string) $row->total_credit,
-                    'net' => (string) $row->net,
-                ];
-            }, $results);
-            
-            return response()->json($rows);
-        } catch (\Exception $e) {
-            // Return empty array on error instead of 500
-            return response()->json([]);
-        }
+
+        $asOf = $request->input('as_of');
+        $filters = array_filter([
+            'project_id' => $request->input('project_id'),
+            'crop_cycle_id' => $request->input('crop_cycle_id'),
+        ]);
+
+        $data = $this->trialBalanceService->getTrialBalance($tenantId, $asOf, $filters);
+        return response()->json($data);
     }
 
     /**
@@ -138,142 +102,111 @@ class ReportController extends Controller
     }
 
     /**
+     * GET /api/reports/profit-loss/project
+     * P&L scoped to a project (from allocation_rows). Required: project_id, from, to.
+     */
+    public function profitLossProject(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|uuid',
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $projectId = $request->input('project_id');
+        $filters = ['project_id' => $projectId];
+        $data = $this->profitLossService->getProfitLoss($tenantId, $from, $to, $filters);
+        return response()->json($data);
+    }
+
+    /**
+     * GET /api/reports/profit-loss/crop-cycle
+     * P&L scoped to a crop cycle. Required: crop_cycle_id, from, to.
+     */
+    public function profitLossCropCycle(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'crop_cycle_id' => 'required|uuid',
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $cropCycleId = $request->input('crop_cycle_id');
+        $filters = ['crop_cycle_id' => $cropCycleId];
+        $data = $this->profitLossService->getProfitLoss($tenantId, $from, $to, $filters);
+        return response()->json($data);
+    }
+
+    /**
      * GET /api/reports/balance-sheet
-     * Balance Sheet as-of date. Read-only from ledger. Includes equation check.
+     * Balance Sheet as-of date. Optional: crop_cycle_id, project_id (tenant-wide if omitted).
      */
     public function balanceSheet(Request $request): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
         $validator = Validator::make($request->all(), [
             'as_of' => 'required|date',
-            'compare_as_of' => 'nullable|date',
+            'crop_cycle_id' => 'nullable|uuid',
+            'project_id' => 'nullable|uuid',
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
         $asOf = $request->input('as_of');
-        $compareAsOf = $request->input('compare_as_of');
-        $data = $this->financialStatementsService->getBalanceSheet($tenantId, $asOf, $compareAsOf);
+        $filters = [];
+        if ($request->filled('crop_cycle_id')) {
+            $filters['crop_cycle_id'] = $request->input('crop_cycle_id');
+        }
+        if ($request->filled('project_id')) {
+            $filters['project_id'] = $request->input('project_id');
+        }
+        $data = $this->balanceSheetService->getBalanceSheet($tenantId, $asOf, $filters);
         return response()->json($data);
     }
     
     /**
      * GET /api/reports/general-ledger
-     * Returns ledger line items (chronological) with pagination
+     * Account drill-down: opening balance, entries (running balance), closing balance.
+     * Required: account_id, from, to. Optional: project_id, crop_cycle_id.
      */
     public function generalLedger(Request $request): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
-        
+
         $validator = Validator::make($request->all(), [
+            'account_id' => 'required|uuid',
             'from' => 'required|date',
             'to' => 'required|date|after_or_equal:from',
-            'account_id' => 'nullable|uuid',
             'project_id' => 'nullable|uuid',
-            'page' => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:1|max:1000',
+            'crop_cycle_id' => 'nullable|uuid',
         ]);
-        
+
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
-        
+
         $from = $request->input('from');
         $to = $request->input('to');
-        $accountId = $request->input('account_id');
-        $projectId = $request->input('project_id');
-        $page = $request->input('page', 1);
-        $perPage = $request->input('per_page', 50);
-        
-        // Use direct query with new column names
-        $query = "
-            SELECT
-                pg.posting_date,
-                pg.id AS posting_group_id,
-                pg.source_type,
-                pg.source_id,
-                pg.reversal_of_posting_group_id,
-                pg.correction_reason,
-                le.id AS ledger_entry_id,
-                a.id AS account_id,
-                a.code AS account_code,
-                a.name AS account_name,
-                a.type AS account_type,
-                le.currency_code,
-                le.debit_amount AS debit,
-                le.credit_amount AS credit,
-                (le.debit_amount - le.credit_amount) AS net
-            FROM ledger_entries le
-            JOIN accounts a ON a.id = le.account_id
-            JOIN posting_groups pg ON pg.id = le.posting_group_id
-            WHERE le.tenant_id = :tenant_id
-                AND pg.posting_date BETWEEN :from AND :to
-        ";
-        
-        $params = [
-            'tenant_id' => $tenantId,
-            'from' => $from,
-            'to' => $to,
-        ];
-        
-        if ($accountId) {
-            $query .= " AND account_id = :account_id";
-            $params['account_id'] = $accountId;
+        $filters = ['account_id' => $request->input('account_id')];
+        if ($request->filled('project_id')) {
+            $filters['project_id'] = $request->input('project_id');
         }
-        
-        if ($projectId) {
-            // Join with allocation_rows to filter by project
-            $query .= " AND EXISTS (
-                SELECT 1 FROM allocation_rows ar 
-                WHERE ar.posting_group_id = pg.id 
-                AND ar.project_id = :project_id
-            )";
-            $params['project_id'] = $projectId;
+        if ($request->filled('crop_cycle_id')) {
+            $filters['crop_cycle_id'] = $request->input('crop_cycle_id');
         }
-        
-        $query .= " ORDER BY pg.posting_date ASC, le.id ASC";
-        
-        // Get total count for pagination
-        $countQuery = "SELECT COUNT(*) as total FROM ({$query}) AS subquery";
-        $total = DB::selectOne($countQuery, $params)->total;
-        
-        // Apply pagination
-        $offset = ($page - 1) * $perPage;
-        $query .= " LIMIT :limit OFFSET :offset";
-        $params['limit'] = $perPage;
-        $params['offset'] = $offset;
-        
-        $results = DB::select($query, $params);
-        
-        $rows = array_map(function ($row) {
-            return [
-                'posting_date' => $row->posting_date,
-                'posting_group_id' => $row->posting_group_id,
-                'source_type' => $row->source_type,
-                'source_id' => $row->source_id,
-                'reversal_of_posting_group_id' => $row->reversal_of_posting_group_id,
-                'correction_reason' => $row->correction_reason,
-                'ledger_entry_id' => $row->ledger_entry_id,
-                'account_id' => $row->account_id,
-                'account_code' => $row->account_code,
-                'account_name' => $row->account_name,
-                'account_type' => $row->account_type,
-                'currency_code' => $row->currency_code,
-                'debit' => (string) $row->debit,
-                'credit' => (string) $row->credit,
-                'net' => (string) $row->net,
-            ];
-        }, $results);
-        
-        return response()->json([
-            'data' => $rows,
-            'pagination' => [
-                'page' => (int) $page,
-                'per_page' => (int) $perPage,
-                'total' => (int) $total,
-                'last_page' => (int) ceil($total / $perPage),
-            ],
-        ]);
+
+        $data = $this->generalLedgerService->getGeneralLedger($tenantId, $from, $to, $filters);
+        return response()->json($data);
     }
     
     /**

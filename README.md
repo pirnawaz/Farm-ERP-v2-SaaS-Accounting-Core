@@ -52,7 +52,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Audit Logs** — Transaction audit trail for posted operations
 - **Reports** — Trial balance, **Profit & Loss** (income statement), **Balance Sheet** (with equation check), general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, **AR ageing** (including auditable `GET /ar/aging` — open invoice balances per customer with bucket totals and grand totals), customer balances, AP ageing, supplier balances, AR/AP control reconciliation, yield reports, party ledger, party summary, **landlord statement** (Maqada, when `land_leases` module enabled), role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); bank reconciliation; CSV export with Terrava-branded filenames; print-friendly layouts
 - **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
-- **Crop Cycle Close** — Close crop cycle with preview; crop-cycle-based settlements (preview and post); accounting corrections and guards
+- **Crop Cycle Close** — Close crop cycle with preview; **Accounting Period Close (v2)**: full closing entries that zero all income/expense accounts for the cycle period, clear via CURRENT_EARNINGS, and roll to RETAINED_EARNINGS in one PERIOD_CLOSE posting group; idempotent (one close run per cycle); crop cycle lock enforced (no posting after CLOSED); `POST crop-cycles/{id}/close`, `GET crop-cycles/{id}/close-run`; crop-cycle-based settlements (preview and post); accounting corrections and guards
 - **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
@@ -232,7 +232,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Parties**     | `apiResource('parties')`, `.../balances`, `.../statement`, `.../receivables/open-sales` |
 | **Land**        | `apiResource('land-parcels')`, `.../documents`                           |
 | **Land Leases** | `apiResource('land-leases')`; `GET/POST/PUT/DELETE /land-lease-accruals`, `POST /land-lease-accruals/{id}/post`, `POST /land-lease-accruals/{id}/reverse` (tenant_admin, `land_leases` module) |
-| **Crop cycles** | `apiResource('crop-cycles')`, `.../close-preview`, `.../close`, `.../reopen`, `.../open` |
+| **Crop cycles** | `apiResource('crop-cycles')`, `GET .../close-preview`, `GET .../close-run`, `POST .../close` (optional `as_of`), `POST .../reopen`, `POST .../open` |
 | **Land allocations** | `apiResource('land-allocations')`                                   |
 | **Projects**    | `apiResource('projects')`, `POST /projects/from-allocation`              |
 | **Project rules**| `GET/PUT /projects/{id}/rules`                                           |
@@ -251,7 +251,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Posting groups** | `GET /posting-groups/{id}`, `.../ledger-entries`, `.../allocation-rows`, `.../reverse`, `.../reversals` |
 | **Reports**     | `trial-balance`, `profit-loss` (from/to, optional compare), `balance-sheet` (as_of, optional compare_as_of), `general-ledger`, `project-statement`, `project-pl`, `crop-cycle-pl`, `account-balances`, `cashbook`, `ar-ageing`, `GET ar/aging` (auditable AR aging), `customer-balances`, `customer-balance-detail`, `ap-ageing`, `supplier-balances`, `supplier-balance-detail`, `ar-control-reconciliation`, `ap-control-reconciliation`, `yield`, `party-ledger`, `party-summary`, `landlord-statement` (requires `land_leases`), `role-ageing`, `crop-cycle-distribution`, `settlement-statement`, `cost-per-unit`, `sales-margin`; `reports/reconciliation/project`, `reports/reconciliation/crop-cycle`, `reports/reconciliation/supplier-ap` |
 | **Bank reconciliation** | `GET/POST bank-reconciliations`, `GET bank-reconciliations/{id}`, `POST .../clear`, `.../unclear`, `.../finalize`, `.../statement-lines`, `.../statement-lines/{lineId}/match`, `.../unmatch`, `.../void` |
-| **Accounting**  | `GET/POST journals`, `GET/PUT journals/{id}`, `POST journals/{id}/post`, `POST journals/{id}/reverse`; `GET/POST accounting-periods`, `POST accounting-periods/{id}/close`, `POST .../reopen`, `GET .../events` |
+| **Accounting**  | `GET/POST journals`, `GET/PUT journals/{id}`, `POST journals/{id}/post`, `POST journals/{id}/reverse`; `GET/POST accounting-periods`, `POST accounting-periods/{id}/close`, `POST .../reopen`, `GET .../events`; **Period close**: `POST crop-cycles/{id}/close` (body: optional `as_of` date), `GET crop-cycles/{id}/close-run` (returns period_close_run or 404) |
 | **Reconciliation** | `GET /reconciliation/project/{id}`, `GET /reconciliation/supplier/{party_id}` |
 | **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
 
@@ -313,9 +313,10 @@ Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/
 php artisan test --filter=PlatformAdminTenantAndImpersonation
 ```
 
-Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date), **Payments** (posting creates posting group with `source_type=PAYMENT`, allocation row `PAYMENT`, ledger entries; method BANK credits BANK account; reverse creates reversal posting group and negated allocation row; cannot reverse twice), **Payment apply/unapply** (PaymentApplySalesTest: preview FIFO, apply FIFO/manual, unapply voids allocations, reversed sale/payment excluded from open sales), **Reversal guards** (ReversalGuardsTest: cannot reverse payment or sale while ACTIVE allocations exist; 409 until unapplied), **AR Statement** (ARStatementTest), **AR Aging report** (ARAgingReportTest: buckets per customer and grand totals, apply payment reduces open balance, unapply restores it, reversed sale excluded, default as_of), **Financial Statements** (FinancialStatementsTest: Profit & Loss for range with income/expense totals and net profit, Balance Sheet as-of with equation check, compare period deltas, tenant isolation), **Accounting period locking** (AccountingPeriodLockingTest), and **Bank reconciliation** (BankReconciliationTest, BankStatementLinesTest):
+Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Crop Cycle Close** (CropCycleCloseTest: full closing entries zero income/expense, multiple accounts zeroed, loss scenario, idempotency, lock enforcement, tenant isolation, snapshot/rule_snapshot), **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date), **Payments** (posting creates posting group with `source_type=PAYMENT`, allocation row `PAYMENT`, ledger entries; method BANK credits BANK account; reverse creates reversal posting group and negated allocation row; cannot reverse twice), **Payment apply/unapply** (PaymentApplySalesTest: preview FIFO, apply FIFO/manual, unapply voids allocations, reversed sale/payment excluded from open sales), **Reversal guards** (ReversalGuardsTest: cannot reverse payment or sale while ACTIVE allocations exist; 409 until unapplied), **AR Statement** (ARStatementTest), **AR Aging report** (ARAgingReportTest: buckets per customer and grand totals, apply payment reduces open balance, unapply restores it, reversed sale excluded, default as_of), **Financial Statements** (FinancialStatementsTest: Profit & Loss for range with income/expense totals and net profit, Balance Sheet as-of with equation check, compare period deltas, tenant isolation), **Accounting period locking** (AccountingPeriodLockingTest), and **Bank reconciliation** (BankReconciliationTest, BankStatementLinesTest):
 
 ```bash
+php artisan test --filter=CropCycleCloseTest
 php artisan test tests/Feature/SettlementPackTest.php
 php artisan test --filter=LandLeaseAccrualPostingTest
 php artisan test --filter=LandLeaseAccrualReversalTest
@@ -350,7 +351,7 @@ Platform admin flows (tenant list, impersonation) require a profile that logs in
 .
 ├── apps/
 │   ├── api/                    # Laravel API
-│   │   ├── app/Domains/        # Domain logic (e.g. Accounting/Reports/FinancialStatementsService, Governance/SettlementPack)
+│   │   ├── app/Domains/        # Domain logic (e.g. Accounting/PeriodClose, Accounting/Reports, Governance/SettlementPack)
 │   │   ├── app/Http/Controllers/
 │   │   ├── app/Http/Middleware/
 │   │   ├── app/Models/

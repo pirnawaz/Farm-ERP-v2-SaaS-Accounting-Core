@@ -11,6 +11,7 @@ class SettlementPack extends Model
     use HasUuids;
 
     public const STATUS_DRAFT = 'DRAFT';
+    public const STATUS_PENDING_APPROVAL = 'PENDING_APPROVAL';
     public const STATUS_FINAL = 'FINAL';
 
     protected $fillable = [
@@ -19,12 +20,15 @@ class SettlementPack extends Model
         'generated_by_user_id',
         'generated_at',
         'status',
+        'finalized_at',
+        'finalized_by_user_id',
         'summary_json',
         'register_version',
     ];
 
     protected $casts = [
         'generated_at' => 'datetime',
+        'finalized_at' => 'datetime',
         'summary_json' => 'array',
         'created_at' => 'datetime',
     ];
@@ -42,5 +46,15 @@ class SettlementPack extends Model
     public function generatedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'generated_by_user_id');
+    }
+
+    public function finalizedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'finalized_by_user_id');
+    }
+
+    public function approvals(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SettlementPackApproval::class);
     }
 }

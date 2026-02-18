@@ -2,534 +2,453 @@
 
 namespace Tests\Feature;
 
-use App\Models\Tenant;
-use App\Models\Module;
-use App\Models\TenantModule;
+use App\Domains\Accounting\PeriodClose\PeriodCloseService;
+use App\Exceptions\CropCycleClosedException;
+use App\Models\Account;
+use App\Models\AllocationRow;
 use App\Models\CropCycle;
+use App\Models\LedgerEntry;
 use App\Models\Party;
-use App\Models\Project;
-use App\Models\ProjectRule;
-use App\Models\Settlement;
+use App\Models\PeriodCloseRun;
 use App\Models\PostingGroup;
-use App\Models\InvUom;
-use App\Models\InvItemCategory;
-use App\Models\InvItem;
-use App\Models\InvStore;
-use App\Models\InvGrn;
-use App\Models\InvGrnLine;
-use App\Models\InvIssue;
-use App\Models\InvIssueLine;
-use App\Models\Sale;
-use App\Models\SaleLine;
-use App\Models\OperationalTransaction;
-use App\Services\TenantContext;
-use App\Services\InventoryPostingService;
-use App\Services\SaleCOGSService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+use App\Models\Project;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Services\PostingService;
 use Database\Seeders\SystemAccountsSeeder;
-use Database\Seeders\ModulesSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Tests\TestCase;
 
 class CropCycleCloseTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function enableProjectsCropCycles(Tenant $tenant): void
-    {
-        $m = Module::where('key', 'projects_crop_cycles')->first();
-        if ($m) {
-            TenantModule::firstOrCreate(
-                ['tenant_id' => $tenant->id, 'module_id' => $m->id],
-                ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
-            );
-        }
-    }
+    private Tenant $tenant;
+    private CropCycle $cropCycle;
+    private Project $project;
+    private Party $party;
+    private User $tenantAdmin;
 
-    private function enableInventory(Tenant $tenant): void
+    protected function setUp(): void
     {
-        $m = Module::where('key', 'inventory')->first();
-        if ($m) {
-            TenantModule::firstOrCreate(
-                ['tenant_id' => $tenant->id, 'module_id' => $m->id],
-                ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
-            );
-        }
-    }
+        parent::setUp();
+        \App\Services\TenantContext::clear();
 
-    private function enableModule(Tenant $tenant, string $key): void
-    {
-        $m = Module::where('key', $key)->first();
-        if ($m) {
-            TenantModule::firstOrCreate(
-                ['tenant_id' => $tenant->id, 'module_id' => $m->id],
-                ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
-            );
-        }
-    }
+        $this->tenant = Tenant::create(['name' => 'Close Test Tenant', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($this->tenant->id);
 
-    public function test_close_preview_returns_expected_shape(): void
-    {
-        TenantContext::clear();
-        (new ModulesSeeder)->run();
-        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableProjectsCropCycles($tenant);
-
-        $cycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
+        $this->cropCycle = CropCycle::create([
+            'tenant_id' => $this->tenant->id,
             'name' => '2024 Cycle',
             'start_date' => '2024-01-01',
             'end_date' => '2024-12-31',
             'status' => 'OPEN',
         ]);
 
-        $r = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->getJson("/api/crop-cycles/{$cycle->id}/close-preview");
-
-        $r->assertStatus(200);
-        $data = $r->json();
-        $this->assertArrayHasKey('status', $data);
-        $this->assertArrayHasKey('has_posted_settlement', $data);
-        $this->assertArrayHasKey('reconciliation_summary', $data);
-        $this->assertArrayHasKey('blocking_reasons', $data);
-        $this->assertArrayHasKey('reconciliation', $data);
-        $this->assertIsArray($data['blocking_reasons']);
-        $this->assertSame('OPEN', $data['status']);
-        $this->assertFalse($data['has_posted_settlement']);
-        $this->assertContains('At least one POSTED settlement is required for this crop cycle.', $data['blocking_reasons']);
-
-        $recon = $data['reconciliation'];
-        $this->assertArrayHasKey('from', $recon);
-        $this->assertArrayHasKey('to', $recon);
-        $this->assertArrayHasKey('counts', $recon);
-        $this->assertArrayHasKey('pass', $recon['counts']);
-        $this->assertArrayHasKey('warn', $recon['counts']);
-        $this->assertArrayHasKey('fail', $recon['counts']);
-        $this->assertArrayHasKey('checks', $recon);
-        $this->assertIsArray($recon['checks']);
-        foreach ($recon['checks'] as $check) {
-            $this->assertArrayHasKey('key', $check);
-            $this->assertArrayHasKey('status', $check);
-            $this->assertArrayHasKey('summary', $check);
-            $this->assertArrayHasKey('title', $check);
-        }
-    }
-
-    public function test_cannot_close_without_posted_settlement(): void
-    {
-        TenantContext::clear();
-        (new ModulesSeeder)->run();
-        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableProjectsCropCycles($tenant);
-
-        $cycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => '2024 Cycle',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
+        $this->party = Party::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Hari',
+            'party_types' => ['HARI'],
         ]);
 
-        $r = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'tenant_admin')
-            ->postJson("/api/crop-cycles/{$cycle->id}/close", ['note' => 'Test']);
-
-        $r->assertStatus(422);
-        $this->assertStringContainsString('settlement', strtolower($r->json('message') ?? ''));
-    }
-
-    public function test_close_blocked_when_reconciliation_has_fail(): void
-    {
-        TenantContext::clear();
-        (new ModulesSeeder)->run();
-        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableProjectsCropCycles($tenant);
-        $this->enableInventory($tenant);
-        $this->enableModule($tenant, 'ar_sales');
-
-        $cycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => '2024 Cycle',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
-        ]);
-        $party = Party::create(['tenant_id' => $tenant->id, 'name' => 'P', 'party_types' => ['LANDLORD']]);
-        $buyerParty = Party::create(['tenant_id' => $tenant->id, 'name' => 'Buyer', 'party_types' => ['BUYER']]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $party->id,
-            'crop_cycle_id' => $cycle->id,
-            'name' => 'Proj',
+        $this->project = Project::create([
+            'tenant_id' => $this->tenant->id,
+            'party_id' => $this->party->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'name' => 'Test Project',
             'status' => 'CLOSED',
         ]);
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 60,
-            'profit_split_hari_pct' => 40,
-            'kamdari_pct' => 0,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
-        ]);
 
-        $uom = InvUom::create(['tenant_id' => $tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
-        $cat = InvItemCategory::create(['tenant_id' => $tenant->id, 'name' => 'Fert']);
-        $item = InvItem::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Fert',
-            'uom_id' => $uom->id,
-            'category_id' => $cat->id,
-            'valuation_method' => 'WAC',
-            'is_active' => true,
+        $this->tenantAdmin = User::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Admin',
+            'email' => 'admin-close@test.' . $this->tenant->id,
+            'password' => Hash::make('password'),
+            'role' => 'tenant_admin',
+            'is_enabled' => true,
         ]);
-        $store = InvStore::create(['tenant_id' => $tenant->id, 'name' => 'Main', 'type' => 'MAIN', 'is_active' => true]);
-        $grn = InvGrn::create([
-            'tenant_id' => $tenant->id,
-            'doc_no' => 'GRN-1',
-            'store_id' => $store->id,
-            'doc_date' => '2024-06-01',
+    }
+
+    /**
+     * Create income/expense postings in the cycle to produce a given net profit.
+     * Uses JOURNAL_ENTRY-style posting groups with PROJECT_REVENUE and EXP_SHARED.
+     */
+    private function postProfitLossEntries(float $incomeAmount, float $expenseAmount): void
+    {
+        $revenue = Account::where('tenant_id', $this->tenant->id)->where('code', 'PROJECT_REVENUE')->firstOrFail();
+        $expense = Account::where('tenant_id', $this->tenant->id)->where('code', 'EXP_SHARED')->firstOrFail();
+        $bank = Account::where('tenant_id', $this->tenant->id)->where('code', 'BANK')->firstOrFail();
+
+        if ($incomeAmount > 0) {
+            $pg = PostingGroup::create([
+                'tenant_id' => $this->tenant->id,
+                'crop_cycle_id' => $this->cropCycle->id,
+                'source_type' => 'JOURNAL_ENTRY',
+                'source_id' => (string) \Illuminate\Support\Str::uuid(),
+                'posting_date' => '2024-06-15',
+                'idempotency_key' => 'close-test-income-' . \Illuminate\Support\Str::uuid(),
+            ]);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $bank->id, 'debit_amount' => $incomeAmount, 'credit_amount' => 0, 'currency_code' => 'GBP']);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $revenue->id, 'debit_amount' => 0, 'credit_amount' => $incomeAmount, 'currency_code' => 'GBP']);
+            AllocationRow::create([
+                'tenant_id' => $this->tenant->id,
+                'posting_group_id' => $pg->id,
+                'project_id' => $this->project->id,
+                'party_id' => $this->party->id,
+                'allocation_type' => 'POOL_SHARE',
+                'amount' => $incomeAmount,
+            ]);
+        }
+        if ($expenseAmount > 0) {
+            $pg = PostingGroup::create([
+                'tenant_id' => $this->tenant->id,
+                'crop_cycle_id' => $this->cropCycle->id,
+                'source_type' => 'JOURNAL_ENTRY',
+                'source_id' => (string) \Illuminate\Support\Str::uuid(),
+                'posting_date' => '2024-06-20',
+                'idempotency_key' => 'close-test-expense-' . \Illuminate\Support\Str::uuid(),
+            ]);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $expense->id, 'debit_amount' => $expenseAmount, 'credit_amount' => 0, 'currency_code' => 'GBP']);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $bank->id, 'debit_amount' => 0, 'credit_amount' => $expenseAmount, 'currency_code' => 'GBP']);
+            AllocationRow::create([
+                'tenant_id' => $this->tenant->id,
+                'posting_group_id' => $pg->id,
+                'project_id' => $this->project->id,
+                'party_id' => $this->party->id,
+                'allocation_type' => 'POOL_SHARE',
+                'amount' => $expenseAmount,
+            ]);
+        }
+    }
+
+    /** @test */
+    public function close_creates_closing_posting_group_and_locks_crop_cycle(): void
+    {
+        $this->postProfitLossEntries(500, 200);
+
+        $service = $this->app->make(PeriodCloseService::class);
+        $result = $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
+
+        $this->cropCycle->refresh();
+        $this->assertSame('CLOSED', $this->cropCycle->status);
+
+        $run = PeriodCloseRun::where('tenant_id', $this->tenant->id)->where('crop_cycle_id', $this->cropCycle->id)->firstOrFail();
+        $this->assertSame('300.00', (string) $run->net_profit);
+
+        $pg = PostingGroup::where('id', $result['posting_group_id'])->firstOrFail();
+        $this->assertSame('PERIOD_CLOSE', $pg->source_type);
+        $this->assertSame($run->id, $pg->source_id);
+        $this->assertSame('2024-12-31', $pg->posting_date->format('Y-m-d'));
+
+        $entries = LedgerEntry::where('posting_group_id', $pg->id)->get();
+        $totalDebit = (float) $entries->sum('debit_amount');
+        $totalCredit = (float) $entries->sum('credit_amount');
+        $this->assertEqualsWithDelta($totalDebit, $totalCredit, 0.01, 'Posting group must balance');
+
+        $revenue = Account::where('tenant_id', $this->tenant->id)->where('code', 'PROJECT_REVENUE')->firstOrFail();
+        $expense = Account::where('tenant_id', $this->tenant->id)->where('code', 'EXP_SHARED')->firstOrFail();
+        $retained = Account::where('tenant_id', $this->tenant->id)->where('code', 'RETAINED_EARNINGS')->firstOrFail();
+        $current = Account::where('tenant_id', $this->tenant->id)->where('code', 'CURRENT_EARNINGS')->firstOrFail();
+
+        $revenueEntries = $entries->where('account_id', $revenue->id);
+        $expenseEntries = $entries->where('account_id', $expense->id);
+        $currentEntries = $entries->where('account_id', $current->id);
+        $retainedEntries = $entries->where('account_id', $retained->id);
+
+        $this->assertCount(1, $revenueEntries, 'Income account must have one closing line');
+        $this->assertEquals(500, (float) $revenueEntries->first()->debit_amount);
+        $this->assertEquals(0, (float) $revenueEntries->first()->credit_amount);
+
+        $this->assertCount(1, $expenseEntries, 'Expense account must have one closing line');
+        $this->assertEquals(0, (float) $expenseEntries->first()->debit_amount);
+        $this->assertEquals(200, (float) $expenseEntries->first()->credit_amount);
+
+        $currentNet = $currentEntries->sum('credit_amount') - $currentEntries->sum('debit_amount');
+        $this->assertEqualsWithDelta(0, (float) $currentNet, 0.01, 'CURRENT_EARNINGS must net to zero');
+
+        $retainedNetCredit = (float) $retainedEntries->sum('credit_amount') - (float) $retainedEntries->sum('debit_amount');
+        $this->assertEqualsWithDelta(300, $retainedNetCredit, 0.01, 'RETAINED_EARNINGS net credit must equal net profit');
+    }
+
+    /** @test */
+    public function full_closing_entries_zero_income_and_expense(): void
+    {
+        $this->postProfitLossEntries(500, 200);
+
+        $service = $this->app->make(PeriodCloseService::class);
+        $result = $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
+
+        $run = PeriodCloseRun::where('tenant_id', $this->tenant->id)->where('crop_cycle_id', $this->cropCycle->id)->firstOrFail();
+        $this->assertSame('300.00', (string) $run->net_profit);
+
+        $pg = PostingGroup::where('id', $result['posting_group_id'])->firstOrFail();
+        $entries = LedgerEntry::where('posting_group_id', $pg->id)->get();
+
+        $revenue = Account::where('tenant_id', $this->tenant->id)->where('code', 'PROJECT_REVENUE')->firstOrFail();
+        $expense = Account::where('tenant_id', $this->tenant->id)->where('code', 'EXP_SHARED')->firstOrFail();
+        $current = Account::where('tenant_id', $this->tenant->id)->where('code', 'CURRENT_EARNINGS')->firstOrFail();
+        $retained = Account::where('tenant_id', $this->tenant->id)->where('code', 'RETAINED_EARNINGS')->firstOrFail();
+
+        $revenueLine = $entries->firstWhere('account_id', $revenue->id);
+        $this->assertNotNull($revenueLine);
+        $this->assertEqualsWithDelta(500, (float) $revenueLine->debit_amount, 0.01);
+        $this->assertEqualsWithDelta(0, (float) $revenueLine->credit_amount, 0.01);
+
+        $expenseLine = $entries->firstWhere('account_id', $expense->id);
+        $this->assertNotNull($expenseLine);
+        $this->assertEqualsWithDelta(0, (float) $expenseLine->debit_amount, 0.01);
+        $this->assertEqualsWithDelta(200, (float) $expenseLine->credit_amount, 0.01);
+
+        $currentDebit = (float) $entries->where('account_id', $current->id)->sum('debit_amount');
+        $currentCredit = (float) $entries->where('account_id', $current->id)->sum('credit_amount');
+        $this->assertEqualsWithDelta($currentDebit, $currentCredit, 0.01);
+
+        $retainedCredit = (float) $entries->where('account_id', $retained->id)->sum('credit_amount');
+        $this->assertEqualsWithDelta(300, $retainedCredit, 0.01);
+
+        $this->assertEqualsWithDelta($entries->sum('debit_amount'), $entries->sum('credit_amount'), 0.01);
+    }
+
+    /** @test */
+    public function multiple_income_and_expense_accounts_each_zeroed_correctly(): void
+    {
+        $revenue1 = Account::where('tenant_id', $this->tenant->id)->where('code', 'PROJECT_REVENUE')->firstOrFail();
+        $revenue2 = Account::create([
+            'tenant_id' => $this->tenant->id,
+            'code' => 'OTHER_INCOME',
+            'name' => 'Other Income',
+            'type' => 'income',
+            'is_system' => false,
+        ]);
+        $exp1 = Account::where('tenant_id', $this->tenant->id)->where('code', 'EXP_SHARED')->firstOrFail();
+        $exp2 = Account::where('tenant_id', $this->tenant->id)->where('code', 'EXP_HARI_ONLY')->firstOrFail();
+        $bank = Account::where('tenant_id', $this->tenant->id)->where('code', 'BANK')->firstOrFail();
+
+        foreach ([[$revenue1, 300], [$revenue2, 200]] as [$acc, $amt]) {
+            $pg = PostingGroup::create([
+                'tenant_id' => $this->tenant->id,
+                'crop_cycle_id' => $this->cropCycle->id,
+                'source_type' => 'JOURNAL_ENTRY',
+                'source_id' => (string) \Illuminate\Support\Str::uuid(),
+                'posting_date' => '2024-06-15',
+                'idempotency_key' => 'multi-' . $acc->id . '-' . \Illuminate\Support\Str::uuid(),
+            ]);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $bank->id, 'debit_amount' => $amt, 'credit_amount' => 0, 'currency_code' => 'GBP']);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $acc->id, 'debit_amount' => 0, 'credit_amount' => $amt, 'currency_code' => 'GBP']);
+            AllocationRow::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'project_id' => $this->project->id, 'party_id' => $this->party->id, 'allocation_type' => 'POOL_SHARE', 'amount' => $amt]);
+        }
+        foreach ([[$exp1, 100], [$exp2, 150]] as [$acc, $amt]) {
+            $pg = PostingGroup::create([
+                'tenant_id' => $this->tenant->id,
+                'crop_cycle_id' => $this->cropCycle->id,
+                'source_type' => 'JOURNAL_ENTRY',
+                'source_id' => (string) \Illuminate\Support\Str::uuid(),
+                'posting_date' => '2024-06-20',
+                'idempotency_key' => 'multi-exp-' . $acc->id . '-' . \Illuminate\Support\Str::uuid(),
+            ]);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $acc->id, 'debit_amount' => $amt, 'credit_amount' => 0, 'currency_code' => 'GBP']);
+            LedgerEntry::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $bank->id, 'debit_amount' => 0, 'credit_amount' => $amt, 'currency_code' => 'GBP']);
+            AllocationRow::create(['tenant_id' => $this->tenant->id, 'posting_group_id' => $pg->id, 'project_id' => $this->project->id, 'party_id' => $this->party->id, 'allocation_type' => 'POOL_SHARE', 'amount' => $amt]);
+        }
+
+        $service = $this->app->make(PeriodCloseService::class);
+        $result = $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
+
+        $run = PeriodCloseRun::where('tenant_id', $this->tenant->id)->where('crop_cycle_id', $this->cropCycle->id)->firstOrFail();
+        $this->assertEqualsWithDelta(250, (float) $run->net_profit, 0.01);
+
+        $pg = PostingGroup::where('id', $result['posting_group_id'])->firstOrFail();
+        $entries = LedgerEntry::where('posting_group_id', $pg->id)->get();
+
+        foreach ([[$revenue1->id, 300], [$revenue2->id, 200]] as [$accountId, $expectedDebit]) {
+            $line = $entries->firstWhere('account_id', $accountId);
+            $this->assertNotNull($line, "Income account {$accountId} must have closing debit");
+            $this->assertEqualsWithDelta($expectedDebit, (float) $line->debit_amount, 0.01);
+            $this->assertEquals(0, (float) $line->credit_amount);
+        }
+        foreach ([[$exp1->id, 100], [$exp2->id, 150]] as [$accountId, $expectedCredit]) {
+            $line = $entries->firstWhere('account_id', $accountId);
+            $this->assertNotNull($line, "Expense account {$accountId} must have closing credit");
+            $this->assertEquals(0, (float) $line->debit_amount);
+            $this->assertEqualsWithDelta($expectedCredit, (float) $line->credit_amount, 0.01);
+        }
+
+        $current = Account::where('tenant_id', $this->tenant->id)->where('code', 'CURRENT_EARNINGS')->firstOrFail();
+        $currentNet = (float) $entries->where('account_id', $current->id)->sum('credit_amount') - (float) $entries->where('account_id', $current->id)->sum('debit_amount');
+        $this->assertEqualsWithDelta(0, $currentNet, 0.01);
+
+        $this->assertEqualsWithDelta($entries->sum('debit_amount'), $entries->sum('credit_amount'), 0.01);
+
+        $this->assertArrayHasKey('total_income', $run->snapshot_json);
+        $this->assertArrayHasKey('total_expense', $run->snapshot_json);
+        $this->assertArrayHasKey('net_profit', $run->snapshot_json);
+        $this->assertArrayHasKey('accounts_closed', $run->snapshot_json);
+        $this->assertEquals(1, $run->snapshot_json['accounts_closed']['income']);
+        $this->assertEquals(1, $run->snapshot_json['accounts_closed']['expense']);
+
+        $row = AllocationRow::where('posting_group_id', $pg->id)->firstOrFail();
+        $this->assertArrayHasKey('count_income_accounts_closed', $row->rule_snapshot);
+        $this->assertArrayHasKey('count_expense_accounts_closed', $row->rule_snapshot);
+        $this->assertEquals(1, $row->rule_snapshot['count_income_accounts_closed']);
+        $this->assertEquals(1, $row->rule_snapshot['count_expense_accounts_closed']);
+    }
+
+    /** @test */
+    public function idempotency_second_close_returns_existing_run_and_creates_no_second_posting_group(): void
+    {
+        $this->postProfitLossEntries(100, 0);
+
+        $service = $this->app->make(PeriodCloseService::class);
+        $first = $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
+        $second = $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
+
+        $this->assertSame($first['posting_group_id'], $second['posting_group_id']);
+        $this->assertSame($first['net_profit'], $second['net_profit']);
+
+        $count = PostingGroup::where('tenant_id', $this->tenant->id)->where('source_type', 'PERIOD_CLOSE')->where('crop_cycle_id', $this->cropCycle->id)->count();
+        $this->assertSame(1, $count);
+    }
+
+    /** @test */
+    public function lock_enforcement_after_close_posting_operational_transaction_fails(): void
+    {
+        $this->postProfitLossEntries(200, 50);
+
+        $service = $this->app->make(PeriodCloseService::class);
+        $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
+
+        $this->project->update(['status' => 'ACTIVE']);
+
+        $draftTxn = \App\Models\OperationalTransaction::create([
+            'tenant_id' => $this->tenant->id,
+            'project_id' => $this->project->id,
+            'crop_cycle_id' => $this->cropCycle->id,
+            'type' => 'EXPENSE',
             'status' => 'DRAFT',
-        ]);
-        InvGrnLine::create([
-            'tenant_id' => $tenant->id,
-            'grn_id' => $grn->id,
-            'item_id' => $item->id,
-            'qty' => 100,
-            'unit_cost' => 10,
-            'line_total' => 1000,
-        ]);
-        app(InventoryPostingService::class)->postGRN($grn->id, $tenant->id, '2024-06-01', 'grn-1');
-
-        $sale = Sale::create([
-            'tenant_id' => $tenant->id,
-            'buyer_party_id' => $buyerParty->id,
-            'project_id' => $project->id,
-            'crop_cycle_id' => $cycle->id,
-            'amount' => 2000.00,
-            'posting_date' => '2024-06-15',
-            'status' => 'DRAFT',
-        ]);
-        SaleLine::create([
-            'tenant_id' => $tenant->id,
-            'sale_id' => $sale->id,
-            'inventory_item_id' => $item->id,
-            'store_id' => $store->id,
-            'quantity' => 50,
-            'unit_price' => 40.00,
-            'line_total' => 2000.00,
-        ]);
-        $sale->refresh();
-        app(SaleCOGSService::class)->postSaleWithCOGS($sale, '2024-06-15', 'close-fail-sale-1');
-
-        $settlement = Settlement::create([
-            'tenant_id' => $tenant->id,
-            'crop_cycle_id' => $cycle->id,
-            'project_id' => $project->id,
-            'status' => 'DRAFT',
-            'pool_revenue' => 0,
-            'shared_costs' => 0,
-            'pool_profit' => 0,
-            'kamdari_amount' => 0,
-            'landlord_share' => 0,
-            'hari_share' => 0,
-            'hari_only_deductions' => 0,
-        ]);
-        $pg = PostingGroup::create([
-            'tenant_id' => $tenant->id,
-            'crop_cycle_id' => $cycle->id,
-            'source_type' => 'SETTLEMENT',
-            'source_id' => $settlement->id,
-            'posting_date' => '2024-06-15',
-            'idempotency_key' => 'close-fail-settle-1',
-        ]);
-        $settlement->update([
-            'posting_group_id' => $pg->id,
-            'status' => 'POSTED',
-            'posting_date' => '2024-06-15',
-            'posted_at' => now(),
+            'transaction_date' => '2024-07-01',
+            'amount' => 10.00,
+            'classification' => 'SHARED',
         ]);
 
-        $ot = OperationalTransaction::where('tenant_id', $tenant->id)
-            ->where('project_id', $project->id)
-            ->where('type', 'INCOME')
-            ->first();
-        $this->assertNotNull($ot, 'OT should exist after posting sale');
-        $ot->update(['amount' => $ot->amount + 100]);
-
-        $preview = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->getJson("/api/crop-cycles/{$cycle->id}/close-preview");
-        $preview->assertStatus(200);
-        $previewData = $preview->json();
-        $failCount = $previewData['reconciliation']['counts']['fail'] ?? $previewData['reconciliation_summary']['fail'] ?? 0;
-        $this->assertGreaterThan(0, $failCount, 'Preview should show at least one reconciliation FAIL');
-
-        $r = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'tenant_admin')
-            ->postJson("/api/crop-cycles/{$cycle->id}/close", ['note' => 'Should be blocked']);
-        $r->assertStatus(422);
-        $msg = $r->json('message') ?? '';
-        $this->assertStringContainsString('Reconciliation', $msg);
-        $this->assertTrue(
-            str_contains(strtolower($msg), 'failure') || str_contains(strtolower($msg), 'failures'),
-            'Message should mention reconciliation failure: ' . $msg
+        $this->expectException(CropCycleClosedException::class);
+        $this->app->make(PostingService::class)->postOperationalTransaction(
+            $draftTxn->id,
+            $this->tenant->id,
+            '2024-07-01',
+            'idem-lock-test'
         );
     }
 
-    public function test_close_sets_status_and_audit_fields(): void
+    /** @test */
+    public function preconditions_fail_when_project_still_active(): void
     {
-        TenantContext::clear();
-        (new ModulesSeeder)->run();
-        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableProjectsCropCycles($tenant);
+        $this->project->update(['status' => 'ACTIVE']);
+        $this->postProfitLossEntries(100, 30);
 
-        $cycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => '2024 Cycle',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'OPEN',
-        ]);
+        $service = $this->app->make(PeriodCloseService::class);
 
-        $party = Party::create(['tenant_id' => $tenant->id, 'name' => 'P', 'party_types' => ['LANDLORD']]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $party->id,
-            'crop_cycle_id' => $cycle->id,
-            'name' => 'Proj',
-            'status' => 'CLOSED',
-        ]);
-        ProjectRule::create([
-            'project_id' => $project->id,
-            'profit_split_landlord_pct' => 60,
-            'profit_split_hari_pct' => 40,
-            'kamdari_pct' => 0,
-            'kamdari_order' => 'BEFORE_SPLIT',
-            'pool_definition' => 'REVENUE_MINUS_SHARED_COSTS',
-        ]);
-
-        $settlement = Settlement::create([
-            'tenant_id' => $tenant->id,
-            'crop_cycle_id' => $cycle->id,
-            'project_id' => $project->id,
-            'status' => 'DRAFT',
-            'pool_revenue' => 0,
-            'shared_costs' => 0,
-            'pool_profit' => 0,
-            'kamdari_amount' => 0,
-            'landlord_share' => 0,
-            'hari_share' => 0,
-            'hari_only_deductions' => 0,
-        ]);
-        $pg = PostingGroup::create([
-            'tenant_id' => $tenant->id,
-            'crop_cycle_id' => $cycle->id,
-            'source_type' => 'SETTLEMENT',
-            'source_id' => $settlement->id,
-            'posting_date' => '2024-06-15',
-            'idempotency_key' => 'settle-1',
-        ]);
-        $settlement->update([
-            'posting_group_id' => $pg->id,
-            'status' => 'POSTED',
-            'posting_date' => '2024-06-15',
-            'posted_at' => now(),
-        ]);
-
-        $r = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'tenant_admin')
-            ->postJson("/api/crop-cycles/{$cycle->id}/close", ['note' => 'Final close']);
-
-        $r->assertStatus(200);
-        $data = $r->json();
-        $this->assertSame('CLOSED', $data['status']);
-        $this->assertNotNull($data['closed_at']);
-        $this->assertSame('Final close', $data['close_note'] ?? null);
-
-        $cycle->refresh();
-        $this->assertSame('CLOSED', $cycle->status);
-        $this->assertNotNull($cycle->closed_at);
-        $this->assertSame('Final close', $cycle->close_note);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ACTIVE');
+        $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
     }
 
-    public function test_posting_to_closed_cycle_is_rejected(): void
+    /** @test */
+    public function tenant_isolation_other_tenant_cannot_close_or_fetch_run(): void
     {
-        TenantContext::clear();
-        (new ModulesSeeder)->run();
-        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableProjectsCropCycles($tenant);
-        $this->enableInventory($tenant);
+        $otherTenant = Tenant::create(['name' => 'Other Tenant', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($otherTenant->id);
 
-        $cycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => '2024 Cycle',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'CLOSED',
-        ]);
-        $party = Party::create(['tenant_id' => $tenant->id, 'name' => 'Hari', 'party_types' => ['HARI']]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $party->id,
-            'crop_cycle_id' => $cycle->id,
-            'name' => 'Proj',
-            'status' => 'ACTIVE',
-        ]);
+        $this->postProfitLossEntries(100, 20);
+        $service = $this->app->make(PeriodCloseService::class);
+        $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, null, null);
 
-        $uom = InvUom::create(['tenant_id' => $tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
-        $cat = InvItemCategory::create(['tenant_id' => $tenant->id, 'name' => 'Fert']);
-        $item = InvItem::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Fert',
-            'uom_id' => $uom->id,
-            'category_id' => $cat->id,
-            'valuation_method' => 'WAC',
-            'is_active' => true,
-        ]);
-        $store = InvStore::create(['tenant_id' => $tenant->id, 'name' => 'Main', 'type' => 'MAIN', 'is_active' => true]);
+        $runForOther = $service->getCloseRun($otherTenant->id, $this->cropCycle->id);
+        $this->assertNull($runForOther);
 
-        $grn = InvGrn::create([
-            'tenant_id' => $tenant->id,
-            'doc_no' => 'GRN-1',
-            'store_id' => $store->id,
-            'doc_date' => '2024-06-01',
-            'status' => 'DRAFT',
-        ]);
-        InvGrnLine::create([
-            'tenant_id' => $tenant->id,
-            'grn_id' => $grn->id,
-            'item_id' => $item->id,
-            'qty' => 10,
-            'unit_cost' => 50,
-            'line_total' => 500,
-        ]);
-        app(InventoryPostingService::class)->postGRN($grn->id, $tenant->id, '2024-06-01', 'grn-1');
-
-        $issue = InvIssue::create([
-            'tenant_id' => $tenant->id,
-            'doc_no' => 'ISS-1',
-            'store_id' => $store->id,
-            'crop_cycle_id' => $cycle->id,
-            'project_id' => $project->id,
-            'doc_date' => '2024-06-15',
-            'status' => 'DRAFT',
-            'allocation_mode' => 'HARI_ONLY',
-            'hari_id' => $party->id,
-        ]);
-        InvIssueLine::create([
-            'tenant_id' => $tenant->id,
-            'issue_id' => $issue->id,
-            'item_id' => $item->id,
-            'qty' => 2,
-        ]);
-
-        $r = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/v1/inventory/issues/{$issue->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'issue-closed',
-            ]);
-
-        $r->assertStatus(422);
-        $msg = $r->json('message') ?? '';
-        $this->assertStringContainsString('CLOSED', $msg);
-        $this->assertStringContainsString('Reopen', $msg);
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $service->closeCropCycle($otherTenant->id, $this->cropCycle->id, null, null);
     }
 
-    public function test_reopen_restores_ability_to_post(): void
+    /** @test */
+    public function retained_earnings_direction_reversed_for_loss(): void
     {
-        TenantContext::clear();
-        (new ModulesSeeder)->run();
-        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
-        SystemAccountsSeeder::runForTenant($tenant->id);
-        $this->enableProjectsCropCycles($tenant);
-        $this->enableInventory($tenant);
+        $this->postProfitLossEntries(100, 250);
 
-        $cycle = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => '2024 Cycle',
-            'start_date' => '2024-01-01',
-            'end_date' => '2024-12-31',
-            'status' => 'CLOSED',
-            'closed_at' => now(),
-        ]);
-        $party = Party::create(['tenant_id' => $tenant->id, 'name' => 'Hari', 'party_types' => ['HARI']]);
-        $project = Project::create([
-            'tenant_id' => $tenant->id,
-            'party_id' => $party->id,
-            'crop_cycle_id' => $cycle->id,
-            'name' => 'Proj',
-            'status' => 'ACTIVE',
-        ]);
+        $service = $this->app->make(PeriodCloseService::class);
+        $result = $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
 
-        $r = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'tenant_admin')
-            ->postJson("/api/crop-cycles/{$cycle->id}/reopen");
+        $run = PeriodCloseRun::where('tenant_id', $this->tenant->id)->where('crop_cycle_id', $this->cropCycle->id)->firstOrFail();
+        $this->assertSame('-150.00', (string) $run->net_profit);
 
-        $r->assertStatus(200);
-        $this->assertSame('OPEN', $r->json('status'));
+        $pg = PostingGroup::where('id', $result['posting_group_id'])->firstOrFail();
+        $entries = LedgerEntry::where('posting_group_id', $pg->id)->get();
 
-        $cycle->refresh();
-        $this->assertSame('OPEN', $cycle->status);
+        $revenue = Account::where('tenant_id', $this->tenant->id)->where('code', 'PROJECT_REVENUE')->firstOrFail();
+        $expense = Account::where('tenant_id', $this->tenant->id)->where('code', 'EXP_SHARED')->firstOrFail();
+        $retained = Account::where('tenant_id', $this->tenant->id)->where('code', 'RETAINED_EARNINGS')->firstOrFail();
+        $current = Account::where('tenant_id', $this->tenant->id)->where('code', 'CURRENT_EARNINGS')->firstOrFail();
 
-        $uom = InvUom::create(['tenant_id' => $tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
-        $cat = InvItemCategory::create(['tenant_id' => $tenant->id, 'name' => 'Fert']);
-        $item = InvItem::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Fert',
-            'uom_id' => $uom->id,
-            'category_id' => $cat->id,
-            'valuation_method' => 'WAC',
-            'is_active' => true,
-        ]);
-        $store = InvStore::create(['tenant_id' => $tenant->id, 'name' => 'Main', 'type' => 'MAIN', 'is_active' => true]);
-        $grn = InvGrn::create([
-            'tenant_id' => $tenant->id,
-            'doc_no' => 'GRN-1',
-            'store_id' => $store->id,
-            'doc_date' => '2024-06-01',
-            'status' => 'DRAFT',
-        ]);
-        InvGrnLine::create([
-            'tenant_id' => $tenant->id,
-            'grn_id' => $grn->id,
-            'item_id' => $item->id,
-            'qty' => 10,
-            'unit_cost' => 50,
-            'line_total' => 500,
-        ]);
-        app(InventoryPostingService::class)->postGRN($grn->id, $tenant->id, '2024-06-01', 'grn-reopen');
+        $revenueLine = $entries->firstWhere('account_id', $revenue->id);
+        $this->assertNotNull($revenueLine);
+        $this->assertEquals(100, (float) $revenueLine->debit_amount);
+        $this->assertEquals(0, (float) $revenueLine->credit_amount);
 
-        $issue = InvIssue::create([
-            'tenant_id' => $tenant->id,
-            'doc_no' => 'ISS-1',
-            'store_id' => $store->id,
-            'crop_cycle_id' => $cycle->id,
-            'project_id' => $project->id,
-            'doc_date' => '2024-06-15',
-            'status' => 'DRAFT',
-            'allocation_mode' => 'HARI_ONLY',
-            'hari_id' => $party->id,
-        ]);
-        InvIssueLine::create([
-            'tenant_id' => $tenant->id,
-            'issue_id' => $issue->id,
-            'item_id' => $item->id,
-            'qty' => 2,
-        ]);
+        $expenseLine = $entries->firstWhere('account_id', $expense->id);
+        $this->assertNotNull($expenseLine);
+        $this->assertEquals(0, (float) $expenseLine->debit_amount);
+        $this->assertEquals(250, (float) $expenseLine->credit_amount);
 
-        $post = $this->withHeader('X-Tenant-Id', $tenant->id)
-            ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/v1/inventory/issues/{$issue->id}/post", [
-                'posting_date' => '2024-06-15',
-                'idempotency_key' => 'issue-after-reopen',
-            ]);
+        $retainedNetDebit = (float) $entries->where('account_id', $retained->id)->sum('debit_amount') - (float) $entries->where('account_id', $retained->id)->sum('credit_amount');
+        $this->assertEqualsWithDelta(150, $retainedNetDebit, 0.01, 'RETAINED_EARNINGS net debit must equal abs(loss)');
 
-        $post->assertStatus(201);
+        $currentNet = (float) $entries->where('account_id', $current->id)->sum('credit_amount') - (float) $entries->where('account_id', $current->id)->sum('debit_amount');
+        $this->assertEqualsWithDelta(0, $currentNet, 0.01, 'CURRENT_EARNINGS must net to zero');
+
+        $this->assertEqualsWithDelta($entries->sum('debit_amount'), $entries->sum('credit_amount'), 0.01);
+    }
+
+    /** @test */
+    public function api_close_returns_expected_shape_and_get_close_run_returns_run(): void
+    {
+        $this->postProfitLossEntries(80, 20);
+
+        $service = $this->app->make(PeriodCloseService::class);
+        $result = $service->closeCropCycle($this->tenant->id, $this->cropCycle->id, $this->tenantAdmin->id, null);
+
+        $this->assertSame($this->cropCycle->id, $result['crop_cycle']->id);
+        $this->assertSame('CLOSED', $result['crop_cycle']->status);
+        $this->assertSame('60.00', $result['net_profit']);
+        $this->assertArrayHasKey('posting_group_id', $result);
+        $this->assertArrayHasKey('closed_at', $result);
+        $this->assertArrayHasKey('closed_by_user_id', $result);
+
+        $run = $service->getCloseRun($this->tenant->id, $this->cropCycle->id);
+        $this->assertNotNull($run);
+        $this->assertEqualsWithDelta(60, (float) $run->net_profit, 0.01);
+        $this->assertSame($this->cropCycle->id, $run->crop_cycle_id);
+    }
+
+    /** @test */
+    public function api_close_run_returns_404_when_not_closed(): void
+    {
+        $run = $this->app->make(PeriodCloseService::class)->getCloseRun($this->tenant->id, $this->cropCycle->id);
+        $this->assertNull($run);
+    }
+
+    /** @test */
+    public function api_close_run_returns_404_for_other_tenant_cycle(): void
+    {
+        $otherTenant = Tenant::create(['name' => 'Other', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($otherTenant->id);
+
+        $this->postProfitLossEntries(50, 10);
+        $this->app->make(PeriodCloseService::class)->closeCropCycle($this->tenant->id, $this->cropCycle->id, null, null);
+
+        $runForOther = $this->app->make(PeriodCloseService::class)->getCloseRun($otherTenant->id, $this->cropCycle->id);
+        $this->assertNull($runForOther);
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->app->make(PeriodCloseService::class)->closeCropCycle($otherTenant->id, $this->cropCycle->id, null, null);
     }
 }

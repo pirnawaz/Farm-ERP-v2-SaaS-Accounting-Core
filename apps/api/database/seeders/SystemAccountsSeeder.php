@@ -68,6 +68,8 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'EXP_FARM_OVERHEAD', 'name' => 'Farm Overhead Expense', 'type' => 'expense'],
             ['code' => 'EXP_KAMDARI', 'name' => 'Kamdari Expense', 'type' => 'expense'],
             ['code' => 'PROFIT_DISTRIBUTION', 'name' => 'Profit Distribution / Settlement Clearing', 'type' => 'equity'],
+            ['code' => 'RETAINED_EARNINGS', 'name' => 'Retained Earnings', 'type' => 'equity'],
+            ['code' => 'CURRENT_EARNINGS', 'name' => 'Current Earnings (period close clearing)', 'type' => 'equity'],
             ['code' => 'INVENTORY_INPUTS', 'name' => 'Inventory / Inputs Stock', 'type' => 'asset'],
             ['code' => 'INVENTORY_PRODUCE', 'name' => 'Produce Inventory', 'type' => 'asset'],
             ['code' => 'CROP_WIP', 'name' => 'Crop Work-In-Progress', 'type' => 'asset'],

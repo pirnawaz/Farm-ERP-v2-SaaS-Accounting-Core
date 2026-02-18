@@ -130,12 +130,11 @@ class FinancialStatementsTest extends TestCase
         $response->assertStatus(200);
         $data = $response->json();
 
-        $this->assertSame('2024-01-31', $data['as_of']);
-        $this->assertEqualsWithDelta(1300.0, (float) $data['assets']['total'], 0.01, 'Total assets (BANK 1000-200+500)');
-        $this->assertEqualsWithDelta(0.0, (float) $data['liabilities']['total'], 0.01, 'Total liabilities');
-        $this->assertEqualsWithDelta(1300.0, (float) $data['equity']['total'], 0.01, 'Total equity (1000 + net profit 300)');
-        $equationDiff = (float) $data['checks']['equation_diff'];
-        $this->assertLessThanOrEqual(0.01, abs($equationDiff), 'Accounting equation should balance (equation_diff ~= 0)');
+        $this->assertSame('2024-01-31', $data['meta']['as_of']);
+        $this->assertEqualsWithDelta(1300.0, (float) $data['totals']['assets_total'], 0.01, 'Total assets (BANK 1000-200+500)');
+        $this->assertEqualsWithDelta(0.0, (float) $data['totals']['liabilities_total'], 0.01, 'Total liabilities');
+        $this->assertEqualsWithDelta(1300.0, (float) $data['totals']['equity_total'], 0.01, 'Total equity (1000 + net profit 300)');
+        $this->assertTrue($data['totals']['balanced'], 'Accounting equation should balance');
     }
 
     /**
@@ -214,6 +213,6 @@ class FinancialStatementsTest extends TestCase
             ->getJson('/api/reports/balance-sheet?as_of=2024-01-31');
         $response2->assertStatus(200);
         $data2 = $response2->json();
-        $this->assertEqualsWithDelta(150.0, (float) $data2['assets']['total'], 0.01, 'Tenant1 assets 100+50 only');
+        $this->assertEqualsWithDelta(150.0, (float) $data2['totals']['assets_total'], 0.01, 'Tenant1 assets 100+50 only');
     }
 }

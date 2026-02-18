@@ -25,7 +25,7 @@ const emptyLine = (): LineRow => ({
   credit_amount: '0',
 });
 
-export default function JournalFormPage() {
+function JournalFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { formatMoney } = useFormatting();
@@ -302,3 +302,5 @@ export default function JournalFormPage() {
     </div>
   );
 }
+
+export default JournalFormPage;
