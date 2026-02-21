@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 
 const navigation = [
   { name: 'Tenants', href: '/app/platform/tenants' },
+  { name: 'Audit Logs', href: '/app/platform/audit-logs' },
 ];
 
 export function PlatformLayout() {

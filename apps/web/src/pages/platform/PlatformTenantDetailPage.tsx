@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlatformTenant, useUpdatePlatformTenant } from '../../hooks/usePlatformTenants';
 import { useStartImpersonation } from '../../hooks/useImpersonation';
 import { useTenant } from '../../hooks/useTenant';
@@ -8,12 +8,14 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { useFormatting } from '../../hooks/useFormatting';
+import { platformApi, type PlatformTenantModuleItem } from '../../api/platform';
 import toast from 'react-hot-toast';
 import type { UpdatePlatformTenantPayload } from '../../types';
 
 export default function PlatformTenantDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { setTenantId } = useTenant();
   const { data: tenant, isLoading, error } = usePlatformTenant(id || null);
   const updateMutation = useUpdatePlatformTenant();
@@ -22,12 +24,80 @@ export default function PlatformTenantDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<UpdatePlatformTenantPayload>({});
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [resetPasswordMode, setResetPasswordMode] = useState<'token' | 'direct'>('token');
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetTokenResult, setResetTokenResult] = useState<string | null>(null);
 
-  useQuery({
-    queryKey: ['tenantModules', id],
-    queryFn: async () => ({ modules: [] as unknown[] }),
+  const { data: modulesData, isLoading: modulesLoading } = useQuery({
+    queryKey: ['platformTenantModules', id],
+    queryFn: () => platformApi.getTenantModules(id!),
     enabled: !!id,
   });
+
+  const updateModulesMutation = useMutation({
+    mutationFn: (updates: Array<{ key: string; enabled: boolean }>) =>
+      platformApi.updateTenantModules(id!, { modules: updates }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platformTenantModules', id] });
+      queryClient.invalidateQueries({ queryKey: ['platformTenants', id] });
+      toast.success('Modules updated');
+    },
+    onError: (e: Error) => {
+      toast.error(e?.message ?? 'Failed to update modules');
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (newPassword?: string) => platformApi.resetTenantAdminPassword(id!, newPassword),
+    onSuccess: (data) => {
+      if (data.reset_token) {
+        setResetTokenResult(data.reset_token);
+      } else {
+        setResetPasswordOpen(false);
+        setResetPasswordValue('');
+        setResetTokenResult(null);
+        toast.success(data.message);
+      }
+    },
+    onError: (e: Error) => {
+      toast.error(e?.message ?? 'Failed to reset password');
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => platformApi.archiveTenant(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platformTenants', id] });
+      queryClient.invalidateQueries({ queryKey: ['platformTenants'] });
+      toast.success('Tenant archived');
+    },
+    onError: (e: Error) => toast.error((e as Error)?.message ?? 'Failed to archive'),
+  });
+
+  const unarchiveMutation = useMutation({
+    mutationFn: () => platformApi.unarchiveTenant(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platformTenants', id] });
+      queryClient.invalidateQueries({ queryKey: ['platformTenants'] });
+      toast.success('Tenant unarchived');
+    },
+    onError: (e: Error) => toast.error((e as Error)?.message ?? 'Failed to unarchive'),
+  });
+
+  const handleModuleToggle = useCallback(
+    (mod: PlatformTenantModuleItem, nextEnabled: boolean) => {
+      if (!modulesData?.modules) return;
+      if (mod.is_core && !nextEnabled) return;
+      if (!mod.allowed_by_plan && nextEnabled) return;
+      const updates = modulesData.modules.map((m) => ({
+        key: m.key,
+        enabled: m.key === mod.key ? nextEnabled : m.enabled,
+      }));
+      updateModulesMutation.mutate(updates);
+    },
+    [modulesData, updateModulesMutation]
+  );
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +185,9 @@ export default function PlatformTenantDetailPage() {
                   className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     tenant.status === 'active'
                       ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
+                      : tenant.status === 'archived'
+                        ? 'bg-gray-100 text-gray-800'
+                        : 'bg-yellow-100 text-yellow-800'
                   }`}
                 >
                   {tenant.status}
@@ -178,14 +250,207 @@ export default function PlatformTenantDetailPage() {
           </div>
         )}
 
+        {/* Support actions */}
+        <div className="bg-white rounded-lg shadow p-6 md:col-span-2">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Support actions</h2>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setResetTokenResult(null);
+                setResetPasswordValue('');
+                setResetPasswordOpen(true);
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+            >
+              Reset admin password
+            </button>
+            {tenant.status === 'archived' ? (
+              <button
+                type="button"
+                onClick={() => unarchiveMutation.mutate()}
+                disabled={unarchiveMutation.isPending}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm"
+              >
+                {unarchiveMutation.isPending ? 'Unarchiving...' : 'Unarchive tenant'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Archive tenant "${tenant.name}"? They will not be able to sign in until unarchived.`)) {
+                    archiveMutation.mutate();
+                  }
+                }}
+                disabled={archiveMutation.isPending}
+                className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 text-sm"
+              >
+                {archiveMutation.isPending ? 'Archiving...' : 'Archive tenant'}
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Modules */}
         <div className="bg-white rounded-lg shadow p-6 md:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Enabled Modules</h2>
-          <p className="text-sm text-gray-500">
-            Module management for this tenant. (Module management UI to be implemented)
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Modules</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Plan: <span className="font-medium text-gray-700">{tenant.plan_key || '—'}</span>
+            {' · '}
+            Edit plan in &quot;Edit tenant&quot; to change which modules can be enabled.
           </p>
+          {modulesLoading ? (
+            <div className="flex justify-center py-4">
+              <LoadingSpinner />
+            </div>
+          ) : modulesData?.modules ? (
+            <ul className="space-y-3">
+              {modulesData.modules.map((mod) => (
+                <li
+                  key={mod.key}
+                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-gray-900">{mod.name}</span>
+                    {mod.is_core && (
+                      <span className="ml-2 text-xs text-amber-600">core</span>
+                    )}
+                    {!mod.allowed_by_plan && !mod.is_core && (
+                      <span className="ml-2 text-xs text-gray-500" title={`Not allowed on plan "${modulesData.plan_key ?? 'null'}"`}>
+                        (not on plan)
+                      </span>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-sm text-gray-600">
+                      {mod.enabled ? 'On' : 'Off'}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={mod.enabled}
+                      disabled={
+                        mod.is_core ||
+                        (!mod.allowed_by_plan && !mod.enabled) ||
+                        updateModulesMutation.isPending
+                      }
+                      title={
+                        mod.is_core
+                          ? 'Core modules cannot be disabled'
+                          : !mod.allowed_by_plan
+                            ? `Module ${mod.key} is not allowed on plan ${modulesData.plan_key ?? 'null'}`
+                            : undefined
+                      }
+                      onChange={(e) => handleModuleToggle(mod, e.target.checked)}
+                      className="rounded border-gray-300 text-[#1F6F5C] focus:ring-[#1F6F5C] disabled:opacity-50"
+                    />
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500">No modules data.</p>
+          )}
         </div>
       </div>
+
+      {/* Reset admin password modal */}
+      <Modal
+        isOpen={resetPasswordOpen}
+        onClose={() => {
+          setResetPasswordOpen(false);
+          setResetPasswordValue('');
+          setResetTokenResult(null);
+        }}
+        title="Reset tenant admin password"
+        size="md"
+      >
+        {resetTokenResult ? (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              One-time token (provide to tenant admin to set a new password; expires in 24 hours):
+            </p>
+            <pre className="p-3 bg-gray-100 rounded text-sm break-all font-mono">{resetTokenResult}</pre>
+            <button
+              type="button"
+              onClick={() => {
+                setResetPasswordOpen(false);
+                setResetTokenResult(null);
+                toast.success('Copy the token and share it securely.');
+              }}
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (resetPasswordMode === 'direct' && resetPasswordValue.trim()) {
+                resetPasswordMutation.mutate(resetPasswordValue.trim());
+              } else if (resetPasswordMode === 'token') {
+                resetPasswordMutation.mutate(undefined);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resetMode"
+                  checked={resetPasswordMode === 'token'}
+                  onChange={() => setResetPasswordMode('token')}
+                />
+                <span className="text-sm">Generate token (share with admin)</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resetMode"
+                  checked={resetPasswordMode === 'direct'}
+                  onChange={() => setResetPasswordMode('direct')}
+                />
+                <span className="text-sm">Set new password directly</span>
+              </label>
+            </div>
+            {resetPasswordMode === 'direct' && (
+              <FormField label="New password">
+                <input
+                  type="password"
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                  placeholder="Min 8 characters"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  minLength={8}
+                />
+              </FormField>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setResetPasswordOpen(false);
+                  setResetPasswordValue('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={
+                  resetPasswordMutation.isPending ||
+                  (resetPasswordMode === 'direct' && !resetPasswordValue.trim())
+                }
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+              >
+                {resetPasswordMutation.isPending ? 'Processing...' : resetPasswordMode === 'token' ? 'Generate token' : 'Set password'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Edit Modal */}
       <Modal isOpen={editOpen} onClose={() => { setEditOpen(false); setEditForm({}); }} title="Edit tenant" size="md">
@@ -201,11 +466,12 @@ export default function PlatformTenantDetailPage() {
           <FormField label="Status">
             <select
               value={editForm.status ?? tenant.status}
-              onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'active' | 'suspended' })}
+              onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'active' | 'suspended' | 'archived' })}
               className="w-full border border-gray-300 rounded-md px-3 py-2"
             >
               <option value="active">active</option>
               <option value="suspended">suspended</option>
+              <option value="archived">archived</option>
             </select>
           </FormField>
           <FormField label="Plan">

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { apiClient } from '@farm-erp/shared';
+import { platformApi } from '../api/platform';
 import type { UserRole } from '../types';
 
 const USER_ROLE_KEY = 'farm_erp_user_role';
@@ -80,6 +81,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTenantIdState(stored.tenantId);
         setIsLoading(false);
 
+        const isPlatformAdminSession = stored.role === 'platform_admin' && !stored.tenantId;
+        if (isPlatformAdminSession) {
+          try {
+            const user = await platformApi.me();
+            setUserRoleState('platform_admin');
+            setUserIdState(user.user_id);
+            setTenantIdState(null);
+            writeLocalStorage({ role: 'platform_admin', userId: user.user_id, tenantId: null });
+          } catch {
+            setUserRoleState(null);
+            setUserIdState(null);
+            setTenantIdState(null);
+            localStorage.removeItem(USER_ROLE_KEY);
+            localStorage.removeItem(USER_ID_KEY);
+            localStorage.removeItem(TENANT_ID_KEY);
+          }
+          setIsLoading(false);
+          return;
+        }
+
         const verifyInDev = import.meta.env.VITE_VERIFY_COOKIE_AUTH_IN_DEV === 'true';
         if (verifyInDev) {
           try {
@@ -137,8 +158,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const isPlatformSession = userRole === 'platform_admin' && !tenantId;
     try {
-      await apiClient.post('/api/auth/logout', {});
+      if (isPlatformSession) {
+        await platformApi.logout();
+      } else {
+        await apiClient.post('/api/auth/logout', {});
+      }
     } catch {
       // Ignore errors on logout
     }
@@ -148,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(USER_ROLE_KEY);
     localStorage.removeItem(USER_ID_KEY);
     localStorage.removeItem(TENANT_ID_KEY);
-  }, []);
+  }, [userRole, tenantId]);
 
   useEffect(() => {
     if (bootstrappedRef.current) return;

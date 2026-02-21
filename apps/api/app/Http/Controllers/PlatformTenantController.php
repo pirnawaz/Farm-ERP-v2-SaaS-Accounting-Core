@@ -9,6 +9,7 @@ use App\Models\Module;
 use App\Models\Tenant;
 use App\Models\TenantModule;
 use App\Models\User;
+use App\Services\PlanModules;
 use App\Services\SystemPartyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,9 @@ use Illuminate\Support\Str;
 
 class PlatformTenantController extends Controller
 {
+    public function __construct(
+        protected PlanModules $planModules
+    ) {}
     private const ENABLED_MODULE_KEYS = [
         'accounting_core',
         'projects_crop_cycles',
@@ -156,11 +160,14 @@ class PlatformTenantController extends Controller
     /**
      * Update a tenant.
      * PUT /api/platform/tenants/{id}
+     * On plan_key change, disables any tenant_modules not allowed by the new plan.
      */
     public function update(UpdatePlatformTenantRequest $request, string $id): JsonResponse
     {
         $tenant = Tenant::findOrFail($id);
         $tenant->update($request->validated());
+
+        $this->syncTenantModulesToPlan($tenant);
 
         return response()->json([
             'id' => $tenant->id,
@@ -213,6 +220,30 @@ class PlatformTenantController extends Controller
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+        }
+    }
+
+    private function syncTenantModulesToPlan(Tenant $tenant): void
+    {
+        $allowedKeys = $this->planModules->getAllowedModuleKeysForPlan($tenant->plan_key);
+        $modules = Module::all();
+        $nonCoreKeys = $modules->filter(fn ($m) => !$m->is_core)->pluck('key')->all();
+
+        foreach ($nonCoreKeys as $key) {
+            if (in_array($key, $allowedKeys, true)) {
+                continue;
+            }
+            $module = $modules->firstWhere('key', $key);
+            if (!$module) {
+                continue;
+            }
+            TenantModule::where('tenant_id', $tenant->id)
+                ->where('module_id', $module->id)
+                ->where('status', 'ENABLED')
+                ->update([
+                    'status' => 'DISABLED',
+                    'disabled_at' => now(),
+                ]);
         }
     }
 

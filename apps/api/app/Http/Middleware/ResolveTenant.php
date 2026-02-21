@@ -26,6 +26,11 @@ class ResolveTenant
         if ($request->is('api/platform/*')) {
             return $next($request);
         }
+
+        // Skip tenant check for auth set-password-with-token (no tenant context)
+        if ($request->is('api/auth/set-password-with-token')) {
+            return $next($request);
+        }
         
         $tenantId = $request->header('X-Tenant-Id');
         

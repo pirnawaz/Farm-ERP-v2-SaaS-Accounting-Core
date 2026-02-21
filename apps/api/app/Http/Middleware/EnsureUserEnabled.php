@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Helpers\DevIdentity;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -10,8 +11,9 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureUserEnabled
 {
     /**
-     * If X-User-Id is present, ensure the user exists and is_enabled.
-     * Skip for health, dev, and when X-User-Id is absent (dev/compat).
+     * When user identity is present, ensure the user exists and is_enabled.
+     * Identity is taken from request attributes (cookie/auth) or, when dev identity
+     * is allowed, from X-User-Id header. Skip for health and dev routes.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -19,7 +21,9 @@ class EnsureUserEnabled
             return $next($request);
         }
 
-        $userId = $request->header('X-User-Id');
+        $userId = DevIdentity::isAllowed()
+            ? ($request->attributes->get('user_id') ?? $request->header('X-User-Id'))
+            : $request->attributes->get('user_id');
         if (!$userId || $userId === '') {
             return $next($request);
         }

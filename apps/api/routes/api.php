@@ -21,6 +21,10 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TenantModuleController;
 use App\Http\Controllers\PlatformTenantController;
 use App\Http\Controllers\Platform\ImpersonationController;
+use App\Http\Controllers\Platform\PlatformAuthController;
+use App\Http\Controllers\Platform\PlatformAuditLogController;
+use App\Http\Controllers\Platform\PlatformTenantModulesController;
+use App\Http\Controllers\Platform\PlatformTenantLifecycleController;
 use App\Http\Controllers\TenantFarmProfileController;
 use App\Http\Controllers\TenantUserAdminController;
 use App\Http\Controllers\TenantOnboardingController;
@@ -64,16 +68,28 @@ Route::get('/health', [HealthController::class, 'index']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/logout', [AuthController::class, 'logout']);
 Route::get('/auth/me', [AuthController::class, 'me']);
+Route::post('/auth/set-password-with-token', [AuthController::class, 'setPasswordWithToken']);
 
-// Platform admin (no X-Tenant-Id; ResolveTenant skips api/platform/*)
-Route::prefix('platform')->middleware(['role:platform_admin'])->group(function () {
-    Route::get('tenants', [PlatformTenantController::class, 'index']);
-    Route::post('tenants', [PlatformTenantController::class, 'store']);
-    Route::get('tenants/{id}', [PlatformTenantController::class, 'show']);
-    Route::put('tenants/{id}', [PlatformTenantController::class, 'update']);
-    Route::get('impersonation', [ImpersonationController::class, 'status']);
-    Route::post('impersonation/start', [ImpersonationController::class, 'start']);
-    Route::post('impersonation/stop', [ImpersonationController::class, 'stop']);
+// Platform auth: login does not require tenant or role; logout/me require platform_admin (cookie or headers)
+Route::prefix('platform')->group(function () {
+    Route::post('auth/login', [PlatformAuthController::class, 'login']);
+    Route::middleware(['role:platform_admin'])->group(function () {
+        Route::post('auth/logout', [PlatformAuthController::class, 'logout']);
+        Route::get('auth/me', [PlatformAuthController::class, 'me']);
+        Route::get('tenants', [PlatformTenantController::class, 'index']);
+        Route::post('tenants', [PlatformTenantController::class, 'store']);
+        Route::get('tenants/{id}', [PlatformTenantController::class, 'show']);
+        Route::put('tenants/{id}', [PlatformTenantController::class, 'update']);
+        Route::post('tenants/{id}/reset-admin-password', [PlatformTenantLifecycleController::class, 'resetAdminPassword']);
+        Route::post('tenants/{id}/archive', [PlatformTenantLifecycleController::class, 'archive']);
+        Route::post('tenants/{id}/unarchive', [PlatformTenantLifecycleController::class, 'unarchive']);
+        Route::get('tenants/{tenantId}/modules', [PlatformTenantModulesController::class, 'index']);
+        Route::put('tenants/{tenantId}/modules', [PlatformTenantModulesController::class, 'update']);
+        Route::get('impersonation', [ImpersonationController::class, 'status']);
+        Route::post('impersonation/start', [ImpersonationController::class, 'start']);
+        Route::post('impersonation/stop', [ImpersonationController::class, 'stop']);
+        Route::get('audit-logs', [PlatformAuditLogController::class, 'index']);
+    });
 });
 
 // Dev-only routes (disabled in production)

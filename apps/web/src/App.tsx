@@ -107,6 +107,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminRolesPage from './pages/AdminRolesPage';
 import PlatformTenantsPage from './pages/PlatformTenantsPage';
 import PlatformTenantDetailPage from './pages/platform/PlatformTenantDetailPage';
+import PlatformAuditLogsPage from './pages/platform/PlatformAuditLogsPage';
 import PostingGroupDetailPage from './pages/PostingGroupDetailPage';
 import { ModulesProvider } from './contexts/ModulesContext';
 import { PlatformLayout } from './components/PlatformLayout';
@@ -129,6 +130,7 @@ function App() {
         <Route index element={<Navigate to="/app/platform/tenants" replace />} />
         <Route path="tenants" element={<PlatformTenantsPage />} />
         <Route path="tenants/:id" element={<PlatformTenantDetailPage />} />
+        <Route path="audit-logs" element={<PlatformAuditLogsPage />} />
       </Route>
       <Route
         path="/app"

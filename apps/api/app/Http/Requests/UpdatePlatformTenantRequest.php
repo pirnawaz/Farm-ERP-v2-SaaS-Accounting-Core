@@ -15,7 +15,7 @@ class UpdatePlatformTenantRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
-            'status' => ['sometimes', 'required', 'string', 'in:active,suspended'],
+            'status' => ['sometimes', 'required', 'string', 'in:active,suspended,archived'],
             'plan_key' => ['sometimes', 'nullable', 'string', 'max:64'],
             'currency_code' => ['sometimes', 'nullable', 'string', 'max:10'],
             'locale' => ['sometimes', 'nullable', 'string', 'max:10'],

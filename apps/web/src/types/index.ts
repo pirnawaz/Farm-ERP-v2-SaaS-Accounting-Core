@@ -65,7 +65,7 @@ export interface UpdateTenantUserPayload {
 export interface PlatformTenant {
   id: string;
   name: string;
-  status: 'active' | 'suspended';
+  status: 'active' | 'suspended' | 'archived';
   plan_key?: string | null;
   currency_code: string;
   locale: string;
@@ -94,7 +94,7 @@ export interface CreatePlatformTenantPayload {
 
 export interface UpdatePlatformTenantPayload {
   name?: string;
-  status?: 'active' | 'suspended';
+  status?: 'active' | 'suspended' | 'archived';
   plan_key?: string | null;
   currency_code?: string;
   locale?: string;

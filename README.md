@@ -18,6 +18,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - [Database Setup](#database-setup)
 - [Configuration](#configuration)
 - [Staging / production deployment](#staging--production-deployment)
+- [Production access & safety](#production-access--safety)
 - [Running the Application](#running-the-application)
 - [API Overview](#api-overview)
 - [Frontend Modules](#frontend-modules)
@@ -32,7 +33,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 ## Features
 
 - **Multi-tenant SaaS** — Tenant isolation, platform admin, and tenant-level modules
-- **Platform admin** — Tenant list, activate/suspend, minimal plan field (no billing), controlled impersonation with audit logging
+- **Platform admin** — Tenant list, activate/suspend/archive, minimal plan field (no billing), controlled impersonation with audit logging; **platform audit log viewer** (tenant audit logs with filters); **tenant lifecycle**: reset tenant admin password (token or direct), archive/unarchive (platform_audit_log); production safety: header-based auth disabled unless `DEV_IDENTITY_ENABLED` or local/testing
 - **Roles** — `platform_admin`, `tenant_admin`, `accountant`, `operator`
 - **Land & Projects** — Land parcels, crop cycles (close/reopen with preview), land allocations (owner and Hari), projects, project rules
 - **Land Leases (Maqada)** — Land leases per project/parcel/landlord, accruals (draft/post), posting to DUE_TO_LANDLORD and expense; reversal of posted accruals (new posting group, no mutation); **Landlord Statement** report (ledger-backed, read-only); traceability from accrual to posting group and reversal
@@ -49,7 +50,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Crop Operations** — Activity types, activities (inputs, labour); post consumes stock and accrues wages
 - **Accounting Core** — Immutable ledger: `posting_groups` and `ledger_entries` are never updated or deleted; period locking enforced at posting time; **journal entries** (draft/post/reverse); **accounting periods** (create, close, reopen); **bank reconciliation** (create, statement lines, match/unmatch, finalize); **financial statements** from ledger only: **Profit & Loss** (income statement for date range, optional compare period) and **Balance Sheet** (as-of date, optional compare, equation check); accounts tenant-scoped with system accounts (AR/AP/CASH/BANK) and seeded chart; posting date cutoffs driven by `posting_groups.posting_date`
 - **Accounting Guards** — Immutability protection for posted transactions, balanced posting validation
-- **Audit Logs** — Transaction audit trail for posted operations
+- **Audit Logs** — Transaction audit trail for posted operations; **platform audit log** viewer (GET `/api/platform/audit-logs`, filters: tenant_id, actor_user_id, action, date range; platform_admin only)
 - **Reports** — Trial balance, **Profit & Loss** (income statement), **Balance Sheet** (with equation check), general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, **AR ageing** (including auditable `GET /ar/aging` — open invoice balances per customer with bucket totals and grand totals), customer balances, AP ageing, supplier balances, AR/AP control reconciliation, yield reports, party ledger, party summary, **landlord statement** (Maqada, when `land_leases` module enabled), role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); bank reconciliation; CSV export with Terrava-branded filenames; print-friendly layouts
 - **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
 - **Crop Cycle Close** — Close crop cycle with preview; **Accounting Period Close (v2)**: full closing entries that zero all income/expense accounts for the cycle period, clear via CURRENT_EARNINGS, and roll to RETAINED_EARNINGS in one PERIOD_CLOSE posting group; idempotent (one close run per cycle); crop cycle lock enforced (no posting after CLOSED); `POST crop-cycles/{id}/close`, `GET crop-cycles/{id}/close-run`; crop-cycle-based settlements (preview and post); accounting corrections and guards
@@ -188,6 +189,7 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Key env vars:**
   - `APP_ENV` — `local`, `staging`, or `production`; affects auth cookie `secure` flag and validation.
   - `APP_URL` — Base URL of the API (e.g. `https://api.example.com`). Auth cookie is set `secure=true` only when `APP_ENV=production` or `APP_URL` begins with `https://`, so staging over HTTP works.
+  - `DEV_IDENTITY_ENABLED` — When `false` (default), `X-User-Id` and `X-User-Role` headers are **ignored** in production-like environments; header-only requests return 401/403. Set `true` only for dev/testing. In `local` or `testing` env, header auth is always allowed. See [Production access & safety](#production-access--safety).
   - `VITE_API_URL` (optional, in `apps/web`) — When set, the frontend uses this as the API base. When unset, the frontend uses same-origin (`''`) so Nginx (or the same host) can proxy `/api` in production.
 - **Web:** `apps/web` reads from API; tenant and auth are applied via shared client / context.
 - **CORS:** Laravel CORS is set for `http://localhost:3000`; adjust in `apps/api/config/cors.php` if needed.
@@ -201,6 +203,14 @@ The app is set up for droplet/staging deployment with the following behaviour:
 - **Auth cookie:** The login cookie is `secure=true` only when `APP_ENV=production` or `APP_URL` begins with `https://`. Otherwise it is `secure=false` so staging over HTTP works. `httpOnly` stays `true`.
 - **Frontend API base:** When `VITE_API_URL` is not set, the shared API client uses same-origin (`''`), so you can serve the web app and API from the same host and proxy `/api` with Nginx to the Laravel backend. Set `VITE_API_URL` only when the API is on a different origin.
 - **Staging seed:** Run `php artisan db:seed --class=StagingSeeder` from `apps/api` to create/update the Staging tenant and admin user (see [Seed / default tenant](#seed--default-tenant)). Use the documented staging credentials only for staging; change the admin password in production.
+
+### Production access & safety
+
+In production (or when `APP_ENV` is not `local`/`testing` and `DEV_IDENTITY_ENABLED` is not `true`):
+
+- **Header-based identity is disabled:** Any middleware that reads `X-User-Id` or `X-User-Role` ignores those headers; identity is taken only from request attributes (e.g. set by cookie/session for platform routes).
+- **Header-only requests fail:** API calls that rely only on `X-User-Id` / `X-User-Role` (e.g. from scripts or Postman without a real auth cookie) return **401** or **403**.
+- **Platform admin:** Must sign in via platform login (cookie); the cookie is then used to resolve identity. E2E and PHPUnit use `DEV_IDENTITY_ENABLED=true` in `.env.testing` so header auth continues to work in tests.
 
 ---
 
@@ -225,8 +235,8 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | Area            | Examples                                                                 |
 |-----------------|---------------------------------------------------------------------------|
 | **Health**      | `GET /api/health`                                                        |
-| **Auth**        | `POST /api/auth/login`                                                   |
-| **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`; `GET /api/platform/impersonation`, `POST /api/platform/impersonation/start`, `POST /api/platform/impersonation/stop` (platform_admin only, audited) |
+| **Auth**        | `POST /api/auth/login`, `POST /api/auth/set-password-with-token` (body: `token`, `new_password`; no tenant; for platform-issued reset tokens) |
+| **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`; `GET /api/platform/tenants/{id}/modules`, `PUT .../modules`; `POST .../reset-admin-password` (body optional: `new_password`; else returns one-time token), `POST .../archive`, `POST .../unarchive` (platform_admin only, audited in `platform_audit_log`); `GET /api/platform/audit-logs` (query: `tenant_id`, `actor_user_id`, `action`, `date_from`, `date_to`, `per_page`, `page`; platform_admin only); `GET /api/platform/impersonation`, `POST .../start`, `POST .../stop` (platform_admin only, audited) |
 | **Dev**         | `GET/POST /api/dev/tenants`, `POST /api/dev/tenants/{id}/activate`        |
 | **Users**       | `apiResource('users')`                                                   |
 | **Parties**     | `apiResource('parties')`, `.../balances`, `.../statement`, `.../receivables/open-sales` |
@@ -274,7 +284,7 @@ The web app includes pages (and routes) for:
 - **Reports:** trial balance, **Profit & Loss**, **Balance Sheet**, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, customer balances, AP ageing, supplier balances, yield reports, sales margin, party ledger, party summary, **landlord statement** (when `land_leases` enabled), role ageing, crop cycle distribution, settlement statement; reconciliation dashboard; **bank reconciliation** (list and detail: statement lines, match/unmatch, finalize); CSV export functionality; print-friendly layouts
 - **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
-- **Platform (platform_admin only):** tenant list at `/app/platform/tenants` (status badge, suspend/activate, plan dropdown, impersonate); impersonation banner in tenant app with “Impersonating: {tenant}” and exit; tenant detail with plan and impersonate
+- **Platform (platform_admin only):** tenant list at `/app/platform/tenants` (status badge: active/suspended/archived, plan dropdown, impersonate); **Audit Logs** at `/app/platform/audit-logs` (table, filters: tenant, actor user ID, action, date range, pagination); tenant detail with plan, modules, **Support actions** (Reset admin password — generate token or set directly; Archive / Unarchive tenant), and impersonate; impersonation banner in tenant app with “Impersonating: {tenant}” and exit; tenant detail with plan and impersonate
 
 Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `land_leases`, `inventory`, `labour`, `machinery`, `crop_ops`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`).
 
@@ -307,10 +317,18 @@ cd apps/api
 php artisan test
 ```
 
-Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/activate, impersonation gating and audit), and other feature tests. To run only platform admin and impersonation tests:
+Covers tenant isolation, CRUD, validation, platform admin (tenant list, suspend/activate/archive, impersonation gating and audit), **dev identity production guard** (header-only rejected when `DEV_IDENTITY_ENABLED` off), **platform audit log** (list, filters, pagination), **tenant lifecycle** (reset admin password with/without token, set-password-with-token, archive/unarchive, platform_audit_log), and other feature tests. To run only platform admin and impersonation tests:
 
 ```bash
 php artisan test --filter=PlatformAdminTenantAndImpersonation
+```
+
+To run production-safety and platform feature tests:
+
+```bash
+php artisan test tests/Feature/DevIdentityProductionGuardTest.php
+php artisan test tests/Feature/PlatformAuditLogTest.php
+php artisan test tests/Feature/PlatformTenantLifecycleTest.php
 ```
 
 Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Crop Cycle Close** (CropCycleCloseTest: full closing entries zero income/expense, multiple accounts zeroed, loss scenario, idempotency, lock enforcement, tenant isolation, snapshot/rule_snapshot), **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date), **Payments** (posting creates posting group with `source_type=PAYMENT`, allocation row `PAYMENT`, ledger entries; method BANK credits BANK account; reverse creates reversal posting group and negated allocation row; cannot reverse twice), **Payment apply/unapply** (PaymentApplySalesTest: preview FIFO, apply FIFO/manual, unapply voids allocations, reversed sale/payment excluded from open sales), **Reversal guards** (ReversalGuardsTest: cannot reverse payment or sale while ACTIVE allocations exist; 409 until unapplied), **AR Statement** (ARStatementTest), **AR Aging report** (ARAgingReportTest: buckets per customer and grand totals, apply payment reduces open balance, unapply restores it, reversed sale excluded, default as_of), **Financial Statements** (FinancialStatementsTest: Profit & Loss for range with income/expense totals and net profit, Balance Sheet as-of with equation check, compare period deltas, tenant isolation), **Accounting period locking** (AccountingPeriodLockingTest), and **Bank reconciliation** (BankReconciliationTest, BankStatementLinesTest):
@@ -341,7 +359,7 @@ npm run e2e:core     # E2E with profile "core"
 npm run e2e:all      # E2E with profile "all" (includes platform admin)
 ```
 
-Platform admin flows (tenant list, impersonation) require a profile that logs in as `platform_admin` (e.g. set `E2E_PROFILE=all` or use seed that creates a platform admin). Spec: `apps/web/playwright/specs/15_platform_tenant_impersonation.spec.ts`.
+Platform admin flows (tenant list, impersonation, audit logs) require a profile that logs in as `platform_admin` (e.g. set `E2E_PROFILE=all` or use seed that creates a platform admin). Specs: `apps/web/playwright/specs/15_platform_tenant_impersonation.spec.ts`, `16_platform_login_and_modules.spec.ts` (includes audit logs page load).
 
 ---
 

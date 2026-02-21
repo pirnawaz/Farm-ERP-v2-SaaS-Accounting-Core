@@ -35,13 +35,20 @@ async function globalSetup(_config: FullConfig): Promise<void> {
   };
   const { tenant_id, tenant_admin_user_id } = seedData;
 
+  const profile = (process.env.E2E_PROFILE ?? 'core') as E2EProfile;
+  const isPlatformProfile = profile === 'all';
+  const role = isPlatformProfile ? 'platform_admin' : 'tenant_admin';
+  const userId = isPlatformProfile
+    ? (seedData.platform_admin_user_id as string)
+    : tenant_admin_user_id;
+
   const authRes = await fetch(`${API_BASE_URL}/api/dev/e2e/auth-cookie`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       tenant_id,
-      role: 'tenant_admin',
-      user_id: tenant_admin_user_id,
+      role,
+      user_id: userId,
     }),
   });
   if (!authRes.ok) {
@@ -49,15 +56,17 @@ async function globalSetup(_config: FullConfig): Promise<void> {
   }
   const cookie = parseSetCookieHeaders(authRes.headers);
 
-  const profile = (process.env.E2E_PROFILE ?? 'core') as E2EProfile;
   const cookieHeader = cookie ? `${cookie.name}=${cookie.value}` : '';
-  const enabledModules = await applyE2EProfile({
-    cookie: cookieHeader,
-    tenantId: tenant_id,
-    userRole: 'tenant_admin',
-    userId: tenant_admin_user_id,
-    profile,
-  });
+  let enabledModules: string[] = [];
+  if (!isPlatformProfile) {
+    enabledModules = await applyE2EProfile({
+      cookie: cookieHeader,
+      tenantId: tenant_id,
+      userRole: 'tenant_admin',
+      userId: tenant_admin_user_id,
+      profile,
+    });
+  }
 
   const authDir = path.join(process.cwd(), 'playwright', '.auth');
   fs.mkdirSync(authDir, { recursive: true });
@@ -72,9 +81,9 @@ async function globalSetup(_config: FullConfig): Promise<void> {
       {
         origin,
         localStorage: [
-          { name: 'farm_erp_tenant_id', value: tenant_id },
-          { name: 'farm_erp_user_role', value: 'tenant_admin' },
-          { name: 'farm_erp_user_id', value: tenant_admin_user_id },
+          { name: 'farm_erp_tenant_id', value: isPlatformProfile ? '' : tenant_id },
+          { name: 'farm_erp_user_role', value: role },
+          { name: 'farm_erp_user_id', value: userId },
         ],
       },
     ],

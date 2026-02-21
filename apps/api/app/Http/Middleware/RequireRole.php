@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Helpers\DevIdentity;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -10,19 +11,21 @@ class RequireRole
 {
     /**
      * Handle an incoming request.
-     * 
+     * When dev identity is disabled (production), only role from request attributes
+     * (e.g. set by ResolvePlatformAuth from cookie) is trusted; header-only requests fail (401).
+     *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      * @param  string  ...$roles
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // For now, we'll use a simple approach with X-User-Role header
-        // In production, this should be replaced with proper JWT/OAuth authentication
-        $userRole = $request->header('X-User-Role');
+        $userRole = DevIdentity::isAllowed()
+            ? ($request->attributes->get('user_role') ?? $request->header('X-User-Role'))
+            : $request->attributes->get('user_role');
 
         if (!$userRole) {
             return response()->json([
-                'error' => 'X-User-Role header is required'
+                'error' => 'Authentication required'
             ], 401);
         }
 
@@ -33,6 +36,9 @@ class RequireRole
         }
 
         $request->attributes->set('user_role', $userRole);
+        if (!$request->attributes->has('user_id') && DevIdentity::isAllowed()) {
+            $request->attributes->set('user_id', $request->header('X-User-Id') ?? '');
+        }
 
         return $next($request);
     }

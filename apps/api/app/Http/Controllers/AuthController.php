@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PasswordResetToken;
 use App\Models\User;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -104,5 +105,28 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => 'Invalid token'], 401);
         }
+    }
+
+    /**
+     * Set password using a one-time reset token (from platform admin reset).
+     * POST /api/auth/set-password-with-token
+     * Body: { token, new_password }
+     */
+    public function setPasswordWithToken(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'min:8'],
+        ]);
+
+        $record = PasswordResetToken::consumeToken($validated['token']);
+        if (!$record) {
+            return response()->json(['error' => 'Invalid or expired token'], 400);
+        }
+
+        $user = User::findOrFail($record->user_id);
+        $user->update(['password' => Hash::make($validated['new_password'])]);
+
+        return response()->json(['message' => 'Password updated successfully']);
     }
 }

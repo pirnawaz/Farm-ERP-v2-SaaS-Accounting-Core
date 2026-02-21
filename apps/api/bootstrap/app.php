@@ -16,10 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Order: ResolveTenant → EnsureTenantActive → EnsureUserEnabled → (route: EnsureModuleLicensed/RequireRole)
+        // Order: ResolveTenant → EnsureTenantActive → ResolvePlatformAuth (cookie→headers for platform) → EnsureUserEnabled → (route: RequireRole/RequireModule)
         $middleware->api(prepend: [
             \App\Http\Middleware\ResolveTenant::class,
             \App\Http\Middleware\EnsureTenantActive::class,
+            \App\Http\Middleware\ResolvePlatformAuth::class,
             \App\Http\Middleware\EnsureUserEnabled::class,
             \App\Http\Middleware\LogSlowRequests::class,
         ]);

@@ -82,14 +82,17 @@ class ImpersonationController extends Controller
             'target_user_id' => $targetUserId,
             'started_at' => now()->toIso8601String(),
         ]);
+        $secure = config('app.env') === 'production' || str_starts_with(config('app.url'), 'https://');
         $cookie = cookie(
             self::COOKIE_NAME,
             $cookieValue,
             60 * 24 * self::COOKIE_DAYS,
             '/',
             null,
+            $secure,
             true,
-            true
+            false,
+            'lax'
         );
 
         return response()->json([
