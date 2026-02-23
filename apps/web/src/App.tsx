@@ -4,6 +4,7 @@ import { ModuleProtectedRoute } from './components/ModuleProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import GovernanceHubPage from './pages/GovernanceHubPage';
 import LandParcelsPage from './pages/LandParcelsPage';
 import LandParcelDetailPage from './pages/LandParcelDetailPage';
 import LandLeasesPage from './pages/LandLease/LandLeasesPage';
@@ -144,6 +145,7 @@ function App() {
       >
         <Route index element={<Navigate to="/app/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="governance" element={<GovernanceHubPage />} />
         <Route path="land" element={<ModuleProtectedRoute requiredModule="land"><LandParcelsPage /></ModuleProtectedRoute>} />
         <Route path="land/:id" element={<ModuleProtectedRoute requiredModule="land"><LandParcelDetailPage /></ModuleProtectedRoute>} />
         <Route path="land-leases" element={<ModuleProtectedRoute requiredModule="land_leases"><LandLeasesPage /></ModuleProtectedRoute>} />

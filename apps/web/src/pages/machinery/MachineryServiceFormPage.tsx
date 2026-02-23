@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useCreateMachineryService,
   useUpdateMachineryService,
@@ -20,6 +20,8 @@ const ALLOCATION_SCOPES: MachineryServiceAllocationScope[] = ['SHARED', 'HARI_ON
 export default function MachineryServiceFormPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const projectIdFromQuery = searchParams.get('project_id') ?? '';
   const isEdit = !!id && id !== 'new';
   const createM = useCreateMachineryService();
   const updateM = useUpdateMachineryService();
@@ -30,7 +32,7 @@ export default function MachineryServiceFormPage() {
   const { data: inventoryStores } = useInventoryStores(true);
   const { formatMoney } = useFormatting();
 
-  const [project_id, setProjectId] = useState('');
+  const [project_id, setProjectId] = useState(projectIdFromQuery);
   const [machine_id, setMachineId] = useState('');
   const [rate_card_id, setRateCardId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -60,8 +62,10 @@ export default function MachineryServiceFormPage() {
       setInKindItemId(service.in_kind_item_id ?? '');
       setInKindRatePerUnit(service.in_kind_rate_per_unit ?? '');
       setInKindStoreId(service.in_kind_store_id ?? '');
+    } else if (!isEdit && projectIdFromQuery) {
+      setProjectId(projectIdFromQuery);
     }
-  }, [service, isEdit]);
+  }, [service, isEdit, projectIdFromQuery]);
 
   const selectedRateCard = cards?.find((r) => r.id === rate_card_id);
   const qtyNum = parseFloat(quantity);
@@ -139,6 +143,7 @@ export default function MachineryServiceFormPage() {
         title={isEdit ? 'Edit Service' : 'New Service'}
         backTo="/app/machinery/services"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
           { label: 'Services', to: '/app/machinery/services' },
           { label: isEdit ? 'Edit' : 'New' },

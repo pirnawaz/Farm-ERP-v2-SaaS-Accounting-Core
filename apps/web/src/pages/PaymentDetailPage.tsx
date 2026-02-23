@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { usePayment, useDeletePayment, usePostPayment, useReversePayment } from '../hooks/usePayments';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -95,12 +96,15 @@ export default function PaymentDetailPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/payments" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
-          ← Back to Payments
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">Payment Details</h1>
-      </div>
+      <PageHeader
+        title={payment.reference ? `Payment ${payment.reference}` : 'Payment'}
+        backTo="/app/payments"
+        breadcrumbs={[
+          { label: 'Sales & Money', to: '/app/sales' },
+          { label: 'Payments', to: '/app/payments' },
+          { label: payment.reference || 'Payment' },
+        ]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -156,6 +156,7 @@ export default function ActivityDetailPage() {
         title={activity.doc_no}
         backTo={backTo}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Crop Ops', to: '/app/crop-ops' },
           { label: 'Activities', to: '/app/crop-ops/activities' },
           { label: activity.doc_no },

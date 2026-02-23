@@ -73,9 +73,9 @@ export default function SettlementsPage() {
   return (
     <div>
       <PageHeader
-        title="Settlements"
-        backTo="/app/dashboard"
-        breadcrumbs={[{ label: 'Settlements' }]}
+        title="Settlement Packs"
+        backTo="/app/governance"
+        breadcrumbs={[{ label: 'Governance', to: '/app/governance' }, { label: 'Settlement Packs' }]}
         right={canCreate ? (
           <Link
             to="/app/settlements/new"

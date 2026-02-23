@@ -93,7 +93,7 @@ export default function AdvancesPage() {
       <PageHeader
         title="Advances"
         backTo="/app/dashboard"
-        breadcrumbs={[{ label: 'Advances' }]}
+        breadcrumbs={[{ label: 'Sales & Money', to: '/app/sales' }, { label: 'Advances' }]}
         right={canCreate ? (
           <Link
             to="/app/advances/new"

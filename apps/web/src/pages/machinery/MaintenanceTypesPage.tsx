@@ -75,9 +75,9 @@ export default function MaintenanceTypesPage() {
   return (
     <div>
       <PageHeader
-        title="Maintenance Types"
+        title="Maintenance Setup"
         backTo="/app/machinery"
-        breadcrumbs={[{ label: 'Machinery', to: '/app/machinery' }, { label: 'Maintenance Types' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Maintenance Setup' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Maintenance Type</button>
         ) : undefined}

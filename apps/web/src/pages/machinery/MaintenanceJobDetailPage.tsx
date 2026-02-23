@@ -105,8 +105,9 @@ export default function MaintenanceJobDetailPage() {
         title={`Maintenance Job ${job.job_no}`}
         backTo="/app/machinery/maintenance-jobs"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs' },
+          { label: 'Maintenance', to: '/app/machinery/maintenance-jobs' },
           { label: job.job_no },
         ]}
       />

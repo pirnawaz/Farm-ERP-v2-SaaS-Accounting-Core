@@ -136,6 +136,7 @@ export default function WorkLogFormPage() {
         title={isEdit ? `Edit Work Log ${workLog?.work_log_no ?? ''}` : 'New Work Log'}
         backTo={isEdit ? `/app/machinery/work-logs/${id}` : '/app/machinery/work-logs'}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
           { label: 'Work Logs', to: '/app/machinery/work-logs' },
           { label: isEdit ? (workLog?.work_log_no ?? 'Edit') : 'New' },

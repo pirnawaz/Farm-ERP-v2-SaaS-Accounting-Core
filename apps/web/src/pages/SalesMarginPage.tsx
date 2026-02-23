@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@farm-erp/shared';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { DataTable, type Column } from '../components/DataTable';
 import { useFormatting } from '../hooks/useFormatting';
 import { useCropCycles } from '../hooks/useCropCycles';
@@ -116,12 +117,13 @@ export default function SalesMarginPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Sales Margin Report</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Shows revenue, COGS, and gross margin for sales
-        </p>
-      </div>
+      <PageHeader
+        title="Sales Margin"
+        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: 'Sales Margin' }]}
+      />
+      <p className="text-sm text-gray-600 mb-6 -mt-4">
+        Shows revenue, COGS, and gross margin for sales
+      </p>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

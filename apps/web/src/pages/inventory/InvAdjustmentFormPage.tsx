@@ -65,6 +65,7 @@ export default function InvAdjustmentFormPage() {
         title="New Adjustment"
         backTo="/app/inventory/adjustments"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'Adjustments', to: '/app/inventory/adjustments' },
           { label: 'New Adjustment' },

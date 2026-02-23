@@ -33,7 +33,7 @@ export default function StockMovementsPage() {
 
   return (
     <div>
-      <PageHeader title="Stock Movements" backTo="/app/inventory" breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Stock Movements' }]} />
+      <PageHeader title="Stock Movements" backTo="/app/inventory" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Stock Movements' }]} />
       <div className="flex flex-wrap gap-4 mb-4">
         <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All stores</option>

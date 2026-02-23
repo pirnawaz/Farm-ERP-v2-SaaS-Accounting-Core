@@ -51,7 +51,7 @@ export default function ActivityTypesPage() {
       <PageHeader
         title="Crop Ops → Activity Types"
         backTo="/app/crop-ops"
-        breadcrumbs={[{ label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activity Types' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activity Types' }]}
         right={
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Type

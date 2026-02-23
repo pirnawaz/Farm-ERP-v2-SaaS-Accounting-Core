@@ -54,7 +54,8 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Reports** — Trial balance, **Profit & Loss** (income statement), **Balance Sheet** (with equation check), general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, **AR ageing** (including auditable `GET /ar/aging` — open invoice balances per customer with bucket totals and grand totals), customer balances, AP ageing, supplier balances, AR/AP control reconciliation, yield reports, party ledger, party summary, **landlord statement** (Maqada, when `land_leases` module enabled), role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; reconciliation reports (project, crop-cycle, supplier AP); bank reconciliation; CSV export with Terrava-branded filenames; print-friendly layouts
 - **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
 - **Crop Cycle Close** — Close crop cycle with preview; **Accounting Period Close (v2)**: full closing entries that zero all income/expense accounts for the cycle period, clear via CURRENT_EARNINGS, and roll to RETAINED_EARNINGS in one PERIOD_CLOSE posting group; idempotent (one close run per cycle); crop cycle lock enforced (no posting after CLOSED); `POST crop-cycles/{id}/close`, `GET crop-cycles/{id}/close-run`; crop-cycle-based settlements (preview and post); accounting corrections and guards
-- **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states
+- **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states. **Global crop cycle scope**: header-level selector (All Crop Cycles / single cycle); scope persists per tenant in `localStorage`; dashboard summary API accepts optional `scope_type` and `scope_id` (read-only, no ledger writes); default selection is the active OPEN cycle when present.
+- **Navigation & UX** — Farm-first sidebar: **Farm** (Dashboard, Land Parcels, Land Leases, Crop Cycles, Land Allocation, People & Partners, Projects, Unposted Records, Crop Ops, Harvests, Labour, **Machinery** submenu, Inventory), **Sales & Money** (Sales, Payments, Advances), **Profit & Reports**, **Governance** (Governance Hub, Settlement Packs, Accounting Periods), **Settings**. **Breadcrumbs**: `PageHeader` with breadcrumb trail on list/detail/form pages; hierarchy matches sidebar (e.g. Farm → Machinery → Work Logs; Sales & Money → Sales; Profit & Reports → Sales Margin; Governance → Settlement Packs). **Land Allocation** and **Maintenance Setup** appear under Farm/Machinery (not under Settings).
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
 ---
@@ -235,6 +236,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | Area            | Examples                                                                 |
 |-----------------|---------------------------------------------------------------------------|
 | **Health**      | `GET /api/health`                                                        |
+| **Dashboard**   | `GET /api/dashboard/summary` — optional query: `scope_type=crop_cycle`, `scope_id=<uuid>` (read-only; scopes metrics to one crop cycle) |
 | **Auth**        | `POST /api/auth/login`, `POST /api/auth/set-password-with-token` (body: `token`, `new_password`; no tenant; for platform-issued reset tokens) |
 | **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`; `GET /api/platform/tenants/{id}/modules`, `PUT .../modules`; `POST .../reset-admin-password` (body optional: `new_password`; else returns one-time token), `POST .../archive`, `POST .../unarchive` (platform_admin only, audited in `platform_audit_log`); `GET /api/platform/audit-logs` (query: `tenant_id`, `actor_user_id`, `action`, `date_from`, `date_to`, `per_page`, `page`; platform_admin only); `GET /api/platform/impersonation`, `POST .../start`, `POST .../stop` (platform_admin only, audited) |
 | **Dev**         | `GET/POST /api/dev/tenants`, `POST /api/dev/tenants/{id}/activate`        |
@@ -282,7 +284,8 @@ The web app includes pages (and routes) for:
 - **Machinery:** machines, work logs, rate cards, charges, maintenance jobs and types, profitability reports (when `machinery` module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
 - **Reports:** trial balance, **Profit & Loss**, **Balance Sheet**, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, customer balances, AP ageing, supplier balances, yield reports, sales margin, party ledger, party summary, **landlord statement** (when `land_leases` enabled), role ageing, crop cycle distribution, settlement statement; reconciliation dashboard; **bank reconciliation** (list and detail: statement lines, match/unmatch, finalize); CSV export functionality; print-friendly layouts
-- **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states
+- **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states; **global crop cycle scope selector** in header (All Crop Cycles / single cycle; persisted per tenant; dashboard numbers respect selected scope)
+- **Navigation:** Farm-first sidebar with collapsible Machinery submenu; **breadcrumbs** on Sales, Payments, Reports, Settlement Pack, and other core pages (hierarchy matches sidebar)
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform (platform_admin only):** tenant list at `/app/platform/tenants` (status badge: active/suspended/archived, plan dropdown, impersonate); **Audit Logs** at `/app/platform/audit-logs` (table, filters: tenant, actor user ID, action, date range, pagination); tenant detail with plan, modules, **Support actions** (Reset admin password — generate token or set directly; Archive / Unarchive tenant), and impersonate; impersonation banner in tenant app with “Impersonating: {tenant}” and exit; tenant detail with plan and impersonate
 
@@ -300,7 +303,10 @@ Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, 
 | `start-servers.bat` / `start-servers.ps1` | Start API and web              |
 | `setup-api.ps1`            | API .env and composer setup               |
 | `scripts/create-test-db.ps1` | Create test DB (see script for target)  |
-| `npm run build`             | Build shared package + web app            |
+| `npm run build`             | Build shared package + web app (root: `npm run build`; runs `build:shared` then `build:web`) |
+| `npm run build:shared`       | Build `packages/shared` only               |
+| `npm run build:web`          | Build shared then `apps/web`               |
+| `npm run typecheck` / `npm run typecheck:web` | TypeScript check (web app)        |
 | `npm run e2e`               | Start API then run Playwright E2E (uses `E2E_PROFILE` or default) |
 | `npm run e2e:core`          | E2E with profile `core`                   |
 | `npm run e2e:all`           | E2E with profile `all` (e.g. platform admin flows) |
@@ -379,8 +385,8 @@ Platform admin flows (tenant list, impersonation, audit logs) require a profile 
 │   └── web/                    # React + Vite
 │       ├── src/
 │       │   ├── api/             # API clients
-│       │   ├── components/
-│       │   ├── contexts/
+│       │   ├── components/     # PageHeader, CropCycleScopeSelector, etc.
+│       │   ├── contexts/      # Auth, Modules, CropCycleScope (scope + localStorage)
 │       │   ├── hooks/
 │       │   ├── pages/
 │       │   ├── types/

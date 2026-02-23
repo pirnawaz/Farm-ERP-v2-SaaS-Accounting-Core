@@ -105,6 +105,7 @@ export default function InvTransferDetailPage() {
         title={`Transfer ${transfer.doc_no}`}
         backTo={backTo}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'Transfers', to: '/app/inventory/transfers' },
           { label: transfer.doc_no },

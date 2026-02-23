@@ -156,6 +156,56 @@ export interface AccountBalanceRow {
   balance: string
 }
 
+// Dashboard summary (read-only, single payload for all role views)
+export interface DashboardScope {
+  type: string
+  id: string | null
+  label: string
+}
+
+export interface DashboardFarm {
+  active_crop_cycles_count: number
+  open_projects_count: number
+  harvests_this_cycle_count: number
+  unposted_records_count: number
+}
+
+export interface DashboardMoney {
+  cash_balance: number
+  bank_balance: number
+  receivables_total: number
+  advances_outstanding_total: number
+}
+
+export interface DashboardProfit {
+  profit_this_cycle: number | null
+  profit_ytd: number
+  best_project: { project_id: string; name: string; profit: number } | null
+  cost_per_acre: number | null
+}
+
+export interface DashboardGovernance {
+  settlements_pending_count: number
+  cycles_closed_count: number
+  locks_warning: Array<{ type: string; label: string; date: string }>
+}
+
+export interface DashboardAlert {
+  severity: 'info' | 'warn' | 'critical'
+  title: string
+  detail: string
+  action: { label: string; to: string }
+}
+
+export interface DashboardSummary {
+  scope: DashboardScope
+  farm: DashboardFarm
+  money: DashboardMoney
+  profit: DashboardProfit
+  governance: DashboardGovernance
+  alerts: DashboardAlert[]
+}
+
 // Land Lease (Maqada) — lease master, no accounting
 export type LandLeaseFrequency = 'MONTHLY'
 

@@ -7,6 +7,7 @@ import { useCropCycles } from '../hooks/useCropCycles';
 import { useInventoryStores, useInventoryItems } from '../hooks/useInventory';
 import { FormField } from '../components/FormField';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { useRole } from '../hooks/useRole';
 import { saleSchema } from '../validation/saleSchema';
 import toast from 'react-hot-toast';
@@ -185,14 +186,15 @@ export default function SaleFormPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/sales" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
-          ← Back to Sales
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">
-          {isEdit ? 'Edit Sale' : 'New Sale'}
-        </h1>
-      </div>
+      <PageHeader
+        title={isEdit ? 'Edit Sale' : 'New Sale'}
+        backTo="/app/sales"
+        breadcrumbs={[
+          { label: 'Sales & Money', to: '/app/sales' },
+          { label: 'Sales', to: '/app/sales' },
+          { label: isEdit ? 'Edit Sale' : 'New Sale' },
+        ]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-4">

@@ -71,7 +71,7 @@ export default function ActivitiesPage() {
       <PageHeader
         title="Crop Ops → Activities"
         backTo="/app/crop-ops"
-        breadcrumbs={[{ label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activities' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activities' }]}
         right={
           <button onClick={() => navigate('/app/crop-ops/activities/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Activity

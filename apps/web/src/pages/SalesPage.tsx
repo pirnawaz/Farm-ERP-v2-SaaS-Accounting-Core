@@ -4,6 +4,7 @@ import { useSales } from '../hooks/useSales';
 import { useParties } from '../hooks/useParties';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import type { Sale } from '../types';
@@ -74,17 +75,18 @@ export default function SalesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Sales</h1>
-        {canCreate && (
+      <PageHeader
+        title="Sales"
+        breadcrumbs={[{ label: 'Sales & Money', to: '/app/sales' }, { label: 'Sales' }]}
+        right={canCreate ? (
           <Link
             to="/app/sales/new"
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Sale
           </Link>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-6">
         <p className="text-sm text-[#2D3A3A]">

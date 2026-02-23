@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   useWorkLogsQuery,
   usePostWorkLog,
@@ -18,12 +18,13 @@ import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLog } from '../../types';
 
 export default function WorkLogsPage() {
-  const [status, setStatus] = useState('');
-  const [machineId, setMachineId] = useState('');
-  const [cropCycleId, setCropCycleId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [searchParams] = useSearchParams();
+  const [status, setStatus] = useState(searchParams.get('status') ?? '');
+  const [machineId, setMachineId] = useState(searchParams.get('machine_id') ?? '');
+  const [cropCycleId, setCropCycleId] = useState(searchParams.get('crop_cycle_id') ?? '');
+  const [projectId, setProjectId] = useState(searchParams.get('project_id') ?? '');
+  const [from, setFrom] = useState(searchParams.get('from') ?? '');
+  const [to, setTo] = useState(searchParams.get('to') ?? '');
 
   const { data: workLogs, isLoading } = useWorkLogsQuery({
     status: status || undefined,
@@ -161,7 +162,7 @@ export default function WorkLogsPage() {
       <PageHeader
         title="Work Logs"
         backTo="/app/machinery"
-        breadcrumbs={[{ label: 'Machinery', to: '/app/machinery' }, { label: 'Work Logs' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Work Logs' }]}
         right={
           canEdit ? (
             <button

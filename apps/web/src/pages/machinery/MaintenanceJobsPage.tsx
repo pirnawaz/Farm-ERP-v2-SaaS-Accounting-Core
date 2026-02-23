@@ -188,8 +188,9 @@ export default function MaintenanceJobsPage() {
       <PageHeader
         title="Maintenance Jobs"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Maintenance Jobs' },
+          { label: 'Maintenance' },
         ]}
         right={
           canCreate ? (

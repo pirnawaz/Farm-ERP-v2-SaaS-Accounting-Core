@@ -251,4 +251,13 @@ export const apiClient = {
     const query = buildQueryString(params)
     return request<import('./types').ReconciliationResponse>(`/api/reports/reconciliation/supplier-ap${query}`)
   },
+
+  getDashboardSummary: (params?: {
+    scope_type?: 'crop_cycle' | 'project' | 'year'
+    scope_id?: string
+    year?: number
+  }) => {
+    const query = params ? buildQueryString(params as Record<string, string | number | undefined | null>) : ''
+    return request<import('./types').DashboardSummary>(`/api/dashboard/summary${query}`)
+  },
 }

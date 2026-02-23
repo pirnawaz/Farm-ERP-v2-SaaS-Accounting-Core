@@ -106,7 +106,7 @@ export default function HarvestFormPage() {
       <PageHeader
         title="New Harvest"
         backTo="/app/harvests"
-        breadcrumbs={[{ label: 'Harvests', to: '/app/harvests' }, { label: 'New' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Harvests', to: '/app/harvests' }, { label: 'New' }]}
       />
       <div className="bg-white rounded-lg shadow p-6 max-w-4xl">
         <div className="space-y-4">

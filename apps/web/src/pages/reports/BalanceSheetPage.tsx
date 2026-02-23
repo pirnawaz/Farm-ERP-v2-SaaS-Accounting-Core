@@ -21,7 +21,7 @@ export default function BalanceSheetPage() {
     <div className="space-y-6">
       <PageHeader
         title="Balance Sheet"
-        breadcrumbs={[{ label: 'Reports', to: '/app/reports' }, { label: 'Balance Sheet' }]}
+        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: 'Balance Sheet' }]}
       />
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4">

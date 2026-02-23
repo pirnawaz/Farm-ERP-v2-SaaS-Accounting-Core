@@ -43,7 +43,7 @@ export default function InvTransfersPage() {
       <PageHeader
         title="Transfers"
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Inventory', to: '/app/inventory' }, { label: 'Transfers' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Transfers' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => navigate('/app/inventory/transfers/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Transfer</button>
         ) : undefined}

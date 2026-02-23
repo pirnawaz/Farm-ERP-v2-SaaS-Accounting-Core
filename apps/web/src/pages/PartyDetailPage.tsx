@@ -588,7 +588,7 @@ export default function PartyDetailPage() {
     <div>
       <div className="mb-6">
         <Link to="/app/parties" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
-          ← Back to Parties
+          ← Back to People & Partners
         </Link>
         <div className="flex justify-between items-start mt-2">
           <div>

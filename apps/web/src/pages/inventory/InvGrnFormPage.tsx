@@ -69,6 +69,7 @@ export default function InvGrnFormPage() {
         title="New GRN"
         backTo="/app/inventory/grns"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'GRNs', to: '/app/inventory/grns' },
           { label: 'New GRN' },

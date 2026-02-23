@@ -4,10 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTenant } from '../hooks/useTenant';
 import { useAuth, useRole } from '../hooks';
 import { useModules } from '../contexts/ModulesContext';
+import { CropCycleScopeProvider } from '../contexts/CropCycleScopeContext';
 import { BrandLogo } from './BrandLogo';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingChecklist } from './OnboardingChecklist';
 import { ImpersonationBanner } from './ImpersonationBanner';
+import { CropCycleScopeSelector } from './CropCycleScopeSelector';
 import type { UserRole } from '../types';
 
 type NavigationItem = {
@@ -17,107 +19,101 @@ type NavigationItem = {
   requiredModuleKey?: string;
 };
 
-type NavigationGroup = {
+type NavigationParent = {
   name: string;
-  items: NavigationItem[];
+  submenuKey: string;
+  children: NavigationItem[];
 };
 
+function isSubmenuParent(item: NavigationItem | NavigationParent): item is NavigationParent {
+  return 'children' in item && Array.isArray((item as NavigationParent).children);
+}
+
+type NavigationGroup = {
+  name: string;
+  items: (NavigationItem | NavigationParent)[];
+};
+
+// Navigation v2: Farm-first sidebar. Order: Farm → Sales & Money → Profit & Reports → Governance → Settings.
+// All routes unchanged; no Allocations, Posting Groups, or Ledger Entries in sidebar.
 const navigationGroups: NavigationGroup[] = [
   {
-    name: 'Dashboard',
+    name: 'Farm',
     items: [
       { name: 'Dashboard', href: '/app/dashboard', roles: ['tenant_admin', 'accountant', 'operator'] },
-    ],
-  },
-  {
-    name: 'Land Management',
-    items: [
       { name: 'Land Parcels', href: '/app/land', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'land' },
       { name: 'Land Leases (Maqada)', href: '/app/land-leases', roles: ['tenant_admin'], requiredModuleKey: 'land_leases' },
-    ],
-  },
-  {
-    name: 'Project Management',
-    items: [
       { name: 'Crop Cycles', href: '/app/crop-cycles', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
-      { name: 'Parties', href: '/app/parties', roles: ['tenant_admin', 'accountant'] },
-      { name: 'Allocations', href: '/app/allocations', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Land Allocation', href: '/app/allocations', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'People & Partners', href: '/app/parties', roles: ['tenant_admin', 'accountant'] },
       { name: 'Projects', href: '/app/projects', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
-      { name: 'Transactions', href: '/app/transactions', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Unposted Records', href: '/app/transactions', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Crop Ops', href: '/app/crop-ops', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
+      { name: 'Harvests', href: '/app/harvests', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
+      { name: 'Labour', href: '/app/labour', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'labour' },
+      {
+        name: 'Machinery',
+        submenuKey: 'machinery',
+        children: [
+          { name: 'Machines', href: '/app/machinery/machines', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+          { name: 'Work Logs', href: '/app/machinery/work-logs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+          { name: 'Services', href: '/app/machinery/services', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+          { name: 'Charges', href: '/app/machinery/charges', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+          { name: 'Maintenance', href: '/app/machinery/maintenance-jobs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+          { name: 'Maintenance Setup', href: '/app/machinery/maintenance-types', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+          { name: 'Rate Cards', href: '/app/machinery/rate-cards', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
+        ],
+      },
+      { name: 'Inventory', href: '/app/inventory', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'inventory' },
     ],
   },
   {
-    name: 'Treasury',
+    name: 'Sales & Money',
     items: [
-      { name: 'Settlement', href: '/app/settlement', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'settlements' },
+      { name: 'Sales', href: '/app/sales', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'ar_sales' },
       { name: 'Payments', href: '/app/payments', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_payments' },
       { name: 'Advances', href: '/app/advances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_advances' },
     ],
   },
   {
-    name: 'Sales & Receivables',
+    name: 'Profit & Reports',
     items: [
-      { name: 'Sales', href: '/app/sales', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'ar_sales' },
-    ],
-  },
-  {
-    name: 'Operations',
-    items: [
-      { name: 'Inventory', href: '/app/inventory', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'inventory' },
-      { name: 'Labour', href: '/app/labour', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'labour' },
-      { name: 'Crop Ops', href: '/app/crop-ops', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
-      { name: 'Harvests', href: '/app/harvests', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
-    ],
-  },
-  {
-    name: 'Machinery',
-    items: [
-      { name: 'Work Logs', href: '/app/machinery/work-logs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-      { name: 'Services', href: '/app/machinery/services', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-      { name: 'Charges', href: '/app/machinery/charges', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-      { name: 'Maintenance Jobs', href: '/app/machinery/maintenance-jobs', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-      { name: 'Profitability', href: '/app/machinery/reports/profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-      { name: 'Machines', href: '/app/machinery/machines', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-      { name: 'Maintenance Types', href: '/app/machinery/maintenance-types', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-      { name: 'Rate Cards', href: '/app/machinery/rate-cards', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
-    ],
-  },
-  {
-    name: 'Reports',
-    items: [
-      { name: 'Trial Balance', href: '/app/reports/trial-balance', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Profit & Loss', href: '/app/reports/profit-loss', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Balance Sheet', href: '/app/reports/balance-sheet', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'General Ledger', href: '/app/reports/general-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Project P&L', href: '/app/reports/project-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Crop Cycle P&L', href: '/app/reports/crop-cycle-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Account Balances', href: '/app/reports/account-balances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Trial Balance', href: '/app/reports/trial-balance', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Cashbook', href: '/app/reports/cashbook', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'AR Ageing', href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
+      { name: 'Project P&L', href: '/app/reports/project-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Crop Cycle P&L', href: '/app/reports/crop-cycle-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Machinery Profitability', href: '/app/machinery/reports/profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
       { name: 'Sales Margin', href: '/app/reports/sales-margin', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Party Ledger', href: '/app/reports/party-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Landlord Statement', href: '/app/reports/landlord-statement', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'land_leases' },
-      { name: 'Role Summary', href: '/app/reports/party-summary', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Role Ageing', href: '/app/reports/role-ageing', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Reconciliation Dashboard', href: '/app/reports/reconciliation-dashboard', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Party Summary', href: '/app/reports/party-summary', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Party Ageing', href: '/app/reports/role-ageing', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Reconcile Accounts', href: '/app/reports/reconciliation-dashboard', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Bank Reconciliation', href: '/app/reports/bank-reconciliation', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
-      { name: 'General Journal', href: '/app/accounting/journals', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
-      { name: 'Accounting periods', href: '/app/accounting/periods', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
+      { name: 'Advanced: Account Balances', href: '/app/reports/account-balances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Advanced: General Ledger', href: '/app/reports/general-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Advanced: General Journal', href: '/app/accounting/journals', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
+    ],
+  },
+  {
+    name: 'Governance',
+    items: [
+      { name: 'Governance Hub', href: '/app/governance', roles: ['tenant_admin', 'accountant', 'operator'] },
+      { name: 'Settlement Packs', href: '/app/settlement', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'settlements' },
+      { name: 'Accounting Periods', href: '/app/accounting/periods', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
     ],
   },
   {
     name: 'Settings',
     items: [
-      { name: 'Settings', href: '/app/settings/localisation', roles: ['tenant_admin'] },
-    ],
-  },
-  {
-    name: 'Administration',
-    items: [
+      { name: 'Localisation', href: '/app/settings/localisation', roles: ['tenant_admin'] },
       { name: 'Farm Profile', href: '/app/admin/farm', roles: ['tenant_admin'] },
       { name: 'Users', href: '/app/admin/users', roles: ['tenant_admin'] },
       { name: 'Roles', href: '/app/admin/roles', roles: ['tenant_admin'] },
-      { name: 'Module Toggles', href: '/app/admin/modules', roles: ['tenant_admin'] },
+      { name: 'Modules', href: '/app/admin/modules', roles: ['tenant_admin'] },
     ],
   },
 ];
@@ -144,16 +140,77 @@ export function AppLayout() {
         ? 'error'
         : 'ready';
 
+  const SIDEBAR_EXPANDED_KEY = 'terrava.sidebar.expanded';
+
+  const getSubmenuStorageKey = () => `${SIDEBAR_EXPANDED_KEY}.${tenantId ?? '_default'}`;
+
+  const loadSubmenuExpanded = (): Record<string, boolean> => {
+    try {
+      const raw = localStorage.getItem(getSubmenuStorageKey());
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, boolean>;
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return {};
+  };
+
+  const saveSubmenuExpanded = (map: Record<string, boolean>) => {
+    try {
+      localStorage.setItem(getSubmenuStorageKey(), JSON.stringify(map));
+    } catch {
+      // ignore
+    }
+  };
+
+  const isOnMachineryRoute = location.pathname.startsWith('/app/machinery');
+  const [expandedSubmenus, setExpandedSubmenus] = useState<Record<string, boolean>>(() => {
+    const saved = loadSubmenuExpanded();
+    return { machinery: saved.machinery ?? isOnMachineryRoute, ...saved };
+  });
+
+  useEffect(() => {
+    const key = getSubmenuStorageKey();
+    const saved = (() => {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+      } catch {
+        return {};
+      }
+    })();
+    setExpandedSubmenus((_prev) => ({ ...saved, machinery: saved.machinery ?? isOnMachineryRoute }));
+  }, [tenantId]);
+
+  const toggleSubmenu = (submenuKey: string) => {
+    setExpandedSubmenus((prev) => {
+      const next = { ...prev, [submenuKey]: !prev[submenuKey] };
+      saveSubmenuExpanded(next);
+      return next;
+    });
+  };
+
   // Track expanded groups - initialize with groups that contain the active route
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
     const active = new Set<string>();
     navigationGroups.forEach((group) => {
-      const hasActiveItem = group.items.some(
-        (item) =>
+      const hasActiveItem = group.items.some((item) => {
+        if (isSubmenuParent(item)) {
+          const visible = item.children.filter(
+            (c) => hasRole(c.roles) && (!c.requiredModuleKey || isModuleEnabled(c.requiredModuleKey))
+          );
+          return visible.some(
+            (c) => location.pathname === c.href || location.pathname.startsWith(c.href + '/')
+          );
+        }
+        return (
           location.pathname === item.href &&
           hasRole(item.roles) &&
           (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))
-      );
+        );
+      });
       if (hasActiveItem) {
         active.add(group.name);
       }
@@ -190,25 +247,44 @@ export function AppLayout() {
     });
   };
 
-  // Filter navigation groups and their items
-  const filteredGroups = navigationGroups
+  // Filter navigation groups and their items; for submenu parents, filter children and keep parent only if at least one child is visible
+  const filteredGroups: NavigationGroup[] = navigationGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter(
-        (item) => hasRole(item.roles) && (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))
-      ),
+      items: group.items.flatMap((item): (NavigationItem | NavigationParent)[] => {
+        if (isSubmenuParent(item)) {
+          const visibleChildren = item.children.filter(
+            (c) => hasRole(c.roles) && (!c.requiredModuleKey || isModuleEnabled(c.requiredModuleKey))
+          );
+          if (visibleChildren.length === 0) return [];
+          return [{ ...item, children: visibleChildren }];
+        }
+        if (hasRole(item.roles) && (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))) {
+          return [item];
+        }
+        return [];
+      }),
     }))
     .filter((group) => group.items.length > 0);
 
   // Auto-expand groups when navigating to a page within them
   useEffect(() => {
     navigationGroups.forEach((group) => {
-      const hasActiveItem = group.items.some(
-        (item) =>
+      const hasActiveItem = group.items.some((item) => {
+        if (isSubmenuParent(item)) {
+          const visible = item.children.filter(
+            (c) => hasRole(c.roles) && (!c.requiredModuleKey || isModuleEnabled(c.requiredModuleKey))
+          );
+          return visible.some(
+            (c) => location.pathname === c.href || location.pathname.startsWith(c.href + '/')
+          );
+        }
+        return (
           location.pathname === item.href &&
           hasRole(item.roles) &&
           (!item.requiredModuleKey || isModuleEnabled(item.requiredModuleKey))
-      );
+        );
+      });
       if (hasActiveItem) {
         setExpandedGroups((prev) => {
           if (!prev.has(group.name)) {
@@ -221,9 +297,17 @@ export function AppLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  // Auto-expand Machinery submenu when navigating to a machinery route (do not persist; only user toggle persists)
+  useEffect(() => {
+    if (location.pathname.startsWith('/app/machinery') && !expandedSubmenus.machinery) {
+      setExpandedSubmenus((prev) => ({ ...prev, machinery: true }));
+    }
+  }, [location.pathname]);
+
   const isTenantApp = location.pathname.startsWith('/app') && !location.pathname.startsWith('/app/platform');
 
   return (
+    <CropCycleScopeProvider tenantId={tenantId}>
     <div className="min-h-screen bg-gray-50" data-testid="app-shell">
       <ImpersonationBanner enabled={isTenantApp} />
       {/* Readiness marker for E2E: state encoded in data-state (loading | error | ready) */}
@@ -244,10 +328,17 @@ export function AppLayout() {
             <nav className="mt-5 flex-1 px-2 space-y-1">
               {filteredGroups.map((group) => {
                 const isExpanded = expandedGroups.has(group.name);
-                const hasActiveItem = group.items.some((item) => location.pathname === item.href);
+                const hasActiveItem = group.items.some((item) => {
+                  if (isSubmenuParent(item)) {
+                    return item.children.some(
+                      (c) => location.pathname === c.href || location.pathname.startsWith(c.href + '/')
+                    );
+                  }
+                  return location.pathname === item.href;
+                });
 
-                // If group has only one item, render it directly without grouping
-                if (group.items.length === 1) {
+                // If group has only one item, render it directly without grouping (and no submenu)
+                if (group.items.length === 1 && !isSubmenuParent(group.items[0])) {
                   const item = group.items[0];
                   const isActive = location.pathname === item.href;
                   const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
@@ -291,6 +382,64 @@ export function AppLayout() {
                     {isExpanded && (
                       <div className="ml-4 mt-1 space-y-1">
                         {group.items.map((item) => {
+                          if (isSubmenuParent(item)) {
+                            const subExpanded = expandedSubmenus[item.submenuKey] ?? false;
+                            const hasChildActive = item.children.some(
+                              (c) => location.pathname === c.href || location.pathname.startsWith(c.href + '/')
+                            );
+                            return (
+                              <div key={item.submenuKey}>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSubmenu(item.submenuKey)}
+                                  aria-expanded={subExpanded}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      toggleSubmenu(item.submenuKey);
+                                    }
+                                  }}
+                                  className={`${
+                                    hasChildActive
+                                      ? 'bg-[#E6ECEA] text-[#1F6F5C]'
+                                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                  } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
+                                >
+                                  <span>{item.name}</span>
+                                  <svg
+                                    className={`h-4 w-4 transition-transform ${subExpanded ? 'transform rotate-90' : ''}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                                {subExpanded && (
+                                  <div className="ml-4 mt-1 space-y-1 pl-2 border-l border-gray-200">
+                                    {item.children.map((child) => {
+                                      const isActive = location.pathname === child.href || location.pathname.startsWith(child.href + '/');
+                                      const navTestId = `nav-${child.href.replace('/app/', '').replace(/\//g, '-')}`;
+                                      return (
+                                        <Link
+                                          key={child.href}
+                                          to={child.href}
+                                          data-testid={navTestId}
+                                          className={`${
+                                            isActive
+                                              ? 'bg-[#E6ECEA] text-[#1F6F5C]'
+                                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                          } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                                        >
+                                          {child.name}
+                                        </Link>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
                           const isActive = location.pathname === item.href;
                           const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
                           return (
@@ -341,10 +490,17 @@ export function AppLayout() {
               <nav className="mt-5 px-2 space-y-1">
                 {filteredGroups.map((group) => {
                   const isExpanded = expandedGroups.has(group.name);
-                  const hasActiveItem = group.items.some((item) => location.pathname === item.href);
+                  const hasActiveItem = group.items.some((item) => {
+                    if (isSubmenuParent(item)) {
+                      return item.children.some(
+                        (c) => location.pathname === c.href || location.pathname.startsWith(c.href + '/')
+                      );
+                    }
+                    return location.pathname === item.href;
+                  });
 
-                  // If group has only one item, render it directly without grouping
-                  if (group.items.length === 1) {
+                  // If group has only one item, render it directly without grouping (and no submenu)
+                  if (group.items.length === 1 && !isSubmenuParent(group.items[0])) {
                     const item = group.items[0];
                     const isActive = location.pathname === item.href;
                     const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
@@ -389,6 +545,65 @@ export function AppLayout() {
                       {isExpanded && (
                         <div className="ml-4 mt-1 space-y-1">
                           {group.items.map((item) => {
+                            if (isSubmenuParent(item)) {
+                              const subExpanded = expandedSubmenus[item.submenuKey] ?? false;
+                              const hasChildActive = item.children.some(
+                                (c) => location.pathname === c.href || location.pathname.startsWith(c.href + '/')
+                              );
+                              return (
+                                <div key={item.submenuKey}>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSubmenu(item.submenuKey)}
+                                    aria-expanded={subExpanded}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        toggleSubmenu(item.submenuKey);
+                                      }
+                                    }}
+                                    className={`${
+                                      hasChildActive
+                                        ? 'bg-[#E6ECEA] text-[#1F6F5C]'
+                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                    } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
+                                  >
+                                    <span>{item.name}</span>
+                                    <svg
+                                      className={`h-4 w-4 transition-transform ${subExpanded ? 'transform rotate-90' : ''}`}
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </button>
+                                  {subExpanded && (
+                                    <div className="ml-4 mt-1 space-y-1 pl-2 border-l border-gray-200">
+                                      {item.children.map((child) => {
+                                        const isActive = location.pathname === child.href || location.pathname.startsWith(child.href + '/');
+                                        const navTestId = `nav-${child.href.replace('/app/', '').replace(/\//g, '-')}`;
+                                        return (
+                                          <Link
+                                            key={child.href}
+                                            to={child.href}
+                                            data-testid={navTestId}
+                                            onClick={() => setSidebarOpen(false)}
+                                            className={`${
+                                              isActive
+                                                ? 'bg-[#E6ECEA] text-[#1F6F5C]'
+                                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                            } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                                          >
+                                            {child.name}
+                                          </Link>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
                             const isActive = location.pathname === item.href;
                             const navTestId = `nav-${item.href.replace('/app/', '').replace(/\//g, '-')}`;
                             return (
@@ -433,7 +648,8 @@ export function AppLayout() {
             </svg>
           </button>
             <div className="flex-1 px-4 flex justify-between items-center">
-            <div className="flex-1 flex items-center">
+            <div className="flex-1 flex items-center gap-4">
+              {isTenantApp && <CropCycleScopeSelector />}
               <div className="flex items-center space-x-4">
                 <div className="text-sm text-gray-600">
                   Tenant ID: <span className="font-mono text-xs text-gray-500">{tenantId ? `${tenantId.substring(0, 8)}...` : 'None'}</span>
@@ -473,5 +689,6 @@ export function AppLayout() {
         </main>
       </div>
     </div>
+    </CropCycleScopeProvider>
   );
 }

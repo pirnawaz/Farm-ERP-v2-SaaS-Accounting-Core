@@ -174,7 +174,7 @@ export default function BankReconciliationDetailPage() {
           title="Bank Reconciliation"
           backTo="/app/reports/bank-reconciliation"
           breadcrumbs={[
-            { label: 'Reports', to: '/app/reports' },
+            { label: 'Profit & Reports', to: '/app/reports' },
             { label: 'Bank Reconciliation', to: '/app/reports/bank-reconciliation' },
             { label: 'Detail' },
           ]}
@@ -192,7 +192,7 @@ export default function BankReconciliationDetailPage() {
         title={`Bank Reconciliation — ${report.account_code}`}
         backTo="/app/reports/bank-reconciliation"
         breadcrumbs={[
-          { label: 'Reports', to: '/app/reports' },
+          { label: 'Profit & Reports', to: '/app/reports' },
           { label: 'Bank Reconciliation', to: '/app/reports/bank-reconciliation' },
           { label: report.statement_date },
         ]}

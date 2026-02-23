@@ -76,7 +76,7 @@ export default function PaymentsPage() {
       <PageHeader
         title="Payments"
         backTo="/app/dashboard"
-        breadcrumbs={[{ label: 'Payments' }]}
+        breadcrumbs={[{ label: 'Sales & Money', to: '/app/sales' }, { label: 'Payments' }]}
         right={canCreate ? (
           <Link
             to="/app/payments/new"

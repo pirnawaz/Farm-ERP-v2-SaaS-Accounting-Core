@@ -114,7 +114,7 @@ export default function BankReconciliationsPage() {
       <PageHeader
         title="Bank Reconciliation"
         backTo="/app/reports"
-        breadcrumbs={[{ label: 'Reports', to: '/app/reports' }, { label: 'Bank Reconciliation' }]}
+        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: 'Bank Reconciliation' }]}
         right={
           <button
             type="button"

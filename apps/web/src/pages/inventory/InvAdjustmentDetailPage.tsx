@@ -106,6 +106,7 @@ export default function InvAdjustmentDetailPage() {
         title={`Adjustment ${adj.doc_no}`}
         backTo={backTo}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'Adjustments', to: '/app/inventory/adjustments' },
           { label: adj.doc_no },

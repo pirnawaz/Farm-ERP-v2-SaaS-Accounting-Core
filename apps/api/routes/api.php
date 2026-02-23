@@ -61,9 +61,15 @@ use App\Http\Controllers\AccountingPeriodController;
 use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\SettlementPackController;
 use App\Domains\Operations\LandLease\LandLeaseController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandLeaseAccrualController;
 
 Route::get('/health', [HealthController::class, 'index']);
+
+// Dashboard (read-only summary for all tenant roles)
+Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () {
+    Route::get('dashboard/summary', [DashboardController::class, 'summary']);
+});
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/logout', [AuthController::class, 'logout']);

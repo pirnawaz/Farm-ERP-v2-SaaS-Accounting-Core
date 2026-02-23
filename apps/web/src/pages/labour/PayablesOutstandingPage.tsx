@@ -27,7 +27,7 @@ export default function PayablesOutstandingPage() {
       <PageHeader
         title="Wages Payable Outstanding"
         backTo="/app/labour"
-        breadcrumbs={[{ label: 'Labour', to: '/app/labour' }, { label: 'Payables' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Labour', to: '/app/labour' }, { label: 'Payables' }]}
       />
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {!rows || rows.length === 0 ? (

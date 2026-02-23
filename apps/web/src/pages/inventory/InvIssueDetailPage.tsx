@@ -195,6 +195,7 @@ export default function InvIssueDetailPage() {
         title={`Issue ${issue.doc_no}`}
         backTo={backTo}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'Issues', to: '/app/inventory/issues' },
           { label: issue.doc_no },

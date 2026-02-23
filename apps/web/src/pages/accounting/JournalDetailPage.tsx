@@ -51,7 +51,7 @@ export default function JournalDetailPage() {
         title={`Journal ${j.journal_number}`}
         backTo="/app/accounting/journals"
         breadcrumbs={[
-          { label: 'Reports', to: '/app/reports' },
+          { label: 'Profit & Reports', to: '/app/reports' },
           { label: 'General Journal', to: '/app/accounting/journals' },
           { label: j.journal_number },
         ]}

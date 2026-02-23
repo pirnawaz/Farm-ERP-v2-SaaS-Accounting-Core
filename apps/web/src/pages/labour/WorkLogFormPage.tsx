@@ -60,6 +60,7 @@ export default function WorkLogFormPage() {
         title="New Work Log"
         backTo="/app/labour/work-logs"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Labour', to: '/app/labour' },
           { label: 'Work Logs', to: '/app/labour/work-logs' },
           { label: 'New' },

@@ -434,4 +434,158 @@ class MachineryServicePostingTest extends TestCase
         $this->assertEqualsWithDelta($baselinePoolProfit, (float) $afterReversePreview['pool_profit'], 0.01,
             'Settlement pool_profit should return to baseline after reversal');
     }
+
+    public function test_posting_date_before_crop_cycle_fails(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-06-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $projectParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'P',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $projectParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Proj',
+            'status' => 'ACTIVE',
+        ]);
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK',
+            'name' => 'Tractor',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'meter_unit' => 'HOURS',
+            'opening_meter' => 0,
+        ]);
+
+        $service = $this->createDraftMachineryService($tenant, $cropCycle, $project, $machine, MachineryService::ALLOCATION_SCOPE_SHARED, 10.0, 25.00);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/machinery/machinery-services/{$service->id}/post", [
+                'posting_date' => '2024-05-15',
+            ]);
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Posting date is before crop cycle start date.');
+        $service->refresh();
+        $this->assertEquals(MachineryService::STATUS_DRAFT, $service->status);
+    }
+
+    public function test_posting_date_after_crop_cycle_fails(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-06-30',
+            'status' => 'OPEN',
+        ]);
+        $projectParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'P',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $projectParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Proj',
+            'status' => 'ACTIVE',
+        ]);
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK',
+            'name' => 'Tractor',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'meter_unit' => 'HOURS',
+            'opening_meter' => 0,
+        ]);
+
+        $service = $this->createDraftMachineryService($tenant, $cropCycle, $project, $machine, MachineryService::ALLOCATION_SCOPE_SHARED, 10.0, 25.00);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/machinery/machinery-services/{$service->id}/post", [
+                'posting_date' => '2024-07-01',
+            ]);
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Posting date is after crop cycle end date.');
+        $service->refresh();
+        $this->assertEquals(MachineryService::STATUS_DRAFT, $service->status);
+    }
+
+    public function test_closed_crop_cycle_blocks_posting(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'CLOSED',
+        ]);
+        $projectParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'P',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $projectParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Proj',
+            'status' => 'ACTIVE',
+        ]);
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK',
+            'name' => 'Tractor',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'meter_unit' => 'HOURS',
+            'opening_meter' => 0,
+        ]);
+
+        $service = $this->createDraftMachineryService($tenant, $cropCycle, $project, $machine, MachineryService::ALLOCATION_SCOPE_SHARED, 10.0, 25.00);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/machinery/machinery-services/{$service->id}/post", [
+                'posting_date' => '2024-06-15',
+            ]);
+        $response->assertStatus(422);
+        $body = $response->json();
+        $this->assertArrayHasKey('message', $body);
+        $service->refresh();
+        $this->assertEquals(MachineryService::STATUS_DRAFT, $service->status);
+    }
 }

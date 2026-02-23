@@ -4,6 +4,7 @@ import {
   useMachineryServicesQuery,
   usePostMachineryService,
   useReverseMachineryService,
+  useMachinesQuery,
 } from '../../hooks/useMachinery';
 import { useProjects } from '../../hooks/useProjects';
 import { DataTable, type Column } from '../../components/DataTable';
@@ -22,6 +23,9 @@ export default function MachineryServicesPage() {
   const [filters, setFilters] = useState({
     status: searchParams.get('status') || '',
     project_id: searchParams.get('project_id') || '',
+    machine_id: searchParams.get('machine_id') || '',
+    from: searchParams.get('from') || '',
+    to: searchParams.get('to') || '',
   });
   const serviceFilters = {
     ...filters,
@@ -29,9 +33,13 @@ export default function MachineryServicesPage() {
       ? filters.status
       : undefined) as 'DRAFT' | 'POSTED' | 'REVERSED' | undefined,
     project_id: filters.project_id || undefined,
+    machine_id: filters.machine_id || undefined,
+    from: filters.from || undefined,
+    to: filters.to || undefined,
   };
   const { data: services, isLoading } = useMachineryServicesQuery(serviceFilters);
   const { data: projects } = useProjects();
+  const { data: machines } = useMachinesQuery();
   const { hasRole } = useRole();
   const postMutation = usePostMachineryService();
   const reverseMutation = useReverseMachineryService();
@@ -188,6 +196,7 @@ export default function MachineryServicesPage() {
       <PageHeader
         title="Machinery Services"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
           { label: 'Services' },
         ]}
@@ -205,7 +214,7 @@ export default function MachineryServicesPage() {
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
@@ -234,6 +243,39 @@ export default function MachineryServicesPage() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Machine</label>
+            <select
+              value={filters.machine_id}
+              onChange={(e) => handleFilterChange('machine_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {machines?.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.code} – {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">From date</label>
+            <input
+              type="date"
+              value={filters.from}
+              onChange={(e) => handleFilterChange('from', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To date</label>
+            <input
+              type="date"
+              value={filters.to}
+              onChange={(e) => handleFilterChange('to', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
+          </div>
         </div>
       </div>
 
@@ -248,6 +290,10 @@ export default function MachineryServicesPage() {
       {postingId && (
         <Modal isOpen={!!postingId} title="Post Service" onClose={() => setPostingId(null)}>
           <div className="space-y-4">
+            {(() => {
+              const msg = (postMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+              return msg ? <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{msg}</div> : null;
+            })()}
             <FormField label="Posting Date" required>
               <input
                 type="date"
@@ -287,6 +333,10 @@ export default function MachineryServicesPage() {
           }}
         >
           <div className="space-y-4">
+            {(() => {
+              const msg = (reverseMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+              return msg ? <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{msg}</div> : null;
+            })()}
             <FormField label="Posting Date" required>
               <input
                 type="date"

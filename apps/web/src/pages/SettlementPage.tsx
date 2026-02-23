@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import { settlementPackApi } from '../api/settlementPack';
 import { useSettlementPreview, usePostSettlement, useSettlementOffsetPreview } from '../hooks/useSettlement';
+import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
@@ -139,7 +140,10 @@ export default function SettlementPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settlement</h1>
+      <PageHeader
+        title="Settlement"
+        breadcrumbs={[{ label: 'Governance', to: '/app/governance' }, { label: 'Settlement Packs' }]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Settlement Dashboard</h2>

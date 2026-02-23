@@ -77,6 +77,7 @@ export default function WorkLogDetailPage() {
         title={`Work Log ${log.work_log_no}`}
         backTo={backTo}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
           { label: 'Work Logs', to: '/app/machinery/work-logs' },
           { label: log.work_log_no },

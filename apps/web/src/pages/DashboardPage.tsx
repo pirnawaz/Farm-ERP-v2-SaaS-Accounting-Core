@@ -1,104 +1,89 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { useRole } from '../hooks/useRole';
-import { useModules } from '../contexts/ModulesContext';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@farm-erp/shared';
+import { useAuth } from '../hooks/useAuth';
+import { useCropCycleScope } from '../contexts/CropCycleScopeContext';
 import { useOnboardingState } from '../hooks/useOnboardingState';
 import { OnboardingPanel } from '../components/OnboardingPanel';
-import { getDashboardConfig } from './dashboard/dashboardConfig';
-import { DashboardWidget } from './dashboard/DashboardWidgets';
-import type { WidgetKey } from './dashboard/dashboardConfig';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import {
+  DashboardViewSelector,
+  getStoredView,
+  setStoredView,
+  getDefaultViewForRole,
+} from '../components/dashboard/DashboardViewSelector';
+import { OwnerLayout } from '../components/dashboard/OwnerLayout';
+import { ManagerLayout } from '../components/dashboard/ManagerLayout';
+import { AccountantLayout } from '../components/dashboard/AccountantLayout';
+import type { DashboardViewType } from '../components/dashboard/dashboardTypes';
 
 export default function DashboardPage() {
-  const { userRole } = useRole();
-  const { isModuleEnabled } = useModules();
+  const { tenantId, userRole } = useAuth();
+  const { scopeType, cropCycleId } = useCropCycleScope();
   const onboardingState = useOnboardingState();
 
-  const config = useMemo(() => getDashboardConfig(userRole), [userRole]);
+  const defaultView = useMemo(() => getDefaultViewForRole(userRole ?? null), [userRole]);
+  const initialView = useMemo(
+    () => (tenantId ? (getStoredView(tenantId) ?? defaultView) : defaultView),
+    [tenantId, defaultView]
+  );
+  const [view, setView] = useState<DashboardViewType>(initialView);
 
-  // Filter quick actions by module availability - memoized
-  const availableQuickActions = useMemo(
-    () => config.quickActions.filter(
-      (action) => !action.requiredModule || isModuleEnabled(action.requiredModule)
-    ),
-    [config.quickActions, isModuleEnabled]
-  );
+  useEffect(() => {
+    if (!tenantId) return;
+    const stored = getStoredView(tenantId);
+    const def = getDefaultViewForRole(userRole ?? null);
+    setView(stored ?? def);
+  }, [tenantId, userRole]);
 
-  // Filter widgets by module availability - memoized
-  const filterWidgets = useMemo(
-    () => (widgets: WidgetKey[]) =>
-      widgets.filter(() => {
-        // Widgets that require specific modules are handled in DashboardWidget component
-        return true;
-      }),
-    []
-  );
+  const handleViewChange = (v: DashboardViewType) => {
+    setView(v);
+    setStoredView(tenantId, v);
+  };
 
-  const primaryWidgets = useMemo(
-    () => filterWidgets(config.primaryWidgets),
-    [config.primaryWidgets, filterWidgets]
-  );
-  const secondaryWidgets = useMemo(
-    () => filterWidgets(config.secondaryWidgets),
-    [config.secondaryWidgets, filterWidgets]
-  );
+  const { data: summary, isLoading, error } = useQuery({
+    queryKey: ['dashboard', 'summary', tenantId ?? '', scopeType, cropCycleId ?? ''],
+    queryFn: () =>
+      scopeType === 'crop_cycle' && cropCycleId
+        ? apiClient.getDashboardSummary({ scope_type: 'crop_cycle', scope_id: cropCycleId })
+        : apiClient.getDashboardSummary(),
+    enabled: !!tenantId,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <DashboardViewSelector value={view} onChange={handleViewChange} />
       </div>
 
-      {/* Onboarding Panel - only show for tenant_admin */}
       {userRole === 'tenant_admin' && <OnboardingPanel onboardingState={onboardingState} />}
 
-      {/* Quick Actions Strip */}
-      {availableQuickActions.length > 0 && (
-        <div className="mb-6">
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-            <div className="flex flex-wrap gap-2">
-              {availableQuickActions.map((action, idx) => (
-                <Link
-                  key={idx}
-                  to={action.to}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    action.variant === 'primary'
-                      ? 'bg-[#1F6F5C] text-white hover:bg-[#1a5a4a]'
-                      : action.variant === 'outline'
-                      ? 'border border-[#1F6F5C] text-[#1F6F5C] hover:bg-[#1F6F5C]/10'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {action.label}
-                </Link>
-              ))}
-            </div>
-          </div>
+      {isLoading && (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner />
         </div>
       )}
 
-      {/* Primary Widgets */}
-      {primaryWidgets.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-          {primaryWidgets.map((widgetKey) => (
-            <DashboardWidget
-              key={widgetKey}
-              widgetKey={widgetKey}
-              isModuleEnabled={isModuleEnabled}
-            />
-          ))}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Failed to load dashboard. Please try again.
         </div>
       )}
 
-      {/* Secondary Widgets */}
-      {secondaryWidgets.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-          {secondaryWidgets.map((widgetKey) => (
-            <DashboardWidget
-              key={widgetKey}
-              widgetKey={widgetKey}
-              isModuleEnabled={isModuleEnabled}
-            />
-          ))}
+      {!isLoading && !error && summary && (
+        <>
+          {view === 'owner' && <OwnerLayout data={summary} />}
+          {view === 'manager' && <ManagerLayout data={summary} />}
+          {view === 'accountant' && <AccountantLayout data={summary} />}
+        </>
+      )}
+
+      {!isLoading && !error && !summary && tenantId && (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-600">
+          No dashboard data available.
         </div>
       )}
     </div>

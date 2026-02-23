@@ -85,6 +85,7 @@ export default function MachineryServiceDetailPage() {
         title="Machinery Service"
         backTo="/app/machinery/services"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
           { label: 'Services', to: '/app/machinery/services' },
           { label: service.id.slice(0, 8) + '…' },
@@ -246,6 +247,10 @@ export default function MachineryServiceDetailPage() {
       {showPostModal && (
         <Modal isOpen={true} title="Post Service" onClose={() => setShowPostModal(false)} testId="posting-date-modal">
           <div className="space-y-4">
+            {(() => {
+              const msg = (postMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+              return msg ? <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{msg}</div> : null;
+            })()}
             <FormField label="Posting Date" required>
               <input
                 type="date"
@@ -289,6 +294,10 @@ export default function MachineryServiceDetailPage() {
           }}
         >
           <div className="space-y-4">
+            {(() => {
+              const msg = (reverseMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+              return msg ? <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{msg}</div> : null;
+            })()}
             <FormField label="Posting Date" required>
               <input
                 type="date"

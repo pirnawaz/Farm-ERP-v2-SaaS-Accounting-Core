@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useParties, useCreateParty, useUpdateParty, useDeleteParty } from '../hooks/useParties';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -205,9 +206,10 @@ export default function PartiesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Parties</h1>
-        {canCreate && (
+      <PageHeader
+        title="People & Partners"
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'People & Partners' }]}
+        right={canCreate ? (
           <button
             onClick={() => {
               setShowCreateModal(true);
@@ -218,8 +220,8 @@ export default function PartiesPage() {
           >
             New Party
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Quick Filters */}
       <div className="mb-4 flex space-x-2">

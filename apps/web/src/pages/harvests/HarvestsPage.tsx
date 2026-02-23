@@ -57,7 +57,7 @@ export default function HarvestsPage() {
       <PageHeader
         title="Harvests"
         backTo="/app/crop-ops"
-        breadcrumbs={[{ label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Harvests' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Harvests' }]}
         right={
           <button onClick={() => navigate('/app/harvests/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Harvest

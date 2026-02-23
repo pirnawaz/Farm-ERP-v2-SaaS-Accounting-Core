@@ -29,7 +29,7 @@ export default function ProfitLossPage() {
     <div className="space-y-6">
       <PageHeader
         title="Profit &amp; Loss"
-        breadcrumbs={[{ label: 'Reports', to: '/app/reports' }, { label: 'Profit & Loss' }]}
+        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: 'Profit & Loss' }]}
       />
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4">

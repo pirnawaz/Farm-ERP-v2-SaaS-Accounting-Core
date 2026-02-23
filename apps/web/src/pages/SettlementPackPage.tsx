@@ -6,6 +6,7 @@ import {
   SettlementPackSummary,
 } from '@farm-erp/shared';
 import { settlementPackApi } from '../api/settlementPack';
+import { PageHeader } from '../components/PageHeader';
 import { useFormatting } from '../hooks/useFormatting';
 
 export default function SettlementPackPage() {
@@ -71,37 +72,34 @@ export default function SettlementPackPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-start gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Settlement Pack</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {pack.project?.name && (
-              <>Project: {pack.project.name}</>
+      <PageHeader
+        title={pack.register_version ? `Settlement Pack · ${pack.register_version}` : 'Settlement Pack'}
+        backTo="/app/settlement"
+        breadcrumbs={[
+          { label: 'Governance', to: '/app/governance' },
+          { label: 'Settlement Packs', to: '/app/settlement' },
+          { label: 'Settlement Pack' },
+        ]}
+        right={
+          <div className="flex items-center gap-2">
+            {canRegenerate && (
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50 text-sm font-medium"
+              >
+                {regenerating ? 'Generating…' : 'Re-generate pack'}
+              </button>
             )}
-            {pack.register_version && (
-              <> · Version: {pack.register_version}</>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/app/settlement"
-            className="text-[#1F6F5C] hover:text-[#1a5a4a] font-medium"
-          >
-            ← Settlement
-          </Link>
-          {canRegenerate && (
-            <button
-              type="button"
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50 text-sm font-medium"
-            >
-              {regenerating ? 'Generating…' : 'Re-generate pack'}
-            </button>
-          )}
-        </div>
-      </div>
+          </div>
+        }
+      />
+      {pack.project?.name && (
+        <p className="text-sm text-gray-500 -mt-4">
+          Project: {pack.project.name}
+        </p>
+      )}
 
       {/* Summary totals */}
       <section className="bg-white rounded-lg shadow p-6" data-testid="settlement-pack-summary">

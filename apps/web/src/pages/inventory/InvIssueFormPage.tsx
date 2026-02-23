@@ -173,6 +173,7 @@ export default function InvIssueFormPage() {
         title="New Issue"
         backTo="/app/inventory/issues"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'Issues', to: '/app/inventory/issues' },
           { label: 'New Issue' },

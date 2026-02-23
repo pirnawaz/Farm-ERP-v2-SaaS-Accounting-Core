@@ -67,7 +67,7 @@ export default function WorkersPage() {
       <PageHeader
         title="Workers"
         backTo="/app/labour"
-        breadcrumbs={[{ label: 'Labour', to: '/app/labour' }, { label: 'Workers' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Labour', to: '/app/labour' }, { label: 'Workers' }]}
         right={
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Worker</button>
         }

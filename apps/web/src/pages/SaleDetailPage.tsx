@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useSale, useDeleteSale, usePostSale, useReverseSale } from '../hooks/useSales';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -180,19 +181,24 @@ export default function SaleDetailPage() {
         )}
       </div>
 
-      <div className="mb-6 no-print">
-        <Link to="/app/sales" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
-          ← Back to Sales
-        </Link>
-        <div className="flex justify-between items-center mt-2">
-          <h1 className="text-2xl font-bold text-gray-900">Sale Details</h1>
-          <button
-            onClick={() => window.print()}
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-          >
-            Print Invoice
-          </button>
-        </div>
+      <div className="no-print">
+        <PageHeader
+          title={sale.sale_no ? `Sale ${sale.sale_no}` : 'Sale'}
+          backTo="/app/sales"
+          breadcrumbs={[
+            { label: 'Sales & Money', to: '/app/sales' },
+            { label: 'Sales', to: '/app/sales' },
+            { label: sale.sale_no || 'Sale' },
+          ]}
+          right={
+            <button
+              onClick={() => window.print()}
+              className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+            >
+              Print Invoice
+            </button>
+          }
+        />
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">

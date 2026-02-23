@@ -147,7 +147,7 @@ function JournalFormPage() {
         title={isNew ? 'New journal' : 'Edit journal'}
         backTo="/app/accounting/journals"
         breadcrumbs={[
-          { label: 'Reports', to: '/app/reports' },
+          { label: 'Profit & Reports', to: '/app/reports' },
           { label: 'General Journal', to: '/app/accounting/journals' },
           { label: isNew ? 'New' : 'Edit' },
         ]}

@@ -109,6 +109,7 @@ export default function ActivityFormPage() {
         title="Crop Ops → Activities → New Activity"
         backTo="/app/crop-ops/activities"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Crop Ops', to: '/app/crop-ops' },
           { label: 'Activities', to: '/app/crop-ops/activities' },
           { label: 'New Activity' },

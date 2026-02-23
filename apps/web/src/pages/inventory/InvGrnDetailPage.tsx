@@ -118,6 +118,7 @@ export default function InvGrnDetailPage() {
         title={`GRN ${grn.doc_no}`}
         backTo={backTo}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'GRNs', to: '/app/inventory/grns' },
           { label: grn.doc_no },

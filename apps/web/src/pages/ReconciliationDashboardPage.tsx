@@ -229,7 +229,7 @@ function ReconciliationDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center no-print">
-        <h2 className="text-2xl font-bold">Reconciliation Dashboard</h2>
+        <h2 className="text-2xl font-bold">Reconcile Accounts</h2>
         <div className="flex gap-2">
           <button
             onClick={() => window.print()}
@@ -368,7 +368,7 @@ function ReconciliationDashboardPage() {
             </div>
           </div>
           <PrintableReport
-            title="Reconciliation Dashboard"
+            title="Reconcile Accounts"
             subtitle={scopeLabel}
             metaLeft={`From: ${filters.from} To: ${filters.to}`}
             metaRight={`Generated: ${result.generated_at}`}

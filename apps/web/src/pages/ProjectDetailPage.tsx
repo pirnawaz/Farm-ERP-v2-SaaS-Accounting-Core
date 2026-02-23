@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import { useProject } from '../hooks/useProjects';
+import { useModules } from '../contexts/ModulesContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: project, isLoading } = useProject(id || '');
+  const { isModuleEnabled } = useModules();
+  const showMachinery = isModuleEnabled('machinery');
 
   if (isLoading) {
     return (
@@ -76,6 +79,41 @@ export default function ProjectDetailPage() {
             </Link>
           </div>
         </div>
+
+        {showMachinery && (
+          <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Machinery</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Machinery services, work logs and charges linked to this project.
+            </p>
+            <div className="flex flex-wrap gap-3 items-center">
+              <Link
+                to={`/app/machinery/services?project_id=${project.id}`}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              >
+                Machinery Services
+              </Link>
+              <Link
+                to={`/app/machinery/work-logs?project_id=${project.id}`}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              >
+                Work Logs
+              </Link>
+              <Link
+                to={`/app/machinery/charges?project_id=${project.id}`}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              >
+                Charges
+              </Link>
+              <Link
+                to={`/app/machinery/services/new?project_id=${project.id}`}
+                className="px-4 py-2 border-2 border-[#1F6F5C] text-[#1F6F5C] rounded-md hover:bg-[#1F6F5C] hover:text-white"
+              >
+                Add Machinery Service
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

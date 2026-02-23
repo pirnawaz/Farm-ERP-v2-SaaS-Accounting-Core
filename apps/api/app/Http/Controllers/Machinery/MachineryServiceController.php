@@ -149,12 +149,16 @@ class MachineryServiceController extends Controller
             'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $pg = $this->postingService->postService(
-            $id,
-            $tenantId,
-            $validated['posting_date'],
-            $idempotencyKey
-        );
+        try {
+            $pg = $this->postingService->postService(
+                $id,
+                $tenantId,
+                $validated['posting_date'],
+                $idempotencyKey
+            );
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         $service = MachineryService::where('id', $id)->where('tenant_id', $tenantId)
             ->with(['machine', 'project', 'rateCard', 'postingGroup', 'reversalPostingGroup'])
@@ -177,12 +181,16 @@ class MachineryServiceController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $pg = $this->postingService->reverseService(
-            $id,
-            $tenantId,
-            $validated['posting_date'],
-            $validated['reason'] ?? null
-        );
+        try {
+            $pg = $this->postingService->reverseService(
+                $id,
+                $tenantId,
+                $validated['posting_date'],
+                $validated['reason'] ?? null
+            );
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         $service = MachineryService::where('id', $id)->where('tenant_id', $tenantId)
             ->with(['machine', 'project', 'rateCard', 'postingGroup', 'reversalPostingGroup'])

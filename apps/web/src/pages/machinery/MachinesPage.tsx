@@ -125,7 +125,7 @@ export default function MachinesPage() {
       <PageHeader
         title="Machines"
         backTo="/app/machinery"
-        breadcrumbs={[{ label: 'Machinery', to: '/app/machinery' }, { label: 'Machines' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Machines' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Machine</button>
         ) : undefined}

@@ -80,7 +80,7 @@ function RoleAgeingPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center no-print">
-        <h2 className="text-2xl font-bold">Role Ageing</h2>
+        <h2 className="text-2xl font-bold">Party Ageing</h2>
         <div className="flex gap-2">
           <button
             onClick={() => window.print()}
@@ -240,7 +240,7 @@ function RoleAgeingPage() {
           </div>
 
           <PrintableReport
-            title="Role Ageing"
+            title="Party Ageing"
             metaLeft={`As of ${formatDate(filters.as_of)}`}
           >
             <table className="w-full divide-y divide-gray-200">

@@ -143,6 +143,7 @@ export default function HarvestDetailPage() {
         title={harvest.harvest_no || `Harvest ${harvest.id.slice(0, 8)}`}
         backTo={backTo}
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Harvests', to: '/app/harvests' },
           { label: harvest.harvest_no || 'Detail' },
         ]}

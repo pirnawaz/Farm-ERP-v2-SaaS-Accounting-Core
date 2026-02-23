@@ -6,6 +6,7 @@ import { paymentsApi } from '../api/payments';
 import { useQuery } from '@tanstack/react-query';
 import { FormField } from '../components/FormField';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageHeader } from '../components/PageHeader';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import type { CreatePaymentPayload, PaymentDirection, PaymentMethod, AllocationPreview, OpenSale } from '../types';
@@ -183,14 +184,15 @@ export default function PaymentFormPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <Link to="/app/payments" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
-          ← Back to Payments
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">
-          {isEdit ? 'Edit Payment' : 'New Payment'}
-        </h1>
-      </div>
+      <PageHeader
+        title={isEdit ? 'Edit Payment' : 'New Payment'}
+        backTo="/app/payments"
+        breadcrumbs={[
+          { label: 'Sales & Money', to: '/app/sales' },
+          { label: 'Payments', to: '/app/payments' },
+          { label: isEdit ? 'Edit Payment' : 'New Payment' },
+        ]}
+      />
 
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-4">

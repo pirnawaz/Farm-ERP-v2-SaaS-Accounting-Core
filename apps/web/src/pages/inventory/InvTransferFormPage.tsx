@@ -65,6 +65,7 @@ export default function InvTransferFormPage() {
         title="New Transfer"
         backTo="/app/inventory/transfers"
         breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
           { label: 'Transfers', to: '/app/inventory/transfers' },
           { label: 'New Transfer' },

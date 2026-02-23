@@ -115,11 +115,10 @@ export default function AccountingPeriodsPage() {
     <div>
       <PageHeader
         title="Accounting periods"
-        backTo="/app/accounting/journals"
+        backTo="/app/governance"
         breadcrumbs={[
-          { label: 'Reports', to: '/app/reports' },
-          { label: 'General Journal', to: '/app/accounting/journals' },
-          { label: 'Periods' },
+          { label: 'Governance', to: '/app/governance' },
+          { label: 'Accounting Periods' },
         ]}
         right={
           <button
