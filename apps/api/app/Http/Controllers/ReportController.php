@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\TenantContext;
 use App\Domains\Accounting\Reports\FinancialStatementsService;
+use App\Domains\Reporting\ReportingQuery;
 use App\Domains\Reporting\TrialBalanceService;
 use App\Domains\Reporting\GeneralLedgerService;
 use App\Domains\Reporting\ProfitLossService;
@@ -2523,6 +2524,775 @@ class ReportController extends Controller
             'open_bills' => $openBillsList,
             'unapplied_instruments' => $unappliedList,
             'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/crop-costs
+     * Crop-aware cost reporting: expense costs, allocated acres, cost_per_acre.
+     * group_by: crop | category | cycle. Excludes reversals; tenant-scoped.
+     */
+    public function cropCosts(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'group_by' => ['nullable', 'string', 'in:crop,category,cycle'],
+            'include_unassigned' => ['nullable', 'boolean'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $groupBy = $request->input('group_by', 'crop');
+        $includeUnassigned = filter_var($request->input('include_unassigned'), FILTER_VALIDATE_BOOLEAN);
+
+        $costByCycle = DB::table('ledger_entries as le')
+            ->join('posting_groups', 'posting_groups.id', '=', 'le.posting_group_id')
+            ->join('accounts as a', 'a.id', '=', 'le.account_id')
+            ->leftJoin('crop_cycles as cc', 'cc.id', '=', 'posting_groups.crop_cycle_id')
+            ->leftJoin('tenant_crop_items as tci', 'tci.id', '=', 'cc.tenant_crop_item_id')
+            ->leftJoin('crop_catalog_items as cci', 'cci.id', '=', 'tci.crop_catalog_item_id')
+            ->where('a.type', 'expense')
+            ->whereBetween('posting_groups.posting_date', [$from, $to])
+            ->selectRaw("
+                posting_groups.crop_cycle_id as crop_cycle_id,
+                cc.name as crop_cycle_name,
+                cc.tenant_crop_item_id as tenant_crop_item_id,
+                tci.id as crop_item_id,
+                COALESCE(NULLIF(TRIM(tci.display_name), ''), tci.custom_name, cci.default_name) as crop_display_name,
+                cci.code as catalog_code,
+                cci.category as category,
+                SUM(le.debit_amount - le.credit_amount) as cost
+            ")
+            ->groupBy(
+                'posting_groups.crop_cycle_id',
+                'cc.name',
+                'cc.tenant_crop_item_id',
+                'tci.id',
+                'tci.display_name',
+                'tci.custom_name',
+                'cci.default_name',
+                'cci.code',
+                'cci.category'
+            );
+
+        if (!$includeUnassigned) {
+            $costByCycle->whereNotNull('posting_groups.crop_cycle_id');
+        }
+        ReportingQuery::applyTenant($costByCycle, $tenantId);
+        ReportingQuery::applyExcludeReversals($costByCycle);
+
+        $costRows = $costByCycle->get();
+
+        $acresByCycle = DB::table('land_allocations')
+            ->select('crop_cycle_id', DB::raw('SUM(allocated_acres) as acres'))
+            ->where('tenant_id', $tenantId)
+            ->groupBy('crop_cycle_id')
+            ->get()
+            ->keyBy('crop_cycle_id');
+
+        foreach ($costRows as $row) {
+            $row->acres = $row->crop_cycle_id && $acresByCycle->has($row->crop_cycle_id)
+                ? (float) $acresByCycle->get($row->crop_cycle_id)->acres
+                : null;
+        }
+
+        $aggregated = $this->aggregateCropCostsByGroup($costRows, $groupBy);
+
+        $totalCostNum = 0.0;
+        $totalAcresNum = 0.0;
+        foreach ($aggregated as $r) {
+            $totalCostNum += (float) $r['cost'];
+            if ($r['acres'] !== null && $r['acres'] !== '') {
+                $totalAcresNum += (float) $r['acres'];
+            }
+        }
+        $totalCost = number_format($totalCostNum, 2, '.', '');
+        $totalAcres = number_format($totalAcresNum, 2, '.', '');
+        $totalCostPerAcre = $totalAcresNum > 0 ? number_format($totalCostNum / $totalAcresNum, 2, '.', '') : null;
+
+        return response()->json([
+            'from' => $from,
+            'to' => $to,
+            'group_by' => $groupBy,
+            'rows' => $aggregated,
+            'totals' => [
+                'cost' => $totalCost,
+                'acres' => $totalAcres,
+                'cost_per_acre' => $totalCostPerAcre,
+            ],
+        ]);
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, object> $costRows
+     * @return list<array{key: string, crop_cycle_id?: string, crop_cycle_name?: string, crop_display_name?: string|null, catalog_code?: string|null, category?: string|null, cost: string, acres: string|null, cost_per_acre: string|null}>
+     */
+    private function aggregateCropCostsByGroup($costRows, string $groupBy): array
+    {
+        $keyed = [];
+        foreach ($costRows as $row) {
+            $cost = (float) $row->cost;
+            $acres = $row->acres !== null ? (float) $row->acres : null;
+
+            if ($groupBy === 'cycle') {
+                $key = (string) $row->crop_cycle_id;
+                if (!isset($keyed[$key])) {
+                    $keyed[$key] = [
+                        'key' => $key,
+                        'crop_cycle_id' => $row->crop_cycle_id,
+                        'crop_cycle_name' => $row->crop_cycle_name,
+                        'crop_display_name' => $row->crop_display_name,
+                        'catalog_code' => $row->catalog_code,
+                        'category' => $row->category,
+                        'cost' => 0.0,
+                        'acres' => null,
+                    ];
+                }
+                $keyed[$key]['cost'] += $cost;
+                if ($acres !== null) {
+                    $keyed[$key]['acres'] = ($keyed[$key]['acres'] ?? 0) + $acres;
+                }
+            } elseif ($groupBy === 'category') {
+                $key = $row->category !== null && $row->category !== '' ? $row->category : 'unclassified';
+                if (!isset($keyed[$key])) {
+                    $keyed[$key] = [
+                        'key' => $key,
+                        'category' => $key === 'unclassified' ? null : $key,
+                        'cost' => 0.0,
+                        'acres' => null,
+                    ];
+                }
+                $keyed[$key]['cost'] += $cost;
+                if ($acres !== null) {
+                    $keyed[$key]['acres'] = ($keyed[$key]['acres'] ?? 0) + $acres;
+                }
+            } else {
+                $key = $row->crop_item_id !== null ? (string) $row->crop_item_id : 'unassigned';
+                if (!isset($keyed[$key])) {
+                    $keyed[$key] = [
+                        'key' => $key,
+                        'crop_display_name' => $row->crop_display_name,
+                        'catalog_code' => $row->catalog_code,
+                        'category' => $row->category,
+                        'cost' => 0.0,
+                        'acres' => null,
+                    ];
+                }
+                $keyed[$key]['cost'] += $cost;
+                if ($acres !== null) {
+                    $keyed[$key]['acres'] = ($keyed[$key]['acres'] ?? 0) + $acres;
+                }
+            }
+        }
+
+        $result = [];
+        foreach ($keyed as $r) {
+            $cost = $r['cost'];
+            $acres = $r['acres'];
+            $costPerAcre = $acres !== null && $acres > 0 ? $cost / $acres : null;
+            $result[] = [
+                'key' => $r['key'],
+                'crop_cycle_id' => $r['crop_cycle_id'] ?? null,
+                'crop_cycle_name' => $r['crop_cycle_name'] ?? null,
+                'crop_display_name' => $r['crop_display_name'] ?? null,
+                'catalog_code' => $r['catalog_code'] ?? null,
+                'category' => $r['category'] ?? null,
+                'cost' => number_format($cost, 2, '.', ''),
+                'acres' => $acres !== null ? number_format($acres, 2, '.', '') : null,
+                'cost_per_acre' => $costPerAcre !== null ? number_format($costPerAcre, 2, '.', '') : null,
+            ];
+        }
+
+        usort($result, function ($a, $b) {
+            $order = ['crop_cycle_name', 'crop_display_name', 'category', 'key'];
+            foreach ($order as $f) {
+                $va = $a[$f] ?? '';
+                $vb = $b[$f] ?? '';
+                if ($va !== $vb) {
+                    return strcmp((string) $va, (string) $vb);
+                }
+            }
+            return 0;
+        });
+        return $result;
+    }
+
+    /**
+     * GET /api/reports/crop-profitability
+     * Crop profitability: cost + revenue + margin and per-acre metrics.
+     * group_by: crop | category | cycle. Excludes reversals; tenant-scoped.
+     */
+    public function cropProfitability(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'group_by' => ['nullable', 'string', 'in:crop,category,cycle'],
+            'include_unassigned' => ['nullable', 'boolean'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $groupBy = $request->input('group_by', 'crop');
+        $includeUnassigned = filter_var($request->input('include_unassigned'), FILTER_VALIDATE_BOOLEAN);
+
+        $cycleRows = $this->buildCycleFinancials($tenantId, $from, $to, $includeUnassigned);
+
+        $acresByCycle = DB::table('land_allocations')
+            ->select('crop_cycle_id', DB::raw('SUM(allocated_acres) as acres'))
+            ->where('tenant_id', $tenantId)
+            ->groupBy('crop_cycle_id')
+            ->get()
+            ->keyBy('crop_cycle_id');
+
+        foreach ($cycleRows as $row) {
+            $row->acres = $row->crop_cycle_id && $acresByCycle->has($row->crop_cycle_id)
+                ? (float) $acresByCycle->get($row->crop_cycle_id)->acres
+                : null;
+        }
+
+        $aggregated = $this->aggregateCropProfitabilityByGroup($cycleRows, $groupBy);
+
+        $totalCost = 0.0;
+        $totalRevenue = 0.0;
+        $totalAcres = 0.0;
+        foreach ($aggregated as $r) {
+            $totalCost += (float) $r['cost'];
+            $totalRevenue += (float) $r['revenue'];
+            if ($r['acres'] !== null && $r['acres'] !== '') {
+                $totalAcres += (float) $r['acres'];
+            }
+        }
+        $totalMargin = $totalRevenue - $totalCost;
+
+        return response()->json([
+            'from' => $from,
+            'to' => $to,
+            'group_by' => $groupBy,
+            'rows' => $aggregated,
+            'totals' => [
+                'cost' => number_format($totalCost, 2, '.', ''),
+                'revenue' => number_format($totalRevenue, 2, '.', ''),
+                'margin' => number_format($totalMargin, 2, '.', ''),
+                'acres' => number_format($totalAcres, 2, '.', ''),
+                'cost_per_acre' => $totalAcres > 0 ? number_format($totalCost / $totalAcres, 2, '.', '') : null,
+                'revenue_per_acre' => $totalAcres > 0 ? number_format($totalRevenue / $totalAcres, 2, '.', '') : null,
+                'margin_per_acre' => $totalAcres > 0 ? number_format($totalMargin / $totalAcres, 2, '.', '') : null,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/crop-profitability-trend
+     * Month-by-month profitability trend: margin per acre and metrics per series.
+     * group_by: category | crop | all. Excludes reversals; tenant-scoped.
+     */
+    public function cropProfitabilityTrend(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'group_by' => ['nullable', 'string', 'in:category,crop,all'],
+            'include_unassigned' => ['nullable', 'boolean'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $groupBy = $request->input('group_by', 'category');
+        $includeUnassigned = filter_var($request->input('include_unassigned'), FILTER_VALIDATE_BOOLEAN);
+
+        $driver = DB::connection()->getDriverName();
+        $monthExpr = $driver === 'mysql'
+            ? "DATE_FORMAT(posting_groups.posting_date, '%Y-%m')"
+            : ($driver === 'pgsql'
+                ? "to_char(posting_groups.posting_date, 'YYYY-MM')"
+                : "strftime('%Y-%m', posting_groups.posting_date)");
+
+        $baseSelect = "
+            {$monthExpr} as month,
+            posting_groups.crop_cycle_id as crop_cycle_id,
+            cc.name as crop_cycle_name,
+            cc.tenant_crop_item_id as tenant_crop_item_id,
+            tci.id as crop_item_id,
+            COALESCE(NULLIF(TRIM(tci.display_name), ''), tci.custom_name, cci.default_name) as crop_display_name,
+            cci.code as catalog_code,
+            cci.category as category
+        ";
+        $groupByCols = [
+            \Illuminate\Support\Facades\DB::raw($monthExpr),
+            'posting_groups.crop_cycle_id',
+            'cc.name',
+            'cc.tenant_crop_item_id',
+            'tci.id',
+            'tci.display_name',
+            'tci.custom_name',
+            'cci.default_name',
+            'cci.code',
+            'cci.category',
+        ];
+
+        $costByMonthCycle = DB::table('ledger_entries as le')
+            ->join('posting_groups', 'posting_groups.id', '=', 'le.posting_group_id')
+            ->join('accounts as a', 'a.id', '=', 'le.account_id')
+            ->leftJoin('crop_cycles as cc', 'cc.id', '=', 'posting_groups.crop_cycle_id')
+            ->leftJoin('tenant_crop_items as tci', 'tci.id', '=', 'cc.tenant_crop_item_id')
+            ->leftJoin('crop_catalog_items as cci', 'cci.id', '=', 'tci.crop_catalog_item_id')
+            ->where('a.type', 'expense')
+            ->whereBetween('posting_groups.posting_date', [$from, $to])
+            ->selectRaw($baseSelect . ', SUM(le.debit_amount - le.credit_amount) as cost')
+            ->groupBy($groupByCols);
+        if (!$includeUnassigned) {
+            $costByMonthCycle->whereNotNull('posting_groups.crop_cycle_id');
+        }
+        ReportingQuery::applyTenant($costByMonthCycle, $tenantId);
+        ReportingQuery::applyExcludeReversals($costByMonthCycle);
+        $costRows = $costByMonthCycle->get();
+
+        $revenueByMonthCycle = DB::table('ledger_entries as le')
+            ->join('posting_groups', 'posting_groups.id', '=', 'le.posting_group_id')
+            ->join('accounts as a', 'a.id', '=', 'le.account_id')
+            ->leftJoin('crop_cycles as cc', 'cc.id', '=', 'posting_groups.crop_cycle_id')
+            ->leftJoin('tenant_crop_items as tci', 'tci.id', '=', 'cc.tenant_crop_item_id')
+            ->leftJoin('crop_catalog_items as cci', 'cci.id', '=', 'tci.crop_catalog_item_id')
+            ->where('a.type', 'income')
+            ->whereBetween('posting_groups.posting_date', [$from, $to])
+            ->selectRaw($baseSelect . ', SUM(le.credit_amount - le.debit_amount) as revenue')
+            ->groupBy($groupByCols);
+        if (!$includeUnassigned) {
+            $revenueByMonthCycle->whereNotNull('posting_groups.crop_cycle_id');
+        }
+        ReportingQuery::applyTenant($revenueByMonthCycle, $tenantId);
+        ReportingQuery::applyExcludeReversals($revenueByMonthCycle);
+        $revenueRows = $revenueByMonthCycle->get();
+
+        $merged = [];
+        foreach ($costRows as $row) {
+            $k = $row->month . "\0" . ($row->crop_cycle_id ?? '');
+            $merged[$k] = (object) [
+                'month' => $row->month,
+                'crop_cycle_id' => $row->crop_cycle_id,
+                'crop_cycle_name' => $row->crop_cycle_name,
+                'crop_item_id' => $row->crop_item_id,
+                'crop_display_name' => $row->crop_display_name,
+                'catalog_code' => $row->catalog_code,
+                'category' => $row->category,
+                'cost' => (float) $row->cost,
+                'revenue' => 0.0,
+            ];
+        }
+        foreach ($revenueRows as $row) {
+            $k = $row->month . "\0" . ($row->crop_cycle_id ?? '');
+            if (isset($merged[$k])) {
+                $merged[$k]->revenue = (float) $row->revenue;
+            } else {
+                $merged[$k] = (object) [
+                    'month' => $row->month,
+                    'crop_cycle_id' => $row->crop_cycle_id,
+                    'crop_cycle_name' => $row->crop_cycle_name,
+                    'crop_item_id' => $row->crop_item_id,
+                    'crop_display_name' => $row->crop_display_name,
+                    'catalog_code' => $row->catalog_code,
+                    'category' => $row->category,
+                    'cost' => 0.0,
+                    'revenue' => (float) $row->revenue,
+                ];
+            }
+        }
+
+        $acresByCycle = DB::table('land_allocations')
+            ->select('crop_cycle_id', DB::raw('SUM(allocated_acres) as acres'))
+            ->where('tenant_id', $tenantId)
+            ->groupBy('crop_cycle_id')
+            ->get()
+            ->keyBy('crop_cycle_id');
+
+        foreach ($merged as $row) {
+            $row->acres = $row->crop_cycle_id && $acresByCycle->has($row->crop_cycle_id)
+                ? (float) $acresByCycle->get($row->crop_cycle_id)->acres
+                : 0.0;
+        }
+
+        $monthsSet = [];
+        $byMonthKey = [];
+        foreach ($merged as $row) {
+            $monthsSet[$row->month] = true;
+            $margin = $row->revenue - $row->cost;
+            $acres = $row->acres ?? 0.0;
+            $costPerAcre = $acres > 0 ? $row->cost / $acres : null;
+            $revenuePerAcre = $acres > 0 ? $row->revenue / $acres : null;
+            $marginPerAcre = $acres > 0 ? $margin / $acres : null;
+
+            if ($groupBy === 'all') {
+                $key = 'all';
+                $label = 'Overall';
+            } elseif ($groupBy === 'category') {
+                $key = $row->category !== null && $row->category !== '' ? $row->category : 'unclassified';
+                $label = $key === 'unclassified' ? 'Unclassified' : ucfirst(strtolower($key));
+            } else {
+                $key = $row->crop_item_id !== null ? (string) $row->crop_item_id : 'unassigned';
+                $label = $key === 'unassigned' ? 'Unassigned' : ($row->crop_display_name ?? $key);
+            }
+
+            $pk = $row->month . "\0" . $key;
+            if (!isset($byMonthKey[$pk])) {
+                $byMonthKey[$pk] = [
+                    'month' => $row->month,
+                    'key' => $key,
+                    'label' => $label,
+                    'cost' => 0.0,
+                    'revenue' => 0.0,
+                    'acres' => 0.0,
+                ];
+            }
+            $byMonthKey[$pk]['cost'] += $row->cost;
+            $byMonthKey[$pk]['revenue'] += $row->revenue;
+            $byMonthKey[$pk]['acres'] += $row->acres;
+        }
+
+        $seriesMap = [];
+        foreach ($byMonthKey as $pk => $agg) {
+            $key = $agg['key'];
+            $label = $agg['label'];
+            $cost = $agg['cost'];
+            $revenue = $agg['revenue'];
+            $acres = $agg['acres'];
+            $margin = $revenue - $cost;
+            $costPerAcre = $acres > 0 ? $cost / $acres : null;
+            $revenuePerAcre = $acres > 0 ? $revenue / $acres : null;
+            $marginPerAcre = $acres > 0 ? $margin / $acres : null;
+
+            if (!isset($seriesMap[$key])) {
+                $seriesMap[$key] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'points' => [],
+                    'totals' => ['cost' => 0.0, 'revenue' => 0.0, 'margin' => 0.0, 'acres' => 0.0],
+                ];
+            }
+            $seriesMap[$key]['points'][] = [
+                'month' => $agg['month'],
+                'cost' => number_format($cost, 2, '.', ''),
+                'revenue' => number_format($revenue, 2, '.', ''),
+                'margin' => number_format($margin, 2, '.', ''),
+                'acres' => number_format($acres, 2, '.', ''),
+                'cost_per_acre' => $costPerAcre !== null ? number_format($costPerAcre, 2, '.', '') : null,
+                'revenue_per_acre' => $revenuePerAcre !== null ? number_format($revenuePerAcre, 2, '.', '') : null,
+                'margin_per_acre' => $marginPerAcre !== null ? number_format($marginPerAcre, 2, '.', '') : null,
+            ];
+            $seriesMap[$key]['totals']['cost'] += $cost;
+            $seriesMap[$key]['totals']['revenue'] += $revenue;
+            $seriesMap[$key]['totals']['margin'] += $margin;
+            $seriesMap[$key]['totals']['acres'] += $acres;
+        }
+
+        $months = array_keys($monthsSet);
+        sort($months);
+
+        if ($groupBy === 'all' && empty($seriesMap)) {
+            $seriesMap['all'] = [
+                'key' => 'all',
+                'label' => 'Overall',
+                'points' => [],
+                'totals' => ['cost' => 0.0, 'revenue' => 0.0, 'margin' => 0.0, 'acres' => 0.0],
+            ];
+        }
+
+        foreach ($seriesMap as $key => &$series) {
+            usort($series['points'], function ($a, $b) {
+                return strcmp($a['month'], $b['month']);
+            });
+            $t = $series['totals'];
+            $series['totals'] = [
+                'cost' => number_format($t['cost'], 2, '.', ''),
+                'revenue' => number_format($t['revenue'], 2, '.', ''),
+                'margin' => number_format($t['margin'], 2, '.', ''),
+                'acres' => number_format($t['acres'], 2, '.', ''),
+                'margin_per_acre' => $t['acres'] > 0 ? number_format($t['margin'] / $t['acres'], 2, '.', '') : null,
+            ];
+        }
+        unset($series);
+
+        $series = array_values($seriesMap);
+
+        return response()->json([
+            'from' => $from,
+            'to' => $to,
+            'group_by' => $groupBy,
+            'months' => $months,
+            'series' => $series,
+        ]);
+    }
+
+    /**
+     * Build cycle-level financials: cost (expense) and revenue (income) per crop_cycle_id.
+     * Merges two queries (cost by cycle, revenue by cycle) keyed by crop_cycle_id.
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function buildCycleFinancials(string $tenantId, string $from, string $to, bool $includeUnassigned)
+    {
+        $baseSelect = "
+            posting_groups.crop_cycle_id as crop_cycle_id,
+            cc.name as crop_cycle_name,
+            cc.tenant_crop_item_id as tenant_crop_item_id,
+            tci.id as crop_item_id,
+            COALESCE(NULLIF(TRIM(tci.display_name), ''), tci.custom_name, cci.default_name) as crop_display_name,
+            cci.code as catalog_code,
+            cci.category as category
+        ";
+        $groupByCols = [
+            'posting_groups.crop_cycle_id',
+            'cc.name',
+            'cc.tenant_crop_item_id',
+            'tci.id',
+            'tci.display_name',
+            'tci.custom_name',
+            'cci.default_name',
+            'cci.code',
+            'cci.category',
+        ];
+
+        $costByCycle = DB::table('ledger_entries as le')
+            ->join('posting_groups', 'posting_groups.id', '=', 'le.posting_group_id')
+            ->join('accounts as a', 'a.id', '=', 'le.account_id')
+            ->leftJoin('crop_cycles as cc', 'cc.id', '=', 'posting_groups.crop_cycle_id')
+            ->leftJoin('tenant_crop_items as tci', 'tci.id', '=', 'cc.tenant_crop_item_id')
+            ->leftJoin('crop_catalog_items as cci', 'cci.id', '=', 'tci.crop_catalog_item_id')
+            ->where('a.type', 'expense')
+            ->whereBetween('posting_groups.posting_date', [$from, $to])
+            ->selectRaw($baseSelect . ', SUM(le.debit_amount - le.credit_amount) as cost')
+            ->groupBy($groupByCols);
+        if (!$includeUnassigned) {
+            $costByCycle->whereNotNull('posting_groups.crop_cycle_id');
+        }
+        ReportingQuery::applyTenant($costByCycle, $tenantId);
+        ReportingQuery::applyExcludeReversals($costByCycle);
+        $costRows = $costByCycle->get();
+
+        $revenueByCycle = DB::table('ledger_entries as le')
+            ->join('posting_groups', 'posting_groups.id', '=', 'le.posting_group_id')
+            ->join('accounts as a', 'a.id', '=', 'le.account_id')
+            ->leftJoin('crop_cycles as cc', 'cc.id', '=', 'posting_groups.crop_cycle_id')
+            ->leftJoin('tenant_crop_items as tci', 'tci.id', '=', 'cc.tenant_crop_item_id')
+            ->leftJoin('crop_catalog_items as cci', 'cci.id', '=', 'tci.crop_catalog_item_id')
+            ->where('a.type', 'income')
+            ->whereBetween('posting_groups.posting_date', [$from, $to])
+            ->selectRaw($baseSelect . ', SUM(le.credit_amount - le.debit_amount) as revenue')
+            ->groupBy($groupByCols);
+        if (!$includeUnassigned) {
+            $revenueByCycle->whereNotNull('posting_groups.crop_cycle_id');
+        }
+        ReportingQuery::applyTenant($revenueByCycle, $tenantId);
+        ReportingQuery::applyExcludeReversals($revenueByCycle);
+        $revenueRows = $revenueByCycle->get();
+
+        $merged = [];
+        foreach ($costRows as $row) {
+            $id = $row->crop_cycle_id;
+            $merged[$id] = (object) [
+                'crop_cycle_id' => $row->crop_cycle_id,
+                'crop_cycle_name' => $row->crop_cycle_name,
+                'crop_item_id' => $row->crop_item_id,
+                'crop_display_name' => $row->crop_display_name,
+                'catalog_code' => $row->catalog_code,
+                'category' => $row->category,
+                'cost' => (float) $row->cost,
+                'revenue' => 0.0,
+            ];
+        }
+        foreach ($revenueRows as $row) {
+            $id = $row->crop_cycle_id;
+            if (isset($merged[$id])) {
+                $merged[$id]->revenue = (float) $row->revenue;
+            } else {
+                $merged[$id] = (object) [
+                    'crop_cycle_id' => $row->crop_cycle_id,
+                    'crop_cycle_name' => $row->crop_cycle_name,
+                    'crop_item_id' => $row->crop_item_id,
+                    'crop_display_name' => $row->crop_display_name,
+                    'catalog_code' => $row->catalog_code,
+                    'category' => $row->category,
+                    'cost' => 0.0,
+                    'revenue' => (float) $row->revenue,
+                ];
+            }
+        }
+
+        return collect(array_values($merged));
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, object> $cycleRows
+     * @return list<array{key: string, crop_cycle_id?: string|null, crop_cycle_name?: string|null, crop_display_name?: string|null, catalog_code?: string|null, category?: string|null, cost: string, revenue: string, margin: string, acres: string|null, cost_per_acre: string|null, revenue_per_acre: string|null, margin_per_acre: string|null}>
+     */
+    private function aggregateCropProfitabilityByGroup($cycleRows, string $groupBy): array
+    {
+        $keyed = [];
+        foreach ($cycleRows as $row) {
+            $cost = (float) $row->cost;
+            $revenue = (float) $row->revenue;
+            $acres = isset($row->acres) && $row->acres !== null ? (float) $row->acres : null;
+
+            if ($groupBy === 'cycle') {
+                $key = (string) $row->crop_cycle_id;
+                if (!isset($keyed[$key])) {
+                    $keyed[$key] = [
+                        'key' => $key,
+                        'crop_cycle_id' => $row->crop_cycle_id,
+                        'crop_cycle_name' => $row->crop_cycle_name,
+                        'crop_display_name' => $row->crop_display_name,
+                        'catalog_code' => $row->catalog_code,
+                        'category' => $row->category,
+                        'cost' => 0.0,
+                        'revenue' => 0.0,
+                        'acres' => null,
+                    ];
+                }
+                $keyed[$key]['cost'] += $cost;
+                $keyed[$key]['revenue'] += $revenue;
+                if ($acres !== null) {
+                    $keyed[$key]['acres'] = ($keyed[$key]['acres'] ?? 0) + $acres;
+                }
+            } elseif ($groupBy === 'category') {
+                $key = $row->category !== null && $row->category !== '' ? $row->category : 'unclassified';
+                if (!isset($keyed[$key])) {
+                    $keyed[$key] = [
+                        'key' => $key,
+                        'category' => $key === 'unclassified' ? null : $key,
+                        'cost' => 0.0,
+                        'revenue' => 0.0,
+                        'acres' => null,
+                    ];
+                }
+                $keyed[$key]['cost'] += $cost;
+                $keyed[$key]['revenue'] += $revenue;
+                if ($acres !== null) {
+                    $keyed[$key]['acres'] = ($keyed[$key]['acres'] ?? 0) + $acres;
+                }
+            } else {
+                $key = $row->crop_item_id !== null ? (string) $row->crop_item_id : 'unassigned';
+                if (!isset($keyed[$key])) {
+                    $keyed[$key] = [
+                        'key' => $key,
+                        'crop_display_name' => $row->crop_display_name,
+                        'catalog_code' => $row->catalog_code,
+                        'category' => $row->category,
+                        'cost' => 0.0,
+                        'revenue' => 0.0,
+                        'acres' => null,
+                    ];
+                }
+                $keyed[$key]['cost'] += $cost;
+                $keyed[$key]['revenue'] += $revenue;
+                if ($acres !== null) {
+                    $keyed[$key]['acres'] = ($keyed[$key]['acres'] ?? 0) + $acres;
+                }
+            }
+        }
+
+        $result = [];
+        foreach ($keyed as $r) {
+            $cost = $r['cost'];
+            $revenue = $r['revenue'];
+            $margin = $revenue - $cost;
+            $acres = $r['acres'] ?? null;
+            $costPerAcre = $acres !== null && $acres > 0 ? $cost / $acres : null;
+            $revenuePerAcre = $acres !== null && $acres > 0 ? $revenue / $acres : null;
+            $marginPerAcre = $acres !== null && $acres > 0 ? $margin / $acres : null;
+            $result[] = [
+                'key' => $r['key'],
+                'crop_cycle_id' => $r['crop_cycle_id'] ?? null,
+                'crop_cycle_name' => $r['crop_cycle_name'] ?? null,
+                'crop_display_name' => ($r['key'] === 'unassigned' ? 'Unassigned' : ($r['crop_display_name'] ?? null)),
+                'catalog_code' => $r['catalog_code'] ?? null,
+                'category' => $r['category'] ?? null,
+                'cost' => number_format($cost, 2, '.', ''),
+                'revenue' => number_format($revenue, 2, '.', ''),
+                'margin' => number_format($margin, 2, '.', ''),
+                'acres' => $acres !== null ? number_format($acres, 2, '.', '') : null,
+                'cost_per_acre' => $costPerAcre !== null ? number_format($costPerAcre, 2, '.', '') : null,
+                'revenue_per_acre' => $revenuePerAcre !== null ? number_format($revenuePerAcre, 2, '.', '') : null,
+                'margin_per_acre' => $marginPerAcre !== null ? number_format($marginPerAcre, 2, '.', '') : null,
+            ];
+        }
+
+        usort($result, function ($a, $b) {
+            $order = ['crop_cycle_name', 'crop_display_name', 'category', 'key'];
+            foreach ($order as $f) {
+                $va = $a[$f] ?? '';
+                $vb = $b[$f] ?? '';
+                if ($va !== $vb) {
+                    return strcmp((string) $va, (string) $vb);
+                }
+            }
+            return 0;
+        });
+        return $result;
+    }
+
+    /**
+     * GET /api/reports/crop-category-acres
+     * Tenant-scoped acres by crop category and by crop (from land_allocations -> crop_cycles -> tenant_crop_items -> crop_catalog_items).
+     */
+    public function cropCategoryAcres(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $totalsByCategory = DB::table('land_allocations')
+            ->join('crop_cycles', 'land_allocations.crop_cycle_id', '=', 'crop_cycles.id')
+            ->join('tenant_crop_items', 'crop_cycles.tenant_crop_item_id', '=', 'tenant_crop_items.id')
+            ->join('crop_catalog_items', 'tenant_crop_items.crop_catalog_item_id', '=', 'crop_catalog_items.id')
+            ->where('land_allocations.tenant_id', $tenantId)
+            ->whereNotNull('crop_cycles.tenant_crop_item_id')
+            ->selectRaw('crop_catalog_items.category as category, COALESCE(SUM(land_allocations.allocated_acres), 0) as acres')
+            ->groupBy('crop_catalog_items.category')
+            ->orderBy('crop_catalog_items.category')
+            ->get();
+
+        $totalsByCrop = DB::table('land_allocations')
+            ->join('crop_cycles', 'land_allocations.crop_cycle_id', '=', 'crop_cycles.id')
+            ->join('tenant_crop_items', 'crop_cycles.tenant_crop_item_id', '=', 'tenant_crop_items.id')
+            ->join('crop_catalog_items', 'tenant_crop_items.crop_catalog_item_id', '=', 'crop_catalog_items.id')
+            ->where('land_allocations.tenant_id', $tenantId)
+            ->whereNotNull('crop_cycles.tenant_crop_item_id')
+            ->selectRaw('
+                crop_catalog_items.code as code,
+                crop_catalog_items.default_name as name,
+                crop_catalog_items.category as category,
+                COALESCE(SUM(land_allocations.allocated_acres), 0) as acres
+            ')
+            ->groupBy('crop_catalog_items.code', 'crop_catalog_items.default_name', 'crop_catalog_items.category')
+            ->orderBy('crop_catalog_items.category')
+            ->orderBy('crop_catalog_items.default_name')
+            ->get();
+
+        return response()->json([
+            'totals_by_category' => $totalsByCategory->map(fn ($r) => [
+                'category' => $r->category,
+                'acres' => number_format((float) $r->acres, 2, '.', ''),
+            ]),
+            'totals_by_crop' => $totalsByCrop->map(fn ($r) => [
+                'code' => $r->code,
+                'name' => $r->name,
+                'category' => $r->category,
+                'acres' => number_format((float) $r->acres, 2, '.', ''),
+            ]),
         ]);
     }
 

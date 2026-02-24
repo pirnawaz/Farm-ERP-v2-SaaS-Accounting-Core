@@ -130,15 +130,48 @@ export interface LandDocument {
   created_at: string;
 }
 
+export interface LandParcelAuditLogEntry {
+  id: string;
+  land_parcel_id: string;
+  changed_by_user_id: string | null;
+  changed_by_role: string | null;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_at: string;
+}
+
 export interface LandParcelDetail extends LandParcel {
   documents?: LandDocument[];
   allocations?: LandAllocation[];
+  /** From API: allocation_summary (grouped by crop cycle) */
+  allocation_summary?: {
+    crop_cycle: CropCycle;
+    total_allocated_acres: number;
+    allocations: LandAllocation[];
+  }[];
   allocations_by_cycle?: {
     crop_cycle: CropCycle;
     total_allocated_acres: string;
     allocations: LandAllocation[];
   }[];
   remaining_acres?: string;
+}
+
+// Crop Item (tenant-facing crop list for crop cycles)
+export type CropItemSource = 'global' | 'custom';
+
+export interface CropItem {
+  id: string;
+  display_name: string;
+  source: CropItemSource;
+  catalog_code: string | null;
+  category: string | null;
+}
+
+export interface CreateCropItemPayload {
+  custom_name: string;
+  display_name?: string;
 }
 
 // Crop Cycle
@@ -148,6 +181,10 @@ export interface CropCycle {
   id: string;
   tenant_id: string;
   name: string;
+  tenant_crop_item_id?: string | null;
+  crop_variety_id?: string | null;
+  crop_display_name?: string | null;
+  /** @deprecated Legacy; use crop_display_name */
   crop_type?: string;
   start_date: string;
   end_date?: string;
@@ -172,6 +209,13 @@ export interface CropCycleClosePreview {
 }
 
 // Land Allocation
+// Rotation warning (crop rotation on same parcel)
+export interface RotationWarning {
+  code: string;
+  message: string;
+  severity: string;
+}
+
 export interface LandAllocation {
   id: string;
   tenant_id: string;
@@ -1589,6 +1633,80 @@ export interface BalanceSheetResponse {
   compare?: BalanceSheetCompare;
 }
 
+// Crop Profitability report
+export type CropProfitabilityGroupBy = 'crop' | 'category' | 'cycle';
+
+export interface CropProfitabilityRow {
+  key: string;
+  crop_cycle_id?: string | null;
+  crop_cycle_name?: string | null;
+  crop_display_name?: string | null;
+  catalog_code?: string | null;
+  category?: string | null;
+  cost: string;
+  revenue: string;
+  margin: string;
+  acres: string | null;
+  cost_per_acre: string | null;
+  revenue_per_acre: string | null;
+  margin_per_acre: string | null;
+}
+
+export interface CropProfitabilityTotals {
+  cost: string;
+  revenue: string;
+  margin: string;
+  acres: string;
+  cost_per_acre: string | null;
+  revenue_per_acre: string | null;
+  margin_per_acre: string | null;
+}
+
+export interface CropProfitabilityResponse {
+  from: string;
+  to: string;
+  group_by: CropProfitabilityGroupBy;
+  rows: CropProfitabilityRow[];
+  totals: CropProfitabilityTotals;
+}
+
+// Crop Profitability Trend (month-by-month)
+export type CropProfitabilityTrendGroupBy = 'category' | 'crop' | 'all';
+
+export interface CropProfitabilityTrendPoint {
+  month: string;
+  cost: string;
+  revenue: string;
+  margin: string;
+  acres: string;
+  cost_per_acre: string | null;
+  revenue_per_acre: string | null;
+  margin_per_acre: string | null;
+}
+
+export interface CropProfitabilityTrendSeriesTotals {
+  cost: string;
+  revenue: string;
+  margin: string;
+  acres: string;
+  margin_per_acre: string | null;
+}
+
+export interface CropProfitabilityTrendSeries {
+  key: string;
+  label: string;
+  points: CropProfitabilityTrendPoint[];
+  totals: CropProfitabilityTrendSeriesTotals;
+}
+
+export interface CropProfitabilityTrendResponse {
+  from: string;
+  to: string;
+  group_by: CropProfitabilityTrendGroupBy;
+  months: string[];
+  series: CropProfitabilityTrendSeries[];
+}
+
 export interface PartyLedgerRow {
   posting_date: string;
   posting_group_id: string;
@@ -1699,7 +1817,8 @@ export interface CreateLandDocumentPayload {
 
 export interface CreateCropCyclePayload {
   name: string;
-  crop_type?: string;
+  tenant_crop_item_id: string;
+  crop_variety_id?: string | null;
   start_date: string;
   end_date?: string;
 }

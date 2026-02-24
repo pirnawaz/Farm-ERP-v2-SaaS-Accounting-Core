@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\LandAllocation;
+use App\Models\LandParcel;
+use App\Models\CropCycle;
 use App\Services\TenantContext;
 use App\Services\LandAllocationService;
 use Illuminate\Http\Request;
+use Throwable;
 
 class LandAllocationController extends Controller
 {
@@ -45,6 +48,23 @@ class LandAllocationController extends Controller
             'allocated_acres' => ['required', 'numeric', 'min:0.01'],
         ]);
 
+        $parcel = LandParcel::where('id', $request->land_parcel_id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+        $cropCycle = CropCycle::where('id', $request->crop_cycle_id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+        if ($cropCycle->status !== 'OPEN') {
+            return response()->json([
+                'message' => 'Allocations can only be created or changed for open crop cycles.',
+            ], 422);
+        }
+        if (!$cropCycle->tenant_crop_item_id) {
+            return response()->json([
+                'message' => 'The selected crop cycle must have a crop assigned before creating allocations.',
+            ], 422);
+        }
+
         // Determine allocation mode and party_id
         $allocationMode = $request->allocation_mode;
         $partyId = $request->party_id;
@@ -65,13 +85,24 @@ class LandAllocationController extends Controller
             }
         }
 
-        // Validate acre allocation with locking
-        $this->allocationService->validateAcreAllocation(
-            $tenantId,
-            $request->land_parcel_id,
-            $request->crop_cycle_id,
-            $request->allocated_acres
-        );
+        try {
+            $this->allocationService->validateAcreAllocation(
+                $tenantId,
+                $request->land_parcel_id,
+                $request->crop_cycle_id,
+                (float) $request->allocated_acres
+            );
+        } catch (Throwable $e) {
+            $remaining = $this->allocationService->getRemainingAcres(
+                $tenantId,
+                $request->land_parcel_id,
+                $request->crop_cycle_id
+            );
+            return response()->json([
+                'message' => $e->getMessage(),
+                'available_acres' => round($remaining, 2),
+            ], 422);
+        }
 
         $allocation = LandAllocation::create([
             'tenant_id' => $tenantId,
@@ -136,15 +167,40 @@ class LandAllocationController extends Controller
         $cropCycleId = $request->crop_cycle_id ?? $allocation->crop_cycle_id;
         $newAcres = $request->allocated_acres ?? $allocation->allocated_acres;
 
+        $cropCycle = CropCycle::where('id', $cropCycleId)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($cropCycle->status !== 'OPEN') {
+            return response()->json([
+                'message' => 'Allocations can only be created or changed for open crop cycles.',
+            ], 422);
+        }
+        if (!$cropCycle->tenant_crop_item_id) {
+            return response()->json([
+                'message' => 'The selected crop cycle must have a crop assigned before creating allocations.',
+            ], 422);
+        }
+        $parcel = LandParcel::where('id', $landParcelId)->where('tenant_id', $tenantId)->firstOrFail();
+
         // Validate acre allocation with locking (excluding current allocation)
         if ($request->has('allocated_acres') || $request->has('land_parcel_id') || $request->has('crop_cycle_id')) {
-            $this->allocationService->validateAcreAllocation(
-                $tenantId,
-                $landParcelId,
-                $cropCycleId,
-                $newAcres,
-                $allocation->id
-            );
+            try {
+                $this->allocationService->validateAcreAllocation(
+                    $tenantId,
+                    $landParcelId,
+                    $cropCycleId,
+                    (float) $newAcres,
+                    $allocation->id
+                );
+            } catch (Throwable $e) {
+                $remaining = $this->allocationService->getRemainingAcres(
+                    $tenantId,
+                    $landParcelId,
+                    $cropCycleId
+                );
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'available_acres' => round($remaining, 2),
+                ], 422);
+            }
         }
 
         $updateData = $request->only(['crop_cycle_id', 'land_parcel_id', 'allocated_acres']);

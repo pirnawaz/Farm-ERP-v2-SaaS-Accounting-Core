@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\PartyController;
 use App\Http\Controllers\LandParcelController;
 use App\Http\Controllers\CropCycleController;
+use App\Http\Controllers\CropItemController;
 use App\Http\Controllers\LandAllocationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectRuleController;
@@ -126,11 +127,32 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::get('parties/{id}/receivables/open-sales', [PartyController::class, 'openSales']);
 });
 
-// Land Parcels (tenant_admin, accountant) — requires land module
+// Land Parcels — VIEW: tenant_admin, accountant, manager(operator); MUTATE: tenant_admin, accountant only
+Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:land'])->group(function () {
+    Route::get('land-parcels', [LandParcelController::class, 'index']);
+    Route::get('land-parcels/{id}', [LandParcelController::class, 'show']);
+    Route::get('land-parcels/{id}/rotation-warnings', [LandParcelController::class, 'rotationWarnings']);
+});
 Route::middleware(['role:tenant_admin,accountant', 'require_module:land'])->group(function () {
-    Route::apiResource('land-parcels', LandParcelController::class);
-    Route::post('land-parcels/{id}/documents', [LandParcelController::class, 'storeDocument']);
-    Route::get('land-parcels/{id}/documents', [LandParcelController::class, 'listDocuments']);
+    Route::post('land-parcels', [LandParcelController::class, 'store']);
+    Route::patch('land-parcels/{id}', [LandParcelController::class, 'update']);
+    Route::delete('land-parcels/{id}', [LandParcelController::class, 'destroy']);
+    Route::get('land-parcels/{id}/audit', [LandParcelController::class, 'audit']);
+});
+if (config('features.land_documents_enabled')) {
+    Route::middleware(['role:tenant_admin,accountant', 'require_module:land'])->group(function () {
+        Route::get('land-parcels/{id}/documents', [LandParcelController::class, 'listDocuments']);
+        Route::post('land-parcels/{id}/documents', [LandParcelController::class, 'storeDocument']);
+    });
+}
+
+// Crop Items (tenant-facing crop list for crop cycles) — GET: operator+; POST/PATCH: tenant_admin, accountant
+Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:projects_crop_cycles'])->group(function () {
+    Route::get('crop-items', [CropItemController::class, 'index']);
+});
+Route::middleware(['role:tenant_admin,accountant', 'require_module:projects_crop_cycles'])->group(function () {
+    Route::post('crop-items', [CropItemController::class, 'store']);
+    Route::patch('crop-items/{id}', [CropItemController::class, 'update']);
 });
 
 // Crop Cycles (tenant_admin, accountant)
@@ -409,6 +431,14 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
     Route::post('posting-groups/{id}/reverse', [PostingGroupController::class, 'reverse'])
         ->middleware('role:tenant_admin,accountant');
     Route::get('posting-groups/{id}/reversals', [PostingGroupController::class, 'reversals']);
+});
+
+// Crop reports (projects_crop_cycles only)
+Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:projects_crop_cycles'])->group(function () {
+    Route::get('reports/crop-category-acres', [ReportController::class, 'cropCategoryAcres']);
+    Route::get('reports/crop-costs', [ReportController::class, 'cropCosts']);
+    Route::get('reports/crop-profitability', [ReportController::class, 'cropProfitability']);
+    Route::get('reports/crop-profitability-trend', [ReportController::class, 'cropProfitabilityTrend']);
 });
 
 // Reports (tenant_admin, accountant, operator) — requires reports module

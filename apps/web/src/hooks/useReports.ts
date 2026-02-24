@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { reportsApi } from '../api/reports';
-import type { GeneralLedgerResponse, TrialBalanceRow, ProfitLossResponse, BalanceSheetResponse } from '../types';
+import { getApiErrorMessage } from '../utils/api';
+import type { GeneralLedgerResponse, TrialBalanceRow, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy } from '../types';
 
 export function useTrialBalance(params: { from: string; to: string }) {
   return useQuery<TrialBalanceRow[], Error>({
@@ -55,4 +58,54 @@ export function useBalanceSheet(params: { as_of: string; compare_as_of?: string 
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
+}
+
+export function useCropProfitability(
+  params: {
+    from: string;
+    to: string;
+    group_by?: CropProfitabilityGroupBy;
+    include_unassigned?: boolean;
+  },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.from && !!params.to;
+  const query = useQuery<CropProfitabilityResponse, Error>({
+    queryKey: ['reports', 'crop-profitability', params],
+    queryFn: () => reportsApi.getCropProfitability(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+  useEffect(() => {
+    if (query.error) {
+      toast.error(getApiErrorMessage(query.error, 'Failed to load crop profitability report'));
+    }
+  }, [query.error]);
+  return query;
+}
+
+export function useCropProfitabilityTrend(
+  params: {
+    from: string;
+    to: string;
+    group_by?: CropProfitabilityTrendGroupBy;
+    include_unassigned?: boolean;
+  },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.from && !!params.to;
+  const query = useQuery<CropProfitabilityTrendResponse, Error>({
+    queryKey: ['reports', 'crop-profitability-trend', params],
+    queryFn: () => reportsApi.getCropProfitabilityTrend(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+  useEffect(() => {
+    if (query.error) {
+      toast.error(getApiErrorMessage(query.error, 'Failed to load crop profitability trend'));
+    }
+  }, [query.error]);
+  return query;
 }

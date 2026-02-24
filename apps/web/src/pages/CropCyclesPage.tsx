@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCropCycles, useCreateCropCycle, useCloseCropCycle, useOpenCropCycle } from '../hooks/useCropCycles';
+import { useCropItems, useCreateCropItem } from '../hooks/useCropItems';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
@@ -10,22 +11,29 @@ import { useRole } from '../hooks/useRole';
 import toast from 'react-hot-toast';
 import type { CropCycle, CreateCropCyclePayload } from '../types';
 
+const initialFormData: CreateCropCyclePayload = {
+  name: '',
+  tenant_crop_item_id: '',
+  start_date: '',
+  end_date: '',
+};
+
 export default function CropCyclesPage() {
   const { data: cycles, isLoading } = useCropCycles();
+  const { data: cropItems, isLoading: cropItemsLoading } = useCropItems();
   const createMutation = useCreateCropCycle();
+  const createCropItemMutation = useCreateCropItem();
   const closeMutation = useCloseCropCycle();
   const openMutation = useOpenCropCycle();
   const { hasRole, canCloseCropCycle } = useRole();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAddCropModal, setShowAddCropModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: 'close' | 'open'; id: string } | null>(null);
-  const [formData, setFormData] = useState<CreateCropCyclePayload>({
-    name: '',
-    crop_type: '',
-    start_date: '',
-    end_date: '',
-  });
+  const [formData, setFormData] = useState<CreateCropCyclePayload>(initialFormData);
+  const [newCropName, setNewCropName] = useState('');
 
   const canCreate = hasRole(['tenant_admin', 'accountant']);
+  const canAddCrop = hasRole(['tenant_admin', 'accountant']);
 
   const handleClose = async (id: string) => {
     try {
@@ -50,16 +58,32 @@ export default function CropCyclesPage() {
     try {
       const payload: CreateCropCyclePayload = {
         name: formData.name,
+        tenant_crop_item_id: formData.tenant_crop_item_id,
         start_date: formData.start_date,
-        ...(formData.crop_type?.trim() && { crop_type: formData.crop_type.trim() }),
         ...(formData.end_date?.trim() && { end_date: formData.end_date.trim() }),
       };
       await createMutation.mutateAsync(payload);
       toast.success('Crop cycle created successfully');
       setShowCreateModal(false);
-      setFormData({ name: '', crop_type: '', start_date: '', end_date: '' });
+      setFormData(initialFormData);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create crop cycle');
+      toast.error(error?.response?.data?.message ?? error.message ?? 'Failed to create crop cycle');
+    }
+  };
+
+  const handleAddCrop = async () => {
+    const name = newCropName.trim();
+    if (!name) {
+      toast.error('Enter a crop name');
+      return;
+    }
+    try {
+      await createCropItemMutation.mutateAsync({ custom_name: name });
+      toast.success('Crop added');
+      setNewCropName('');
+      setShowAddCropModal(false);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message ?? error.message ?? 'Failed to add crop');
     }
   };
 
@@ -72,7 +96,10 @@ export default function CropCyclesPage() {
         </Link>
       ),
     },
-    { header: 'Crop Type', accessor: 'crop_type' },
+    {
+      header: 'Crop',
+      accessor: (row) => row.crop_display_name ?? row.crop_type ?? '—',
+    },
     { header: 'Start Date', accessor: 'start_date' },
     { header: 'End Date', accessor: (r) => r.end_date ?? '—' },
     { header: 'Status', accessor: 'status' },
@@ -148,13 +175,33 @@ export default function CropCyclesPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
-          <FormField label="Crop Type">
-            <input
-              type="text"
-              value={formData.crop_type}
-              onChange={(e) => setFormData({ ...formData, crop_type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            />
+          <FormField label="Crop" required>
+            <div className="flex gap-2">
+              <select
+                value={formData.tenant_crop_item_id}
+                onChange={(e) => setFormData({ ...formData, tenant_crop_item_id: e.target.value })}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+                disabled={cropItemsLoading}
+              >
+                <option value="">Select crop</option>
+                {(cropItems ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.display_name}
+                    {item.source === 'custom' ? ' (custom)' : ''}
+                  </option>
+                ))}
+              </select>
+              {canAddCrop && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddCropModal(true)}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+                  title="Add custom crop"
+                >
+                  + Add crop
+                </button>
+              )}
+            </div>
           </FormField>
           <FormField label="Start Date" required>
             <input
@@ -182,7 +229,12 @@ export default function CropCyclesPage() {
             </button>
             <button
               onClick={handleCreate}
-              disabled={createMutation.isPending || !formData.name || !formData.start_date}
+              disabled={
+                createMutation.isPending ||
+                !formData.name ||
+                !formData.start_date ||
+                !formData.tenant_crop_item_id
+              }
               className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}
@@ -190,6 +242,41 @@ export default function CropCyclesPage() {
           </div>
         </div>
       </Modal>
+
+      {canAddCrop && (
+        <Modal
+          isOpen={showAddCropModal}
+          onClose={() => setShowAddCropModal(false)}
+          title="Add custom crop"
+        >
+          <div className="space-y-4">
+            <FormField label="Crop name" required>
+              <input
+                type="text"
+                value={newCropName}
+                onChange={(e) => setNewCropName(e.target.value)}
+                placeholder="e.g. Local maize variety"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              />
+            </FormField>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowAddCropModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCrop}
+                disabled={createCropItemMutation.isPending || !newCropName.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {createCropItemMutation.isPending ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <ConfirmDialog
         isOpen={!!confirmAction}

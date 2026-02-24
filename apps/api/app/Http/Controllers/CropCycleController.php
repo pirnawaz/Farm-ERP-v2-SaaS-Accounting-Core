@@ -8,6 +8,7 @@ use App\Services\CropCycleCloseService;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class CropCycleController extends Controller
@@ -19,12 +20,14 @@ class CropCycleController extends Controller
     public function index(Request $request)
     {
         $tenantId = TenantContext::getTenantId($request);
-        
+
         $cycles = CropCycle::where('tenant_id', $tenantId)
+            ->with('tenantCropItem.cropCatalogItem')
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return response()->json($cycles)
+        $data = $cycles->map(fn (CropCycle $c) => $this->cycleToArray($c));
+        return response()->json($data)
             ->header('Cache-Control', 'private, max-age=60')
             ->header('Vary', 'X-Tenant-Id');
     }
@@ -35,22 +38,39 @@ class CropCycleController extends Controller
 
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'tenant_crop_item_id' => ['required', 'uuid', Rule::exists('tenant_crop_items', 'id')->where('tenant_id', $tenantId)],
+            'crop_variety_id' => ['nullable', 'uuid', Rule::exists('crop_varieties', 'id')->where('tenant_id', $tenantId)],
             'start_date' => ['required', 'date', 'date_format:Y-m-d'],
             'end_date' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
         ]);
 
+        if ($request->filled('crop_variety_id')) {
+            $variety = \App\Models\CropVariety::where('id', $request->crop_variety_id)
+                ->where('tenant_id', $tenantId)
+                ->where('tenant_crop_item_id', $request->tenant_crop_item_id)
+                ->first();
+            if (!$variety) {
+                throw ValidationException::withMessages([
+                    'crop_variety_id' => ['The selected crop variety must belong to the selected crop item.'],
+                ])->status(422);
+            }
+        }
+
         $data = [
             'tenant_id' => $tenantId,
             'name' => $request->name,
+            'tenant_crop_item_id' => $request->tenant_crop_item_id,
             'start_date' => $request->start_date,
             'status' => 'OPEN',
         ];
+        $data['crop_variety_id'] = $request->filled('crop_variety_id') ? $request->crop_variety_id : null;
         if ($request->filled('end_date')) {
             $data['end_date'] = $request->end_date;
         }
         $cycle = CropCycle::create($data);
+        $cycle->load('tenantCropItem.cropCatalogItem');
 
-        return response()->json($cycle, 201);
+        return response()->json($this->cycleToArray($cycle), 201);
     }
 
     public function show(Request $request, string $id)
@@ -59,9 +79,10 @@ class CropCycleController extends Controller
 
         $cycle = CropCycle::where('id', $id)
             ->where('tenant_id', $tenantId)
+            ->with('tenantCropItem.cropCatalogItem', 'cropVariety')
             ->firstOrFail();
 
-        return response()->json($cycle);
+        return response()->json($this->cycleToArray($cycle));
     }
 
     public function update(Request $request, string $id)
@@ -74,17 +95,40 @@ class CropCycleController extends Controller
 
         $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'tenant_crop_item_id' => ['sometimes', 'required', 'uuid', Rule::exists('tenant_crop_items', 'id')->where('tenant_id', $tenantId)],
+            'crop_variety_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('crop_varieties', 'id')->where('tenant_id', $tenantId),
+            ],
             'start_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d'],
             'end_date' => ['sometimes', 'nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
         ]);
 
-        $data = $request->only(['name', 'start_date', 'end_date']);
+        if ($request->filled('crop_variety_id')) {
+            $cropItemId = $request->filled('tenant_crop_item_id') ? $request->tenant_crop_item_id : $cycle->tenant_crop_item_id;
+            $variety = \App\Models\CropVariety::where('id', $request->crop_variety_id)
+                ->where('tenant_id', $tenantId)
+                ->where('tenant_crop_item_id', $cropItemId)
+                ->first();
+            if (!$variety) {
+                throw ValidationException::withMessages([
+                    'crop_variety_id' => ['The selected crop variety must belong to the selected crop item.'],
+                ])->status(422);
+            }
+        }
+
+        $data = $request->only(['name', 'start_date', 'end_date', 'tenant_crop_item_id', 'crop_variety_id']);
         if (array_key_exists('end_date', $data) && $data['end_date'] === '') {
             $data['end_date'] = null;
         }
+        if (array_key_exists('crop_variety_id', $data) && ($data['crop_variety_id'] === '' || $data['crop_variety_id'] === null)) {
+            $data['crop_variety_id'] = null;
+        }
         $cycle->update($data);
+        $cycle->load('tenantCropItem.cropCatalogItem', 'cropVariety');
 
-        return response()->json($cycle);
+        return response()->json($this->cycleToArray($cycle));
     }
 
     public function destroy(Request $request, string $id)
@@ -173,7 +217,22 @@ class CropCycleController extends Controller
             ->firstOrFail();
 
         $cycle->update(['status' => 'OPEN']);
+        $cycle->load('tenantCropItem.cropCatalogItem');
 
-        return response()->json($cycle);
+        return response()->json($this->cycleToArray($cycle));
+    }
+
+    private function cycleToArray(CropCycle $cycle): array
+    {
+        $item = $cycle->tenantCropItem;
+        $displayName = null;
+        if ($item) {
+            $displayName = $item->display_name !== null && $item->display_name !== ''
+                ? $item->display_name
+                : ($item->cropCatalogItem ? $item->cropCatalogItem->default_name : $item->custom_name);
+        }
+        $arr = $cycle->toArray();
+        $arr['crop_display_name'] = $displayName;
+        return $arr;
     }
 }

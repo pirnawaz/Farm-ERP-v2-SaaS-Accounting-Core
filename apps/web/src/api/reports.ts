@@ -1,6 +1,6 @@
 import { apiClient } from '@farm-erp/shared';
 import type { LandlordStatementResponse } from '@farm-erp/shared';
-import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse, ProfitLossResponse, BalanceSheetResponse } from '../types';
+import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy } from '../types';
 
 export const reportsApi = {
   trialBalance: (params: { from: string; to: string }) => {
@@ -115,5 +115,33 @@ export const reportsApi = {
     query.append('as_of', params.as_of);
     if (params.compare_as_of) query.append('compare_as_of', params.compare_as_of);
     return apiClient.get<BalanceSheetResponse>(`/api/reports/balance-sheet?${query.toString()}`);
+  },
+
+  getCropProfitability: (params: {
+    from: string;
+    to: string;
+    group_by?: CropProfitabilityGroupBy;
+    include_unassigned?: boolean;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.group_by) query.append('group_by', params.group_by);
+    if (params.include_unassigned !== undefined) query.append('include_unassigned', params.include_unassigned ? '1' : '0');
+    return apiClient.get<CropProfitabilityResponse>(`/api/reports/crop-profitability?${query.toString()}`);
+  },
+
+  getCropProfitabilityTrend: (params: {
+    from: string;
+    to: string;
+    group_by?: CropProfitabilityTrendGroupBy;
+    include_unassigned?: boolean;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.group_by) query.append('group_by', params.group_by);
+    if (params.include_unassigned !== undefined) query.append('include_unassigned', params.include_unassigned ? '1' : '0');
+    return apiClient.get<CropProfitabilityTrendResponse>(`/api/reports/crop-profitability-trend?${query.toString()}`);
   },
 };

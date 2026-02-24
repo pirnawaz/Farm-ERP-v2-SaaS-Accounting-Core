@@ -87,6 +87,8 @@ import ProfitLossPage from './pages/reports/ProfitLossPage';
 import BalanceSheetPage from './pages/reports/BalanceSheetPage';
 import ProjectPLPage from './pages/ProjectPLPage';
 import CropCyclePLPage from './pages/CropCyclePLPage';
+import CropProfitabilityReportPage from './pages/reports/CropProfitabilityReportPage';
+import CropProfitabilityTrendPage from './pages/reports/CropProfitabilityTrendPage';
 import AccountBalancesPage from './pages/AccountBalancesPage';
 import CashbookPage from './pages/CashbookPage';
 import ARAgeingPage from './pages/ARAgeingPage';
@@ -235,6 +237,8 @@ function App() {
         <Route path="reports/general-ledger" element={<ModuleProtectedRoute requiredModule="reports"><GeneralLedgerPage /></ModuleProtectedRoute>} />
         <Route path="reports/project-pl" element={<ModuleProtectedRoute requiredModule="reports"><ProjectPLPage /></ModuleProtectedRoute>} />
         <Route path="reports/crop-cycle-pl" element={<ModuleProtectedRoute requiredModule="reports"><CropCyclePLPage /></ModuleProtectedRoute>} />
+        <Route path="reports/crop-profitability" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropProfitabilityReportPage /></ModuleProtectedRoute>} />
+        <Route path="reports/crop-profitability-trend" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropProfitabilityTrendPage /></ModuleProtectedRoute>} />
         <Route path="reports/account-balances" element={<ModuleProtectedRoute requiredModule="reports"><AccountBalancesPage /></ModuleProtectedRoute>} />
         <Route path="reports/cashbook" element={<ModuleProtectedRoute requiredModule="reports"><CashbookPage /></ModuleProtectedRoute>} />
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />

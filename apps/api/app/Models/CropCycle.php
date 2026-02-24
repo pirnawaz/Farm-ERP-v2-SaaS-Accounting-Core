@@ -15,6 +15,8 @@ class CropCycle extends Model
     protected $fillable = [
         'tenant_id',
         'name',
+        'tenant_crop_item_id',
+        'crop_variety_id',
         'start_date',
         'end_date',
         'status',
@@ -34,6 +36,16 @@ class CropCycle extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function tenantCropItem(): BelongsTo
+    {
+        return $this->belongsTo(TenantCropItem::class, 'tenant_crop_item_id');
+    }
+
+    public function cropVariety(): BelongsTo
+    {
+        return $this->belongsTo(CropVariety::class, 'crop_variety_id');
     }
 
     public function projects(): HasMany

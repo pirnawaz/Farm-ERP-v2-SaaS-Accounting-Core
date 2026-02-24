@@ -37,6 +37,7 @@ export function useUpdateLandParcel() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['land-parcels'] });
       queryClient.invalidateQueries({ queryKey: ['land-parcels', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['land-parcels', variables.id, 'audit'] });
     },
   });
 }
@@ -68,5 +69,22 @@ export function useAddLandParcelDocument() {
       queryClient.invalidateQueries({ queryKey: ['land-parcels', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['land-parcels', variables.id, 'documents'] });
     },
+  });
+}
+
+export function useLandParcelAudit(landParcelId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['land-parcels', landParcelId, 'audit'],
+    queryFn: () => landParcelsApi.getAudit(landParcelId),
+    enabled: !!landParcelId && (options?.enabled !== false),
+  });
+}
+
+export function useRotationWarnings(parcelId: string, cropCycleId: string) {
+  return useQuery({
+    queryKey: ['land-parcels', parcelId, 'rotation-warnings', cropCycleId],
+    queryFn: () => landParcelsApi.getRotationWarnings(parcelId, cropCycleId),
+    enabled: !!parcelId && !!cropCycleId,
+    staleTime: 60 * 1000,
   });
 }

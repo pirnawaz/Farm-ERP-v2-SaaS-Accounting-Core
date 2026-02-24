@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLandAllocations, useCreateLandAllocation } from '../hooks/useLandAllocations';
 import { useCropCycles } from '../hooks/useCropCycles';
-import { useLandParcels } from '../hooks/useLandParcels';
+import { useLandParcels, useRotationWarnings } from '../hooks/useLandParcels';
 import { useParties } from '../hooks/useParties';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -33,6 +33,12 @@ export default function LandAllocationsPage() {
   const canCreate = hasRole(['tenant_admin', 'accountant']);
   const hariParties = parties?.filter((p) => p.party_types.includes('HARI')) || [];
   const hasHariParties = hariParties.length > 0;
+
+  const { data: rotationData } = useRotationWarnings(
+    formData.land_parcel_id || '',
+    formData.crop_cycle_id || ''
+  );
+  const rotationWarnings = rotationData?.warnings ?? [];
   
   // Initialize allocation mode based on HARI parties availability
   const [allocationMode, setAllocationMode] = useState<'OWNER' | 'HARI'>('OWNER');
@@ -216,6 +222,16 @@ export default function LandAllocationsPage() {
               ))}
             </select>
           </FormField>
+          {formData.land_parcel_id && formData.crop_cycle_id && rotationWarnings.length > 0 && (
+            <div className="rounded-md bg-amber-50 border border-amber-200 p-3" role="alert">
+              <p className="text-sm font-medium text-amber-800 mb-1">Crop rotation</p>
+              <ul className="list-disc list-inside text-sm text-amber-700 space-y-0.5">
+                {rotationWarnings.map((w, i) => (
+                  <li key={i}>{w.message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {hasHariParties && (
             <FormField label="Allocation Mode" required>
               <div className="flex space-x-4">

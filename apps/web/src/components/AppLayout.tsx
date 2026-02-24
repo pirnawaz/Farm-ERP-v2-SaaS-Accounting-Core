@@ -41,7 +41,7 @@ const navigationGroups: NavigationGroup[] = [
     name: 'Farm',
     items: [
       { name: 'Dashboard', href: '/app/dashboard', roles: ['tenant_admin', 'accountant', 'operator'] },
-      { name: 'Land Parcels', href: '/app/land', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'land' },
+      { name: 'Land Parcels', href: '/app/land', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'land' },
       { name: 'Land Leases (Maqada)', href: '/app/land-leases', roles: ['tenant_admin'], requiredModuleKey: 'land_leases' },
       { name: 'Crop Cycles', href: '/app/crop-cycles', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
       { name: 'Land Allocation', href: '/app/allocations', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
@@ -85,6 +85,8 @@ const navigationGroups: NavigationGroup[] = [
       { name: 'AR Ageing', href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
       { name: 'Project P&L', href: '/app/reports/project-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Crop Cycle P&L', href: '/app/reports/crop-cycle-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Crop Profitability', href: '/app/reports/crop-profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Profitability Trend', href: '/app/reports/crop-profitability-trend', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
       { name: 'Machinery Profitability', href: '/app/machinery/reports/profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
       { name: 'Sales Margin', href: '/app/reports/sales-margin', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Party Ledger', href: '/app/reports/party-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
