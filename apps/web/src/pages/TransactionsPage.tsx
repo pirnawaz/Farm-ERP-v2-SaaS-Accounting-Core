@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import { EmptyState } from '../components/EmptyState';
+import { term } from '../config/terminology';
 import type { OperationalTransaction } from '../types';
 
 export default function TransactionsPage() {
@@ -78,20 +79,20 @@ export default function TransactionsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Operational Transactions</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{term('operationalRecordPlural')}</h1>
         {canCreate && (
           <Link
             to="/app/transactions/new"
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
-            New Transaction
+            New {term('operationalRecord')}
           </Link>
         )}
       </div>
 
       <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-6">
         <p className="text-sm text-[#2D3A3A]">
-          <strong>Note:</strong> Draft transactions do not appear in reports until posted.
+          <strong>Note:</strong> Draft {term('operationalRecordPlural').toLowerCase()} do not appear in reports until posted.
         </p>
       </div>
 
@@ -187,7 +188,7 @@ export default function TransactionsPage() {
             action={
               canCreate
                 ? {
-                    label: 'Create Transaction',
+                    label: `Create ${term('operationalRecord')}`,
                     onClick: () => navigate('/app/transactions/new'),
                   }
                 : undefined

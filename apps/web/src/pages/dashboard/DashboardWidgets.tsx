@@ -12,6 +12,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { apiClient } from '@farm-erp/shared';
 import type { AccountBalanceRow } from '@farm-erp/shared';
 import type { WidgetKey } from './dashboardConfig';
+import { term } from '../../config/terminology';
 
 interface DashboardWidgetProps {
   widgetKey: WidgetKey;
@@ -79,7 +80,7 @@ function DraftTransactionsWidget() {
   const draftCount = transactions?.length || 0;
 
   if (isLoading) return <LoadingSpinner />;
-  return <StatCard title="Draft Transactions" value={draftCount} link="/app/transactions?status=DRAFT" />;
+  return <StatCard title={`Draft ${term('operationalRecordPlural')}`} value={draftCount} link="/app/transactions?status=DRAFT" />;
 }
 
 function ProjectsCountWidget() {
@@ -175,7 +176,7 @@ function TrialBalanceLinkWidget() {
   return (
     <Link to="/app/reports/trial-balance">
       <div className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:border-[#1F6F5C]/30 transition-colors">
-        <p className="text-sm font-medium text-gray-600">Trial Balance</p>
+        <p className="text-sm font-medium text-gray-600">{term('trialBalance')}</p>
         <p className="text-sm text-[#1F6F5C] mt-2 font-medium">View Report →</p>
       </div>
     </Link>
@@ -188,7 +189,7 @@ function RecentPostingsWidget() {
     <Link to="/app/reports/general-ledger">
       <div className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:border-[#1F6F5C]/30 transition-colors">
         <p className="text-sm font-medium text-gray-600">Recent Postings</p>
-        <p className="text-sm text-[#1F6F5C] mt-2 font-medium">View General Ledger →</p>
+        <p className="text-sm text-[#1F6F5C] mt-2 font-medium">View {term('generalLedger')} →</p>
       </div>
     </Link>
   );
@@ -204,7 +205,7 @@ function InventoryAlertsWidget() {
   if (isLoading) return <LoadingSpinner />;
   return (
     <StatCard
-      title="Low Stock Items"
+      title={`Low Stock ${term('inventoryItem')}`}
       value={lowStockCount}
       link="/app/inventory/stock-on-hand"
     />

@@ -17,6 +17,8 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
 import type { UpdateInvAdjustmentPayload, InvAdjustmentReason } from '../../types';
+import { Term } from '../../components/Term';
+import { term } from '../../config/terminology';
 
 const REASONS: InvAdjustmentReason[] = ['LOSS', 'DAMAGE', 'COUNT_GAIN', 'COUNT_LOSS', 'OTHER'];
 
@@ -95,7 +97,7 @@ export default function InvAdjustmentDetailPage() {
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-  if (!adj) return <div>Adjustment not found.</div>;
+  if (!adj) return <div>{term('adjustmentSingular')} not found.</div>;
 
   const lineTotal = (l: { qty_delta: string; line_total?: string }) => (l.line_total ? parseFloat(String(l.line_total)) : 0);
   const total = (adj.lines || []).reduce((a, l) => a + lineTotal(l), 0);
@@ -103,12 +105,12 @@ export default function InvAdjustmentDetailPage() {
   return (
     <div>
       <PageHeader
-        title={`Adjustment ${adj.doc_no}`}
+        title={`${term('adjustmentSingular')} ${adj.doc_no}`}
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
-          { label: 'Adjustments', to: '/app/inventory/adjustments' },
+          { label: term('adjustment'), to: '/app/inventory/adjustments' },
           { label: adj.doc_no },
         ]}
       />
@@ -123,7 +125,7 @@ export default function InvAdjustmentDetailPage() {
             <dd><span className={`px-2 py-1 rounded text-xs ${adj.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : adj.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{adj.status}</span></dd>
           </div>
           {adj.notes && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Notes</dt><dd>{adj.notes}</dd></div>}
-          {adj.posting_group_id && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Posting Group</dt><dd><Link to={`/app/posting-groups/${adj.posting_group_id}`} className="text-[#1F6F5C]">{adj.posting_group_id}</Link></dd></div>}
+          {adj.posting_group_id && <div className="md:col-span-2"><dt className="text-sm text-gray-500"><Term k="postingGroup" showHint /></dt><dd><Link to={`/app/posting-groups/${adj.posting_group_id}`} className="text-[#1F6F5C]">{adj.posting_group_id}</Link></dd></div>}
           {adj.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(adj.posting_date)}</dd></div>}
         </dl>
       </div>
@@ -156,7 +158,7 @@ export default function InvAdjustmentDetailPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
-            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
+            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
           </div>
         </div>
       ) : (
@@ -174,26 +176,26 @@ export default function InvAdjustmentDetailPage() {
         </div>
       )}
 
-      {isPosted && canPost && <div className="mb-6"><button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button></div>}
+      {isPosted && canPost && <div className="mb-6"><button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button></div>}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title="Post Adjustment">
+      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={`${term('postAction')} ${term('adjustmentSingular')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowPostModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>
+            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">{postM.isPending ? term('postActionPending') : term('postAction')}</button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title="Reverse Adjustment">
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={`${term('reverseAction')} ${term('adjustmentSingular')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Reason" required><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowReverseModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button>
+            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">{reverseM.isPending ? term('reverseActionPending') : term('reverseAction')}</button>
           </div>
         </div>
       </Modal>

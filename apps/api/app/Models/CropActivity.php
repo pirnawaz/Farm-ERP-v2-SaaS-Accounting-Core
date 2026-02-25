@@ -20,6 +20,7 @@ class CropActivity extends Model
         'activity_date',
         'crop_cycle_id',
         'project_id',
+        'production_unit_id',
         'land_parcel_id',
         'notes',
         'status',
@@ -57,6 +58,11 @@ class CropActivity extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class, 'project_id');
+    }
+
+    public function productionUnit(): BelongsTo
+    {
+        return $this->belongsTo(ProductionUnit::class, 'production_unit_id');
     }
 
     public function landParcel(): BelongsTo

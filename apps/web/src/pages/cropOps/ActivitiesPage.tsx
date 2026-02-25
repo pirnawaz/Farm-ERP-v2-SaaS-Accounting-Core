@@ -8,6 +8,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
+import { term } from '../../config/terminology';
 import type { CropActivity } from '../../types';
 
 export default function ActivitiesPage() {
@@ -45,7 +46,7 @@ export default function ActivitiesPage() {
   const cols: Column<CropActivity>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'Type', accessor: (r) => r.type?.name || r.activity_type_id },
-    { header: 'Activity Date', accessor: (r) => formatDate(r.activity_date) },
+    { header: 'Work date', accessor: (r) => formatDate(r.activity_date) },
     { header: 'Crop Cycle', accessor: (r) => r.crop_cycle?.name || r.crop_cycle_id },
     { header: 'Project', accessor: (r) => r.project?.name || r.project_id },
     { header: 'Total', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(totalCost(r))}</span> },
@@ -69,16 +70,16 @@ export default function ActivitiesPage() {
   return (
     <div>
       <PageHeader
-        title="Crop Ops → Activities"
+        title={`Crop Ops → ${term('activities')}`}
         backTo="/app/crop-ops"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activities' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Crop Ops', to: '/app/crop-ops' }, { label: term('activities') }]}
         right={
           <button onClick={() => navigate('/app/crop-ops/activities/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
-            New Activity
+            {term('newActivity')}
           </button>
         }
       />
-      <p className="text-sm text-gray-500 mb-4">Activities are field operations (e.g. ploughing, sowing, spraying) linked to a crop cycle and project.</p>
+      <p className="text-sm text-gray-500 mb-4">{term('activities')} are field operations (e.g. ploughing, sowing, spraying) linked to a crop cycle and project.</p>
       <div className="flex gap-4 mb-4 flex-wrap">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All statuses</option>

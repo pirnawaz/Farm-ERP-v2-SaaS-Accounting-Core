@@ -11,6 +11,7 @@ import { OnboardingChecklist } from './OnboardingChecklist';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { CropCycleScopeSelector } from './CropCycleScopeSelector';
 import type { UserRole } from '../types';
+import { term } from '../config/terminology';
 
 type NavigationItem = {
   name: string;
@@ -34,20 +35,25 @@ type NavigationGroup = {
   items: (NavigationItem | NavigationParent)[];
 };
 
-// Navigation v2: Farm-first sidebar. Order: Farm → Sales & Money → Profit & Reports → Governance → Settings.
-// All routes unchanged; no Allocations, Posting Groups, or Ledger Entries in sidebar.
+// Sprint 12: Farm-First Operating System sidebar. Three collapsible groups.
+// All routes and permissions unchanged; only grouping and labels restructured.
 const navigationGroups: NavigationGroup[] = [
   {
-    name: 'Farm',
+    name: 'FARM OPERATIONS',
     items: [
-      { name: 'Dashboard', href: '/app/dashboard', roles: ['tenant_admin', 'accountant', 'operator'] },
+      { name: 'Farm Pulse', href: '/app/farm-pulse', roles: ['tenant_admin', 'accountant', 'operator'] },
+      { name: 'Today', href: '/app/today', roles: ['tenant_admin', 'accountant', 'operator'] },
+      { name: 'Alerts', href: '/app/alerts', roles: ['tenant_admin', 'accountant', 'operator'] },
       { name: 'Land Parcels', href: '/app/land', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'land' },
       { name: 'Land Leases (Maqada)', href: '/app/land-leases', roles: ['tenant_admin'], requiredModuleKey: 'land_leases' },
       { name: 'Crop Cycles', href: '/app/crop-cycles', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Production Units', href: '/app/production-units', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Orchards', href: '/app/orchards', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Livestock', href: '/app/livestock', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
       { name: 'Land Allocation', href: '/app/allocations', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
       { name: 'People & Partners', href: '/app/parties', roles: ['tenant_admin', 'accountant'] },
       { name: 'Projects', href: '/app/projects', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'projects_crop_cycles' },
-      { name: 'Unposted Records', href: '/app/transactions', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: 'Pending Review', href: '/app/transactions', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
       { name: 'Crop Ops', href: '/app/crop-ops', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
       { name: 'Harvests', href: '/app/harvests', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'crop_ops' },
       { name: 'Labour', href: '/app/labour', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'labour' },
@@ -65,27 +71,27 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       { name: 'Inventory', href: '/app/inventory', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'inventory' },
-    ],
-  },
-  {
-    name: 'Sales & Money',
-    items: [
-      { name: 'Sales', href: '/app/sales', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'ar_sales' },
+      { name: 'Sales & Money', href: '/app/sales', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'ar_sales' },
       { name: 'Payments', href: '/app/payments', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_payments' },
       { name: 'Advances', href: '/app/advances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'treasury_advances' },
     ],
   },
   {
-    name: 'Profit & Reports',
+    name: 'FINANCE & REVIEW',
     items: [
-      { name: 'Profit & Loss', href: '/app/reports/profit-loss', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Balance Sheet', href: '/app/reports/balance-sheet', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Trial Balance', href: '/app/reports/trial-balance', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Accounting Overview', href: '/app/dashboard', roles: ['tenant_admin', 'accountant', 'operator'] },
+      { name: 'Review Queue', href: '/app/review-queue', roles: ['tenant_admin', 'accountant'] },
+      { name: 'Account Balances', href: '/app/reports/account-balances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Crop Profitability', href: '/app/reports/crop-profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
+      { name: term('arAgeing'), href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
+      { name: 'Bank Reconciliation', href: '/app/reports/bank-reconciliation', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
+      { name: term('trialBalance'), href: '/app/reports/trial-balance', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'Governance', href: '/app/governance', roles: ['tenant_admin', 'accountant', 'operator'] },
+      { name: term('profitAndLoss'), href: '/app/reports/profit-loss', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: term('balanceSheet'), href: '/app/reports/balance-sheet', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Cashbook', href: '/app/reports/cashbook', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'AR Ageing', href: '/app/reports/ar-ageing', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'ar_sales' },
       { name: 'Project P&L', href: '/app/reports/project-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Crop Cycle P&L', href: '/app/reports/crop-cycle-pl', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Crop Profitability', href: '/app/reports/crop-profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
       { name: 'Profitability Trend', href: '/app/reports/crop-profitability-trend', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'projects_crop_cycles' },
       { name: 'Machinery Profitability', href: '/app/machinery/reports/profitability', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'machinery' },
       { name: 'Sales Margin', href: '/app/reports/sales-margin', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
@@ -94,28 +100,21 @@ const navigationGroups: NavigationGroup[] = [
       { name: 'Party Summary', href: '/app/reports/party-summary', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Party Ageing', href: '/app/reports/role-ageing', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
       { name: 'Reconcile Accounts', href: '/app/reports/reconciliation-dashboard', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Bank Reconciliation', href: '/app/reports/bank-reconciliation', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
-      { name: 'Advanced: Account Balances', href: '/app/reports/account-balances', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Advanced: General Ledger', href: '/app/reports/general-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
-      { name: 'Advanced: General Journal', href: '/app/accounting/journals', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
-    ],
-  },
-  {
-    name: 'Governance',
-    items: [
-      { name: 'Governance Hub', href: '/app/governance', roles: ['tenant_admin', 'accountant', 'operator'] },
+      { name: term('generalLedger'), href: '/app/reports/general-ledger', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'reports' },
+      { name: 'General Journal', href: '/app/accounting/journals', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
       { name: 'Settlement Packs', href: '/app/settlement', roles: ['tenant_admin', 'accountant', 'operator'], requiredModuleKey: 'settlements' },
       { name: 'Accounting Periods', href: '/app/accounting/periods', roles: ['tenant_admin', 'accountant'], requiredModuleKey: 'reports' },
     ],
   },
   {
-    name: 'Settings',
+    name: 'ADMIN',
     items: [
-      { name: 'Localisation', href: '/app/settings/localisation', roles: ['tenant_admin'] },
       { name: 'Farm Profile', href: '/app/admin/farm', roles: ['tenant_admin'] },
       { name: 'Users', href: '/app/admin/users', roles: ['tenant_admin'] },
       { name: 'Roles', href: '/app/admin/roles', roles: ['tenant_admin'] },
       { name: 'Modules', href: '/app/admin/modules', roles: ['tenant_admin'] },
+      { name: 'Farm Integrity', href: '/app/internal/farm-integrity', roles: ['tenant_admin'] },
+      { name: 'Localisation', href: '/app/settings/localisation', roles: ['tenant_admin'] },
     ],
   },
 ];
@@ -194,9 +193,10 @@ export function AppLayout() {
     });
   };
 
-  // Track expanded groups - initialize with groups that contain the active route
+  // Track expanded groups - FARM OPERATIONS default expanded; also expand group containing active route
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
     const active = new Set<string>();
+    active.add('FARM OPERATIONS');
     navigationGroups.forEach((group) => {
       const hasActiveItem = group.items.some((item) => {
         if (isSubmenuParent(item)) {

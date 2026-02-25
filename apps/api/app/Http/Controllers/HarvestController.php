@@ -40,6 +40,9 @@ class HarvestController extends Controller
         if ($request->filled('to')) {
             $query->where('harvest_date', '<=', $request->to);
         }
+        if ($request->filled('production_unit_id')) {
+            $query->where('production_unit_id', $request->production_unit_id);
+        }
 
         $harvests = $query->orderBy('harvest_date', 'desc')->orderBy('created_at', 'desc')->get();
         return response()->json($harvests);
@@ -53,6 +56,7 @@ class HarvestController extends Controller
             'harvest_no' => 'nullable|string|max:255',
             'crop_cycle_id' => 'required|uuid|exists:crop_cycles,id',
             'project_id' => 'required|uuid|exists:projects,id',
+            'production_unit_id' => 'nullable|uuid|exists:production_units,id',
             'harvest_date' => 'required|date|date_format:Y-m-d',
             'notes' => 'nullable|string',
         ]);
@@ -67,12 +71,16 @@ class HarvestController extends Controller
         if ($project->crop_cycle_id !== $request->crop_cycle_id) {
             return response()->json(['errors' => ['project_id' => ['Project must belong to the selected crop cycle.']]], 422);
         }
+        if ($request->filled('production_unit_id')) {
+            \App\Models\ProductionUnit::where('id', $request->production_unit_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
 
         $harvest = $this->harvestService->create([
             'tenant_id' => $tenantId,
             'harvest_no' => $request->harvest_no,
             'crop_cycle_id' => $request->crop_cycle_id,
             'project_id' => $request->project_id,
+            'production_unit_id' => $request->production_unit_id,
             'harvest_date' => $request->harvest_date,
             'notes' => $request->notes,
         ]);
@@ -98,6 +106,7 @@ class HarvestController extends Controller
         $validator = Validator::make($request->all(), [
             'harvest_no' => 'nullable|string|max:255',
             'project_id' => 'nullable|uuid|exists:projects,id',
+            'production_unit_id' => 'nullable|uuid|exists:production_units,id',
             'harvest_date' => 'sometimes|required|date|date_format:Y-m-d',
             'notes' => 'nullable|string',
         ]);
@@ -112,8 +121,11 @@ class HarvestController extends Controller
                 return response()->json(['errors' => ['project_id' => ['Project must belong to the harvest\'s crop cycle.']]], 422);
             }
         }
+        if ($request->filled('production_unit_id')) {
+            \App\Models\ProductionUnit::where('id', $request->production_unit_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
 
-        $data = $request->only(['harvest_no', 'project_id', 'harvest_date', 'notes']);
+        $data = $request->only(['harvest_no', 'project_id', 'production_unit_id', 'harvest_date', 'notes']);
         $data = array_filter($data, fn ($v) => $v !== null);
 
         try {

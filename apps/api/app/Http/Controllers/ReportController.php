@@ -2737,6 +2737,7 @@ class ReportController extends Controller
             'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
             'group_by' => ['nullable', 'string', 'in:crop,category,cycle'],
             'include_unassigned' => ['nullable', 'boolean'],
+            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
@@ -2746,8 +2747,12 @@ class ReportController extends Controller
         $to = $request->input('to');
         $groupBy = $request->input('group_by', 'crop');
         $includeUnassigned = filter_var($request->input('include_unassigned'), FILTER_VALIDATE_BOOLEAN);
+        $productionUnitId = $request->input('production_unit_id');
+        if ($productionUnitId && !\App\Models\ProductionUnit::where('id', $productionUnitId)->where('tenant_id', $tenantId)->exists()) {
+            return response()->json(['errors' => ['production_unit_id' => ['Production unit not found or access denied.']]], 422);
+        }
 
-        $cycleRows = $this->buildCycleFinancials($tenantId, $from, $to, $includeUnassigned);
+        $cycleRows = $this->buildCycleFinancials($tenantId, $from, $to, $includeUnassigned, $productionUnitId);
 
         $acresByCycle = DB::table('land_allocations')
             ->select('crop_cycle_id', DB::raw('SUM(allocated_acres) as acres'))
@@ -2790,6 +2795,105 @@ class ReportController extends Controller
                 'revenue_per_acre' => $totalAcres > 0 ? number_format($totalRevenue / $totalAcres, 2, '.', '') : null,
                 'margin_per_acre' => $totalAcres > 0 ? number_format($totalMargin / $totalAcres, 2, '.', '') : null,
             ],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/production-unit-summary
+     * Cost, revenue and margin totals for a single production unit over a date range.
+     * Reuses same logic as crop profitability filtered by production_unit_id.
+     */
+    public function productionUnitSummary(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'production_unit_id' => ['required', 'uuid', 'exists:production_units,id'],
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $productionUnitId = $request->input('production_unit_id');
+        if (!\App\Models\ProductionUnit::where('id', $productionUnitId)->where('tenant_id', $tenantId)->exists()) {
+            return response()->json(['errors' => ['production_unit_id' => ['Production unit not found or access denied.']]], 422);
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        $cycleRows = $this->buildCycleFinancials($tenantId, $from, $to, true, $productionUnitId);
+
+        $totalCost = 0.0;
+        $totalRevenue = 0.0;
+        foreach ($cycleRows as $row) {
+            $totalCost += (float) $row->cost;
+            $totalRevenue += (float) $row->revenue;
+        }
+        $totalMargin = $totalRevenue - $totalCost;
+
+        return response()->json([
+            'production_unit_id' => $productionUnitId,
+            'from' => $from,
+            'to' => $to,
+            'cost' => number_format($totalCost, 2, '.', ''),
+            'revenue' => number_format($totalRevenue, 2, '.', ''),
+            'margin' => number_format($totalMargin, 2, '.', ''),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/livestock-unit-status
+     * Headcount as of date and optional last 30 days event summary.
+     */
+    public function livestockUnitStatus(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'production_unit_id' => ['required', 'uuid', 'exists:production_units,id'],
+            'as_of' => ['required', 'date', 'date_format:Y-m-d'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $productionUnitId = $request->input('production_unit_id');
+        $asOf = $request->input('as_of');
+
+        $unit = \App\Models\ProductionUnit::where('id', $productionUnitId)
+            ->where('tenant_id', $tenantId)
+            ->first();
+        if (!$unit || $unit->category !== \App\Models\ProductionUnit::CATEGORY_LIVESTOCK) {
+            return response()->json(['errors' => ['production_unit_id' => ['Production unit not found or is not a livestock unit.']]], 422);
+        }
+
+        $herdStart = (int) ($unit->herd_start_count ?? 0);
+        $eventSum = \App\Models\LivestockEvent::where('production_unit_id', $productionUnitId)
+            ->where('tenant_id', $tenantId)
+            ->where('event_date', '<=', $asOf)
+            ->sum('quantity');
+        $headcountAsOf = $herdStart + (int) $eventSum;
+
+        $from30 = date('Y-m-d', strtotime($asOf . ' -30 days'));
+        $last30ByType = \App\Models\LivestockEvent::where('production_unit_id', $productionUnitId)
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('event_date', [$from30, $asOf])
+            ->selectRaw('event_type, SUM(quantity) as total')
+            ->groupBy('event_type')
+            ->get()
+            ->mapWithKeys(function ($row) {
+                return [$row->event_type => (int) $row->total];
+            })
+            ->all();
+
+        return response()->json([
+            'production_unit_id' => $productionUnitId,
+            'as_of' => $asOf,
+            'headcount_as_of' => $headcountAsOf,
+            'last_30_days_by_type' => $last30ByType,
         ]);
     }
 
@@ -3042,11 +3146,38 @@ class ReportController extends Controller
     /**
      * Build cycle-level financials: cost (expense) and revenue (income) per crop_cycle_id.
      * Merges two queries (cost by cycle, revenue by cycle) keyed by crop_cycle_id.
+     * Optional production_unit_id: restrict to posting_groups from operational records with that production_unit_id.
      *
      * @return \Illuminate\Support\Collection<int, object>
      */
-    private function buildCycleFinancials(string $tenantId, string $from, string $to, bool $includeUnassigned)
+    private function buildCycleFinancials(string $tenantId, string $from, string $to, bool $includeUnassigned, ?string $productionUnitId = null)
     {
+        $pgIdSubquery = null;
+        if ($productionUnitId) {
+            $pgIds = DB::table('crop_activities')
+                ->where('tenant_id', $tenantId)
+                ->where('production_unit_id', $productionUnitId)
+                ->whereNotNull('posting_group_id')
+                ->pluck('posting_group_id')
+                ->merge(
+                    DB::table('lab_work_logs')->where('tenant_id', $tenantId)->where('production_unit_id', $productionUnitId)->whereNotNull('posting_group_id')->pluck('posting_group_id')
+                )
+                ->merge(
+                    DB::table('inv_issues')->where('tenant_id', $tenantId)->where('production_unit_id', $productionUnitId)->whereNotNull('posting_group_id')->pluck('posting_group_id')
+                )
+                ->merge(
+                    DB::table('harvests')->where('tenant_id', $tenantId)->where('production_unit_id', $productionUnitId)->whereNotNull('posting_group_id')->pluck('posting_group_id')
+                )
+                ->merge(
+                    DB::table('sales')->where('tenant_id', $tenantId)->where('production_unit_id', $productionUnitId)->whereNotNull('posting_group_id')->pluck('posting_group_id')
+                )
+                ->unique()
+                ->filter()
+                ->values()
+                ->all();
+            $pgIdSubquery = $pgIds;
+        }
+
         $baseSelect = "
             posting_groups.crop_cycle_id as crop_cycle_id,
             cc.name as crop_cycle_name,
@@ -3081,6 +3212,12 @@ class ReportController extends Controller
         if (!$includeUnassigned) {
             $costByCycle->whereNotNull('posting_groups.crop_cycle_id');
         }
+        if ($pgIdSubquery !== null) {
+            if (count($pgIdSubquery) === 0) {
+                return collect([]);
+            }
+            $costByCycle->whereIn('posting_groups.id', $pgIdSubquery);
+        }
         ReportingQuery::applyTenant($costByCycle, $tenantId);
         ReportingQuery::applyExcludeReversals($costByCycle);
         $costRows = $costByCycle->get();
@@ -3097,6 +3234,9 @@ class ReportController extends Controller
             ->groupBy($groupByCols);
         if (!$includeUnassigned) {
             $revenueByCycle->whereNotNull('posting_groups.crop_cycle_id');
+        }
+        if ($pgIdSubquery !== null && count($pgIdSubquery) > 0) {
+            $revenueByCycle->whereIn('posting_groups.id', $pgIdSubquery);
         }
         ReportingQuery::applyTenant($revenueByCycle, $tenantId);
         ReportingQuery::applyExcludeReversals($revenueByCycle);

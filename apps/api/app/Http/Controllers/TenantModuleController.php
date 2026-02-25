@@ -10,6 +10,7 @@ use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class TenantModuleController extends Controller
 {
@@ -33,7 +34,8 @@ class TenantModuleController extends Controller
 
         $modules = Module::orderBy('sort_order')->orderBy('name')->get();
         $effectiveEnabled = $this->moduleDependencies->getEffectiveEnabledModulesForTenant($tenantId);
-        $userId = $request->attributes->get('user_id') ?? $request->header('X-User-Id');
+        $userIdRaw = $request->attributes->get('user_id') ?? $request->header('X-User-Id');
+        $userId = ($userIdRaw !== null && $userIdRaw !== '' && Str::isUuid($userIdRaw)) ? $userIdRaw : null;
 
         // TEMP: skip self-heal when force-all-modules so we don't write tenant_modules for every module.
         if (! filter_var(env('FORCE_ALL_MODULES_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
@@ -110,7 +112,8 @@ class TenantModuleController extends Controller
             return response()->json(['error' => 'Tenant not found'], 404);
         }
 
-        $userId = $request->attributes->get('user_id') ?? $request->header('X-User-Id');
+        $userIdRaw = $request->attributes->get('user_id') ?? $request->header('X-User-Id');
+        $userId = ($userIdRaw !== null && $userIdRaw !== '' && Str::isUuid($userIdRaw)) ? $userIdRaw : null;
         $payload = $request->validated('modules');
 
         $moduleKeys = collect($payload)->pluck('key')->all();

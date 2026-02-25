@@ -17,6 +17,7 @@ class StoreSaleRequest extends FormRequest
             'buyer_party_id' => ['required', 'uuid', 'exists:parties,id'],
             'project_id' => ['nullable', 'uuid', 'exists:projects,id'],
             'crop_cycle_id' => ['nullable', 'uuid', 'exists:crop_cycles,id'],
+            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'posting_date' => ['required', 'date', 'date_format:Y-m-d'],
             'sale_no' => ['nullable', 'string', 'max:255'],

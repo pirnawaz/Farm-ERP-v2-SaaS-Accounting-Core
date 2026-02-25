@@ -17,6 +17,8 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
 import type { UpdateInvGrnPayload } from '../../types';
+import { Term } from '../../components/Term';
+import { term } from '../../config/terminology';
 
 type Line = { item_id: string; qty: string; unit_cost: string };
 
@@ -107,7 +109,7 @@ export default function InvGrnDetailPage() {
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-  if (!grn) return <div>GRN not found.</div>;
+  if (!grn) return <div>{term('grnSingular')} not found.</div>;
 
   const lineTotals = (grn.lines || []).map((l) => parseFloat(String(l.qty)) * parseFloat(String(l.unit_cost)));
   const total = lineTotals.reduce((a, b) => a + b, 0);
@@ -115,12 +117,12 @@ export default function InvGrnDetailPage() {
   return (
     <div>
       <PageHeader
-        title={`GRN ${grn.doc_no}`}
+        title={`${term('grnSingular')} ${grn.doc_no}`}
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
-          { label: 'GRNs', to: '/app/inventory/grns' },
+          { label: term('grn'), to: '/app/inventory/grns' },
           { label: grn.doc_no },
         ]}
       />
@@ -139,7 +141,7 @@ export default function InvGrnDetailPage() {
           {grn.supplier && <div><dt className="text-sm text-gray-500">Supplier</dt><dd>{grn.supplier.name}</dd></div>}
           {grn.posting_group_id && (
             <div className="md:col-span-2">
-              <dt className="text-sm text-gray-500">Posting Group</dt>
+              <dt className="text-sm text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd><Link to={`/app/posting-groups/${grn.posting_group_id}`} className="text-[#1F6F5C]">{grn.posting_group_id}</Link></dd>
             </div>
           )}
@@ -190,7 +192,7 @@ export default function InvGrnDetailPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
-            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
+            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
           </div>
         </div>
       ) : (
@@ -210,28 +212,28 @@ export default function InvGrnDetailPage() {
 
       {isPosted && canPost && (
         <div className="mb-6">
-          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button>
+          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
         </div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title="Post GRN">
+      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={`${term('postAction')} ${term('grnSingular')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowPostModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>
+            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">{postM.isPending ? term('postActionPending') : term('postAction')}</button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title="Reverse GRN">
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={`${term('reverseAction')} ${term('grnSingular')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Reason" required><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowReverseModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button>
+            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">{reverseM.isPending ? term('reverseActionPending') : term('reverseAction')}</button>
           </div>
         </div>
       </Modal>

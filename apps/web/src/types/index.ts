@@ -208,6 +208,93 @@ export interface CropCycleClosePreview {
   blocking_reasons: string[];
 }
 
+// Production Unit (long-duration crops e.g. Sugarcane)
+export type ProductionUnitType = 'SEASONAL' | 'LONG_CYCLE';
+export type ProductionUnitStatus = 'ACTIVE' | 'CLOSED';
+
+export interface ProductionUnit {
+  id: string;
+  tenant_id: string;
+  name: string;
+  type: ProductionUnitType;
+  start_date: string;
+  end_date?: string | null;
+  status: ProductionUnitStatus;
+  notes?: string | null;
+  category?: string | null;
+  orchard_crop?: string | null;
+  planting_year?: number | null;
+  area_acres?: string | null;
+  tree_count?: number | null;
+  livestock_type?: string | null;
+  herd_start_count?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProductionUnitPayload {
+  name: string;
+  type: ProductionUnitType;
+  start_date: string;
+  end_date?: string | null;
+  status?: ProductionUnitStatus;
+  notes?: string | null;
+  category?: string | null;
+  orchard_crop?: string | null;
+  planting_year?: number | null;
+  area_acres?: number | string | null;
+  tree_count?: number | null;
+  livestock_type?: string | null;
+  herd_start_count?: number | null;
+}
+
+export interface ProductionUnitSummaryResponse {
+  production_unit_id: string;
+  from: string;
+  to: string;
+  cost: string;
+  revenue: string;
+  margin: string;
+}
+
+// Livestock
+export type LivestockEventType = 'PURCHASE' | 'SALE' | 'BIRTH' | 'DEATH' | 'ADJUSTMENT';
+
+export interface LivestockEvent {
+  id: string;
+  tenant_id: string;
+  production_unit_id: string;
+  event_date: string;
+  event_type: LivestockEventType;
+  quantity: number;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  production_unit?: ProductionUnit;
+}
+
+export interface CreateLivestockEventPayload {
+  production_unit_id: string;
+  event_date: string;
+  event_type: LivestockEventType;
+  quantity: number;
+  notes?: string | null;
+}
+
+export interface UpdateLivestockEventPayload {
+  event_date?: string;
+  event_type?: LivestockEventType;
+  quantity?: number;
+  notes?: string | null;
+}
+
+export interface LivestockUnitStatusResponse {
+  production_unit_id: string;
+  as_of: string;
+  headcount_as_of: number;
+  last_30_days_by_type: Record<string, number>;
+}
+
 // Land Allocation
 // Rotation warning (crop rotation on same parcel)
 export interface RotationWarning {
@@ -626,6 +713,7 @@ export interface CreateLabWorkLogPayload {
   work_date: string;
   crop_cycle_id: string;
   project_id: string;
+  production_unit_id?: string;
   activity_id?: string;
   rate_basis: LabRateBasis;
   units: number;
@@ -639,6 +727,7 @@ export interface UpdateLabWorkLogPayload {
   work_date?: string;
   crop_cycle_id?: string;
   project_id?: string;
+  production_unit_id?: string | null;
   activity_id?: string | null;
   machine_id?: string | null;
   rate_basis?: LabRateBasis;
@@ -1187,6 +1276,7 @@ export interface CreateCropActivityPayload {
   activity_date: string;
   crop_cycle_id: string;
   project_id: string;
+  production_unit_id?: string | null;
   land_parcel_id?: string | null;
   notes?: string | null;
   inputs?: { store_id: string; item_id: string; qty: number }[];
@@ -1263,6 +1353,7 @@ export interface CreateHarvestPayload {
   harvest_no?: string | null;
   crop_cycle_id: string;
   project_id: string;
+  production_unit_id?: string | null;
   harvest_date: string;
   notes?: string | null;
 }
@@ -1270,6 +1361,7 @@ export interface CreateHarvestPayload {
 export interface UpdateHarvestPayload {
   harvest_no?: string | null;
   project_id?: string | null;
+  production_unit_id?: string | null;
   harvest_date?: string;
   notes?: string | null;
 }
@@ -1393,6 +1485,7 @@ export interface CreateSalePayload {
   buyer_party_id: string;
   project_id?: string;
   crop_cycle_id?: string;
+  production_unit_id?: string;
   amount: string;
   posting_date: string;
   sale_no?: string;
@@ -2043,6 +2136,7 @@ export interface CreateInvIssuePayload {
   store_id: string;
   crop_cycle_id: string;
   project_id: string;
+  production_unit_id?: string;
   activity_id?: string;
   doc_date: string;
   lines: { item_id: string; qty: number | string }[];
@@ -2053,6 +2147,7 @@ export interface UpdateInvIssuePayload {
   store_id?: string;
   crop_cycle_id?: string;
   project_id?: string;
+  production_unit_id?: string;
   activity_id?: string;
   machine_id?: string;
   doc_date?: string;

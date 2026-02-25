@@ -12,6 +12,7 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import { v4 as uuidv4 } from 'uuid';
+import { Term } from '../../components/Term';
 
 export default function MaintenanceJobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -159,7 +160,7 @@ export default function MaintenanceJobDetailPage() {
           )}
           {job.posting_group_id && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${job.posting_group_id}`}
@@ -172,7 +173,7 @@ export default function MaintenanceJobDetailPage() {
           )}
           {job.reversal_posting_group_id && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Reversal Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="reversalPostingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${job.reversal_posting_group_id}`}

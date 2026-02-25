@@ -32,6 +32,7 @@ class StoreCropActivityRequest extends FormRequest
                     }
                 },
             ],
+            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
             'land_parcel_id' => ['nullable', 'uuid', 'exists:land_parcels,id'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'inputs' => ['nullable', 'array'],

@@ -7,6 +7,7 @@ import { useFormatting } from '../hooks/useFormatting';
 import { useParties } from '../hooks/useParties';
 import { PrintableReport } from '../components/print/PrintableReport';
 import type { PartyLedgerResponse, Party, Project, CropCycle } from '../types';
+import { Term } from '../components/Term';
 
 function PartyLedgerPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -203,7 +204,7 @@ function PartyLedgerPage() {
                       Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Posting Group
+                      <Term k="postingGroup" showHint />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Source Type
@@ -227,7 +228,7 @@ function PartyLedgerPage() {
                     <tr>
                       <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                         {filters.party_id
-                          ? 'No ledger entries in this period'
+                          ? 'No accounting lines in this period'
                           : 'Select a party and date range'}
                       </td>
                     </tr>
@@ -305,7 +306,7 @@ function PartyLedgerPage() {
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Posting Group
+                    <Term k="postingGroup" showHint />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Source Type

@@ -11,6 +11,7 @@ import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
+import { Term } from '../../components/Term';
 export default function ChargeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { formatMoney, formatDate } = useFormatting();
@@ -198,7 +199,7 @@ export default function ChargeDetailPage() {
           )}
           {charge.posting_group_id && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${charge.posting_group_id}`}
@@ -211,7 +212,7 @@ export default function ChargeDetailPage() {
           )}
           {charge.reversal_posting_group_id && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Reversal Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="reversalPostingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${charge.reversal_posting_group_id}`}

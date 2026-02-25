@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { term } from '../../config/terminology';
 import type { CropActivityType } from '../../types';
 
 export default function ActivityTypesPage() {
@@ -49,16 +50,16 @@ export default function ActivityTypesPage() {
   return (
     <div>
       <PageHeader
-        title="Crop Ops → Activity Types"
+        title={`Crop Ops → ${term('activityType')}`}
         backTo="/app/crop-ops"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Crop Ops', to: '/app/crop-ops' }, { label: 'Activity Types' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Crop Ops', to: '/app/crop-ops' }, { label: term('activityType') }]}
         right={
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
-            New Type
+            New {term('activityTypeSingular')}
           </button>
         }
       />
-      <p className="text-sm text-gray-500 mb-4">Activity types represent operations like ploughing, sowing, spraying.</p>
+      <p className="text-sm text-gray-500 mb-4">{term('activityType')} represent operations like ploughing, sowing, spraying.</p>
       <div className="flex gap-4 mb-4 flex-wrap">
         <select
           value={String(isActiveFilter)}
@@ -71,9 +72,9 @@ export default function ActivityTypesPage() {
         </select>
       </div>
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={types || []} columns={cols} emptyMessage="No activity types. Create one." />
+        <DataTable data={types || []} columns={cols} emptyMessage={`No ${term('activityType').toLowerCase()}. Create one.`} />
       </div>
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Activity Type">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={`New ${term('activityTypeSingular')}`}>
         <div className="space-y-4">
           <p className="text-sm text-gray-500">e.g. Ploughing, Sowing, Fertilizer, Spraying…</p>
           <FormField label="Name" required>

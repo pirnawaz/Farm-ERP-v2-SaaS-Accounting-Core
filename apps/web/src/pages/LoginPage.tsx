@@ -296,7 +296,7 @@ export default function LoginPage() {
                               type="button"
                               onClick={() => handleBootstrapAccounts(tenant.id)}
                               disabled={bootstrappingId !== null}
-                              title="Add missing system accounts (e.g. for GRN post)"
+                              title="Add missing system accounts (e.g. for posting supplies received)"
                               className="px-3 py-1 rounded text-sm font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {bootstrappingId === tenant.id ? '…' : 'Bootstrap accounts'}

@@ -52,6 +52,9 @@ class InvIssueController extends Controller
         if ($request->filled('machine_id')) {
             Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
+        if ($request->filled('production_unit_id')) {
+            \App\Models\ProductionUnit::where('id', $request->production_unit_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
         foreach ($request->lines as $l) {
             InvItem::where('id', $l['item_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
@@ -70,6 +73,7 @@ class InvIssueController extends Controller
             'store_id' => $request->store_id,
             'crop_cycle_id' => $request->crop_cycle_id,
             'project_id' => $request->project_id,
+            'production_unit_id' => $request->production_unit_id,
             'activity_id' => $request->activity_id,
             'machine_id' => $request->machine_id,
             'doc_date' => $request->doc_date,
@@ -121,7 +125,7 @@ class InvIssueController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $issue = InvIssue::where('id', $id)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
 
-        $data = $request->only(['doc_no', 'store_id', 'crop_cycle_id', 'project_id', 'activity_id', 'machine_id', 'doc_date', 'allocation_mode', 'hari_id', 'sharing_rule_id', 'landlord_share_pct', 'hari_share_pct']);
+        $data = $request->only(['doc_no', 'store_id', 'crop_cycle_id', 'project_id', 'production_unit_id', 'activity_id', 'machine_id', 'doc_date', 'allocation_mode', 'hari_id', 'sharing_rule_id', 'landlord_share_pct', 'hari_share_pct']);
         $data = array_filter($data, fn ($v) => $v !== null && $v !== '');
         if (isset($data['doc_no']) && $data['doc_no'] === '') {
             unset($data['doc_no']);
@@ -131,6 +135,12 @@ class InvIssueController extends Controller
         }
         if ($request->has('machine_id') && $request->machine_id === null) {
             $data['machine_id'] = null;
+        }
+        if ($request->has('production_unit_id')) {
+            $data['production_unit_id'] = $request->production_unit_id ?: null;
+        }
+        if (isset($data['production_unit_id']) && $data['production_unit_id']) {
+            \App\Models\ProductionUnit::where('id', $data['production_unit_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
         if ($request->filled('machine_id')) {
             Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();

@@ -76,6 +76,9 @@ class CropActivityController extends Controller
         if ($request->land_parcel_id) {
             LandParcel::where('id', $request->land_parcel_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
+        if ($request->filled('production_unit_id')) {
+            \App\Models\ProductionUnit::where('id', $request->production_unit_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
 
         $inputs = $request->input('inputs', []);
         $labour = $request->input('labour', []);
@@ -95,6 +98,7 @@ class CropActivityController extends Controller
             'activity_date' => $request->activity_date,
             'crop_cycle_id' => $request->crop_cycle_id,
             'project_id' => $request->project_id,
+            'production_unit_id' => $request->production_unit_id,
             'land_parcel_id' => $request->land_parcel_id,
             'notes' => $request->notes,
             'status' => 'DRAFT',
@@ -139,10 +143,16 @@ class CropActivityController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $activity = CropActivity::where('id', $id)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
 
-        $data = $request->only(['doc_no', 'activity_type_id', 'activity_date', 'crop_cycle_id', 'project_id', 'land_parcel_id', 'notes']);
+        $data = $request->only(['doc_no', 'activity_type_id', 'activity_date', 'crop_cycle_id', 'project_id', 'production_unit_id', 'land_parcel_id', 'notes']);
         $data = array_filter($data, fn ($v) => $v !== null);
         if ($request->has('land_parcel_id') && $request->land_parcel_id === null) {
             $data['land_parcel_id'] = null;
+        }
+        if ($request->has('production_unit_id')) {
+            $data['production_unit_id'] = $request->production_unit_id ?: null;
+        }
+        if (isset($data['production_unit_id']) && $data['production_unit_id']) {
+            \App\Models\ProductionUnit::where('id', $data['production_unit_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
         $activity->update($data);
 

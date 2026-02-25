@@ -10,6 +10,8 @@ import { useRole } from '../hooks/useRole';
 import { useCropCycles } from '../hooks/useCropCycles';
 import { useFormatting } from '../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
+import { Term } from '../components/Term';
+import { term } from '../config/terminology';
 
 export default function PaymentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -156,7 +158,7 @@ export default function PaymentDetailPage() {
           )}
           {payment.posting_group_id && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link to={`/app/posting-groups/${payment.posting_group_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
                   {payment.posting_group_id}
@@ -173,7 +175,7 @@ export default function PaymentDetailPage() {
           {payment.reversal_posting_group_id && (
             <>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Reversal Posting Group</dt>
+                <dt className="text-sm font-medium text-gray-500"><Term k="reversalPostingGroup" showHint /></dt>
                 <dd className="text-sm text-gray-900">
                   <Link to={`/app/posting-groups/${payment.reversal_posting_group_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
                     {payment.reversal_posting_group_id}
@@ -249,7 +251,7 @@ export default function PaymentDetailPage() {
                   onClick={() => setShowPostModal(true)}
                   className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
                 >
-                  Post
+                  {term('postAction')}
                 </button>
               )}
             </>
@@ -259,13 +261,13 @@ export default function PaymentDetailPage() {
               onClick={() => setShowReverseModal(true)}
               className="px-4 py-2 border border-amber-600 text-amber-700 rounded-md hover:bg-amber-50"
             >
-              Reverse
+              {term('reverseAction')}
             </button>
           )}
         </div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title="Post Payment">
+      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={term('postAction')}>
         <div className="space-y-4">
           <FormField label="Posting Date" required>
             <input
@@ -311,16 +313,16 @@ export default function PaymentDetailPage() {
               disabled={postMutation.isPending || (!payment.settlement_id && !cropCycleId)}
               className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
-              {postMutation.isPending ? 'Posting...' : 'Post'}
+              {postMutation.isPending ? term('postActionPending') : term('postAction')}
             </button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title="Reverse Payment">
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={term('reverseAction')}>
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            This will create a reversal posting group that negates the original ledger entries. The original payment and posting group will not be changed.
+            This will create a reversal transaction that negates the original accounting lines. The original payment and posted transaction will not be changed.
           </p>
           <FormField label="Posting Date" required>
             <input
@@ -351,7 +353,7 @@ export default function PaymentDetailPage() {
               disabled={reverseMutation.isPending}
               className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
             >
-              {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}
+              {reverseMutation.isPending ? term('reverseActionPending') : term('reverseAction')}
             </button>
           </div>
         </div>

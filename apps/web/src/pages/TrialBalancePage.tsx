@@ -4,6 +4,7 @@ import { exportToCSV } from '../utils/csvExport'
 import { useFormatting } from '../hooks/useFormatting'
 import { useTenantSettings } from '../hooks/useTenantSettings'
 import { PrintableReport } from '../components/print/PrintableReport'
+import { term } from '../config/terminology'
 
 function TrialBalancePage() {
   const { formatMoney, formatDate } = useFormatting()
@@ -73,7 +74,7 @@ function TrialBalancePage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center no-print">
-        <h2 className="text-2xl font-bold" data-testid="report-heading-trial-balance">Trial Balance</h2>
+        <h2 className="text-2xl font-bold" data-testid="report-heading-trial-balance">{term('trialBalance')}</h2>
         <div className="flex gap-2">
           <button
             onClick={() => window.print()}
@@ -241,7 +242,7 @@ function TrialBalancePage() {
 
           {/* Print view */}
           <PrintableReport
-            title="Trial Balance"
+            title={term('trialBalance')}
             metaLeft={`From ${formatDate(filters.from)} to ${formatDate(filters.to)}`}
           >
             <table className="w-full divide-y divide-gray-200">

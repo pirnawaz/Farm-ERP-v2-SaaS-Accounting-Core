@@ -126,7 +126,7 @@ export default function SettlementPage() {
       const postingGroupId = result.posting_group?.id || result.posting_group_id || 'N/A';
       
       toast.success(
-        `Settlement posted successfully. Settlement ID: ${settlementId}, Posting Group: ${postingGroupId}.${offsetMessage}`
+        `Posted successfully. Settlement ID: ${settlementId}, Transaction ID: ${postingGroupId}.${offsetMessage}`
       );
       setShowPostModal(false);
       setPreview(null);

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { PostingGroup, apiClient } from '@farm-erp/shared'
 import { useFormatting } from '../hooks/useFormatting'
+import { term } from '../config/terminology'
+import { Term } from '../components/Term'
 
 function PostingGroupDetailPage() {
   const { id } = useParams()
@@ -23,7 +25,7 @@ function PostingGroupDetailPage() {
         const data = await apiClient.get<PostingGroup>(`/api/posting-groups/${id}`)
         setPostingGroup(data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch posting group')
+        setError(err instanceof Error ? err.message : 'Failed to fetch')
       } finally {
         setLoading(false)
       }
@@ -58,13 +60,13 @@ function PostingGroupDetailPage() {
   }
 
   if (loading) {
-    return <div className="text-gray-600">Loading posting group...</div>
+    return <div className="text-gray-600">Loading…</div>
   }
 
   if (error || !postingGroup) {
     return (
       <div className="bg-red-50 border border-red-200 rounded p-4">
-        <p className="text-red-800">{error || 'Posting group not found'}</p>
+        <p className="text-red-800">{error || 'Not found'}</p>
         <Link to="/daily-book-entries" className="text-[#1F6F5C] hover:underline mt-2 inline-block">
           Back to Entries
         </Link>
@@ -75,7 +77,7 @@ function PostingGroupDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Posting Group Details</h2>
+        <h2 className="text-2xl font-bold"><Term k="postingGroup" showHint /> Details</h2>
         <Link
           to="/daily-book-entries"
           className="text-[#1F6F5C] hover:text-[#1a5a4a]"
@@ -87,7 +89,7 @@ function PostingGroupDetailPage() {
       {/* Posting Group Info */}
       <div className="bg-white rounded-lg shadow p-6" data-testid="posting-group-panel">
         <div className="flex justify-between items-start mb-4">
-          <h3 className="text-lg font-semibold">Posting Group Information</h3>
+          <h3 className="text-lg font-semibold"><Term k="postingGroup" showHint /> Information</h3>
           {postingGroup.source_type !== 'REVERSAL' && (
             <button
               type="button"
@@ -95,7 +97,7 @@ function PostingGroupDetailPage() {
               onClick={() => setShowReverseModal(true)}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
-              Reverse
+              {term('reverseAction')}
             </button>
           )}
         </div>
@@ -147,7 +149,7 @@ function PostingGroupDetailPage() {
       {/* Allocation Rows */}
       <div className="bg-white rounded-lg shadow overflow-hidden" data-testid="allocation-rows-table">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold">Allocation Rows</h3>
+          <h3 className="text-lg font-semibold"><Term k="allocationRows" showHint /></h3>
         </div>
         {postingGroup.allocation_rows && postingGroup.allocation_rows.length > 0 ? (
           <div className="overflow-x-auto">
@@ -206,14 +208,14 @@ function PostingGroupDetailPage() {
             </table>
           </div>
         ) : (
-          <div className="px-6 py-4 text-sm text-gray-500">No allocation rows</div>
+          <div className="px-6 py-4 text-sm text-gray-500">No {term('allocationRows').toLowerCase()}</div>
         )}
       </div>
 
       {/* Ledger Entries */}
       <div className="bg-white rounded-lg shadow overflow-hidden" data-testid="ledger-entries-table">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold">Ledger Entries</h3>
+          <h3 className="text-lg font-semibold"><Term k="ledgerEntries" showHint /></h3>
         </div>
         {postingGroup.ledger_entries && postingGroup.ledger_entries.length > 0 ? (
           <table className="min-w-full divide-y divide-gray-200">
@@ -270,7 +272,7 @@ function PostingGroupDetailPage() {
             </tbody>
           </table>
         ) : (
-          <div className="px-6 py-4 text-sm text-gray-500">No ledger entries</div>
+          <div className="px-6 py-4 text-sm text-gray-500">No {term('ledgerEntries').toLowerCase()}</div>
         )}
       </div>
 
@@ -278,7 +280,7 @@ function PostingGroupDetailPage() {
       {showReverseModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Reverse Posting Group</h3>
+            <h3 className="text-lg font-semibold mb-4"><Term k="reversalPostingGroup" showHint /></h3>
             <form onSubmit={handleReverse}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -322,7 +324,7 @@ function PostingGroupDetailPage() {
                   className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                   disabled={reversing}
                 >
-                  {reversing ? 'Reversing...' : 'Reverse'}
+                  {reversing ? term('reverseActionPending') : term('reverseAction')}
                 </button>
               </div>
             </form>

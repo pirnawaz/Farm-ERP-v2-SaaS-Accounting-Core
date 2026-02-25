@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DataTable, type Column } from '../components/DataTable';
 import { useFormatting } from '../hooks/useFormatting';
 import type { ARAgeingReport } from '../types';
+import { term } from '../config/terminology';
 
 export default function ARAgeingPage() {
   const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -42,7 +43,7 @@ export default function ARAgeingPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">AR Ageing Report</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{term('arAgeing')} Report</h1>
         <p className="text-sm text-gray-600 mt-1">
           Shows outstanding receivables grouped by ageing buckets
         </p>
@@ -64,7 +65,7 @@ export default function ARAgeingPage() {
         <div className="bg-white rounded-lg shadow">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">
-              AR Ageing as of {formatDate(report.as_of)}
+              {term('arAgeing')} as of {formatDate(report.as_of)}
             </h2>
             
             {report.rows && report.rows.length > 0 ? (

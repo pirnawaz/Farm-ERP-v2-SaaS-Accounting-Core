@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useBalanceSheet } from '../../hooks/useReports';
+import { term } from '../../config/terminology';
 
 const defaultAsOf = () => new Date().toISOString().split('T')[0];
 
@@ -20,8 +21,8 @@ export default function BalanceSheetPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Balance Sheet"
-        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: 'Balance Sheet' }]}
+        title={term('balanceSheet')}
+        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: term('balanceSheet') }]}
       />
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4">

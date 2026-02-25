@@ -89,7 +89,7 @@ export default function PaymentsPage() {
 
       <div className="bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4 mb-6">
         <p className="text-sm text-[#2D3A3A]">
-          <strong>Note:</strong> Payments affect accounting only after POST.
+          <strong>Note:</strong> Payments affect accounting only after posting to accounts.
         </p>
       </div>
 

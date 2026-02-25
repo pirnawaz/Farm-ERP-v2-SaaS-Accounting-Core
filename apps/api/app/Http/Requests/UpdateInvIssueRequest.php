@@ -18,6 +18,7 @@ class UpdateInvIssueRequest extends FormRequest
             'store_id' => ['sometimes', 'required', 'uuid', 'exists:inv_stores,id'],
             'crop_cycle_id' => ['sometimes', 'required', 'uuid', 'exists:crop_cycles,id'],
             'project_id' => ['sometimes', 'required', 'uuid', 'exists:projects,id'],
+            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
             'activity_id' => ['nullable', 'uuid'],
             'machine_id' => ['nullable', 'uuid', 'exists:machines,id'],
             'doc_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d'],

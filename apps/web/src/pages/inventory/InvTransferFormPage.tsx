@@ -4,6 +4,7 @@ import { useCreateTransfer, useInventoryStores, useInventoryItems } from '../../
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
+import { term } from '../../config/terminology';
 import type { CreateInvTransferPayload } from '../../types';
 
 type Line = { item_id: string; qty: string };
@@ -62,13 +63,13 @@ export default function InvTransferFormPage() {
   return (
     <div>
       <PageHeader
-        title="New Transfer"
+        title={`New ${term('transferSingular')}`}
         backTo="/app/inventory/transfers"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
-          { label: 'Transfers', to: '/app/inventory/transfers' },
-          { label: 'New Transfer' },
+          { label: term('transfer'), to: '/app/inventory/transfers' },
+          { label: `New ${term('transferSingular')}` },
         ]}
       />
 

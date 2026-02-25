@@ -8,6 +8,8 @@ import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
+import { Term } from '../components/Term';
+import { term } from '../config/terminology';
 
 export default function SettlementDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -128,7 +130,7 @@ export default function SettlementDetailPage() {
           )}
           {settlement.posting_group_id && (
             <div className="md:col-span-2">
-              <dt className="text-sm font-medium text-gray-500">Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${settlement.posting_group_id}`}
@@ -181,7 +183,7 @@ export default function SettlementDetailPage() {
                 onClick={() => setShowPostModal(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
               >
-                Post Settlement
+                {term('postAction')}
               </button>
             )}
             {isPosted && (
@@ -189,7 +191,7 @@ export default function SettlementDetailPage() {
                 onClick={() => setShowReverseModal(true)}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
               >
-                Reverse Settlement
+                {term('reverseAction')}
               </button>
             )}
           </div>
@@ -198,7 +200,7 @@ export default function SettlementDetailPage() {
 
       {/* Post Modal */}
       {showPostModal && (
-        <Modal isOpen={showPostModal} title="Post Settlement" onClose={() => setShowPostModal(false)}>
+        <Modal isOpen={showPostModal} title={term('postAction')} onClose={() => setShowPostModal(false)}>
           <div className="space-y-4">
             <FormField label="Posting Date">
               <input
@@ -220,7 +222,7 @@ export default function SettlementDetailPage() {
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 disabled={postMutation.isPending}
               >
-                Post
+                {term('postAction')}
               </button>
             </div>
           </div>
@@ -229,10 +231,10 @@ export default function SettlementDetailPage() {
 
       {/* Reverse Modal */}
       {showReverseModal && (
-        <Modal isOpen={showReverseModal} title="Reverse Settlement" onClose={() => setShowReverseModal(false)}>
+        <Modal isOpen={showReverseModal} title={term('reverseAction')} onClose={() => setShowReverseModal(false)}>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              This will create a reversal posting group that negates all accounting entries from this settlement.
+              This will create a reversal transaction that negates all accounting entries from this settlement.
             </p>
             <FormField label="Reversal Date">
               <input
@@ -254,7 +256,7 @@ export default function SettlementDetailPage() {
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                 disabled={reverseMutation.isPending}
               >
-                Reverse
+                {term('reverseAction')}
               </button>
             </div>
           </div>

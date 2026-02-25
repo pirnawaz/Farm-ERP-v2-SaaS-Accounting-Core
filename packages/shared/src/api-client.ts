@@ -260,4 +260,10 @@ export const apiClient = {
     const query = params ? buildQueryString(params as Record<string, string | number | undefined | null>) : ''
     return request<import('./types').DashboardSummary>(`/api/dashboard/summary${query}`)
   },
+
+  getFarmIntegrity: () =>
+    request<import('./types').FarmIntegrity>('/api/internal/farm-integrity'),
+
+  getDailyAdminReview: () =>
+    request<import('./types').DailyAdminReview>('/api/internal/daily-admin-review'),
 }

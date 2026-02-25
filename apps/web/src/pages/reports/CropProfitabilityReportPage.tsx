@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useCropProfitability } from '../../hooks/useReports';
@@ -57,9 +58,17 @@ function stableSort<T>(arr: T[], compare: (a: T, b: T) => number): T[] {
 
 export default function CropProfitabilityReportPage() {
   const { formatMoney } = useFormatting();
+  const [searchParams] = useSearchParams();
   const [from, setFrom] = useState(startOfCurrentMonth);
   const [to, setTo] = useState(today);
   const [groupBy, setGroupBy] = useState<CropProfitabilityGroupBy>('crop');
+
+  useEffect(() => {
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+    if (fromParam) setFrom(fromParam);
+    if (toParam) setTo(toParam);
+  }, [searchParams]);
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('margin_per_acre');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');

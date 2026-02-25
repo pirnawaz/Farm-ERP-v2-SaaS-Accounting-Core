@@ -1,6 +1,10 @@
 import type { UserRole } from '../types';
+import { term } from '../config/terminology';
 
 const ROLES: UserRole[] = ['platform_admin', 'tenant_admin', 'accountant', 'operator'];
+
+const POST_LABEL = term('postAction');
+const REVERSE_LABEL = term('reverseAction');
 
 const PERMISSIONS = {
   platform_admin: {
@@ -12,15 +16,15 @@ const PERMISSIONS = {
     'Manage users': true,
     'Assign roles': true,
     'Enable/disable modules': true,
-    'POST accounting documents': true,
-    'REVERSE documents': true,
+    [POST_LABEL]: true,
+    [REVERSE_LABEL]: true,
     'Manage share rules & settlements': true,
     'Close/open crop cycles': true,
     'View all data': true,
   },
   accountant: {
-    'POST accounting documents': true,
-    'REVERSE documents': true,
+    [POST_LABEL]: true,
+    [REVERSE_LABEL]: true,
     'Manage share rules & settlements': true,
     'View all data': true,
     'Create/edit transactions': true,
@@ -87,10 +91,10 @@ export default function AdminRolesPage() {
       <div className="mt-6 bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-[#2D3A3A] mb-2">Important Notes</h3>
         <ul className="text-sm text-[#2D3A3A] space-y-1 list-disc list-inside">
-          <li>POST and REVERSE actions are restricted to tenant_admin and accountant roles only.</li>
+          <li>{POST_LABEL} and {REVERSE_LABEL} are restricted to tenant_admin and accountant roles only.</li>
           <li>Only tenant_admin can manage users and assign roles.</li>
           <li>Only tenant_admin can close/open crop cycles.</li>
-          <li>Operators can create and edit their own transactions but cannot post them.</li>
+          <li>Operators can create and edit their own transactions but cannot post to accounts.</li>
         </ul>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { apiClient } from '@farm-erp/shared';
 import type { LandlordStatementResponse } from '@farm-erp/shared';
-import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy } from '../types';
+import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy, ProductionUnitSummaryResponse, LivestockUnitStatusResponse } from '../types';
 
 export const reportsApi = {
   trialBalance: (params: { from: string; to: string }) => {
@@ -122,12 +122,14 @@ export const reportsApi = {
     to: string;
     group_by?: CropProfitabilityGroupBy;
     include_unassigned?: boolean;
+    production_unit_id?: string;
   }) => {
     const query = new URLSearchParams();
     query.append('from', params.from);
     query.append('to', params.to);
     if (params.group_by) query.append('group_by', params.group_by);
     if (params.include_unassigned !== undefined) query.append('include_unassigned', params.include_unassigned ? '1' : '0');
+    if (params.production_unit_id) query.append('production_unit_id', params.production_unit_id);
     return apiClient.get<CropProfitabilityResponse>(`/api/reports/crop-profitability?${query.toString()}`);
   },
 
@@ -143,5 +145,20 @@ export const reportsApi = {
     if (params.group_by) query.append('group_by', params.group_by);
     if (params.include_unassigned !== undefined) query.append('include_unassigned', params.include_unassigned ? '1' : '0');
     return apiClient.get<CropProfitabilityTrendResponse>(`/api/reports/crop-profitability-trend?${query.toString()}`);
+  },
+
+  getProductionUnitSummary: (params: { production_unit_id: string; from: string; to: string }) => {
+    const query = new URLSearchParams();
+    query.append('production_unit_id', params.production_unit_id);
+    query.append('from', params.from);
+    query.append('to', params.to);
+    return apiClient.get<ProductionUnitSummaryResponse>(`/api/reports/production-unit-summary?${query.toString()}`);
+  },
+
+  getLivestockUnitStatus: (params: { production_unit_id: string; as_of: string }) => {
+    const query = new URLSearchParams();
+    query.append('production_unit_id', params.production_unit_id);
+    query.append('as_of', params.as_of);
+    return apiClient.get<LivestockUnitStatusResponse>(`/api/reports/livestock-unit-status?${query.toString()}`);
   },
 };

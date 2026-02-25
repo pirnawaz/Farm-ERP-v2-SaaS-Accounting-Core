@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
+import { term } from '../../config/terminology';
 import type { InvTransfer } from '../../types';
 
 export default function InvTransfersPage() {
@@ -41,11 +42,11 @@ export default function InvTransfersPage() {
   return (
     <div>
       <PageHeader
-        title="Transfers"
+        title={term('transfer')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Transfers' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('transfer') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => navigate('/app/inventory/transfers/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Transfer</button>
+          <button onClick={() => navigate('/app/inventory/transfers/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('transferSingular')}</button>
         ) : undefined}
       />
       <div className="flex gap-4 mb-4">
@@ -65,7 +66,7 @@ export default function InvTransfersPage() {
         </select>
       </div>
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={(transfers ?? []) as InvTransfer[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No transfers. Create one." />
+        <DataTable data={(transfers ?? []) as InvTransfer[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage={`No ${term('transfer')}. Create one.`} />
       </div>
     </div>
   );

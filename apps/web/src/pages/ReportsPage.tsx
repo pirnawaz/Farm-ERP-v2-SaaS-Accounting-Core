@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useFormatting } from '../hooks/useFormatting';
 import { EmptyState } from '../components/EmptyState';
 import type { TrialBalanceRow, GeneralLedgerRow } from '../types';
+import { term } from '../config/terminology';
 
 type Tab = 'trial-balance' | 'general-ledger' | 'project-statement';
 
@@ -101,7 +102,7 @@ export default function ReportsPage() {
             </>
           ) : (
             <EmptyState
-              title="No trial balance data"
+              title={`No ${term('trialBalance').toLowerCase()} data`}
               description="Reports will appear once transactions are posted."
             />
           )}
@@ -180,7 +181,7 @@ export default function ReportsPage() {
             </>
           ) : (
             <EmptyState
-              title="No general ledger data"
+              title={`No ${term('generalLedger').toLowerCase()} data`}
               description="Reports will appear once transactions are posted."
             />
           )}
@@ -313,7 +314,7 @@ export default function ReportsPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Trial Balance
+            {term('trialBalance')}
           </button>
           <button
             onClick={() => setActiveTab('general-ledger')}
@@ -323,7 +324,7 @@ export default function ReportsPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            General Ledger
+            {term('generalLedger')}
           </button>
           <button
             onClick={() => setActiveTab('project-statement')}

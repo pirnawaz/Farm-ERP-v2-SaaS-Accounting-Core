@@ -12,6 +12,8 @@ import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import { PrintHeader } from '../components/print/PrintHeader';
 import { v4 as uuidv4 } from 'uuid';
+import { Term } from '../components/Term';
+import { term } from '../config/terminology';
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -245,7 +247,7 @@ export default function SaleDetailPage() {
           )}
           {sale.posting_group_id && (
             <div className="md:col-span-2">
-              <dt className="text-sm font-medium text-gray-500">Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${sale.posting_group_id}`}
@@ -344,7 +346,7 @@ export default function SaleDetailPage() {
             <div>
               <h2 className="text-lg font-medium text-gray-900 mb-2">Actions</h2>
               <p className="text-sm text-gray-600">
-                This sale is in DRAFT status. Post it to create accounting entries.
+                This sale is in DRAFT status. {term('postAction')} to create accounting entries.
               </p>
             </div>
             <div className="flex space-x-4">
@@ -396,7 +398,7 @@ export default function SaleDetailPage() {
       {showPostModal && (
         <Modal
           isOpen={showPostModal}
-          title="Post Sale"
+          title={term('postAction')}
           onClose={() => setShowPostModal(false)}
         >
           <div className="space-y-4">
@@ -452,7 +454,7 @@ export default function SaleDetailPage() {
                 disabled={postMutation.isPending || isCycleClosed}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {postMutation.isPending ? 'Posting...' : 'Post Sale'}
+                {postMutation.isPending ? term('postActionPending') : term('postAction')}
               </button>
             </div>
           </div>
@@ -462,7 +464,7 @@ export default function SaleDetailPage() {
       {showReverseModal && (
         <Modal
           isOpen={showReverseModal}
-          title="Reverse Sale"
+          title={term('reverseAction')}
           onClose={() => {
             setShowReverseModal(false);
             setReverseReason('');
@@ -527,7 +529,7 @@ export default function SaleDetailPage() {
                 disabled={reverseMutation.isPending || isCycleClosed}
                 className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {reverseMutation.isPending ? 'Reversing...' : 'Reverse Sale'}
+                {reverseMutation.isPending ? term('reverseActionPending') : term('reverseAction')}
               </button>
             </div>
           </div>

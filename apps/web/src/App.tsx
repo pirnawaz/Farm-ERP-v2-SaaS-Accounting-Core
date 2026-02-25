@@ -2,8 +2,20 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ModuleProtectedRoute } from './components/ModuleProtectedRoute';
 import { AppLayout } from './components/AppLayout';
+import { AppLanding } from './components/AppLanding';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import FarmPulsePage from './pages/FarmPulsePage';
+import CashDrilldownPage from './pages/farmPulse/CashDrilldownPage';
+import BankDrilldownPage from './pages/farmPulse/BankDrilldownPage';
+import LabourOwedPage from './pages/farmPulse/LabourOwedPage';
+import PayablesPage from './pages/farmPulse/PayablesPage';
+import TodayPage from './pages/TodayPage';
+import AlertsPage from './pages/AlertsPage';
+import OverdueCustomersAlertPage from './pages/alerts/OverdueCustomersAlertPage';
+import NegativeMarginFieldsAlertPage from './pages/alerts/NegativeMarginFieldsAlertPage';
+import UnpaidLabourAlertPage from './pages/alerts/UnpaidLabourAlertPage';
+import AlertSettingsPage from './pages/alerts/AlertSettingsPage';
 import GovernanceHubPage from './pages/GovernanceHubPage';
 import LandParcelsPage from './pages/LandParcelsPage';
 import LandParcelDetailPage from './pages/LandParcelDetailPage';
@@ -12,6 +24,11 @@ import LandLeaseDetailPage from './pages/LandLease/LandLeaseDetailPage';
 import LandlordStatementPage from './pages/LandLease/LandlordStatementPage';
 import CropCyclesPage from './pages/CropCyclesPage';
 import CropCycleDetailPage from './pages/CropCycleDetailPage';
+import ProductionUnitsPage from './pages/ProductionUnitsPage';
+import OrchardsPage from './pages/orchards/OrchardsPage';
+import OrchardDetailPage from './pages/orchards/OrchardDetailPage';
+import LivestockPage from './pages/livestock/LivestockPage';
+import LivestockDetailPage from './pages/livestock/LivestockDetailPage';
 import PartiesPage from './pages/PartiesPage';
 import PartyDetailPage from './pages/PartyDetailPage';
 import LandAllocationsPage from './pages/LandAllocationsPage';
@@ -108,6 +125,8 @@ import ModuleTogglePage from './pages/ModuleTogglePage';
 import AdminFarmProfilePage from './pages/AdminFarmProfilePage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminRolesPage from './pages/AdminRolesPage';
+import FarmIntegrityPage from './pages/internal/FarmIntegrityPage';
+import ReviewQueuePage from './pages/ReviewQueuePage';
 import PlatformTenantsPage from './pages/PlatformTenantsPage';
 import PlatformTenantDetailPage from './pages/platform/PlatformTenantDetailPage';
 import PlatformAuditLogsPage from './pages/platform/PlatformAuditLogsPage';
@@ -145,8 +164,19 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/app/dashboard" replace />} />
+        <Route index element={<AppLanding />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="farm-pulse" element={<FarmPulsePage />} />
+        <Route path="farm-pulse/cash" element={<CashDrilldownPage />} />
+        <Route path="farm-pulse/bank" element={<BankDrilldownPage />} />
+        <Route path="farm-pulse/labour-owed" element={<LabourOwedPage />} />
+        <Route path="farm-pulse/payables" element={<PayablesPage />} />
+        <Route path="today" element={<TodayPage />} />
+        <Route path="alerts" element={<AlertsPage />} />
+        <Route path="alerts/overdue-customers" element={<OverdueCustomersAlertPage />} />
+        <Route path="alerts/negative-margin" element={<NegativeMarginFieldsAlertPage />} />
+        <Route path="alerts/unpaid-labour" element={<UnpaidLabourAlertPage />} />
+        <Route path="alerts/settings" element={<AlertSettingsPage />} />
         <Route path="governance" element={<GovernanceHubPage />} />
         <Route path="land" element={<ModuleProtectedRoute requiredModule="land"><LandParcelsPage /></ModuleProtectedRoute>} />
         <Route path="land/:id" element={<ModuleProtectedRoute requiredModule="land"><LandParcelDetailPage /></ModuleProtectedRoute>} />
@@ -154,6 +184,11 @@ function App() {
         <Route path="land-leases/:id" element={<ModuleProtectedRoute requiredModule="land_leases"><LandLeaseDetailPage /></ModuleProtectedRoute>} />
         <Route path="crop-cycles" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCyclesPage /></ModuleProtectedRoute>} />
         <Route path="crop-cycles/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCycleDetailPage /></ModuleProtectedRoute>} />
+        <Route path="production-units" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProductionUnitsPage /></ModuleProtectedRoute>} />
+        <Route path="orchards" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><OrchardsPage /></ModuleProtectedRoute>} />
+        <Route path="orchards/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><OrchardDetailPage /></ModuleProtectedRoute>} />
+        <Route path="livestock" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><LivestockPage /></ModuleProtectedRoute>} />
+        <Route path="livestock/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><LivestockDetailPage /></ModuleProtectedRoute>} />
         <Route path="parties" element={<PartiesPage />} />
         <Route path="parties/:id" element={<PartyDetailPage />} />
         <Route path="allocations" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><LandAllocationsPage /></ModuleProtectedRoute>} />
@@ -261,6 +296,8 @@ function App() {
         <Route path="admin/users" element={<AdminUsersPage />} />
         <Route path="admin/roles" element={<AdminRolesPage />} />
         <Route path="admin/modules" element={<ModuleTogglePage />} />
+        <Route path="internal/farm-integrity" element={<FarmIntegrityPage />} />
+        <Route path="review-queue" element={<ReviewQueuePage />} />
       </Route>
       <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>

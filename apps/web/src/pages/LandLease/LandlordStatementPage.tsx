@@ -6,6 +6,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { useParties } from '../../hooks/useParties';
 import type { LandlordStatementResponse } from '@farm-erp/shared';
 import type { Party } from '../../types';
+import { Term } from '../../components/Term';
 
 export default function LandlordStatementPage() {
   const { formatMoney } = useFormatting();
@@ -172,7 +173,7 @@ export default function LandlordStatementPage() {
                       Description
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Posting Group
+                      <Term k="postingGroup" showHint />
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Debit

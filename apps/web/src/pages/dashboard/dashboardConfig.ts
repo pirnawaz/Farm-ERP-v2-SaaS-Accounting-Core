@@ -1,4 +1,5 @@
 import type { UserRole } from '../../types';
+import { term } from '../../config/terminology';
 
 export type WidgetKey =
   | 'open_crop_cycles'
@@ -48,7 +49,7 @@ const configs: Record<UserRole, DashboardConfig> = {
       { label: 'New Transaction', to: '/app/transactions/new', requiredModule: 'projects_crop_cycles' },
       { label: 'New Payment', to: '/app/payments/new', requiredModule: 'treasury_payments' },
       { label: 'New Sale', to: '/app/sales/new', requiredModule: 'ar_sales' },
-      { label: 'Trial Balance', to: '/app/reports/trial-balance', requiredModule: 'reports' },
+      { label: term('trialBalance'), to: '/app/reports/trial-balance', requiredModule: 'reports' },
       { label: 'Settings', to: '/app/settings/localisation' },
     ],
   },
@@ -66,8 +67,8 @@ const configs: Record<UserRole, DashboardConfig> = {
       'projects_count',
     ],
     quickActions: [
-      { label: 'Trial Balance', to: '/app/reports/trial-balance', requiredModule: 'reports' },
-      { label: 'General Ledger', to: '/app/reports/general-ledger', requiredModule: 'reports' },
+      { label: term('trialBalance'), to: '/app/reports/trial-balance', requiredModule: 'reports' },
+      { label: term('generalLedger'), to: '/app/reports/general-ledger', requiredModule: 'reports' },
       { label: 'Cashbook', to: '/app/reports/cashbook', requiredModule: 'reports' },
       { label: 'New Payment', to: '/app/payments/new', requiredModule: 'treasury_payments' },
       { label: 'Account Balances', to: '/app/reports/account-balances', requiredModule: 'reports' },
@@ -85,9 +86,9 @@ const configs: Record<UserRole, DashboardConfig> = {
     ],
     quickActions: [
       { label: 'New Transaction', to: '/app/transactions/new', requiredModule: 'projects_crop_cycles' },
-      { label: 'New Activity', to: '/app/crop-ops/activities/new', requiredModule: 'crop_ops' },
+      { label: term('newActivity'), to: '/app/crop-ops/activities/new', requiredModule: 'crop_ops' },
       { label: 'New Work Log', to: '/app/labour/work-logs/new', requiredModule: 'labour' },
-      { label: 'New GRN', to: '/app/inventory/grns/new', requiredModule: 'inventory' },
+      { label: `New ${term('grnSingular')}`, to: '/app/inventory/grns/new', requiredModule: 'inventory' },
       { label: 'View Projects', to: '/app/projects', requiredModule: 'projects_crop_cycles' },
     ],
   },

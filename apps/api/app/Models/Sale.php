@@ -22,6 +22,7 @@ class Sale extends Model
         'buyer_party_id',
         'project_id',
         'crop_cycle_id',
+        'production_unit_id',
         'amount',
         'posting_date',
         'sale_no',
@@ -71,6 +72,11 @@ class Sale extends Model
     public function cropCycle(): BelongsTo
     {
         return $this->belongsTo(CropCycle::class);
+    }
+
+    public function productionUnit(): BelongsTo
+    {
+        return $this->belongsTo(ProductionUnit::class, 'production_unit_id');
     }
 
     public function paymentAllocations(): HasMany

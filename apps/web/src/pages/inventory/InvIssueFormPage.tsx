@@ -1,24 +1,49 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useCreateIssue } from '../../hooks/useInventory';
+import { useActivities } from '../../hooks/useCropOps';
 import { useCropCycles } from '../../hooks/useCropCycles';
+import { useProductionUnits } from '../../hooks/useProductionUnits';
 import { useProjects } from '../../hooks/useProjects';
 import { useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { useMachinesQuery } from '../../hooks/useMachinery';
 import { useModules } from '../../contexts/ModulesContext';
+import { useTenant } from '../../hooks/useTenant';
+import { useFormAutosave } from '../../hooks/useFormAutosave';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useParties } from '../../hooks/useParties';
 import { useProjectRule } from '../../hooks/useProjectRules';
 import { shareRulesApi } from '../../api/shareRules';
+import { generateDocNo, getActiveCropCycleId, getStored, setStored, formStorageKeys, getLastSubmit, setLastSubmit } from '../../utils/formDefaults';
+import { term } from '../../config/terminology';
 import type { CreateInvIssuePayload } from '../../types';
 
 type Line = { item_id: string; qty: string };
 
+type InvIssueSnapshot = {
+  doc_no: string;
+  store_id: string;
+  crop_cycle_id: string;
+  project_id: string;
+  production_unit_id: string;
+  activity_id: string;
+  machine_id: string;
+  doc_date: string;
+  lines: Line[];
+  allocation_mode: 'SHARED' | 'HARI_ONLY' | 'FARMER_ONLY';
+  hari_id: string;
+  splitSource: string;
+  landlord_share_pct: string;
+  hari_share_pct: string;
+};
+
 export default function InvIssueFormPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { tenantId } = useTenant();
   const createM = useCreateIssue();
   const { data: cropCycles } = useCropCycles();
   const { data: stores } = useInventoryStores();
@@ -29,6 +54,7 @@ export default function InvIssueFormPage() {
   const [store_id, setStoreId] = useState('');
   const [crop_cycle_id, setCropCycleId] = useState('');
   const [project_id, setProjectId] = useState('');
+  const [production_unit_id, setProductionUnitId] = useState('');
   const [activity_id, setActivityId] = useState('');
   const [machine_id, setMachineId] = useState('');
   const [doc_date, setDocDate] = useState(new Date().toISOString().split('T')[0]);
@@ -41,7 +67,11 @@ export default function InvIssueFormPage() {
   const [hari_share_pct, setHariSharePct] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const { data: productionUnits } = useProductionUnits();
   const { data: projectsForCrop } = useProjects(crop_cycle_id || undefined);
+  const { data: activities } = useActivities(
+    crop_cycle_id && project_id ? { crop_cycle_id, project_id } : undefined
+  );
   const { data: projectRule } = useProjectRule(project_id || '');
   const { data: parties } = useParties();
   const { data: shareRules } = useQuery({
@@ -94,10 +124,136 @@ export default function InvIssueFormPage() {
     }
   }, [allocation_mode, splitSource, projectRule]);
 
+  // Defaults: doc_no, active crop cycle, last store/project
+  useEffect(() => {
+    if (!doc_no) setDocNo(generateDocNo('ISS'));
+  }, []);
+  useEffect(() => {
+    if (!cropCycles?.length) return;
+    const activeId = getActiveCropCycleId(cropCycles);
+    const storedId = getStored<string>(formStorageKeys.last_crop_cycle_id);
+    const initial = storedId && cropCycles.some((c) => c.id === storedId) ? storedId : activeId;
+    if (initial && !crop_cycle_id) setCropCycleId(initial);
+  }, [cropCycles]);
+  useEffect(() => {
+    if (crop_cycle_id) setStored(formStorageKeys.last_crop_cycle_id, crop_cycle_id);
+  }, [crop_cycle_id]);
+  useEffect(() => {
+    const stored = getStored<string>(formStorageKeys.last_store_id);
+    if (stored && stores?.some((s) => s.id === stored) && !store_id) setStoreId(stored);
+  }, [stores]);
+  useEffect(() => {
+    if (store_id) setStored(formStorageKeys.last_store_id, store_id);
+  }, [store_id]);
+  useEffect(() => {
+    if (!projectsForCrop?.length) return;
+    const stored = getStored<string>(formStorageKeys.last_project_id);
+    if (stored && projectsForCrop.some((p) => p.id === stored) && !project_id) setProjectId(stored);
+  }, [projectsForCrop]);
+  useEffect(() => {
+    if (project_id) setStored(formStorageKeys.last_project_id, project_id);
+  }, [project_id]);
+  useEffect(() => {
+    if (!productionUnits?.length) return;
+    const fromUrl = searchParams.get('production_unit_id');
+    if (fromUrl && productionUnits.some((u) => u.id === fromUrl)) {
+      setProductionUnitId(fromUrl);
+      return;
+    }
+    const stored = getStored<string>(formStorageKeys.last_production_unit_id);
+    if (stored && productionUnits.some((u) => u.id === stored) && !production_unit_id) setProductionUnitId(stored);
+  }, [productionUnits, searchParams]);
+  useEffect(() => {
+    if (production_unit_id) setStored(formStorageKeys.last_production_unit_id, production_unit_id);
+  }, [production_unit_id]);
+
   const addLine = () => setLines((l) => [...l, { item_id: '', qty: '' }]);
   const removeLine = (i: number) => setLines((l) => l.filter((_, idx) => idx !== i));
   const updateLine = (i: number, f: Partial<Line>) =>
     setLines((l) => l.map((row, idx) => (idx === i ? { ...row, ...f } : row)));
+
+  const getSnapshot = useCallback(
+    (): InvIssueSnapshot => ({
+      doc_no,
+      store_id,
+      crop_cycle_id,
+      project_id,
+      production_unit_id,
+      activity_id,
+      machine_id,
+      doc_date,
+      lines: [...lines],
+      allocation_mode,
+      hari_id,
+      splitSource,
+      landlord_share_pct,
+      hari_share_pct,
+    }),
+    [
+      doc_no,
+      store_id,
+      crop_cycle_id,
+      project_id,
+      production_unit_id,
+      activity_id,
+      machine_id,
+      doc_date,
+      lines,
+      allocation_mode,
+      hari_id,
+      splitSource,
+      landlord_share_pct,
+      hari_share_pct,
+    ]
+  );
+  const applySnapshot = useCallback((data: InvIssueSnapshot) => {
+    setDocNo(data.doc_no);
+    setStoreId(data.store_id);
+    setCropCycleId(data.crop_cycle_id);
+    setProjectId(data.project_id);
+    setProductionUnitId(data.production_unit_id);
+    setActivityId(data.activity_id);
+    setMachineId(data.machine_id);
+    setDocDate(data.doc_date);
+    setLines(data.lines.length ? data.lines : [{ item_id: '', qty: '' }]);
+    setAllocationMode(data.allocation_mode);
+    setHariId(data.hari_id);
+    setSplitSource(data.splitSource);
+    setLandlordSharePct(data.landlord_share_pct);
+    setHariSharePct(data.hari_share_pct);
+  }, []);
+
+  const { hasDraft, restore, discard, clearDraft } = useFormAutosave<InvIssueSnapshot>({
+    formId: 'inv-issue',
+    tenantId: tenantId || '',
+    context: crop_cycle_id ? { crop_cycle_id } : undefined,
+    getSnapshot,
+    applySnapshot,
+    debounceMs: 4000,
+    disabled: !tenantId,
+  });
+
+  const handleUseLast = () => {
+    const last = getLastSubmit<CreateInvIssuePayload>(tenantId || '', 'inv-issue');
+    if (!last) return;
+    setStoreId(last.store_id || '');
+    setCropCycleId(last.crop_cycle_id || '');
+    setProjectId(last.project_id || '');
+    setProductionUnitId(last.production_unit_id || '');
+    setActivityId(last.activity_id || '');
+    setMachineId(last.machine_id || '');
+    setDocDate(last.doc_date || '');
+    setLines(
+      last.lines?.length
+        ? last.lines.map((l) => ({ item_id: l.item_id, qty: typeof l.qty === 'number' ? String(l.qty) : l.qty }))
+        : [{ item_id: '', qty: '' }]
+    );
+    if (last.allocation_mode) setAllocationMode(last.allocation_mode);
+    if (last.hari_id) setHariId(last.hari_id);
+    if (last.landlord_share_pct != null) setLandlordSharePct(String(last.landlord_share_pct));
+    if (last.hari_share_pct != null) setHariSharePct(String(last.hari_share_pct));
+  };
+  const hasLast = !!tenantId && getLastSubmit(tenantId, 'inv-issue') != null;
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -147,11 +303,13 @@ export default function InvIssueFormPage() {
     const validLines = lines
       .filter((l) => l.item_id && parseFloat(l.qty) > 0)
       .map((l) => ({ item_id: l.item_id, qty: parseFloat(l.qty) }));
+    const finalDocNo = doc_no.trim() || generateDocNo('ISS');
     const payload: CreateInvIssuePayload = {
-      ...(doc_no.trim() && { doc_no: doc_no.trim() }),
+      ...(finalDocNo && { doc_no: finalDocNo }),
       store_id,
       crop_cycle_id,
       project_id,
+      production_unit_id: production_unit_id || undefined,
       activity_id: activity_id || undefined,
       machine_id: machine_id || undefined,
       doc_date,
@@ -164,26 +322,45 @@ export default function InvIssueFormPage() {
         : {}),
     };
     const issue = await createM.mutateAsync(payload);
+    setLastSubmit(tenantId || '', 'inv-issue', payload);
+    clearDraft();
     navigate(`/app/inventory/issues/${issue.id}`);
   };
 
   return (
-    <div>
+    <div className="max-w-2xl mx-auto">
       <PageHeader
-        title="New Issue"
+        title={`New ${term('issueSingular')}`}
         backTo="/app/inventory/issues"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
-          { label: 'Issues', to: '/app/inventory/issues' },
-          { label: 'New Issue' },
+          { label: term('issue'), to: '/app/inventory/issues' },
+          { label: `New ${term('issueSingular')}` },
         ]}
       />
 
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {hasDraft && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex flex-wrap items-center gap-2">
+          <span>Restore draft?</span>
+          <button type="button" onClick={restore} className="font-medium text-[#1F6F5C] hover:underline">Restore</button>
+          <span>|</span>
+          <button type="button" onClick={discard} className="font-medium text-gray-600 hover:underline">Discard</button>
+        </div>
+      )}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6">
+        {hasLast && (
+          <div className="flex justify-end">
+            <button type="button" onClick={handleUseLast} className="text-sm font-medium text-[#1F6F5C] hover:underline">
+              Use last values
+            </button>
+          </div>
+        )}
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Header</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Doc No">
-            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} placeholder="Leave blank to auto-generate" className="w-full px-3 py-2 border rounded" />
+            <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} placeholder={generateDocNo('ISS')} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg disabled:bg-gray-50" />
           </FormField>
           <FormField label="Doc Date" required error={errors.doc_date}>
             <input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" />
@@ -206,8 +383,33 @@ export default function InvIssueFormPage() {
               {(projectsForCrop || [])?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Activity (optional)">
-            <input value={activity_id} onChange={(e) => setActivityId(e.target.value)} disabled={!canEdit} className="w-full px-3 py-2 border rounded" placeholder="UUID or leave blank" />
+          <FormField label="Production Unit (optional)">
+            <select
+              value={production_unit_id}
+              onChange={(e) => setProductionUnitId(e.target.value)}
+              disabled={!canEdit}
+              className="w-full px-3 py-2 border rounded disabled:bg-gray-100"
+            >
+              <option value="">None</option>
+              {(productionUnits ?? []).map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label={`${term('activities')} (optional)`}>
+            <select
+              value={activity_id}
+              onChange={(e) => setActivityId(e.target.value)}
+              disabled={!canEdit || !crop_cycle_id || !project_id}
+              className="w-full px-3 py-2 border rounded disabled:bg-gray-100"
+            >
+              <option value="">None</option>
+              {activities?.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.doc_no} {a.type?.name ? `– ${a.type.name}` : ''}
+                </option>
+              ))}
+            </select>
           </FormField>
           {machineryEnabled && (
             <FormField label="Machine (optional)">
@@ -227,6 +429,7 @@ export default function InvIssueFormPage() {
             </FormField>
           )}
         </div>
+        </section>
 
         <div className="border-t pt-4">
           <h3 className="font-medium mb-4">Cost Ownership</h3>
@@ -356,62 +559,53 @@ export default function InvIssueFormPage() {
           </div>
         </div>
 
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-medium">Lines</h3>
-            {canEdit && <button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add line</button>}
+        <section className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Lines</h2>
+            {canEdit && <button type="button" onClick={addLine} className="text-sm font-medium text-[#1F6F5C] hover:underline">+ Add line</button>}
           </div>
-          {errors.lines && <p className="text-sm text-red-600 mb-2">{errors.lines}</p>}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border">
-              <thead className="bg-[#E6ECEA]">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Item</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Qty</th>
-                  {canEdit && <th className="px-3 py-2 w-10" />}
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2">
-                      <select
-                        value={line.item_id}
-                        onChange={(e) => updateLine(i, { item_id: e.target.value })}
-                        disabled={!canEdit}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                      >
-                        <option value="">Select item</option>
-                        {items?.map((it) => <option key={it.id} value={it.id}>{it.name} ({it.uom?.code})</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={line.qty}
-                        onChange={(e) => updateLine(i, { qty: e.target.value })}
-                        disabled={!canEdit}
-                        className="w-24 px-2 py-1 border rounded text-sm"
-                      />
-                    </td>
-                    {canEdit && (
-                      <td className="px-3 py-2">
-                        <button type="button" onClick={() => removeLine(i)} className="text-red-600 text-sm">Remove</button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {errors.lines && <p className="text-sm text-red-600">{errors.lines}</p>}
+          <div className="space-y-3">
+            {lines.map((line, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <FormField label="Item">
+                    <select
+                      value={line.item_id}
+                      onChange={(e) => updateLine(i, { item_id: e.target.value })}
+                      disabled={!canEdit}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50"
+                    >
+                      <option value="">Select item</option>
+                      {items?.map((it) => <option key={it.id} value={it.id}>{it.name} ({it.uom?.code})</option>)}
+                    </select>
+                  </FormField>
+                  <FormField label="Qty">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={line.qty}
+                      onChange={(e) => updateLine(i, { qty: e.target.value })}
+                      disabled={!canEdit}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50"
+                    />
+                  </FormField>
+                </div>
+                {canEdit && (
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => removeLine(i)} className="text-sm text-red-600 hover:underline">Remove</button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
 
         {canEdit && (
-          <div className="flex justify-end gap-2 pt-4">
-            <button type="button" onClick={() => navigate('/app/inventory/issues')} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
+            <button type="button" onClick={() => navigate('/app/inventory/issues')} className="w-full sm:w-auto px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSubmit} disabled={createM.isPending} className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50">
               {createM.isPending ? 'Creating...' : 'Create'}
             </button>
           </div>

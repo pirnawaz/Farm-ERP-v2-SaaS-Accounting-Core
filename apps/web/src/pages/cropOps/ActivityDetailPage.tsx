@@ -20,6 +20,8 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
 import type { UpdateCropActivityPayload } from '../../types';
+import { Term } from '../../components/Term';
+import { term } from '../../config/terminology';
 
 type InputLine = { store_id: string; item_id: string; qty: string };
 type LabourLine = { worker_id: string; rate_basis: string; units: string; rate: string };
@@ -148,7 +150,7 @@ export default function ActivityDetailPage() {
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-  if (!activity) return <div>Activity not found.</div>;
+  if (!activity) return <div>Field work not found.</div>;
 
   return (
     <div>
@@ -158,7 +160,7 @@ export default function ActivityDetailPage() {
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Crop Ops', to: '/app/crop-ops' },
-          { label: 'Activities', to: '/app/crop-ops/activities' },
+          { label: term('activities'), to: '/app/crop-ops/activities' },
           { label: activity.doc_no },
         ]}
       />
@@ -167,7 +169,7 @@ export default function ActivityDetailPage() {
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{activity.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Type</dt><dd>{activity.type?.name || activity.activity_type_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Activity Date</dt><dd>{formatDate(activity.activity_date)}</dd></div>
+          <div><dt className="text-sm text-gray-500">Work date</dt><dd>{formatDate(activity.activity_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{activity.crop_cycle?.name || activity.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Project</dt><dd>{activity.project?.name || activity.project_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Land Parcel</dt><dd>{activity.land_parcel?.name || activity.land_parcel_id || '—'}</dd></div>
@@ -179,7 +181,7 @@ export default function ActivityDetailPage() {
           </div>
           {activity.posting_group_id && (
             <div className="md:col-span-2">
-              <dt className="text-sm text-gray-500">Posting Group</dt>
+              <dt className="text-sm text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd><Link to={`/app/posting-groups/${activity.posting_group_id}`} className="text-[#1F6F5C]">{activity.posting_group_id}</Link></dd>
             </div>
           )}
@@ -199,7 +201,7 @@ export default function ActivityDetailPage() {
           <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
-            <FormField label="Activity Date"><input type="date" value={activity_date} onChange={(e) => setActivityDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+            <FormField label="Work date"><input type="date" value={activity_date} onChange={(e) => setActivityDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Type">
               <select value={activity_type_id} onChange={(e) => setActivityTypeId(e.target.value)} className="w-full px-3 py-2 border rounded">
                 {activityTypes?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -285,7 +287,7 @@ export default function ActivityDetailPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
-            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
+            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
           </div>
         </div>
       ) : (
@@ -334,28 +336,28 @@ export default function ActivityDetailPage() {
 
       {isPosted && canPost && (
         <div className="mb-6">
-          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button>
+          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
         </div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title="Post Activity">
+      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={term('postAction')}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowPostModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>
+            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">{postM.isPending ? term('postActionPending') : term('postAction')}</button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title="Reverse Activity">
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={term('reverseAction')}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Reason"><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} placeholder="Optional" /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowReverseModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleReverse} disabled={reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button>
+            <button onClick={handleReverse} disabled={reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">{reverseM.isPending ? term('reverseActionPending') : term('reverseAction')}</button>
           </div>
         </div>
       </Modal>

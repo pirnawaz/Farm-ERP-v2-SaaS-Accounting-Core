@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
+import { term } from '../../config/terminology';
 import type { InvGrn } from '../../types';
 
 export default function InvGrnsPage() {
@@ -35,11 +36,11 @@ export default function InvGrnsPage() {
   return (
     <div>
       <PageHeader
-        title="GRNs"
+        title={term('grn')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'GRNs' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('grn') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => navigate('/app/inventory/grns/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New GRN</button>
+          <button onClick={() => navigate('/app/inventory/grns/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('grnSingular')}</button>
         ) : undefined}
       />
       <div className="flex gap-4 mb-4">
@@ -59,7 +60,7 @@ export default function InvGrnsPage() {
           data={(grns ?? []) as InvGrn[]}
           columns={cols}
           onRowClick={(r) => navigate(`/app/inventory/grns/${r.id}`, { state: { from: location.pathname + location.search } })}
-          emptyMessage="No GRNs. Create one."
+          emptyMessage={`No ${term('grn')}. Create one.`}
         />
       </div>
     </div>

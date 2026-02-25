@@ -14,6 +14,7 @@ export interface HarvestFilters {
   status?: string;
   crop_cycle_id?: string;
   project_id?: string;
+  production_unit_id?: string;
   from?: string;
   to?: string;
 }

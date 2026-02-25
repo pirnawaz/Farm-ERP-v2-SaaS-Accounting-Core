@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ConfirmDialog } from './ConfirmDialog';
+import { term } from '../config/terminology';
 
 interface ReverseButtonProps {
   onClick: () => void;
@@ -50,7 +51,7 @@ export function ReverseButton({
           disabled={isDisabled}
           className={`px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         >
-          {isPending ? 'Reversing...' : 'Reverse'}
+          {isPending ? term('reverseActionPending') : term('reverseAction')}
         </button>
       </div>
 
@@ -58,9 +59,9 @@ export function ReverseButton({
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
         onConfirm={handleConfirm}
-        title="Confirm Reverse"
+        title={term('confirmReverse')}
         message="Are you sure you want to reverse this document? This will create offsetting entries and cannot be undone."
-        confirmText="Reverse"
+        confirmText={term('reverseAction')}
         variant="danger"
       />
     </>

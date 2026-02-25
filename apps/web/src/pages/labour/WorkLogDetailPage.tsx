@@ -13,6 +13,8 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
 import type { UpdateLabWorkLogPayload } from '../../types';
+import { Term } from '../../components/Term';
+import { term } from '../../config/terminology';
 
 export default function WorkLogDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -143,7 +145,7 @@ export default function WorkLogDetailPage() {
           <div><dt className="text-sm text-gray-500">Amount</dt><dd><span className="tabular-nums">{formatMoney(log.amount)}</span></dd></div>
           {log.posting_group_id && (
             <div className="md:col-span-2">
-              <dt className="text-sm text-gray-500">Posting Group</dt>
+              <dt className="text-sm text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd><Link to={`/app/posting-groups/${log.posting_group_id}`} className="text-[#1F6F5C]">{log.posting_group_id}</Link></dd>
             </div>
           )}
@@ -202,35 +204,35 @@ export default function WorkLogDetailPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
-            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>}
+            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
           </div>
         </div>
       ) : null}
 
       {isPosted && canPost && (
         <div className="mb-6">
-          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button>
+          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
         </div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title="Post Work Log">
+      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={term('postAction')}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowPostModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">Post</button>
+            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">{postM.isPending ? term('postActionPending') : term('postAction')}</button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title="Reverse Work Log">
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={term('reverseAction')}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Reason" required><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField>
           <div className="flex gap-2 pt-4">
             <button onClick={() => setShowReverseModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">Reverse</button>
+            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">{reverseM.isPending ? term('reverseActionPending') : term('reverseAction')}</button>
           </div>
         </div>
       </Modal>

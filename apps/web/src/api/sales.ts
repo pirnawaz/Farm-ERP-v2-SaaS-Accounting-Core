@@ -5,6 +5,7 @@ export interface SaleFilters {
   status?: string;
   buyer_party_id?: string;
   project_id?: string;
+  production_unit_id?: string;
   date_from?: string;
   date_to?: string;
 }
@@ -15,9 +16,10 @@ export const salesApi = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.buyer_party_id) params.append('buyer_party_id', filters.buyer_party_id);
     if (filters?.project_id) params.append('project_id', filters.project_id);
+    if (filters?.production_unit_id) params.append('production_unit_id', filters.production_unit_id);
     if (filters?.date_from) params.append('date_from', filters.date_from);
     if (filters?.date_to) params.append('date_to', filters.date_to);
-    
+
     const query = params.toString() ? `?${params.toString()}` : '';
     return apiClient.get<Sale[]>(`/api/sales${query}`);
   },

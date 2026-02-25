@@ -19,6 +19,7 @@ class UpdateLabWorkLogRequest extends FormRequest
             'work_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d'],
             'crop_cycle_id' => ['sometimes', 'required', 'uuid', 'exists:crop_cycles,id'],
             'project_id' => ['sometimes', 'required', 'uuid', 'exists:projects,id'],
+            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
             'activity_id' => ['nullable', 'uuid'],
             'machine_id' => ['nullable', 'uuid', 'exists:machines,id'],
             'rate_basis' => ['sometimes', 'required', 'string', 'in:DAILY,HOURLY,PIECE'],

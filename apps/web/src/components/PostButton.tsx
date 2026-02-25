@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ConfirmDialog } from './ConfirmDialog';
+import { term } from '../config/terminology';
 
 interface PostButtonProps {
   onClick: () => void;
@@ -50,7 +51,7 @@ export function PostButton({
           disabled={isDisabled}
           className={`px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         >
-          {isPending ? 'Posting...' : 'Post'}
+          {isPending ? term('postActionPending') : term('postAction')}
         </button>
       </div>
 
@@ -58,9 +59,9 @@ export function PostButton({
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
         onConfirm={handleConfirm}
-        title="Confirm Post"
+        title={term('confirmPost')}
         message="Are you sure you want to post this document? This will create accounting entries that cannot be modified. Only reversal is allowed."
-        confirmText="Post"
+        confirmText={term('postAction')}
         variant="default"
       />
     </>

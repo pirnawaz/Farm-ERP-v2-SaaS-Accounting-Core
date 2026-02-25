@@ -7,6 +7,7 @@ import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
+import { term } from '../../config/terminology';
 import type { InvItem } from '../../types';
 
 export default function InvItemsPage() {
@@ -28,7 +29,7 @@ export default function InvItemsPage() {
   const cols: Column<InvItem>[] = [
     { header: 'Name', accessor: 'name' },
     { header: 'SKU', accessor: (r) => r.sku || '—' },
-    { header: 'Category', accessor: (r) => r.category?.name || '—' },
+    { header: term('inventoryCategorySingular'), accessor: (r) => r.category?.name || '—' },
     { header: 'UoM', accessor: (r) => r.uom?.code || r.uom_id },
     { header: 'Valuation', accessor: 'valuation_method' },
     { header: 'Active', accessor: (r) => (r.is_active ? 'Yes' : 'No') },
@@ -53,21 +54,21 @@ export default function InvItemsPage() {
   return (
     <div>
       <PageHeader
-        title="Items"
+        title={term('inventoryItem')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Items' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('inventoryItem') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Item</button>
+          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('inventoryItemSingular')}</button>
         ) : undefined}
       />
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={items || []} columns={cols} emptyMessage="No items. Create one." />
+        <DataTable data={items || []} columns={cols} emptyMessage={`No ${term('inventoryItem').toLowerCase()}. Create one.`} />
       </div>
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Item">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={`New ${term('inventoryItemSingular')}`}>
         <div className="space-y-4">
           <FormField label="Name" required><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="SKU"><input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Optional" /></FormField>
-          <FormField label="Category">
+          <FormField label={term('inventoryCategorySingular')}>
             <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
               <option value="">—</option>
               {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

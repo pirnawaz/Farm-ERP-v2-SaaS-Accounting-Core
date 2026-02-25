@@ -607,7 +607,7 @@ export default function LandLeaseDetailPage() {
       >
         <div className="space-y-4">
           <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
-            Reversing creates a new posting group with opposite ledger entries. The original posting is not modified. This action cannot be undone.
+            Reversing creates a new reversal transaction with opposite accounting lines. The original posting is not modified. This action cannot be undone.
           </p>
           <FormField label="Posting date" required>
             <input

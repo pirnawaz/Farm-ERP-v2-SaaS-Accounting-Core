@@ -4,6 +4,8 @@ import { GeneralLedgerLine, Project, Account, apiClient } from '@farm-erp/shared
 import { exportToCSV } from '../utils/csvExport'
 import { useFormatting } from '../hooks/useFormatting'
 import { PrintableReport } from '../components/print/PrintableReport'
+import { Term } from '../components/Term'
+import { term } from '../config/terminology'
 
 const defaultFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
 const defaultTo = new Date().toISOString().split('T')[0]
@@ -117,7 +119,7 @@ function GeneralLedgerPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center no-print">
-        <h2 className="text-2xl font-bold">General Ledger</h2>
+        <h2 className="text-2xl font-bold"><Term k="generalLedger" showHint /></h2>
         <div className="flex gap-2">
           <button
             onClick={() => window.print()}
@@ -217,7 +219,7 @@ function GeneralLedgerPage() {
                       Description
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Posting Group
+                      <Term k="postingGroup" showHint />
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Debit
@@ -286,7 +288,7 @@ function GeneralLedgerPage() {
 
           {/* Print view */}
           <PrintableReport
-            title="General Ledger"
+            title={term('generalLedger')}
             metaLeft={`From ${formatDate(filters.from)} to ${formatDate(filters.to)}`}
           >
             <table className="w-full divide-y divide-gray-200">
@@ -302,7 +304,7 @@ function GeneralLedgerPage() {
                     Description
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Posting Group
+                    {term('postingGroup')}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Debit

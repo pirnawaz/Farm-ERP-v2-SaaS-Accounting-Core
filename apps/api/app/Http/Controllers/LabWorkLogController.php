@@ -62,6 +62,9 @@ class LabWorkLogController extends Controller
         if ($request->filled('machine_id')) {
             Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
+        if ($request->filled('production_unit_id')) {
+            \App\Models\ProductionUnit::where('id', $request->production_unit_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
 
         $amount = (float) $request->units * (float) $request->rate;
 
@@ -80,6 +83,7 @@ class LabWorkLogController extends Controller
             'work_date' => $request->work_date,
             'crop_cycle_id' => $request->crop_cycle_id,
             'project_id' => $request->project_id,
+            'production_unit_id' => $request->production_unit_id,
             'activity_id' => $request->activity_id,
             'machine_id' => $request->machine_id,
             'rate_basis' => $request->rate_basis,
@@ -123,7 +127,7 @@ class LabWorkLogController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $log = LabWorkLog::where('id', $id)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
 
-        $data = $request->only(['doc_no', 'worker_id', 'work_date', 'crop_cycle_id', 'project_id', 'activity_id', 'machine_id', 'rate_basis', 'units', 'rate', 'notes']);
+        $data = $request->only(['doc_no', 'worker_id', 'work_date', 'crop_cycle_id', 'project_id', 'production_unit_id', 'activity_id', 'machine_id', 'rate_basis', 'units', 'rate', 'notes']);
         $data = array_filter($data, fn ($v) => $v !== null);
         if ($request->has('activity_id') && $request->activity_id === null) {
             $data['activity_id'] = null;
@@ -131,8 +135,14 @@ class LabWorkLogController extends Controller
         if ($request->has('machine_id') && $request->machine_id === null) {
             $data['machine_id'] = null;
         }
+        if ($request->has('production_unit_id')) {
+            $data['production_unit_id'] = $request->production_unit_id ?: null;
+        }
         if ($request->filled('machine_id')) {
             Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
+        }
+        if (isset($data['production_unit_id']) && $data['production_unit_id']) {
+            \App\Models\ProductionUnit::where('id', $data['production_unit_id'])->where('tenant_id', $tenantId)->firstOrFail();
         }
 
         if (isset($data['units']) || isset($data['rate'])) {

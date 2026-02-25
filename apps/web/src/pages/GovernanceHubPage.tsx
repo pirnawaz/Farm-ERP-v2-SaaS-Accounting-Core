@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useRole } from '../hooks/useRole';
 import { useModules } from '../contexts/ModulesContext';
 import type { UserRole } from '../types';
+import { term } from '../config/terminology';
 
 type HubCardKey = 'settlement' | 'accounting_periods' | 'bank_reconciliation' | 'reports';
 
@@ -40,7 +41,7 @@ const HUB_CARDS: HubCard[] = [
   {
     key: 'bank_reconciliation',
     title: 'Bank Reconciliation',
-    description: 'Reconcile bank statements with ledger entries.',
+    description: 'Reconcile bank statements with accounting lines.',
     to: '/app/reports/bank-reconciliation',
     linkLabel: 'Open',
     roles: ['tenant_admin', 'accountant'],
@@ -49,7 +50,7 @@ const HUB_CARDS: HubCard[] = [
   {
     key: 'reports',
     title: 'Reports',
-    description: 'Trial balance, P&L, balance sheet, reconciliation dashboard, and more.',
+    description: `${term('trialBalance')}, ${term('profitAndLoss')}, ${term('balanceSheet')}, reconciliation dashboard, and more.`,
     to: '/app/reports',
     linkLabel: 'Open',
     roles: ['tenant_admin', 'accountant', 'operator'],

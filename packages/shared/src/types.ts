@@ -206,6 +206,22 @@ export interface DashboardSummary {
   alerts: DashboardAlert[]
 }
 
+/** Farm integrity metrics (internal, read-only, tenant_admin) */
+export interface FarmIntegrity {
+  activities_missing_production_unit: number
+  harvest_without_sale: number
+  sales_overdue_no_payment: number
+  negative_inventory_items: number
+  production_units_no_activity_last_30_days: number
+  livestock_units_negative_headcount: number
+}
+
+/** Daily admin review counts from audit log (created/edited today; deletes not logged) */
+export interface DailyAdminReview {
+  records_created_today: number
+  records_edited_today: number
+}
+
 // Land Lease (Maqada) — lease master, no accounting
 export type LandLeaseFrequency = 'MONTHLY'
 

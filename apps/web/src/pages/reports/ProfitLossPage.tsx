@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useProfitLoss } from '../../hooks/useReports';
+import { term } from '../../config/terminology';
 
 const defaultFrom = () => {
   const d = new Date();
@@ -28,8 +29,8 @@ export default function ProfitLossPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Profit &amp; Loss"
-        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: 'Profit & Loss' }]}
+        title={term('profitAndLoss')}
+        breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: term('profitAndLoss') }]}
       />
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4">

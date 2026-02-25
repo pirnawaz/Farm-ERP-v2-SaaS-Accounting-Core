@@ -4,6 +4,7 @@ import { useCreateAdjustment, useInventoryStores, useInventoryItems } from '../.
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
+import { term } from '../../config/terminology';
 import type { CreateInvAdjustmentPayload, InvAdjustmentReason } from '../../types';
 
 const REASONS: InvAdjustmentReason[] = ['LOSS', 'DAMAGE', 'COUNT_GAIN', 'COUNT_LOSS', 'OTHER'];
@@ -62,13 +63,13 @@ export default function InvAdjustmentFormPage() {
   return (
     <div>
       <PageHeader
-        title="New Adjustment"
+        title={`New ${term('adjustmentSingular')}`}
         backTo="/app/inventory/adjustments"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory', to: '/app/inventory' },
-          { label: 'Adjustments', to: '/app/inventory/adjustments' },
-          { label: 'New Adjustment' },
+          { label: term('adjustment'), to: '/app/inventory/adjustments' },
+          { label: `New ${term('adjustmentSingular')}` },
         ]}
       />
       <div className="bg-white rounded-lg shadow p-6 space-y-4">

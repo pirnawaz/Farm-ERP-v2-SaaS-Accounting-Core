@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStockMovements, useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
+import { term } from '../../config/terminology';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
@@ -33,7 +34,7 @@ export default function StockMovementsPage() {
 
   return (
     <div>
-      <PageHeader title="Stock Movements" backTo="/app/inventory" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Stock Movements' }]} />
+      <PageHeader title={term('stockMovements')} backTo="/app/inventory" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('stockMovements') }]} />
       <div className="flex flex-wrap gap-4 mb-4">
         <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All stores</option>
@@ -50,7 +51,7 @@ export default function StockMovementsPage() {
         {isLoading ? (
           <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
         ) : (
-          <DataTable data={(movements ?? []) as InvStockMovement[]} columns={cols} emptyMessage="No stock movements. Post GRNs or Issues." />
+          <DataTable data={(movements ?? []) as InvStockMovement[]} columns={cols} emptyMessage={`No ${term('stockMovements').toLowerCase()}. Record ${term('grn')} or ${term('issue')}.`} />
         )}
       </div>
     </div>

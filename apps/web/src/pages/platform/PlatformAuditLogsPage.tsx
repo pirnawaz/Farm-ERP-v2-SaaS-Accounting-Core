@@ -104,7 +104,7 @@ export default function PlatformAuditLogsPage() {
               type="text"
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              placeholder="e.g. POST, REVERSE"
+              placeholder="e.g. Post to Accounts, Reverse Posting"
               className="w-full rounded border border-gray-300 text-sm"
             />
           </div>

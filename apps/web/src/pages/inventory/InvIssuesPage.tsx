@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
+import { term } from '../../config/terminology';
 import type { InvIssue } from '../../types';
 
 export default function InvIssuesPage() {
@@ -36,11 +37,11 @@ export default function InvIssuesPage() {
   return (
     <div>
       <PageHeader
-        title="Issues"
+        title={term('issue')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Issues' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('issue') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => navigate('/app/inventory/issues/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Issue</button>
+          <button onClick={() => navigate('/app/inventory/issues/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('issueSingular')}</button>
         ) : undefined}
       />
       <div className="flex gap-4 mb-4">

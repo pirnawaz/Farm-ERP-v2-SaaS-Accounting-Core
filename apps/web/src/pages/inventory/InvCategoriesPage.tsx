@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useCategories, useCreateCategory, useUpdateCategory } from '../../hooks/useInventory';
+import { term } from '../../config/terminology';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
@@ -63,9 +64,9 @@ export default function InvCategoriesPage() {
   return (
     <div>
       <PageHeader
-        title="Categories"
+        title={term('inventoryCategory')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Categories' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('inventoryCategory') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Category</button>
         ) : undefined}

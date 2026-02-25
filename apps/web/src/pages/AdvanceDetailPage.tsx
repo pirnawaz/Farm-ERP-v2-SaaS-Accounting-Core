@@ -9,6 +9,8 @@ import { useRole } from '../hooks/useRole';
 import { useCropCycles } from '../hooks/useCropCycles';
 import { useFormatting } from '../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
+import { Term } from '../components/Term';
+import { term } from '../config/terminology';
 
 export default function AdvanceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -145,7 +147,7 @@ export default function AdvanceDetailPage() {
           )}
           {advance.posting_group_id && (
             <div className="md:col-span-2">
-              <dt className="text-sm font-medium text-gray-500">Posting Group</dt>
+              <dt className="text-sm font-medium text-gray-500"><Term k="postingGroup" showHint /></dt>
               <dd className="text-sm text-gray-900">
                 <Link
                   to={`/app/posting-groups/${advance.posting_group_id}`}
@@ -184,7 +186,7 @@ export default function AdvanceDetailPage() {
                   onClick={() => setShowPostModal(true)}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                 >
-                  Post
+                  {term('postAction')}
                 </button>
               )}
               <button
@@ -201,7 +203,7 @@ export default function AdvanceDetailPage() {
       <Modal
         isOpen={showPostModal}
         onClose={() => setShowPostModal(false)}
-        title="Post Advance"
+        title={term('postAction')}
       >
         <div className="space-y-4">
           <FormField label="Posting Date" required>
@@ -242,7 +244,7 @@ export default function AdvanceDetailPage() {
               disabled={postMutation.isPending}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
             >
-              {postMutation.isPending ? 'Posting...' : 'Post'}
+              {postMutation.isPending ? term('postActionPending') : term('postAction')}
             </button>
           </div>
         </div>

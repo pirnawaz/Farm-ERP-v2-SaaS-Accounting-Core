@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { term } from '../config/terminology';
 import { inventoryApi, type GrnFilters, type IssueFilters, type TransferFilters, type AdjustmentFilters, type StockOnHandFilters, type StockMovementsFilters } from '../api/inventory';
 import type {
   InvGrn,
@@ -178,8 +179,8 @@ export function useCreateGRN() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (p: CreateInvGrnPayload) => inventoryApi.grns.create(p),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory', 'grns'] }); toast.success('GRN created'); },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to create GRN'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory', 'grns'] }); toast.success(`${term('grnSingular')} recorded`); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `Failed to create ${term('grnSingular')}`),
   });
 }
 
@@ -190,9 +191,9 @@ export function useUpdateGRN() {
     onSuccess: (_, v) => {
       qc.invalidateQueries({ queryKey: ['inventory', 'grns'] });
       qc.invalidateQueries({ queryKey: ['inventory', 'grns', v.id] });
-      toast.success('GRN updated');
+      toast.success(`${term('grnSingular')} updated`);
     },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to update GRN'),
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `Failed to update ${term('grnSingular')}`),
   });
 }
 
@@ -204,11 +205,11 @@ export function usePostGRN() {
       qc.invalidateQueries({ queryKey: ['inventory', 'grns'] });
       qc.invalidateQueries({ queryKey: ['inventory', 'grns', v.id] });
       qc.invalidateQueries({ queryKey: ['inventory', 'stock'] });
-      toast.success('GRN posted');
+      toast.success(`${term('grnSingular')} posted`);
     },
     onError: (e: unknown) => {
       const d = (e as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
-      toast.error(d?.error || d?.message || 'Failed to post GRN');
+      toast.error(d?.error || d?.message || `Failed to post ${term('grnSingular')}`);
     },
   });
 }
@@ -221,9 +222,9 @@ export function useReverseGRN() {
       qc.invalidateQueries({ queryKey: ['inventory', 'grns'] });
       qc.invalidateQueries({ queryKey: ['inventory', 'grns', v.id] });
       qc.invalidateQueries({ queryKey: ['inventory', 'stock'] });
-      toast.success('GRN reversed');
+      toast.success(`${term('grnSingular')} reversed`);
     },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to reverse GRN'),
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `Failed to reverse ${term('grnSingular')}`),
   });
 }
 

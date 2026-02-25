@@ -561,7 +561,7 @@ export default function BankReconciliationDetailPage() {
               Statement line: {formatDate(matchModalLine.line_date)} — {formatMoney(matchModalLine.amount)}
             </p>
             {eligibleEntriesForMatch.length === 0 ? (
-              <p className="text-sm text-gray-500">No eligible ledger entries (same sign and account).</p>
+              <p className="text-sm text-gray-500">No eligible accounting lines (same sign and account).</p>
             ) : (
               <div className="max-h-64 overflow-y-auto border rounded-lg">
                 <table className="min-w-full divide-y divide-gray-200">

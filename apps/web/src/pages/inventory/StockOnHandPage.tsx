@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStockOnHand, useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
+import { term } from '../../config/terminology';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
@@ -27,7 +28,7 @@ export default function StockOnHandPage() {
 
   return (
     <div>
-      <PageHeader title="Stock On Hand" backTo="/app/inventory" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Stock On Hand' }]} />
+      <PageHeader title={term('stockOnHand')} backTo="/app/inventory" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('stockOnHand') }]} />
       <div className="flex flex-wrap gap-4 mb-4">
         <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
           <option value="">All stores</option>
@@ -42,7 +43,7 @@ export default function StockOnHandPage() {
         {isLoading ? (
           <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
         ) : (
-          <DataTable data={balances || []} columns={cols} emptyMessage="No stock on hand. Post GRNs to receive stock." />
+          <DataTable data={balances || []} columns={cols} emptyMessage={`No ${term('stockOnHand').toLowerCase()}. Record ${term('grn')} to receive stock.`} />
         )}
       </div>
     </div>

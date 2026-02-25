@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { reportsApi } from '../api/reports';
 import { getApiErrorMessage } from '../utils/api';
-import type { GeneralLedgerResponse, TrialBalanceRow, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy } from '../types';
+import type { GeneralLedgerResponse, TrialBalanceRow, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy, ProductionUnitSummaryResponse, LivestockUnitStatusResponse } from '../types';
 
 export function useTrialBalance(params: { from: string; to: string }) {
   return useQuery<TrialBalanceRow[], Error>({
@@ -66,6 +66,7 @@ export function useCropProfitability(
     to: string;
     group_by?: CropProfitabilityGroupBy;
     include_unassigned?: boolean;
+    production_unit_id?: string;
   },
   options?: { enabled?: boolean }
 ) {
@@ -108,4 +109,32 @@ export function useCropProfitabilityTrend(
     }
   }, [query.error]);
   return query;
+}
+
+export function useProductionUnitSummary(
+  params: { production_unit_id: string; from: string; to: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.production_unit_id && !!params.from && !!params.to;
+  return useQuery<ProductionUnitSummaryResponse, Error>({
+    queryKey: ['reports', 'production-unit-summary', params],
+    queryFn: () => reportsApi.getProductionUnitSummary(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useLivestockUnitStatus(
+  params: { production_unit_id: string; as_of: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.production_unit_id && !!params.as_of;
+  return useQuery<LivestockUnitStatusResponse, Error>({
+    queryKey: ['reports', 'livestock-unit-status', params],
+    queryFn: () => reportsApi.getLivestockUnitStatus(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
 }

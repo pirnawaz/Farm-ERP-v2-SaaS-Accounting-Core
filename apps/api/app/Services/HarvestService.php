@@ -54,6 +54,7 @@ class HarvestService
                 'harvest_no' => $data['harvest_no'] ?? null,
                 'crop_cycle_id' => $cropCycleId,
                 'project_id' => $projectId,
+                'production_unit_id' => $data['production_unit_id'] ?? null,
                 'land_parcel_id' => $landParcelId,
                 'harvest_date' => $data['harvest_date'],
                 'status' => 'DRAFT',
@@ -84,6 +85,9 @@ class HarvestService
                 'harvest_date' => $data['harvest_date'] ?? $harvest->harvest_date,
                 'notes' => $data['notes'] ?? $harvest->notes,
             ];
+            if (array_key_exists('production_unit_id', $data)) {
+                $update['production_unit_id'] = $data['production_unit_id'] ?? null;
+            }
 
             if (array_key_exists('project_id', $data)) {
                 $project = Project::where('id', $data['project_id'])

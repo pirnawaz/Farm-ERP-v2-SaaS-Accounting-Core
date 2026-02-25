@@ -51,6 +51,10 @@ class SaleController extends Controller
             $query->where('posting_date', '<=', $request->date_to);
         }
 
+        if ($request->filled('production_unit_id')) {
+            $query->where('production_unit_id', $request->production_unit_id);
+        }
+
         $sales = $query->orderBy('posting_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -72,6 +76,9 @@ class SaleController extends Controller
             Project::where('id', $request->project_id)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
+        }
+        if ($request->filled('production_unit_id')) {
+            \App\Models\ProductionUnit::where('id', $request->production_unit_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
 
         // Set sale_date and due_date defaults
@@ -102,6 +109,7 @@ class SaleController extends Controller
                 'buyer_party_id' => $request->buyer_party_id,
                 'project_id' => $request->project_id,
                 'crop_cycle_id' => $request->crop_cycle_id,
+                'production_unit_id' => $request->production_unit_id,
                 'amount' => $amount,
                 'posting_date' => $request->posting_date,
                 'sale_no' => $saleNo,
@@ -168,6 +176,9 @@ class SaleController extends Controller
             Project::where('id', $request->project_id)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
+        }
+        if ($request->filled('production_unit_id')) {
+            \App\Models\ProductionUnit::where('id', $request->production_unit_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
 
         $sale = DB::transaction(function () use ($sale, $request, $tenantId) {

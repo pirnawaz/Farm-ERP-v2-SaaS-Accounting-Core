@@ -1,6 +1,6 @@
-# Farm ERP v2 — SaaS Accounting Core
+# Terrava Farm ERP v2 — SaaS Accounting Core
 
-A multi-tenant SaaS accounting and farm management system built as a monorepo: **Laravel API** (backend), **React + Vite** (frontend), and a shared **TypeScript** package. Supports Supabase Postgres (and optionally MySQL for local/Laragon).
+A multi-tenant SaaS accounting and farm management system (Terrava) built as a monorepo: **Laravel API** (backend), **React + Vite** (frontend), and a shared **TypeScript** package. Supports Supabase Postgres (and optionally MySQL for local/Laragon).
 
 [![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php)](https://php.net)
 [![Laravel](https://img.shields.io/badge/Laravel-11+-FF2D20?logo=laravel)](https://laravel.com)
@@ -54,8 +54,8 @@ A multi-tenant SaaS accounting and farm management system built as a monorepo: *
 - **Reports** — Trial balance, **Profit & Loss** (income statement), **Balance Sheet** (with equation check), general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, **AR ageing** (including auditable `GET /ar/aging` — open invoice balances per customer with bucket totals and grand totals), customer balances, AP ageing, supplier balances, AR/AP control reconciliation, yield reports, party ledger, party summary, **landlord statement** (Maqada, when `land_leases` module enabled), role ageing, crop cycle distribution, settlement statement, cost per unit, sales margin; **crop reports** (require `projects_crop_cycles`): **crop-category-acres**, **crop-costs** (expense cost and cost per acre by crop/category/cycle), **crop-profitability** (cost, revenue, margin and per-acre metrics; group by crop/category/cycle; include unassigned option), **crop-profitability-trend** (month-by-month margin per acre; group by category/crop/all); reconciliation reports (project, crop-cycle, supplier AP); bank reconciliation; CSV export with Terrava-branded filenames; print-friendly layouts
 - **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
 - **Crop Cycle Close** — Close crop cycle with preview; **Accounting Period Close (v2)**: full closing entries that zero all income/expense accounts for the cycle period, clear via CURRENT_EARNINGS, and roll to RETAINED_EARNINGS in one PERIOD_CLOSE posting group; idempotent (one close run per cycle); crop cycle lock enforced (no posting after CLOSED); `POST crop-cycles/{id}/close`, `GET crop-cycles/{id}/close-run`; crop-cycle-based settlements (preview and post); accounting corrections and guards
-- **Dashboard** — Role-based dashboard with widgets, quick actions, onboarding panel for new users, empty states. **Global crop cycle scope**: header-level selector (All Crop Cycles / single cycle); scope persists per tenant in `localStorage`; dashboard summary API accepts optional `scope_type` and `scope_id` (read-only, no ledger writes); default selection is the active OPEN cycle when present.
-- **Navigation & UX** — Farm-first sidebar: **Farm** (Dashboard, Land Parcels, Land Leases, Crop Cycles, Land Allocation, People & Partners, Projects, Unposted Records, Crop Ops, Harvests, Labour, **Machinery** submenu, Inventory), **Sales & Money** (Sales, Payments, Advances), **Profit & Reports**, **Governance** (Governance Hub, Settlement Packs, Accounting Periods), **Settings**. **Breadcrumbs**: `PageHeader` with breadcrumb trail on list/detail/form pages; hierarchy matches sidebar (e.g. Farm → Machinery → Work Logs; Sales & Money → Sales; Profit & Reports → Sales Margin; Governance → Settlement Packs). **Land Allocation** and **Maintenance Setup** appear under Farm/Machinery (not under Settings).
+- **Dashboard (Accounting Overview)** — Role-based dashboard at **Finance & Review → Accounting Overview**; widgets, quick actions, onboarding panel for new users, empty states. **Global crop cycle scope**: header-level selector (All Crop Cycles / single cycle); scope persists per tenant in `localStorage`; dashboard summary API accepts optional `scope_type` and `scope_id` (read-only, no ledger writes); default selection is the active OPEN cycle when present. **Farm Pulse** and **Today** are the primary daily entry points under Farm Operations.
+- **Navigation & UX** — Farm-first sidebar (three groups). **FARM OPERATIONS**: Farm Pulse, Today, Alerts, Land Parcels, Land Leases (Maqada), Crop Cycles, Production Units, Orchards, Livestock, Land Allocation, People & Partners, Projects, **Pending Review** (operational records; route `/app/transactions`), Crop Ops, Harvests, Labour, **Machinery** submenu (Machines, Work Logs, Services, Charges, Maintenance, Maintenance Setup, Rate Cards), Inventory, Sales & Money, Payments, Advances. **FINANCE & REVIEW**: **Accounting Overview** (dashboard), Review Queue, Account Balances, Crop Profitability, AR Ageing, Bank Reconciliation, Trial Balance, Governance, P&L, Balance Sheet, Cashbook, Project P&L, Crop Cycle P&L, Profitability Trend, Machinery Profitability, Sales Margin, Party Ledger, Landlord Statement, Party Summary, Party Ageing, Reconcile Accounts, General Ledger, General Journal, Settlement Packs, Accounting Periods. **ADMIN**: Farm Profile, Users, Roles, Modules, Farm Integrity, Localisation. **Breadcrumbs**: `PageHeader` with breadcrumb trail on list/detail/form pages; hierarchy matches sidebar. **Farm-first terminology**: `apps/web/src/config/terminology.ts` and `<Term>` component provide dual farm/accounting labels (e.g. "Post to Accounts" vs "POST", "Field Work" vs "Activities"); use `term('key')` for farmer-facing copy.
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
 ---
@@ -222,10 +222,11 @@ In production (or when `APP_ENV` is not `local`/`testing` and `DEV_IDENTITY_ENAB
 | API     | `cd apps/api && php artisan serve` | http://localhost:8000 |
 | Web     | `cd apps/web && npm run dev`       | http://localhost:3000  |
 
-Optional root scripts (if configured):
+From repo root:
 
-- `npm run dev:api`
-- `npm run dev:web`
+- `npm run dev` — run API and web concurrently (requires `npm run dev:api` and `npm run dev:web` under the hood)
+- `npm run dev:api` — API only
+- `npm run dev:web` — Web only
 
 ---
 
@@ -275,8 +276,8 @@ Exact routes, methods, and middleware are in `apps/api/routes/api.php`.
 
 The web app includes pages (and routes) for:
 
-- **Dashboard**, **Health**
-- **Daily book entries**, **Operational transactions**, **Posting group detail** (`/app/posting-groups/:id`)
+- **Accounting Overview** (dashboard at `/app/dashboard`), **Health**
+- **Daily book entries**, **Operational transactions** (list/detail; labels use "Record" / "Pending Review" via terminology), **Posting group detail** (`/app/posting-groups/:id`)
 - **Parties**, **Sales**, **Payments** (list, detail with Post and **Reverse** for posted payments; reverse modal: posting date, reason), **Advances**
 - **Land parcels**, **Land leases** (when `land_leases` module enabled: list, detail with accruals, post/reverse accruals, view posting group and reversal), **Land allocations**, **Crop cycles** (with close/reopen and detail), **Projects**, **Project rules**, **Share rules**, **Settlements** (project-based, sales-based, crop-cycle-based), **Settlement Pack** (view pack at `/app/settlement-packs/:id` with summary, transaction register, re-generate when not FINAL; generate from Settlement page), **Harvests**
 - **Inventory:** items, stores, categories, UOMs, GRNs, issues (with allocation configuration), transfers, adjustments, stock on-hand, movements (Back + breadcrumbs on internal pages)
@@ -284,8 +285,8 @@ The web app includes pages (and routes) for:
 - **Machinery:** machines, work logs, rate cards, charges, maintenance jobs and types, profitability reports (when `machinery` module enabled)
 - **Crop Operations:** activity types, activities (inputs, labour), timeline (when `crop_ops` enabled)
 - **Reports:** trial balance, **Profit & Loss**, **Balance Sheet**, general ledger, project statement, project P&L, crop cycle P&L, account balances, cashbook, AR ageing, customer balances, AP ageing, supplier balances, yield reports, sales margin, party ledger, party summary, **landlord statement** (when `land_leases` enabled), role ageing, crop cycle distribution, settlement statement; **Crop Profitability** (cost, revenue, margin per acre; group by crop/category/cycle; data-quality warnings for unassigned postings) and **Profitability Trend** (month-by-month margin per acre chart and table; group by category/crop/all; when `projects_crop_cycles` enabled); reconciliation dashboard; **bank reconciliation** (list and detail: statement lines, match/unmatch, finalize); CSV export functionality; print-friendly layouts
-- **Dashboard:** role-based widgets, quick actions, onboarding panel, empty states; **global crop cycle scope selector** in header (All Crop Cycles / single cycle; persisted per tenant; dashboard numbers respect selected scope)
-- **Navigation:** Farm-first sidebar with collapsible Machinery submenu; **breadcrumbs** on Sales, Payments, Reports, Settlement Pack, and other core pages (hierarchy matches sidebar)
+- **Dashboard (Accounting Overview):** under Finance & Review; role-based widgets, quick actions, onboarding panel, empty states; **global crop cycle scope selector** in header (All Crop Cycles / single cycle; persisted per tenant; dashboard numbers respect selected scope)
+- **Navigation:** Farm-first sidebar (FARM OPERATIONS, FINANCE & REVIEW, ADMIN) with collapsible Machinery submenu; **breadcrumbs** on Sales, Payments, Reports, Settlement Pack, and other core pages (hierarchy matches sidebar). Farmer-facing labels use **terminology** (`term()`) for consistency (e.g. "Post to Accounts", "Reverse Posting", "Pending Review", "Field Work").
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform (platform_admin only):** tenant list at `/app/platform/tenants` (status badge: active/suspended/archived, plan dropdown, impersonate); **Audit Logs** at `/app/platform/audit-logs` (table, filters: tenant, actor user ID, action, date range, pagination); tenant detail with plan, modules, **Support actions** (Reset admin password — generate token or set directly; Archive / Unarchive tenant), and impersonate; impersonation banner in tenant app with “Impersonating: {tenant}” and exit; tenant detail with plan and impersonate
 
@@ -307,6 +308,9 @@ Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, 
 | `npm run build:shared`       | Build `packages/shared` only               |
 | `npm run build:web`          | Build shared then `apps/web`               |
 | `npm run typecheck` / `npm run typecheck:web` | TypeScript check (web app)        |
+| `npm run clean`             | Remove `packages/shared/dist` and `apps/web/dist` |
+| `npm run clean:shared`      | Remove `packages/shared/dist` only |
+| `npm run clean:web`         | Remove `apps/web/dist` only       |
 | `npm run e2e`               | Start API then run Playwright E2E (uses `E2E_PROFILE` or default) |
 | `npm run e2e:core`          | E2E with profile `core`                   |
 | `npm run e2e:all`           | E2E with profile `all` (e.g. platform admin flows) |

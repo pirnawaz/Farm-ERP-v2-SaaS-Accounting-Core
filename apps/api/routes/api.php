@@ -8,6 +8,8 @@ use App\Http\Controllers\PartyController;
 use App\Http\Controllers\LandParcelController;
 use App\Http\Controllers\CropCycleController;
 use App\Http\Controllers\CropItemController;
+use App\Http\Controllers\ProductionUnitController;
+use App\Http\Controllers\LivestockEventController;
 use App\Http\Controllers\LandAllocationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectRuleController;
@@ -64,8 +66,15 @@ use App\Http\Controllers\SettlementPackController;
 use App\Domains\Operations\LandLease\LandLeaseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandLeaseAccrualController;
+use App\Http\Controllers\Internal\FarmIntegrityController;
 
 Route::get('/health', [HealthController::class, 'index']);
+
+// Internal: farm integrity + daily admin review (read-only, tenant-scoped, tenant_admin only)
+Route::prefix('internal')->middleware(['role:tenant_admin'])->group(function () {
+    Route::get('farm-integrity', [FarmIntegrityController::class, 'index']);
+    Route::get('daily-admin-review', [FarmIntegrityController::class, 'dailyAdminReview']);
+});
 
 // Dashboard (read-only summary for all tenant roles)
 Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () {
@@ -153,6 +162,19 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:proj
 Route::middleware(['role:tenant_admin,accountant', 'require_module:projects_crop_cycles'])->group(function () {
     Route::post('crop-items', [CropItemController::class, 'store']);
     Route::patch('crop-items/{id}', [CropItemController::class, 'update']);
+});
+
+// Production Units (tenant_admin, accountant) — additive for long-duration crops
+Route::middleware(['role:tenant_admin,accountant', 'require_module:projects_crop_cycles'])->group(function () {
+    Route::get('production-units', [ProductionUnitController::class, 'index']);
+    Route::post('production-units', [ProductionUnitController::class, 'store']);
+    Route::get('production-units/{id}', [ProductionUnitController::class, 'show']);
+    Route::patch('production-units/{id}', [ProductionUnitController::class, 'update']);
+    Route::get('livestock-events', [LivestockEventController::class, 'index']);
+    Route::post('livestock-events', [LivestockEventController::class, 'store']);
+    Route::get('livestock-events/{id}', [LivestockEventController::class, 'show']);
+    Route::patch('livestock-events/{id}', [LivestockEventController::class, 'update']);
+    Route::delete('livestock-events/{id}', [LivestockEventController::class, 'destroy']);
 });
 
 // Crop Cycles (tenant_admin, accountant)
@@ -439,6 +461,8 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:proj
     Route::get('reports/crop-costs', [ReportController::class, 'cropCosts']);
     Route::get('reports/crop-profitability', [ReportController::class, 'cropProfitability']);
     Route::get('reports/crop-profitability-trend', [ReportController::class, 'cropProfitabilityTrend']);
+    Route::get('reports/production-unit-summary', [ReportController::class, 'productionUnitSummary']);
+    Route::get('reports/livestock-unit-status', [ReportController::class, 'livestockUnitStatus']);
 });
 
 // Reports (tenant_admin, accountant, operator) — requires reports module

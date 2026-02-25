@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { OnboardingState } from '../hooks/useOnboardingState';
+import { term } from '../config/terminology';
 
 const DISMISSED_KEY = 'terrava_onboarding_dismissed';
 
@@ -65,7 +66,7 @@ export function OnboardingPanel({ onboardingState }: OnboardingPanelProps) {
   if (!steps.hasReports) {
     incompleteSteps.push({
       text: 'Review your first reports',
-      buttonLabel: 'View Trial Balance',
+      buttonLabel: `View ${term('trialBalance')}`,
       action: () => navigate('/app/reports'),
       primary: incompleteSteps.length === 0,
     });
