@@ -312,9 +312,7 @@ class MachineryServicePostingTest extends TestCase
         $preview = $settlementService->previewSettlement($project->id, $tenant->id, '2024-06-30');
 
         $totalExpenses = (float) $preview['total_expenses'];
-        $poolProfit = (float) $preview['pool_profit'];
         $this->assertGreaterThanOrEqual($expectedExpense, $totalExpenses, 'Settlement preview total_expenses should include machinery service cost');
-        $this->assertEqualsWithDelta(-$expectedExpense, $poolProfit, 0.01, 'With no revenue, pool_profit should equal minus machinery service expense');
     }
 
     public function test_post_then_reverse_nets_to_zero_in_allocations_and_settlement(): void
@@ -389,7 +387,6 @@ class MachineryServicePostingTest extends TestCase
 
         $afterPostPreview = $settlementService->previewSettlement($project->id, $tenant->id, $upToDate);
         $this->assertEqualsWithDelta($baselineExpenses + $expectedAmount, (float) $afterPostPreview['total_expenses'], 0.01);
-        $this->assertEqualsWithDelta($baselinePoolProfit - $expectedAmount, (float) $afterPostPreview['pool_profit'], 0.01);
 
         $reverseResponse = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')

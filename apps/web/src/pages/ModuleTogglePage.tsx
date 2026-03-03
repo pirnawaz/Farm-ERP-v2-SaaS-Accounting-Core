@@ -1,9 +1,16 @@
 import { useState, useMemo } from 'react';
 import { useModules } from '../contexts/ModulesContext';
-import { useUpdateTenantModulesMutation } from '../hooks/useModules';
+import { useUpdateTenantModulesMutation, useTenantAddonModulesQuery, useUpdateTenantAddonModuleMutation } from '../hooks/useModules';
+import { useRole } from '../hooks/useRole';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import type { TenantModuleItem, TenantModulesUpdateResponse } from '@farm-erp/shared';
+import type { TenantAddonModuleKey } from '../api/tenantAddonModules';
+
+const ADDON_MODULES: { key: TenantAddonModuleKey; name: string; envKey: string }[] = [
+  { key: 'orchards', name: 'Orchards', envKey: 'VITE_ENABLE_ORCHARDS' },
+  { key: 'livestock', name: 'Livestock', envKey: 'VITE_ENABLE_LIVESTOCK' },
+];
 
 function tierBadge(tier: TenantModuleItem['tier']) {
   if (tier === 'CORE') return { label: 'Core', className: 'bg-amber-100 text-amber-800' };
@@ -20,6 +27,10 @@ function requiredByLabel(requiredBy: string[], keyToName: Record<string, string>
 export default function ModuleTogglePage() {
   const { modules, loading, error } = useModules();
   const updateMutation = useUpdateTenantModulesMutation();
+  const { hasRole } = useRole();
+  const isTenantAdmin = hasRole('tenant_admin');
+  const { data: addonData, isLoading: addonLoading } = useTenantAddonModulesQuery();
+  const updateAddonMutation = useUpdateTenantAddonModuleMutation();
   const [localOverrides, setLocalOverrides] = useState<Record<string, boolean>>({});
 
   const sorted = useMemo(
@@ -100,6 +111,22 @@ export default function ModuleTogglePage() {
 
   const keyToName = Object.fromEntries(modules.map((m) => [m.key, m.name]));
 
+  const envOrchards = import.meta.env.VITE_ENABLE_ORCHARDS === 'true';
+  const envLivestock = import.meta.env.VITE_ENABLE_LIVESTOCK === 'true';
+
+  const handleAddonToggle = async (key: TenantAddonModuleKey, current: boolean) => {
+    if (!isTenantAdmin) return;
+    const forced = (key === 'orchards' && envOrchards) || (key === 'livestock' && envLivestock);
+    if (forced) return;
+    try {
+      await updateAddonMutation.mutateAsync({ moduleKey: key, isEnabled: !current });
+      toast.success(`${ADDON_MODULES.find((a) => a.key === key)?.name} ${!current ? 'enabled' : 'disabled'}`);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string }; status?: number } };
+      toast.error(err?.response?.data?.message ?? 'Failed to update');
+    }
+  };
+
   return (
     <div data-testid="module-toggles-page">
       <div className="mb-6">
@@ -107,6 +134,64 @@ export default function ModuleTogglePage() {
         <p className="text-sm text-gray-500 mt-1">
           Enable or disable modules for this tenant. Core and required-by-others modules cannot be turned off.
         </p>
+      </div>
+
+      {/* Add-on expansions: Orchards, Livestock (tenant-scoped; env override can force on) */}
+      <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Add-on expansions</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Orchards and Livestock. When enabled, they appear in the sidebar.</p>
+        </div>
+        <ul className="divide-y divide-gray-200">
+          {ADDON_MODULES.map((addon) => {
+            const forced = (addon.key === 'orchards' && envOrchards) || (addon.key === 'livestock' && envLivestock);
+            const enabled = forced || (addonData?.modules?.[addon.key] ?? false);
+            const canToggleAddon = isTenantAdmin && !forced;
+            const isUpdating = updateAddonMutation.isPending;
+            return (
+              <li
+                key={addon.key}
+                className="px-4 py-3 flex items-center justify-between gap-4"
+                data-testid={`addon-module-row-${addon.key}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-gray-900">{addon.name}</span>
+                    {forced && (
+                      <span className="px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-800" data-testid={`addon-forced-${addon.key}`}>
+                        Forced by environment
+                      </span>
+                    )}
+                    {!forced && (
+                      <span className="text-sm text-gray-500">
+                        {addonLoading ? '…' : enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-shrink-0">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={enabled}
+                    disabled={!canToggleAddon || isUpdating}
+                    data-testid={`addon-module-toggle-${addon.key}`}
+                    onClick={() => handleAddonToggle(addon.key, addonData?.modules?.[addon.key] ?? false)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      enabled ? 'bg-[#1F6F5C]' : 'bg-gray-200'
+                    } ${!canToggleAddon ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                        enabled ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">

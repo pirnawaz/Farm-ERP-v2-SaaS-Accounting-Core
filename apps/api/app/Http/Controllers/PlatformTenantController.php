@@ -11,6 +11,7 @@ use App\Models\TenantModule;
 use App\Models\User;
 use App\Services\PlanModules;
 use App\Services\SystemPartyService;
+use App\Services\TenantCropItemProvisioner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -131,6 +132,8 @@ class PlatformTenantController extends Controller
             (new SystemPartyService())->ensureSystemLandlordParty($tenant->id);
 
             $this->enableDefaultModules($tenant->id);
+
+            app(TenantCropItemProvisioner::class)->syncTenant($tenant->id);
 
             User::create([
                 'tenant_id' => $tenant->id,

@@ -1,6 +1,28 @@
 import { apiClient } from '@farm-erp/shared';
 import type { CropCycle, CreateCropCyclePayload, CropCycleClosePreview } from '../types';
 
+export interface SeasonSetupAssignment {
+  land_parcel_id: string;
+  blocks: { tenant_crop_item_id: string; name?: string; area?: number }[];
+}
+
+export interface SeasonSetupPayload {
+  assignments: SeasonSetupAssignment[];
+}
+
+export interface SeasonSetupResponse {
+  crop_cycle_id: string;
+  field_blocks_created?: number;
+  projects_created: number;
+  projects: {
+    field_block_id?: string;
+    project_id: string;
+    name: string;
+    land_parcel_id: string;
+    land_allocation_id: string;
+  }[];
+}
+
 export const cropCyclesApi = {
   list: () => apiClient.get<CropCycle[]>('/api/crop-cycles'),
   get: (id: string) => apiClient.get<CropCycle>(`/api/crop-cycles/${id}`),
@@ -13,4 +35,6 @@ export const cropCyclesApi = {
     apiClient.post<CropCycle>(`/api/crop-cycles/${id}/close`, body ?? {}),
   reopen: (id: string) => apiClient.post<CropCycle>(`/api/crop-cycles/${id}/reopen`, {}),
   open: (id: string) => apiClient.post<CropCycle>(`/api/crop-cycles/${id}/open`, {}),
+  seasonSetup: (cropCycleId: string, payload: SeasonSetupPayload) =>
+    apiClient.post<SeasonSetupResponse>(`/api/crop-cycles/${cropCycleId}/season-setup`, payload),
 };

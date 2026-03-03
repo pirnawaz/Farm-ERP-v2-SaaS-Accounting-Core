@@ -4,10 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Domains\Accounting\PeriodClose\PeriodCloseService;
 use App\Models\CropCycle;
+use App\Models\FieldBlock;
+use App\Models\LandAllocation;
+use App\Models\LandParcel;
+use App\Models\Project;
+use App\Models\TenantCropItem;
 use App\Services\CropCycleCloseService;
+use App\Services\SystemPartyService;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -15,7 +22,8 @@ class CropCycleController extends Controller
 {
     public function __construct(
         private CropCycleCloseService $closeService,
-        private PeriodCloseService $periodCloseService
+        private PeriodCloseService $periodCloseService,
+        private SystemPartyService $systemPartyService
     ) {}
     public function index(Request $request)
     {
@@ -220,6 +228,154 @@ class CropCycleController extends Controller
         $cycle->load('tenantCropItem.cropCatalogItem');
 
         return response()->json($this->cycleToArray($cycle));
+    }
+
+    /**
+     * POST /api/crop-cycles/{id}/season-setup
+     * Assign fields (land parcels) to this crop cycle; creates one field block and one project per block.
+     * One LandAllocation per (cycle, parcel); multiple FieldBlocks and Projects per parcel when advanced.
+     * Cycle must be OPEN. Idempotent: re-posting same payload does not create duplicates.
+     */
+    public function seasonSetup(Request $request, string $id): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        if (!$tenantId) {
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
+
+        $cycle = CropCycle::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->with('tenantCropItem.cropCatalogItem')
+            ->firstOrFail();
+
+        if ($cycle->status !== 'OPEN') {
+            throw ValidationException::withMessages([
+                'crop_cycle' => ['Crop cycle must be OPEN to assign fields.'],
+            ])->status(422);
+        }
+
+        $request->validate([
+            'assignments' => ['required', 'array', 'min:1'],
+            'assignments.*.land_parcel_id' => ['required', 'uuid', Rule::exists('land_parcels', 'id')->where('tenant_id', $tenantId)],
+            'assignments.*.blocks' => ['required', 'array', 'min:1'],
+            'assignments.*.blocks.*.tenant_crop_item_id' => ['required', 'uuid', Rule::exists('tenant_crop_items', 'id')->where('tenant_id', $tenantId)],
+            'assignments.*.blocks.*.name' => ['nullable', 'string', 'max:255'],
+            'assignments.*.blocks.*.area' => ['nullable', 'numeric', 'min:0.01'],
+        ]);
+
+        $landlord = $this->systemPartyService->ensureSystemLandlordParty($tenantId);
+        $created = [];
+        $fieldBlocksCount = 0;
+
+        DB::transaction(function () use ($tenantId, $cycle, $request, $landlord, &$created, &$fieldBlocksCount) {
+            foreach ($request->input('assignments') as $assignment) {
+                $parcel = LandParcel::where('id', $assignment['land_parcel_id'])
+                    ->where('tenant_id', $tenantId)
+                    ->firstOrFail();
+
+                $allocatedAcres = max(0.01, (float) ($parcel->total_acres ?? 0));
+                $allocation = LandAllocation::firstOrCreate(
+                    [
+                        'tenant_id' => $tenantId,
+                        'crop_cycle_id' => $cycle->id,
+                        'land_parcel_id' => $parcel->id,
+                        'party_id' => null,
+                    ],
+                    ['allocated_acres' => $allocatedAcres]
+                );
+
+                $blocks = $this->normalizeBlockNamesForIdempotency($assignment['blocks']);
+                foreach ($blocks as $block) {
+                    $cropItem = TenantCropItem::where('id', $block['tenant_crop_item_id'])
+                        ->where('tenant_id', $tenantId)
+                        ->with('cropCatalogItem')
+                        ->firstOrFail();
+                    $cropName = $cropItem->resolved_display_name ?: 'Crop';
+                    $blockName = isset($block['name']) && (string) $block['name'] !== '' ? (string) $block['name'] : null;
+                    $blockArea = isset($block['area']) && $block['area'] > 0 ? (float) $block['area'] : null;
+
+                    $fieldBlock = FieldBlock::firstOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'crop_cycle_id' => $cycle->id,
+                            'land_parcel_id' => $parcel->id,
+                            'tenant_crop_item_id' => $block['tenant_crop_item_id'],
+                            'name' => $blockName,
+                        ],
+                        ['area' => $blockArea]
+                    );
+                    if ($fieldBlock->wasRecentlyCreated) {
+                        $fieldBlocksCount++;
+                    }
+                    if ($fieldBlock->area !== $blockArea && $blockArea !== null) {
+                        $fieldBlock->update(['area' => $blockArea]);
+                    }
+
+                    $projectName = $parcel->name . ' – ' . $cropName . ($blockName ? ' (' . $blockName . ')' : '');
+                    $project = Project::firstOrCreate(
+                        [
+                            'field_block_id' => $fieldBlock->id,
+                        ],
+                        [
+                            'tenant_id' => $tenantId,
+                            'name' => $projectName,
+                            'party_id' => $landlord->id,
+                            'crop_cycle_id' => $cycle->id,
+                            'land_allocation_id' => $allocation->id,
+                            'status' => 'ACTIVE',
+                        ]
+                    );
+                    if (!$project->wasRecentlyCreated && $project->name !== $projectName) {
+                        $project->update(['name' => $projectName]);
+                    }
+
+                    $created[] = [
+                        'field_block_id' => $fieldBlock->id,
+                        'project_id' => $project->id,
+                        'name' => $project->name,
+                        'land_parcel_id' => $parcel->id,
+                        'land_allocation_id' => $allocation->id,
+                    ];
+                }
+            }
+        });
+
+        return response()->json([
+            'crop_cycle_id' => $cycle->id,
+            'field_blocks_created' => $fieldBlocksCount,
+            'projects_created' => count($created),
+            'projects' => $created,
+        ], 201);
+    }
+
+    /**
+     * Ensure multiple blocks with same crop but no name get synthetic names so idempotency key is unique.
+     */
+    private function normalizeBlockNamesForIdempotency(array $blocks): array
+    {
+        $byCrop = [];
+        foreach ($blocks as $i => $block) {
+            $cid = $block['tenant_crop_item_id'];
+            if (!isset($byCrop[$cid])) {
+                $byCrop[$cid] = [];
+            }
+            $byCrop[$cid][] = $i;
+        }
+        $normalized = $blocks;
+        foreach ($byCrop as $indices) {
+            if (count($indices) <= 1) {
+                continue;
+            }
+            $unnamed = 0;
+            foreach ($indices as $idx) {
+                $name = $normalized[$idx]['name'] ?? null;
+                if ($name === null || (string) $name === '') {
+                    $unnamed++;
+                    $normalized[$idx]['name'] = (string) $unnamed;
+                }
+            }
+        }
+        return $normalized;
     }
 
     private function cycleToArray(CropCycle $cycle): array

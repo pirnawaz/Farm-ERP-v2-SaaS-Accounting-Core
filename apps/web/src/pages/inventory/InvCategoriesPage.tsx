@@ -65,6 +65,7 @@ export default function InvCategoriesPage() {
     <div>
       <PageHeader
         title={term('inventoryCategory')}
+        tooltip="Group farm inputs (e.g. seeds, fertilizer, fuel) for inventory and reporting."
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('inventoryCategory') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (

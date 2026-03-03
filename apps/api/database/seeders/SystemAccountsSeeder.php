@@ -83,6 +83,7 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'MACHINERY_MAINTENANCE_EXPENSE', 'name' => 'Machinery Maintenance Expense', 'type' => 'expense'],
             ['code' => 'MACHINERY_OTHER_EXPENSE', 'name' => 'Machinery Other Expense', 'type' => 'expense'],
             ['code' => 'MACHINERY_SERVICE_EXPENSE', 'name' => 'Machinery Service Expense', 'type' => 'expense'],
+            ['code' => 'MACHINERY_SERVICE_INCOME', 'name' => 'Machinery Service Income', 'type' => 'income'],
             ['code' => 'DUE_TO_LANDLORD', 'name' => 'Due to Landlord', 'type' => 'liability'],
             ['code' => 'ACCRUED_EXPENSES', 'name' => 'Accrued Expenses', 'type' => 'liability'],
             ['code' => 'EXPENSE_RECLASS_CLEARING', 'name' => 'Expense Reclass Clearing (memo)', 'type' => 'equity'],

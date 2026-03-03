@@ -15,6 +15,7 @@ use App\Models\MachineryCharge;
 use App\Models\PostingGroup;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
+use App\Models\Account;
 use App\Services\TenantContext;
 use App\Services\Machinery\MachineryPostingService;
 use App\Services\Machinery\MachineryChargeService;
@@ -38,8 +39,15 @@ class MachineryChargePostingTest extends TestCase
         }
     }
 
-    private function createDraftCharge(Tenant $tenant, CropCycle $cropCycle, Project $project, Party $landlordParty, Machine $machine, string $postingDate): MachineryCharge
-    {
+    private function createDraftCharge(
+        Tenant $tenant,
+        CropCycle $cropCycle,
+        Project $project,
+        Party $landlordParty,
+        Machine $machine,
+        string $postingDate,
+        string $poolScope = MachineWorkLog::POOL_SCOPE_SHARED
+    ): MachineryCharge {
         // Create rate card
         $rateCard = MachineRateCard::create([
             'tenant_id' => $tenant->id,
@@ -70,11 +78,11 @@ class MachineryChargePostingTest extends TestCase
             'meter_start' => 100,
             'meter_end' => 106,
             'usage_qty' => 6,
-            'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
+            'pool_scope' => $poolScope,
         ]);
 
         // Post the work log
-        $postingService = new MachineryPostingService();
+        $postingService = app(MachineryPostingService::class);
         $postingService->postWorkLog($workLog->id, $tenant->id, $postingDate);
         $workLog->refresh();
 
@@ -86,7 +94,7 @@ class MachineryChargePostingTest extends TestCase
             $landlordParty->id,
             $postingDate,
             $postingDate,
-            MachineWorkLog::POOL_SCOPE_SHARED
+            $poolScope
         );
 
         return $charge;
@@ -172,10 +180,18 @@ class MachineryChargePostingTest extends TestCase
         $this->assertEquals($charge->project_id, $allocation->project_id);
         $this->assertEquals($charge->landlord_party_id, $allocation->party_id);
 
-        // Assert balanced ledger entries
-        $entries = LedgerEntry::where('posting_group_id', $pgId)->get();
+        // Assert balanced ledger entries: Dr EXP_SHARED / Cr MACHINERY_SERVICE_INCOME (profit center)
+        $entries = LedgerEntry::with('account')->where('posting_group_id', $pgId)->get();
         $this->assertCount(2, $entries);
-        
+        $expShared = Account::where('tenant_id', $tenant->id)->where('code', 'EXP_SHARED')->firstOrFail();
+        $incomeAccount = Account::where('tenant_id', $tenant->id)->where('code', 'MACHINERY_SERVICE_INCOME')->firstOrFail();
+        $debitEntry = $entries->first(fn ($e) => (float) $e->debit_amount > 0);
+        $creditEntry = $entries->first(fn ($e) => (float) $e->credit_amount > 0);
+        $this->assertNotNull($debitEntry);
+        $this->assertNotNull($creditEntry);
+        $this->assertEquals($expShared->id, $debitEntry->account_id, 'SHARED charge: debit should be EXP_SHARED');
+        $this->assertEquals($incomeAccount->id, $creditEntry->account_id, 'SHARED charge: credit should be MACHINERY_SERVICE_INCOME');
+
         $debitTotal = 0;
         $creditTotal = 0;
         foreach ($entries as $entry) {
@@ -184,7 +200,6 @@ class MachineryChargePostingTest extends TestCase
         }
         $this->assertEqualsWithDelta($expectedAmount, $debitTotal, 0.01);
         $this->assertEqualsWithDelta($expectedAmount, $creditTotal, 0.01);
-        $this->assertEqualsWithDelta($debitTotal, $creditTotal, 0.01);
     }
 
     public function test_posting_is_idempotent_with_same_idempotency_key(): void
@@ -426,14 +441,14 @@ class MachineryChargePostingTest extends TestCase
         $charge = $this->createDraftCharge($tenant, $cropCycle, $project, $landlordParty, $machine, $postingDate);
         $cropCycle->update(['status' => 'CLOSED']);
 
-        // Post should fail
+        // Post should fail (422 when guard throws CropCycleClosedException)
         $post = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->postJson("/api/v1/machinery/charges/{$charge->id}/post", [
                 'posting_date' => $postingDate,
             ]);
-        $post->assertStatus(500);
-        $this->assertStringContainsString('crop cycle is closed', $post->json('message') ?? '');
+        $post->assertStatus(422);
+        $this->assertStringContainsString('closed', strtolower($post->json('message') ?? ''));
     }
 
     public function test_posting_fails_when_date_outside_range(): void
@@ -499,5 +514,79 @@ class MachineryChargePostingTest extends TestCase
             ]);
         $post2->assertStatus(500);
         $this->assertStringContainsString('after crop cycle end date', $post2->json('message') ?? '');
+    }
+
+    public function test_post_hari_only_creates_due_from_hari_and_income_party_is_project_party(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $landlordParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Landlord',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $hariParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Hari',
+            'party_types' => ['HARI'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $hariParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK-01',
+            'name' => 'Tractor 1',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'meter_unit' => 'HOURS',
+            'opening_meter' => 0,
+        ]);
+
+        $postingDate = '2024-06-15';
+        $charge = $this->createDraftCharge($tenant, $cropCycle, $project, $landlordParty, $machine, $postingDate, MachineWorkLog::POOL_SCOPE_HARI_ONLY);
+        $charge->refresh();
+        $expectedAmount = 6.0 * 50.00;
+
+        $post = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/machinery/charges/{$charge->id}/post", [
+                'posting_date' => $postingDate,
+            ]);
+        $post->assertStatus(201);
+
+        $charge->refresh();
+        $this->assertEquals(MachineryCharge::STATUS_POSTED, $charge->status);
+        $pgId = $charge->posting_group_id;
+
+        $allocationRows = AllocationRow::where('posting_group_id', $pgId)->get();
+        $this->assertCount(1, $allocationRows);
+        $this->assertEquals($hariParty->id, $allocationRows->first()->party_id, 'HARI_ONLY: party_id should be project.party_id (Hari debtor)');
+
+        $dueFromHari = Account::where('tenant_id', $tenant->id)->where('code', 'DUE_FROM_HARI')->firstOrFail();
+        $incomeAccount = Account::where('tenant_id', $tenant->id)->where('code', 'MACHINERY_SERVICE_INCOME')->firstOrFail();
+        $entries = LedgerEntry::with('account')->where('posting_group_id', $pgId)->get();
+        $debitEntry = $entries->first(fn ($e) => (float) $e->debit_amount > 0);
+        $creditEntry = $entries->first(fn ($e) => (float) $e->credit_amount > 0);
+        $this->assertEquals($dueFromHari->id, $debitEntry->account_id, 'HARI_ONLY: debit should be DUE_FROM_HARI');
+        $this->assertEquals($incomeAccount->id, $creditEntry->account_id, 'HARI_ONLY: credit should be MACHINERY_SERVICE_INCOME');
+        $this->assertEqualsWithDelta($expectedAmount, (float) $debitEntry->debit_amount, 0.01);
+        $this->assertEqualsWithDelta($expectedAmount, (float) $creditEntry->credit_amount, 0.01);
     }
 }

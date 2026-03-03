@@ -5,6 +5,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 import type { InvStockBalance } from '../../types';
 
 export default function StockOnHandPage() {
@@ -20,7 +21,7 @@ export default function StockOnHandPage() {
 
   const cols: Column<InvStockBalance>[] = [
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
-    { header: 'Item', accessor: (r) => r.item?.name || r.item_id },
+    { header: 'Item', accessor: (r) => formatItemDisplayName(r.item) },
     { header: 'Qty on hand', accessor: (r) => String(r.qty_on_hand) },
     { header: 'Value on hand', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.value_on_hand)}</span> },
     { header: 'WAC cost', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.wac_cost)}</span> },

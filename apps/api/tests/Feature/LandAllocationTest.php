@@ -9,6 +9,7 @@ use App\Models\TenantCropItem;
 use App\Models\LandParcel;
 use App\Models\Party;
 use App\Models\LandAllocation;
+use App\Models\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -66,17 +67,10 @@ class LandAllocationTest extends TestCase
         $response->assertJsonPath('message', 'The selected crop cycle must have a crop assigned before creating allocations.');
     }
 
-    public function test_update_returns_422_when_target_crop_cycle_has_no_crop_assigned(): void
+    public function test_update_only_allows_allocated_acres_and_party_id(): void
     {
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
         $cycleWithCrop = $this->createCropCycleWithCrop($tenant, 'Cycle With Crop');
-        $cycleNoCrop = CropCycle::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Cycle No Crop',
-            'start_date' => '2023-01-01',
-            'end_date' => '2023-12-31',
-            'status' => 'OPEN',
-        ]);
         $parcel = LandParcel::create([
             'tenant_id' => $tenant->id,
             'name' => 'Parcel 1',
@@ -93,11 +87,14 @@ class LandAllocationTest extends TestCase
         $response = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->patchJson("/api/land-allocations/{$allocation->id}", [
-                'crop_cycle_id' => $cycleNoCrop->id,
+                'allocated_acres' => 40.00,
+                'party_id' => null,
             ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonPath('message', 'The selected crop cycle must have a crop assigned before creating allocations.');
+        $response->assertStatus(200);
+        $response->assertJsonPath('crop_cycle_id', $cycleWithCrop->id);
+        $response->assertJsonPath('land_parcel_id', $parcel->id);
+        $response->assertJsonPath('allocated_acres', '40.00');
     }
 
     public function test_allocated_acres_cannot_exceed_total_acres(): void
@@ -290,7 +287,7 @@ class LandAllocationTest extends TestCase
         $this->assertEquals('HARI', $data['allocation_mode']);
     }
 
-    public function test_unique_constraint_prevents_duplicate_owner_allocations(): void
+    public function test_duplicate_owner_operated_blocked(): void
     {
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
         $cropCycle = $this->createCropCycleWithCrop($tenant);
@@ -313,7 +310,7 @@ class LandAllocationTest extends TestCase
 
         $response->assertStatus(201);
 
-        // Try to create duplicate owner-operated allocation
+        // Try to create duplicate owner-operated allocation — app returns 422 with message
         $response = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->postJson('/api/land-allocations', [
@@ -324,11 +321,11 @@ class LandAllocationTest extends TestCase
                 'allocated_acres' => 30.00,
             ]);
 
-        $response->assertStatus(500);
-        $this->assertStringContainsString('duplicate', strtolower($response->getContent()));
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'An allocation already exists for this parcel, crop cycle and Hari.');
     }
 
-    public function test_unique_constraint_prevents_duplicate_hari_allocations(): void
+    public function test_duplicate_hari_blocked(): void
     {
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
         $cropCycle = $this->createCropCycleWithCrop($tenant);
@@ -356,7 +353,7 @@ class LandAllocationTest extends TestCase
 
         $response->assertStatus(201);
 
-        // Try to create duplicate HARI allocation
+        // Try to create duplicate HARI allocation — app returns 422 with message
         $response = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->postJson('/api/land-allocations', [
@@ -367,7 +364,174 @@ class LandAllocationTest extends TestCase
                 'allocated_acres' => 30.00,
             ]);
 
-        $response->assertStatus(500);
-        $this->assertStringContainsString('duplicate', strtolower($response->getContent()));
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'An allocation already exists for this parcel, crop cycle and Hari.');
+    }
+
+    public function test_can_update_allocated_acres(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        $cropCycle = $this->createCropCycleWithCrop($tenant);
+        $parcel = LandParcel::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Parcel 1',
+            'total_acres' => 100.00,
+        ]);
+        $allocation = LandAllocation::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'land_parcel_id' => $parcel->id,
+            'party_id' => null,
+            'allocated_acres' => 50.00,
+        ]);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->patchJson("/api/land-allocations/{$allocation->id}", [
+                'allocated_acres' => 25.50,
+                'party_id' => null,
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('allocated_acres', '25.50');
+        $allocation->refresh();
+        $this->assertSame('25.50', (string) $allocation->allocated_acres);
+    }
+
+    public function test_can_update_party_id(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        $cropCycle = $this->createCropCycleWithCrop($tenant);
+        $parcel = LandParcel::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Parcel 1',
+            'total_acres' => 100.00,
+        ]);
+        $party = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Hari One',
+            'party_types' => ['HARI'],
+        ]);
+        $allocation = LandAllocation::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'land_parcel_id' => $parcel->id,
+            'party_id' => null,
+            'allocated_acres' => 50.00,
+        ]);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->patchJson("/api/land-allocations/{$allocation->id}", [
+                'allocated_acres' => 50.00,
+                'party_id' => $party->id,
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('party_id', $party->id);
+        $response->assertJsonPath('party.name', 'Hari One');
+    }
+
+    public function test_duplicate_update_blocked(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        $cropCycle = $this->createCropCycleWithCrop($tenant);
+        $parcel = LandParcel::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Parcel 1',
+            'total_acres' => 100.00,
+        ]);
+        $party = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Hari',
+            'party_types' => ['HARI'],
+        ]);
+        LandAllocation::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'land_parcel_id' => $parcel->id,
+            'party_id' => null,
+            'allocated_acres' => 30.00,
+        ]);
+        $allocation2 = LandAllocation::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'land_parcel_id' => $parcel->id,
+            'party_id' => $party->id,
+            'allocated_acres' => 40.00,
+        ]);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->patchJson("/api/land-allocations/{$allocation2->id}", [
+                'allocated_acres' => 40.00,
+                'party_id' => null,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'An allocation already exists for this parcel, crop cycle and Hari.');
+    }
+
+    public function test_cannot_delete_if_has_project(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        $cropCycle = $this->createCropCycleWithCrop($tenant);
+        $parcel = LandParcel::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Parcel 1',
+            'total_acres' => 100.00,
+        ]);
+        $party = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Hari',
+            'party_types' => ['HARI'],
+        ]);
+        $allocation = LandAllocation::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'land_parcel_id' => $parcel->id,
+            'party_id' => $party->id,
+            'allocated_acres' => 50.00,
+        ]);
+        Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $party->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'land_allocation_id' => $allocation->id,
+            'name' => 'Project A',
+            'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->deleteJson("/api/land-allocations/{$allocation->id}");
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Cannot delete allocation with a linked project.');
+    }
+
+    public function test_can_delete_when_no_project(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        $cropCycle = $this->createCropCycleWithCrop($tenant);
+        $parcel = LandParcel::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Parcel 1',
+            'total_acres' => 100.00,
+        ]);
+        $allocation = LandAllocation::create([
+            'tenant_id' => $tenant->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'land_parcel_id' => $parcel->id,
+            'party_id' => null,
+            'allocated_acres' => 50.00,
+        ]);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->deleteJson("/api/land-allocations/{$allocation->id}");
+
+        $response->assertStatus(204);
+        $this->assertNull(LandAllocation::find($allocation->id));
     }
 }

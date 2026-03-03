@@ -24,6 +24,7 @@ import LandLeaseDetailPage from './pages/LandLease/LandLeaseDetailPage';
 import LandlordStatementPage from './pages/LandLease/LandlordStatementPage';
 import CropCyclesPage from './pages/CropCyclesPage';
 import CropCycleDetailPage from './pages/CropCycleDetailPage';
+import SeasonSetupWizardPage from './pages/cropCycles/SeasonSetupWizardPage';
 import ProductionUnitsPage from './pages/ProductionUnitsPage';
 import OrchardsPage from './pages/orchards/OrchardsPage';
 import OrchardDetailPage from './pages/orchards/OrchardDetailPage';
@@ -183,6 +184,7 @@ function App() {
         <Route path="land-leases" element={<ModuleProtectedRoute requiredModule="land_leases"><LandLeasesPage /></ModuleProtectedRoute>} />
         <Route path="land-leases/:id" element={<ModuleProtectedRoute requiredModule="land_leases"><LandLeaseDetailPage /></ModuleProtectedRoute>} />
         <Route path="crop-cycles" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCyclesPage /></ModuleProtectedRoute>} />
+        <Route path="crop-cycles/season-setup" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><SeasonSetupWizardPage /></ModuleProtectedRoute>} />
         <Route path="crop-cycles/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropCycleDetailPage /></ModuleProtectedRoute>} />
         <Route path="production-units" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProductionUnitsPage /></ModuleProtectedRoute>} />
         <Route path="orchards" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><OrchardsPage /></ModuleProtectedRoute>} />

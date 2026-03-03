@@ -13,6 +13,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../../components/Term';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 
 export default function MachineryServiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -186,7 +187,7 @@ export default function MachineryServiceDetailPage() {
             <div className="md:col-span-2">
               <dt className="text-sm font-medium text-gray-500">In-kind payment</dt>
               <dd className="text-sm text-gray-900">
-                {service.in_kind_item?.name ?? service.in_kind_item_id}
+                {formatItemDisplayName(service.in_kind_item)}
                 {service.in_kind_rate_per_unit != null && ` @ ${service.in_kind_rate_per_unit} per unit`}
                 {service.in_kind_quantity != null && ` → total ${service.in_kind_quantity}`}
                 {service.in_kind_inventory_issue_id && (

@@ -42,7 +42,27 @@ export type TermKey =
   // Sprint 14: operational records & sidebar
   | 'pendingReview'
   | 'operationalRecord'
-  | 'operationalRecordPlural';
+  | 'operationalRecordPlural'
+  // Farm-first nav & labels
+  | 'navFarm'
+  | 'navPeople'
+  | 'navMoney'
+  | 'navAccounting'
+  | 'navSettings'
+  | 'navFields'
+  | 'navWork'
+  | 'navPayReceive'
+  | 'todayOnFarm'
+  | 'moneySnapshot'
+  | 'reviewQueue'
+  | 'seasonSnapshot'
+  | 'noActiveSeason'
+  | 'createCropCycleCta'
+  | 'quickActions'
+  | 'seasonSetup'
+  | 'assignFieldsToSeason'
+  | 'fieldBlocks'
+  | 'advancedSetup';
 
 export const TERMS: Record<TermKey, { farm: string; accounting: string }> = {
   postingGroup: { farm: 'Posted Transaction', accounting: 'Posting Group' },
@@ -78,9 +98,28 @@ export const TERMS: Record<TermKey, { farm: string; accounting: string }> = {
   activityTypeSingular: { farm: 'Work Type', accounting: 'Activity Type' },
   activities: { farm: 'Field Work', accounting: 'Activities' },
   newActivity: { farm: 'Log Field Work', accounting: 'New Activity' },
-  pendingReview: { farm: 'Pending Review', accounting: 'Unposted Records' },
-  operationalRecord: { farm: 'Record', accounting: 'Transaction' },
-  operationalRecordPlural: { farm: 'Records', accounting: 'Transactions' },
+  pendingReview: { farm: 'Drafts (Unposted)', accounting: 'Unposted Transactions' },
+  operationalRecord: { farm: 'Farm record', accounting: 'Transaction' },
+  operationalRecordPlural: { farm: 'Farm records', accounting: 'Transactions' },
+  navFarm: { farm: 'FARM', accounting: 'Farm Operations' },
+  navPeople: { farm: 'PEOPLE', accounting: 'People' },
+  navMoney: { farm: 'MONEY', accounting: 'Money' },
+  navAccounting: { farm: 'ACCOUNTING', accounting: 'Finance & Review' },
+  navSettings: { farm: 'SETTINGS', accounting: 'Admin' },
+  navFields: { farm: 'Fields', accounting: 'Projects' },
+  navWork: { farm: 'Work', accounting: 'Crop Ops' },
+  navPayReceive: { farm: 'Pay & Receive', accounting: 'Payments' },
+  todayOnFarm: { farm: 'Today on the farm', accounting: 'Today' },
+  moneySnapshot: { farm: 'Money snapshot', accounting: 'Cash & Dues' },
+  reviewQueue: { farm: 'Review Queue', accounting: 'Review Queue' },
+  seasonSnapshot: { farm: 'Season snapshot', accounting: 'Season Snapshot' },
+  noActiveSeason: { farm: 'No active season yet. Create a crop cycle to track this season.', accounting: 'No active crop cycle.' },
+  createCropCycleCta: { farm: 'Create crop cycle', accounting: 'New crop cycle' },
+  quickActions: { farm: 'Quick actions', accounting: 'Quick actions' },
+  seasonSetup: { farm: 'Season setup', accounting: 'Crop cycle setup' },
+  assignFieldsToSeason: { farm: 'Add fields to season', accounting: 'Assign fields' },
+  fieldBlocks: { farm: 'Field blocks', accounting: 'Projects (costing)' },
+  advancedSetup: { farm: 'Advanced setup (split fields / multiple crops)', accounting: 'Advanced' },
 };
 
 export function term(k: TermKey): string {

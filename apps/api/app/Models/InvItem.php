@@ -63,4 +63,70 @@ class InvItem extends Model
     {
         return $this->hasMany(InvStockMovement::class, 'item_id');
     }
+
+    public function adjustmentLines(): HasMany
+    {
+        return $this->hasMany(InvAdjustmentLine::class, 'item_id');
+    }
+
+    public function transferLines(): HasMany
+    {
+        return $this->hasMany(InvTransferLine::class, 'item_id');
+    }
+
+    public function harvestLines(): HasMany
+    {
+        return $this->hasMany(HarvestLine::class, 'inventory_item_id');
+    }
+
+    public function cropActivityInputs(): HasMany
+    {
+        return $this->hasMany(CropActivityInput::class, 'item_id');
+    }
+
+    public function saleLines(): HasMany
+    {
+        return $this->hasMany(SaleLine::class, 'inventory_item_id');
+    }
+
+    public function saleInventoryAllocations(): HasMany
+    {
+        return $this->hasMany(SaleInventoryAllocation::class, 'inventory_item_id');
+    }
+
+    public function machineryServicesAsInKind(): HasMany
+    {
+        return $this->hasMany(MachineryService::class, 'in_kind_item_id');
+    }
+
+    /** Relation names used for withCount (snake_case + _count). */
+    protected static function usageCountAttributes(): array
+    {
+        return [
+            'grn_lines_count', 'issue_lines_count', 'transfer_lines_count', 'adjustment_lines_count',
+            'stock_balances_count', 'stock_movements_count', 'harvest_lines_count', 'crop_activity_inputs_count',
+            'sale_lines_count', 'sale_inventory_allocations_count', 'machinery_services_as_in_kind_count',
+        ];
+    }
+
+    /** True if item has no transactions/usages anywhere (safe to delete). */
+    public function isUnused(): bool
+    {
+        foreach (static::usageCountAttributes() as $attr) {
+            if (array_key_exists($attr, $this->getAttributes()) && (int) $this->getAttribute($attr) > 0) {
+                return false;
+            }
+        }
+        return !$this->grnLines()->exists()
+            && !$this->issueLines()->exists()
+            && !$this->transferLines()->exists()
+            && !$this->adjustmentLines()->exists()
+            && !$this->stockBalances()->exists()
+            && !$this->stockMovements()->exists()
+            && !$this->harvestLines()->exists()
+            && !$this->cropActivityInputs()->exists()
+            && !$this->saleLines()->exists()
+            && !$this->saleInventoryAllocations()->exists()
+            && !$this->machineryServicesAsInKind()->exists();
+    }
 }

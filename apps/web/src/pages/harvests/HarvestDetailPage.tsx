@@ -20,6 +20,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import type { UpdateHarvestPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
 
@@ -190,7 +191,7 @@ export default function HarvestDetailPage() {
           <tbody>
             {harvest.lines?.map((l) => (
               <tr key={l.id}>
-                <td className="px-3 py-2">{l.item?.name || l.inventory_item_id}</td>
+                <td className="px-3 py-2">{formatItemDisplayName(l.item)}</td>
                 <td>{l.store?.name || l.store_id}</td>
                 <td>{l.quantity}</td>
                 <td>{l.uom || '—'}</td>

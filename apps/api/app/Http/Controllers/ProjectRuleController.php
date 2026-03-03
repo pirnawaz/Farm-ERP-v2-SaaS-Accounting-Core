@@ -48,6 +48,10 @@ class ProjectRuleController extends Controller
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
+        if ($project->status === 'CLOSED') {
+            return response()->json(['message' => 'Project is closed.'], 422);
+        }
+
         $rule = ProjectRule::where('project_id', $project->id)->first();
 
         if ($rule) {

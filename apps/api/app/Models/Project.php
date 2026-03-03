@@ -16,12 +16,15 @@ class Project extends Model
         'party_id',
         'crop_cycle_id',
         'land_allocation_id',
+        'field_block_id',
         'name',
         'status',
+        'closed_at',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'closed_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo
@@ -42,6 +45,11 @@ class Project extends Model
     public function landAllocation(): BelongsTo
     {
         return $this->belongsTo(LandAllocation::class);
+    }
+
+    public function fieldBlock(): BelongsTo
+    {
+        return $this->belongsTo(FieldBlock::class, 'field_block_id');
     }
 
     public function projectRule(): HasOne

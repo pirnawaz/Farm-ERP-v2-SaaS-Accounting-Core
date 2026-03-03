@@ -80,8 +80,15 @@ class MachineryServicePostingService
             }
             $amount = (float) $rateCard->base_rate * (float) $service->quantity;
 
-            $expenseAccount = $this->accountService->getByCode($tenantId, 'MACHINERY_SERVICE_EXPENSE');
-            $clearingAccount = $this->accountService->getByCode($tenantId, 'MACHINERY_INTERNAL_SERVICE_CLEARING');
+            // Expense account by allocation scope (project cost bucket)
+            $expenseCode = match ($service->allocation_scope) {
+                MachineryService::ALLOCATION_SCOPE_SHARED => 'EXP_SHARED',
+                MachineryService::ALLOCATION_SCOPE_HARI_ONLY => 'EXP_HARI_ONLY',
+                MachineryService::ALLOCATION_SCOPE_LANDLORD_ONLY => 'EXP_LANDLORD_ONLY',
+                default => 'EXP_SHARED',
+            };
+            $expenseAccount = $this->accountService->getByCode($tenantId, $expenseCode);
+            $incomeAccount = $this->accountService->getByCode($tenantId, 'MACHINERY_SERVICE_INCOME');
 
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
@@ -113,6 +120,7 @@ class MachineryServicePostingService
                 ],
             ]);
 
+            // Dr project expense (by scope) / Cr machinery income (profit center)
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
@@ -124,7 +132,7 @@ class MachineryServicePostingService
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
-                'account_id' => $clearingAccount->id,
+                'account_id' => $incomeAccount->id,
                 'debit_amount' => '0.00',
                 'credit_amount' => (string) $amount,
                 'currency_code' => 'GBP',

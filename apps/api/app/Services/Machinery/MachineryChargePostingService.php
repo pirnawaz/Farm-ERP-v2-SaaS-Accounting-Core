@@ -71,9 +71,18 @@ class MachineryChargePostingService
                 throw new \Exception('Posting date is after crop cycle end date.');
             }
 
-            // Get system accounts
-            $expenseAccount = $this->accountService->getByCode($tenantId, 'MACHINERY_SERVICE_EXPENSE');
-            $liabilityAccount = $this->accountService->getByCode($tenantId, 'DUE_TO_LANDLORD');
+            $poolScope = $charge->pool_scope ?? MachineryCharge::POOL_SCOPE_SHARED;
+            $allocationScope = $poolScope === MachineryCharge::POOL_SCOPE_HARI_ONLY ? 'HARI_ONLY'
+                : ($poolScope === MachineryCharge::POOL_SCOPE_LANDLORD_ONLY ? 'LANDLORD_ONLY' : 'SHARED');
+
+            // Profit-center posting: revenue (income) + receivable or project expense by scope
+            $incomeAccount = $this->accountService->getByCode($tenantId, 'MACHINERY_SERVICE_INCOME');
+            if ($poolScope === MachineryCharge::POOL_SCOPE_HARI_ONLY) {
+                $debitAccount = $this->accountService->getByCode($tenantId, 'DUE_FROM_HARI');
+            } else {
+                $expenseCode = $poolScope === MachineryCharge::POOL_SCOPE_LANDLORD_ONLY ? 'EXP_LANDLORD_ONLY' : 'EXP_SHARED';
+                $debitAccount = $this->accountService->getByCode($tenantId, $expenseCode);
+            }
 
             // Create PostingGroup
             $postingGroup = PostingGroup::create([
@@ -99,20 +108,27 @@ class MachineryChargePostingService
                 ];
             }
 
-            $poolScope = $charge->pool_scope ?? \App\Models\MachineryCharge::POOL_SCOPE_SHARED;
-            $allocationScope = $poolScope === \App\Models\MachineryCharge::POOL_SCOPE_HARI_ONLY ? 'HARI_ONLY' : 'SHARED';
+            // Hari party for "due from" (debtor): use project.party_id when HARI_ONLY
+            $partyId = $charge->landlord_party_id;
+            if ($poolScope === MachineryCharge::POOL_SCOPE_HARI_ONLY && $charge->project?->party_id) {
+                $partyId = $charge->project->party_id;
+            }
+
+            // machine_id from first line's work log so profitability report can attribute revenue by machine
+            $machineId = $charge->lines->first()?->workLog?->machine_id;
 
             // Create AllocationRow (money allocation)
             AllocationRow::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
                 'project_id' => $charge->project_id,
-                'party_id' => $charge->landlord_party_id,
+                'party_id' => $partyId,
                 'allocation_type' => 'MACHINERY_CHARGE',
                 'allocation_scope' => $allocationScope,
                 'amount' => (string) $charge->total_amount,
                 'quantity' => null,
                 'unit' => null,
+                'machine_id' => $machineId,
                 'rule_snapshot' => [
                     'source' => 'machinery_charge',
                     'machinery_charge_id' => $charge->id,
@@ -122,12 +138,12 @@ class MachineryChargePostingService
                 ],
             ]);
 
-            // Create balanced LedgerEntries
+            // Dr DUE_FROM_HARI (or EXP_*) / Cr MACHINERY_SERVICE_INCOME
             $amount = (float) $charge->total_amount;
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
-                'account_id' => $expenseAccount->id,
+                'account_id' => $debitAccount->id,
                 'debit_amount' => (string) $amount,
                 'credit_amount' => '0.00',
                 'currency_code' => 'GBP',
@@ -135,7 +151,7 @@ class MachineryChargePostingService
             LedgerEntry::create([
                 'tenant_id' => $tenantId,
                 'posting_group_id' => $postingGroup->id,
-                'account_id' => $liabilityAccount->id,
+                'account_id' => $incomeAccount->id,
                 'debit_amount' => '0.00',
                 'credit_amount' => (string) $amount,
                 'currency_code' => 'GBP',

@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { UpdateInvAdjustmentPayload, InvAdjustmentReason } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 
 const REASONS: InvAdjustmentReason[] = ['LOSS', 'DAMAGE', 'COUNT_GAIN', 'COUNT_LOSS', 'OTHER'];
 
@@ -168,7 +169,7 @@ export default function InvAdjustmentDetailPage() {
             <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty delta</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
             <tbody>
               {(adj.lines || []).map((l) => (
-                <tr key={l.id}><td className="px-3 py-2">{l.item?.name}</td><td>{l.qty_delta}</td><td>{l.line_total ? <span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span> : '—'}</td></tr>
+                <tr key={l.id}><td className="px-3 py-2">{formatItemDisplayName(l.item)}</td><td>{l.qty_delta}</td><td>{l.line_total ? <span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span> : '—'}</td></tr>
               ))}
             </tbody>
           </table>

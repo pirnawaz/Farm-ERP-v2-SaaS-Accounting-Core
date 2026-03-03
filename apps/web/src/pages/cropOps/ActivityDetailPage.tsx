@@ -22,6 +22,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { UpdateCropActivityPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 
 type InputLine = { store_id: string; item_id: string; qty: string };
 type LabourLine = { worker_id: string; rate_basis: string; units: string; rate: string };
@@ -300,7 +301,7 @@ export default function ActivityDetailPage() {
                 {(activity.inputs || []).map((l) => (
                   <tr key={l.id}>
                     <td className="px-3 py-2">{l.store?.name}</td>
-                    <td>{l.item?.name}</td>
+                    <td>{formatItemDisplayName(l.item)}</td>
                     <td>{l.qty}</td>
                     <td>{l.unit_cost_snapshot != null ? <span className="tabular-nums">{formatMoney(l.unit_cost_snapshot)}</span> : '—'}</td>
                     <td>{l.line_total != null ? <span className="tabular-nums">{formatMoney(l.line_total)}</span> : '—'}</td>

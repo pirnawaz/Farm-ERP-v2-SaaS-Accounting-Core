@@ -27,6 +27,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { UpdateInvIssuePayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 
 type Line = { item_id: string; qty: string };
 
@@ -451,7 +452,7 @@ export default function InvIssueDetailPage() {
             <tbody>
               {(issue.lines || []).map((l) => (
                 <tr key={l.id}>
-                  <td className="px-3 py-2">{l.item?.name}</td>
+                  <td className="px-3 py-2">{formatItemDisplayName(l.item)}</td>
                   <td>{l.qty}</td>
                   <td>{l.unit_cost_snapshot != null ? <span className="tabular-nums">{formatMoney(l.unit_cost_snapshot)}</span> : '—'}</td>
                   <td>{l.line_total != null ? <span className="tabular-nums">{formatMoney(l.line_total)}</span> : '—'}</td>

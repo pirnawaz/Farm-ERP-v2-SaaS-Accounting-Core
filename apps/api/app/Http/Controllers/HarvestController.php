@@ -68,6 +68,9 @@ class HarvestController extends Controller
         // Validate tenant ownership and project belongs to crop cycle
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
         $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($project->status === 'CLOSED') {
+            return response()->json(['message' => 'Project is closed.'], 422);
+        }
         if ($project->crop_cycle_id !== $request->crop_cycle_id) {
             return response()->json(['errors' => ['project_id' => ['Project must belong to the selected crop cycle.']]], 422);
         }
@@ -117,6 +120,9 @@ class HarvestController extends Controller
 
         if ($request->filled('project_id')) {
             $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+            if ($project->status === 'CLOSED') {
+                return response()->json(['message' => 'Project is closed.'], 422);
+            }
             if ($project->crop_cycle_id !== $harvest->crop_cycle_id) {
                 return response()->json(['errors' => ['project_id' => ['Project must belong to the harvest\'s crop cycle.']]], 422);
             }

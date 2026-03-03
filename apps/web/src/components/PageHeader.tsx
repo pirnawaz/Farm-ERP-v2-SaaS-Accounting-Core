@@ -13,12 +13,14 @@ export interface Breadcrumb {
  */
 interface PageHeaderProps {
   title: string;
+  /** Optional tooltip shown on hover over the title (e.g. short explanation of the page). */
+  tooltip?: string;
   backTo?: string;
   breadcrumbs?: Breadcrumb[];
   right?: ReactNode;
 }
 
-export function PageHeader({ title, backTo, breadcrumbs, right }: PageHeaderProps) {
+export function PageHeader({ title, tooltip, backTo, breadcrumbs, right }: PageHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -66,7 +68,7 @@ export function PageHeader({ title, backTo, breadcrumbs, right }: PageHeaderProp
               ))}
             </nav>
           )}
-          <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900" title={tooltip}>{title}</h1>
         </div>
         {right && <div className="flex-shrink-0">{right}</div>}
       </div>

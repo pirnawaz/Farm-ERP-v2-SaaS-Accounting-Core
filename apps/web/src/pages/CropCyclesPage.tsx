@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { term } from '../config/terminology';
 import { useCropCycles, useCreateCropCycle, useCloseCropCycle, useOpenCropCycle } from '../hooks/useCropCycles';
 import { useCropItems, useCreateCropItem } from '../hooks/useCropItems';
 import { DataTable, type Column } from '../components/DataTable';
@@ -147,13 +148,22 @@ export default function CropCyclesPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Crop Cycles</h1>
         {canCreate && (
-          <button
-            data-testid="new-crop-cycle"
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
-          >
-            New Crop Cycle
-          </button>
+          <div className="flex gap-2">
+            <Link
+              to="/app/crop-cycles/season-setup"
+              data-testid="season-setup-cta"
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            >
+              {term('assignFieldsToSeason')}
+            </Link>
+            <button
+              data-testid="new-crop-cycle"
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            >
+              New crop cycle (no fields)
+            </button>
+          </div>
         )}
       </div>
 

@@ -21,7 +21,7 @@ class LandAllocationController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         
         $query = LandAllocation::where('tenant_id', $tenantId)
-            ->with(['cropCycle', 'landParcel', 'party']);
+            ->with(['cropCycle', 'landParcel', 'party', 'projects']);
 
         if ($request->has('crop_cycle_id')) {
             $query->where('crop_cycle_id', $request->crop_cycle_id);
@@ -33,14 +33,15 @@ class LandAllocationController extends Controller
 
         $allocations = $query->orderBy('created_at', 'desc')->get();
 
-        return response()->json($allocations);
+        $data = $allocations->map(fn (LandAllocation $a) => $this->formatAllocation($a));
+        return response()->json($data);
     }
 
     public function store(Request $request)
     {
         $tenantId = TenantContext::getTenantId($request);
 
-        $request->validate([
+        $validated = $request->validate([
             'crop_cycle_id' => ['required', 'uuid', 'exists:crop_cycles,id'],
             'land_parcel_id' => ['required', 'uuid', 'exists:land_parcels,id'],
             'party_id' => ['nullable', 'uuid', 'exists:parties,id'],
@@ -48,10 +49,10 @@ class LandAllocationController extends Controller
             'allocated_acres' => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $parcel = LandParcel::where('id', $request->land_parcel_id)
+        $parcel = LandParcel::where('id', $validated['land_parcel_id'])
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
-        $cropCycle = CropCycle::where('id', $request->crop_cycle_id)
+        $cropCycle = CropCycle::where('id', $validated['crop_cycle_id'])
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
         if ($cropCycle->status !== 'OPEN') {
@@ -66,8 +67,8 @@ class LandAllocationController extends Controller
         }
 
         // Determine allocation mode and party_id
-        $allocationMode = $request->allocation_mode;
-        $partyId = $request->party_id;
+        $allocationMode = $validated['allocation_mode'] ?? null;
+        $partyId = $validated['party_id'] ?? null;
 
         // If allocation_mode is provided, enforce it
         if ($allocationMode === 'HARI') {
@@ -85,18 +86,36 @@ class LandAllocationController extends Controller
             }
         }
 
+        $exists = LandAllocation::where('tenant_id', $tenantId)
+            ->where('crop_cycle_id', $validated['crop_cycle_id'])
+            ->where('land_parcel_id', $validated['land_parcel_id'])
+            ->where(function ($q) use ($partyId) {
+                if (empty($partyId)) {
+                    $q->whereNull('party_id');
+                } else {
+                    $q->where('party_id', $partyId);
+                }
+            })
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'message' => 'An allocation already exists for this parcel, crop cycle and Hari.',
+            ], 422);
+        }
+
         try {
             $this->allocationService->validateAcreAllocation(
                 $tenantId,
-                $request->land_parcel_id,
-                $request->crop_cycle_id,
-                (float) $request->allocated_acres
+                $validated['land_parcel_id'],
+                $validated['crop_cycle_id'],
+                (float) $validated['allocated_acres']
             );
         } catch (Throwable $e) {
             $remaining = $this->allocationService->getRemainingAcres(
                 $tenantId,
-                $request->land_parcel_id,
-                $request->crop_cycle_id
+                $validated['land_parcel_id'],
+                $validated['crop_cycle_id']
             );
             return response()->json([
                 'message' => $e->getMessage(),
@@ -106,10 +125,10 @@ class LandAllocationController extends Controller
 
         $allocation = LandAllocation::create([
             'tenant_id' => $tenantId,
-            'crop_cycle_id' => $request->crop_cycle_id,
-            'land_parcel_id' => $request->land_parcel_id,
+            'crop_cycle_id' => $validated['crop_cycle_id'],
+            'land_parcel_id' => $validated['land_parcel_id'],
             'party_id' => $partyId,
-            'allocated_acres' => $request->allocated_acres,
+            'allocated_acres' => $validated['allocated_acres'],
         ]);
 
         return response()->json($allocation->load(['cropCycle', 'landParcel', 'party']), 201);
@@ -135,82 +154,67 @@ class LandAllocationController extends Controller
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        $request->validate([
-            'crop_cycle_id' => ['sometimes', 'required', 'uuid', 'exists:crop_cycles,id'],
-            'land_parcel_id' => ['sometimes', 'required', 'uuid', 'exists:land_parcels,id'],
-            'party_id' => ['sometimes', 'nullable', 'uuid', 'exists:parties,id'],
-            'allocation_mode' => ['sometimes', 'nullable', 'string', 'in:OWNER,HARI'],
-            'allocated_acres' => ['sometimes', 'required', 'numeric', 'min:0.01'],
+        $validated = $request->validate([
+            'allocated_acres' => ['required', 'numeric', 'min:0.01'],
+            'party_id' => ['nullable', 'uuid', 'exists:parties,id'],
         ]);
 
-        // Determine allocation mode and party_id
-        $allocationMode = $request->allocation_mode;
-        $partyId = $request->has('party_id') ? $request->party_id : $allocation->party_id;
+        $partyId = $validated['party_id'] ?? null;
 
-        // If allocation_mode is provided, enforce it
-        if ($allocationMode === 'HARI') {
-            if (!$partyId) {
-                return response()->json(['errors' => ['party_id' => ['Party ID is required when allocation_mode is HARI']]], 422);
-            }
-        } elseif ($allocationMode === 'OWNER') {
-            $partyId = null; // Force null for OWNER mode
-        } elseif ($request->has('party_id')) {
-            // Infer mode from party_id presence if mode not provided
-            if ($partyId) {
-                $allocationMode = 'HARI';
-            } else {
-                $allocationMode = 'OWNER';
-            }
+        // Duplicate guard: another allocation with same scope (excluding current)
+        $exists = LandAllocation::where('tenant_id', $tenantId)
+            ->where('crop_cycle_id', $allocation->crop_cycle_id)
+            ->where('land_parcel_id', $allocation->land_parcel_id)
+            ->where(function ($q) use ($partyId) {
+                if (empty($partyId)) {
+                    $q->whereNull('party_id');
+                } else {
+                    $q->where('party_id', $partyId);
+                }
+            })
+            ->where('id', '!=', $allocation->id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'message' => 'An allocation already exists for this parcel, crop cycle and Hari.',
+            ], 422);
         }
 
-        $landParcelId = $request->land_parcel_id ?? $allocation->land_parcel_id;
-        $cropCycleId = $request->crop_cycle_id ?? $allocation->crop_cycle_id;
-        $newAcres = $request->allocated_acres ?? $allocation->allocated_acres;
-
-        $cropCycle = CropCycle::where('id', $cropCycleId)->where('tenant_id', $tenantId)->firstOrFail();
-        if ($cropCycle->status !== 'OPEN') {
+        $cropCycle = $allocation->cropCycle;
+        if ($cropCycle && $cropCycle->status !== 'OPEN') {
             return response()->json([
                 'message' => 'Allocations can only be created or changed for open crop cycles.',
             ], 422);
         }
-        if (!$cropCycle->tenant_crop_item_id) {
+
+        try {
+            $this->allocationService->validateAcreAllocation(
+                $tenantId,
+                $allocation->land_parcel_id,
+                $allocation->crop_cycle_id,
+                (float) $validated['allocated_acres'],
+                $allocation->id
+            );
+        } catch (Throwable $e) {
+            $remaining = $this->allocationService->getRemainingAcres(
+                $tenantId,
+                $allocation->land_parcel_id,
+                $allocation->crop_cycle_id
+            );
             return response()->json([
-                'message' => 'The selected crop cycle must have a crop assigned before creating allocations.',
+                'message' => $e->getMessage(),
+                'available_acres' => round($remaining, 2),
             ], 422);
         }
-        $parcel = LandParcel::where('id', $landParcelId)->where('tenant_id', $tenantId)->firstOrFail();
 
-        // Validate acre allocation with locking (excluding current allocation)
-        if ($request->has('allocated_acres') || $request->has('land_parcel_id') || $request->has('crop_cycle_id')) {
-            try {
-                $this->allocationService->validateAcreAllocation(
-                    $tenantId,
-                    $landParcelId,
-                    $cropCycleId,
-                    (float) $newAcres,
-                    $allocation->id
-                );
-            } catch (Throwable $e) {
-                $remaining = $this->allocationService->getRemainingAcres(
-                    $tenantId,
-                    $landParcelId,
-                    $cropCycleId
-                );
-                return response()->json([
-                    'message' => $e->getMessage(),
-                    'available_acres' => round($remaining, 2),
-                ], 422);
-            }
-        }
+        $allocation->update([
+            'allocated_acres' => $validated['allocated_acres'],
+            'party_id' => $partyId,
+        ]);
 
-        $updateData = $request->only(['crop_cycle_id', 'land_parcel_id', 'allocated_acres']);
-        if ($request->has('party_id') || $request->has('allocation_mode')) {
-            $updateData['party_id'] = $partyId;
-        }
-
-        $allocation->update($updateData);
-
-        return response()->json($allocation->load(['cropCycle', 'landParcel', 'party']));
+        $allocation->load(['cropCycle', 'landParcel', 'party', 'projects']);
+        return response()->json($this->formatAllocation($allocation));
     }
 
     public function destroy(Request $request, string $id)
@@ -221,8 +225,34 @@ class LandAllocationController extends Controller
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        $allocation->delete();
+        if ($allocation->projects()->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete allocation with a linked project.',
+            ], 422);
+        }
 
-        return response()->json(null, 204);
+        $allocation->delete();
+        return response()->noContent();
+    }
+
+    private function formatAllocation(LandAllocation $allocation): array
+    {
+        return [
+            'id' => $allocation->id,
+            'tenant_id' => $allocation->tenant_id,
+            'crop_cycle_id' => $allocation->crop_cycle_id,
+            'land_parcel_id' => $allocation->land_parcel_id,
+            'party_id' => $allocation->party_id,
+            'allocated_acres' => $allocation->allocated_acres,
+            'created_at' => $allocation->created_at?->toIso8601String(),
+            'allocation_mode' => $allocation->allocation_mode,
+            'crop_cycle' => $allocation->cropCycle,
+            'land_parcel' => $allocation->landParcel,
+            'party' => $allocation->party ? [
+                'id' => $allocation->party->id,
+                'name' => $allocation->party->name,
+            ] : null,
+            'project' => $allocation->projects->first(),
+        ];
     }
 }

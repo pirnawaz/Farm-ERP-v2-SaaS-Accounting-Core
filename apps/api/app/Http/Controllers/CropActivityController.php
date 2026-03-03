@@ -70,6 +70,9 @@ class CropActivityController extends Controller
         CropActivityType::where('id', $request->activity_type_id)->where('tenant_id', $tenantId)->firstOrFail();
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
         $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($project->status === 'CLOSED') {
+            return response()->json(['message' => 'Project is closed.'], 422);
+        }
         if ($project->crop_cycle_id !== $request->crop_cycle_id) {
             abort(422, 'Project must belong to the selected crop cycle.');
         }
@@ -158,6 +161,9 @@ class CropActivityController extends Controller
 
         if (isset($data['project_id']) || isset($data['crop_cycle_id'])) {
             $project = Project::where('id', $activity->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+            if ($project->status === 'CLOSED') {
+                return response()->json(['message' => 'Project is closed.'], 422);
+            }
             if ($project->crop_cycle_id !== $activity->crop_cycle_id) {
                 abort(422, 'Project must belong to the selected crop cycle.');
             }

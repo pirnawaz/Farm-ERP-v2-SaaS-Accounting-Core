@@ -87,8 +87,11 @@ export const inventoryApi = {
     get: (id: string) => apiClient.get<InvItem>(`${BASE}/items/${id}`),
     create: (payload: { name: string; sku?: string; category_id?: string; uom_id: string; valuation_method?: string; is_active?: boolean }) =>
       apiClient.post<InvItem>(`${BASE}/items`, payload),
-    update: (id: string, payload: Partial<{ name: string; sku?: string; category_id?: string; uom_id: string; valuation_method?: string; is_active?: boolean }>) =>
+    update: (id: string, payload: { name: string; sku?: string | null; category_id?: string | null; uom_id: string; valuation_method: string; is_active?: boolean }) =>
       apiClient.patch<InvItem>(`${BASE}/items/${id}`, payload),
+    deactivate: (id: string) => apiClient.post<InvItem>(`${BASE}/items/${id}/deactivate`, {}),
+    activate: (id: string) => apiClient.post<InvItem>(`${BASE}/items/${id}/activate`, {}),
+    delete: (id: string) => apiClient.delete<void>(`${BASE}/items/${id}`),
   },
   stores: {
     list: (is_active?: boolean) => {

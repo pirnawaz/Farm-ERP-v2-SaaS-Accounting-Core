@@ -14,6 +14,7 @@ import { PrintHeader } from '../components/print/PrintHeader';
 import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../components/Term';
 import { term } from '../config/terminology';
+import { formatItemDisplayName } from '../utils/formatItemDisplay';
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -153,7 +154,7 @@ export default function SaleDetailPage() {
               <tbody>
                 {sale.lines.map((line) => (
                   <tr key={line.id}>
-                    <td>{line.item?.name || line.inventory_item_id}</td>
+                    <td>{formatItemDisplayName(line.item)}</td>
                     <td>{line.store?.name || line.store_id || '-'}</td>
                     <td className="text-right tabular-nums">{line.quantity}</td>
                     <td className="text-right tabular-nums">{formatMoney(line.unit_price)}</td>
@@ -285,7 +286,7 @@ export default function SaleDetailPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {sale.lines.map((line) => (
                   <tr key={line.id}>
-                    <td className="px-4 py-2 text-sm text-gray-900">{line.item?.name || line.inventory_item_id}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{formatItemDisplayName(line.item)}</td>
                     <td className="px-4 py-2 text-sm text-gray-900">{line.store?.name || line.store_id || '-'}</td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">{line.quantity}</td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right tabular-nums"><span className="tabular-nums">{formatMoney(line.unit_price)}</span></td>

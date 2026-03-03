@@ -52,11 +52,20 @@ export function useCreateItem() {
     mutationFn: (p: { name: string; sku?: string; category_id?: string; uom_id: string; valuation_method?: string; is_active?: boolean }) =>
       inventoryApi.items.create(p),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['inventory', 'items'] });
+      invalidateInventoryItemQueries(qc);
       toast.success('Item created');
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to create item'),
   });
+}
+
+function invalidateInventoryItemQueries(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['inventory', 'items'] });
+  qc.invalidateQueries({ queryKey: ['inventory', 'grns'] });
+  qc.invalidateQueries({ queryKey: ['inventory', 'issues'] });
+  qc.invalidateQueries({ queryKey: ['inventory', 'transfers'] });
+  qc.invalidateQueries({ queryKey: ['inventory', 'adjustments'] });
+  qc.invalidateQueries({ queryKey: ['inventory', 'stock'] });
 }
 
 export function useUpdateItem() {
@@ -65,11 +74,52 @@ export function useUpdateItem() {
     mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof inventoryApi.items.update>[1] }) =>
       inventoryApi.items.update(id, payload),
     onSuccess: (_, v) => {
-      qc.invalidateQueries({ queryKey: ['inventory', 'items'] });
+      invalidateInventoryItemQueries(qc);
       qc.invalidateQueries({ queryKey: ['inventory', 'items', v.id] });
       toast.success('Item updated');
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to update item'),
+  });
+}
+
+export function useDeactivateItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => inventoryApi.items.deactivate(id),
+    onSuccess: (_, id) => {
+      invalidateInventoryItemQueries(qc);
+      qc.invalidateQueries({ queryKey: ['inventory', 'items', id] });
+      toast.success('Item deactivated');
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to deactivate item'),
+  });
+}
+
+export function useActivateItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => inventoryApi.items.activate(id),
+    onSuccess: (_, id) => {
+      invalidateInventoryItemQueries(qc);
+      qc.invalidateQueries({ queryKey: ['inventory', 'items', id] });
+      toast.success('Item activated');
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to activate item'),
+  });
+}
+
+export function useDeleteItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => inventoryApi.items.delete(id),
+    onSuccess: () => {
+      invalidateInventoryItemQueries(qc);
+      toast.success('Item deleted');
+    },
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
+      toast.error(d?.message || d?.error || 'Failed to delete item');
+    },
   });
 }
 
@@ -193,7 +243,10 @@ export function useUpdateGRN() {
       qc.invalidateQueries({ queryKey: ['inventory', 'grns', v.id] });
       toast.success(`${term('grnSingular')} updated`);
     },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || `Failed to update ${term('grnSingular')}`),
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
+      toast.error(d?.message || d?.error || `Failed to update ${term('grnSingular')}`);
+    },
   });
 }
 

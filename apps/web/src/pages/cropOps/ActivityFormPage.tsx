@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useCreateActivity, useActivityTypes } from '../../hooks/useCropOps';
 import { useCropCycles } from '../../hooks/useCropCycles';
 import { useProductionUnits } from '../../hooks/useProductionUnits';
@@ -390,6 +390,11 @@ export default function ActivityFormPage() {
             <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Labour</h2>
             <button type="button" onClick={addLabour} className="text-sm font-medium text-[#1F6F5C] hover:underline">+ Add</button>
           </div>
+          {(!workers || workers.length === 0) && (
+            <p className="text-sm text-gray-600">
+              No workers yet. <Link to="/app/labour/workers" className="text-[#1F6F5C] hover:underline font-medium">Add a worker</Link> to log labour.
+            </p>
+          )}
           <div className="space-y-3">
             {labour.map((line, i) => (
               <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">

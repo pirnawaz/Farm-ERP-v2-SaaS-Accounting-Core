@@ -68,7 +68,10 @@ class DailyBookEntryController extends Controller
         $project = \App\Models\Project::where('id', $request->input('project_id'))
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
-        
+        if ($project->status === 'CLOSED') {
+            return response()->json(['message' => 'Project is closed.'], 422);
+        }
+
         $entry = DailyBookEntry::create([
             'tenant_id' => $tenantId,
             'project_id' => $request->input('project_id'),
@@ -116,8 +119,11 @@ class DailyBookEntryController extends Controller
             $project = \App\Models\Project::where('id', $request->input('project_id'))
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
+            if ($project->status === 'CLOSED') {
+                return response()->json(['message' => 'Project is closed.'], 422);
+            }
         }
-        
+
         $entry->update($request->only([
             'project_id',
             'type',

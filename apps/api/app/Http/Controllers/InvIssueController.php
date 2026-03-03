@@ -48,7 +48,10 @@ class InvIssueController extends Controller
 
         InvStore::where('id', $request->store_id)->where('tenant_id', $tenantId)->firstOrFail();
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
-        Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+        $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($project->status === 'CLOSED') {
+            return response()->json(['message' => 'Project is closed.'], 422);
+        }
         if ($request->filled('machine_id')) {
             Machine::where('id', $request->machine_id)->where('tenant_id', $tenantId)->firstOrFail();
         }
@@ -151,6 +154,13 @@ class InvIssueController extends Controller
             $data['sharing_rule_id'] = $request->filled('sharing_rule_id') ? $request->sharing_rule_id : null;
             $data['landlord_share_pct'] = $request->filled('landlord_share_pct') ? $request->landlord_share_pct : null;
             $data['hari_share_pct'] = $request->filled('hari_share_pct') ? $request->hari_share_pct : null;
+        }
+        $projectId = $data['project_id'] ?? $issue->project_id;
+        if ($projectId) {
+            $proj = Project::where('id', $projectId)->where('tenant_id', $tenantId)->firstOrFail();
+            if ($proj->status === 'CLOSED') {
+                return response()->json(['message' => 'Project is closed.'], 422);
+            }
         }
         $issue->update($data);
 

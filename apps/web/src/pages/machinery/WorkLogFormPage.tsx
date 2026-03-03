@@ -12,7 +12,13 @@ import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
-import type { MachineWorkLogCostCode } from '../../types';
+import type { MachineWorkLogCostCode, MachineWorkLogPoolScope } from '../../types';
+
+const BENEFICIARY_OPTIONS: { value: MachineWorkLogPoolScope; label: string }[] = [
+  { value: 'LANDLORD_ONLY', label: 'My farm' },
+  { value: 'SHARED', label: 'Shared' },
+  { value: 'HARI_ONLY', label: 'Hari only' },
+];
 
 type LineRow = {
   cost_code: MachineWorkLogCostCode;
@@ -41,6 +47,7 @@ export default function WorkLogFormPage() {
 
   const [machine_id, setMachineId] = useState('');
   const [project_id, setProjectId] = useState('');
+  const [pool_scope, setPoolScope] = useState<MachineWorkLogPoolScope>('SHARED');
   const [work_date, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
   const [meter_start, setMeterStart] = useState('');
   const [meter_end, setMeterEnd] = useState('');
@@ -51,6 +58,7 @@ export default function WorkLogFormPage() {
     if (!workLog || !isEdit) return;
     setMachineId(workLog.machine_id);
     setProjectId(workLog.project_id);
+    setPoolScope((workLog.pool_scope as MachineWorkLogPoolScope) || 'SHARED');
     setWorkDate(workLog.work_date ?? new Date().toISOString().split('T')[0]);
     setMeterStart(workLog.meter_start ?? '');
     setMeterEnd(workLog.meter_end ?? '');
@@ -95,6 +103,7 @@ export default function WorkLogFormPage() {
     const payload = {
       machine_id,
       project_id,
+      pool_scope: pool_scope || undefined,
       work_date: work_date || undefined,
       meter_start: meter_start !== '' ? parseFloat(meter_start) : undefined,
       meter_end: meter_end !== '' ? parseFloat(meter_end) : undefined,
@@ -178,6 +187,20 @@ export default function WorkLogFormPage() {
             <span className="text-gray-700">
               {selectedProject?.crop_cycle?.name ?? '—'}
             </span>
+          </FormField>
+          <FormField label="Beneficiary">
+            <select
+              value={pool_scope}
+              onChange={(e) => setPoolScope(e.target.value as MachineWorkLogPoolScope)}
+              className="w-full px-3 py-2 border rounded"
+              disabled={isEdit}
+            >
+              {BENEFICIARY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </FormField>
           <FormField label="Work date">
             <input

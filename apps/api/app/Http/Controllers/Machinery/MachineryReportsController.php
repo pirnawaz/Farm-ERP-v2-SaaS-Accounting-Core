@@ -204,53 +204,36 @@ class MachineryReportsController extends Controller
             'to' => $to,
         ]);
 
-        // Get charges (from charges-by-machine logic)
-        $chargesQuery = "
+        // Revenue = income postings (MACHINERY_SERVICE_INCOME) by machine from allocation_rows
+        // Exclude reversed: only include PG where source record has reversal_posting_group_id IS NULL
+        $revenueQuery = "
             SELECT
-                m.id AS machine_id,
-                MAX(mcl.unit) AS unit,
-                COALESCE(SUM(mcl.usage_qty), 0) AS usage_qty,
-                COALESCE(SUM(mcl.amount), 0) AS charges_total
-            FROM machinery_charges mc
-            INNER JOIN machinery_charge_lines mcl ON mcl.machinery_charge_id = mc.id
-            INNER JOIN machine_work_logs mwl ON mwl.id = mcl.machine_work_log_id
-            INNER JOIN machines m ON m.id = mwl.machine_id
-            WHERE mc.tenant_id = :tenant_id
-                AND mc.status = 'POSTED'
-                AND mc.posting_date BETWEEN :from AND :to
-            GROUP BY m.id
+                ar.machine_id,
+                COALESCE(SUM(ar.amount), 0) AS revenue_total
+            FROM allocation_rows ar
+            INNER JOIN posting_groups pg ON pg.id = ar.posting_group_id
+            LEFT JOIN machinery_services ms ON ms.id::text = pg.source_id::text AND pg.source_type = 'MACHINERY_SERVICE'
+            LEFT JOIN machinery_charges mc ON mc.id::text = pg.source_id::text AND pg.source_type = 'MACHINERY_CHARGE'
+            WHERE ar.tenant_id = :tenant_id
+                AND ar.machine_id IS NOT NULL
+                AND ar.amount IS NOT NULL
+                AND ar.allocation_type IN ('MACHINERY_SERVICE', 'MACHINERY_CHARGE')
+                AND pg.posting_date BETWEEN :from AND :to
+                AND (
+                    (pg.source_type = 'MACHINERY_SERVICE' AND ms.posting_group_id = pg.id AND ms.reversal_posting_group_id IS NULL)
+                    OR (pg.source_type = 'MACHINERY_CHARGE' AND mc.posting_group_id = pg.id AND mc.reversal_posting_group_id IS NULL)
+                )
+            GROUP BY ar.machine_id
         ";
 
-        $usage = DB::select($usageQuery, [
+        $revenue = DB::select($revenueQuery, [
             'tenant_id' => $tenantId,
             'from' => $from,
             'to' => $to,
         ]);
 
-        // Get charges (from charges-by-machine logic) - group by machine_id only
-        $chargesQuery = "
-            SELECT
-                m.id AS machine_id,
-                MAX(mcl.unit) AS unit,
-                COALESCE(SUM(mcl.usage_qty), 0) AS usage_qty,
-                COALESCE(SUM(mcl.amount), 0) AS charges_total
-            FROM machinery_charges mc
-            INNER JOIN machinery_charge_lines mcl ON mcl.machinery_charge_id = mc.id
-            INNER JOIN machine_work_logs mwl ON mwl.id = mcl.machine_work_log_id
-            INNER JOIN machines m ON m.id = mwl.machine_id
-            WHERE mc.tenant_id = :tenant_id
-                AND mc.status = 'POSTED'
-                AND mc.posting_date BETWEEN :from AND :to
-            GROUP BY m.id
-        ";
-
-        $charges = DB::select($chargesQuery, [
-            'tenant_id' => $tenantId,
-            'from' => $from,
-            'to' => $to,
-        ]);
-
-        // Get costs (from costs-by-machine logic)
+        // Costs = allocation rows with machine_id excluding revenue types (MACHINERY_SERVICE, MACHINERY_CHARGE)
+        // e.g. MACHINERY_MAINTENANCE and work log cost postings; exclude reversed via source
         $costsQuery = "
             SELECT
                 ar.machine_id,
@@ -260,6 +243,7 @@ class MachineryReportsController extends Controller
             WHERE ar.tenant_id = :tenant_id
                 AND ar.machine_id IS NOT NULL
                 AND ar.amount IS NOT NULL
+                AND (ar.allocation_type IS NULL OR ar.allocation_type NOT IN ('MACHINERY_SERVICE', 'MACHINERY_CHARGE'))
                 AND pg.posting_date BETWEEN :from AND :to
             GROUP BY ar.machine_id
         ";
@@ -276,13 +260,9 @@ class MachineryReportsController extends Controller
             $usageByMachine[$u->machine_id] = $u;
         }
 
-        $chargesByMachine = [];
-        foreach ($charges as $c) {
-            $chargesByMachine[$c->machine_id] = [
-                'unit' => $c->unit,
-                'usage_qty' => (float) $c->usage_qty,
-                'charges_total' => (float) $c->charges_total,
-            ];
+        $revenueByMachine = [];
+        foreach ($revenue as $r) {
+            $revenueByMachine[$r->machine_id] = (float) $r->revenue_total;
         }
 
         $costsByMachine = [];
@@ -290,10 +270,10 @@ class MachineryReportsController extends Controller
             $costsByMachine[$c->machine_id] = (float) $c->costs_total;
         }
 
-        // Get all unique machines from usage, charges, or costs
+        // Get all unique machines from usage, revenue, or costs
         $allMachineIds = array_unique(array_merge(
             array_keys($usageByMachine),
-            array_keys($chargesByMachine),
+            array_keys($revenueByMachine),
             array_keys($costsByMachine)
         ));
 
@@ -301,13 +281,13 @@ class MachineryReportsController extends Controller
         $rows = [];
         foreach ($allMachineIds as $machineId) {
             $usageData = $usageByMachine[$machineId] ?? null;
-            $chargeData = $chargesByMachine[$machineId] ?? null;
+            $revenueTotal = $revenueByMachine[$machineId] ?? 0;
             $costTotal = $costsByMachine[$machineId] ?? 0;
 
             $machineCode = $usageData->machine_code ?? null;
             $machineName = $usageData->machine_name ?? null;
-            $unit = $chargeData['unit'] ?? ($usageData->meter_unit ?? null);
-            
+            $unit = $usageData->meter_unit ?? null;
+
             // Map meter_unit (HOURS/KM) to unit (HOUR/KM)
             if ($unit === 'HOURS') {
                 $unit = 'HOUR';
@@ -315,16 +295,13 @@ class MachineryReportsController extends Controller
 
             // Get usage from work logs (primary source)
             $usageQty = $usageData ? (float) $usageData->usage_qty : 0;
-            
-            // Get charges total
-            $chargesTotal = $chargeData ? (float) $chargeData['charges_total'] : 0;
 
-            // Calculate margin
-            $margin = $chargesTotal - $costTotal;
+            // Margin = revenue (income) - costs
+            $margin = $revenueTotal - $costTotal;
 
             // Calculate per-unit values (null if usage_qty = 0)
             $costPerUnit = $usageQty > 0 ? ($costTotal / $usageQty) : null;
-            $chargePerUnit = $usageQty > 0 ? ($chargesTotal / $usageQty) : null;
+            $chargePerUnit = $usageQty > 0 ? ($revenueTotal / $usageQty) : null;
             $marginPerUnit = $usageQty > 0 ? ($margin / $usageQty) : null;
 
             // If we don't have machine info from usage, fetch it
@@ -348,7 +325,7 @@ class MachineryReportsController extends Controller
                 'machine_name' => $machineName,
                 'unit' => $unit,
                 'usage_qty' => (string) round($usageQty, 2),
-                'charges_total' => (string) round($chargesTotal, 2),
+                'charges_total' => (string) round($revenueTotal, 2),
                 'costs_total' => (string) round($costTotal, 2),
                 'margin' => (string) round($margin, 2),
                 'cost_per_unit' => $costPerUnit !== null ? (string) round($costPerUnit, 2) : null,

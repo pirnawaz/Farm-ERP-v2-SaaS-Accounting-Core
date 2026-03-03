@@ -155,4 +155,47 @@ class ProjectController extends Controller
 
         return response()->json($project->load(['cropCycle', 'party', 'landAllocation']), 201);
     }
+
+    public function close(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $project = Project::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        if ($project->status === 'CLOSED') {
+            return response()->json($project->load(['cropCycle', 'party', 'landAllocation']));
+        }
+
+        $project->update([
+            'status' => 'CLOSED',
+            'closed_at' => now(),
+        ]);
+
+        return response()->json($project->load(['cropCycle', 'party', 'landAllocation']));
+    }
+
+    public function reopen(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $project = Project::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $hasPostedSettlement = $project->settlements()->where('status', 'POSTED')->exists();
+        if ($hasPostedSettlement) {
+            return response()->json([
+                'message' => 'Cannot reopen project that has a posted settlement.',
+            ], 422);
+        }
+
+        $project->update([
+            'status' => 'ACTIVE',
+            'closed_at' => null,
+        ]);
+
+        return response()->json($project->load(['cropCycle', 'party', 'landAllocation']));
+    }
 }

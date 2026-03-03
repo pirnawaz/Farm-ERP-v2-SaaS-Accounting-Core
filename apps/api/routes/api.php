@@ -67,6 +67,7 @@ use App\Domains\Operations\LandLease\LandLeaseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandLeaseAccrualController;
 use App\Http\Controllers\Internal\FarmIntegrityController;
+use App\Http\Controllers\Tenant\TenantAddonModulesController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -76,9 +77,10 @@ Route::prefix('internal')->middleware(['role:tenant_admin'])->group(function () 
     Route::get('daily-admin-review', [FarmIntegrityController::class, 'dailyAdminReview']);
 });
 
-// Dashboard (read-only summary for all tenant roles)
+// Dashboard and tenant addon modules (read-only, all tenant roles)
 Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () {
     Route::get('dashboard/summary', [DashboardController::class, 'summary']);
+    Route::get('tenant/addon-modules', [TenantAddonModulesController::class, 'index']);
 });
 
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -185,6 +187,7 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::post('crop-cycles/{id}/close', [CropCycleController::class, 'close'])->middleware('role:tenant_admin');
     Route::post('crop-cycles/{id}/reopen', [CropCycleController::class, 'reopen'])->middleware('role:tenant_admin');
     Route::post('crop-cycles/{id}/open', [CropCycleController::class, 'open'])->middleware('role:tenant_admin');
+    Route::post('crop-cycles/{id}/season-setup', [CropCycleController::class, 'seasonSetup']);
 });
 
 // Land Allocations (tenant_admin, accountant)
@@ -208,6 +211,8 @@ Route::middleware(['role:tenant_admin', 'require_module:land_leases'])->group(fu
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::apiResource('projects', ProjectController::class);
     Route::post('projects/from-allocation', [ProjectController::class, 'fromAllocation']);
+    Route::post('projects/{id}/close', [ProjectController::class, 'close']);
+    Route::post('projects/{id}/reopen', [ProjectController::class, 'reopen']);
 });
 
 // Project Rules (tenant_admin, accountant)
@@ -299,6 +304,9 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::post('items', [InvItemController::class, 'store']);
         Route::get('items/{id}', [InvItemController::class, 'show']);
         Route::patch('items/{id}', [InvItemController::class, 'update']);
+        Route::post('items/{id}/deactivate', [InvItemController::class, 'deactivate']);
+        Route::post('items/{id}/activate', [InvItemController::class, 'activate']);
+        Route::delete('items/{id}', [InvItemController::class, 'destroy']);
         Route::get('stores', [InvStoreController::class, 'index']);
         Route::post('stores', [InvStoreController::class, 'store']);
         Route::get('stores/{id}', [InvStoreController::class, 'show']);
@@ -553,11 +561,12 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
     Route::get('settings/tenant', [SettingsController::class, 'show']);
 });
 
-// tenant_admin only: settings update, tenant modules, farm profile, users
+// tenant_admin only: settings update, tenant modules, farm profile, users, addon modules
 Route::middleware(['role:tenant_admin'])->group(function () {
     Route::put('settings/tenant', [SettingsController::class, 'update']);
     Route::get('tenant/modules', [TenantModuleController::class, 'index']);
     Route::put('tenant/modules', [TenantModuleController::class, 'update']);
+    Route::patch('tenant/addon-modules/{module_key}', [TenantAddonModulesController::class, 'update']);
     Route::get('tenant/onboarding', [TenantOnboardingController::class, 'show']);
     Route::put('tenant/onboarding', [TenantOnboardingController::class, 'update']);
     Route::get('tenant/farm-profile', [TenantFarmProfileController::class, 'show']);

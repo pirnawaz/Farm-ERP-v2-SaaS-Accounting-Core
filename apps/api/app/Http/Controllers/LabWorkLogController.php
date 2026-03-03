@@ -56,6 +56,9 @@ class LabWorkLogController extends Controller
         LabWorker::where('id', $request->worker_id)->where('tenant_id', $tenantId)->firstOrFail();
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
         $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+        if ($project->status === 'CLOSED') {
+            return response()->json(['message' => 'Project is closed.'], 422);
+        }
         if ($project->crop_cycle_id !== $request->crop_cycle_id) {
             abort(422, 'Project does not belong to the selected crop cycle.');
         }
@@ -155,6 +158,9 @@ class LabWorkLogController extends Controller
 
         if (isset($data['crop_cycle_id']) || isset($data['project_id'])) {
             $project = Project::where('id', $log->project_id)->where('tenant_id', $tenantId)->firstOrFail();
+            if ($project->status === 'CLOSED') {
+                return response()->json(['message' => 'Project is closed.'], 422);
+            }
             if ($project->crop_cycle_id !== $log->crop_cycle_id) {
                 abort(422, 'Project does not belong to the selected crop cycle.');
             }

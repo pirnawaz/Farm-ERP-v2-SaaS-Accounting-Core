@@ -13,4 +13,6 @@ export const projectsApi = {
   delete: (id: string) => apiClient.delete(`/api/projects/${id}`),
   createFromAllocation: (payload: CreateProjectFromAllocationPayload) => 
     apiClient.post<Project>('/api/projects/from-allocation', payload),
+  close: (id: string) => apiClient.post<Project>(`/api/projects/${id}/close`, {}),
+  reopen: (id: string) => apiClient.post<Project>(`/api/projects/${id}/reopen`, {}),
 };

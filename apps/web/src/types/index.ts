@@ -101,6 +101,14 @@ export interface UpdatePlatformTenantPayload {
   timezone?: string;
 }
 
+/** Tenant addon (expansion) modules: orchards, livestock. GET /api/tenant/addon-modules */
+export interface TenantAddonModulesResponse {
+  modules: {
+    orchards: boolean;
+    livestock: boolean;
+  };
+}
+
 // Party
 export type PartyType = 'HARI' | 'KAMDAR' | 'VENDOR' | 'BUYER' | 'LENDER' | 'CONTRACTOR' | 'LANDLORD';
 
@@ -164,6 +172,8 @@ export type CropItemSource = 'global' | 'custom';
 export interface CropItem {
   id: string;
   display_name: string;
+  /** Optional tenant-specific name when source is custom */
+  custom_name?: string | null;
   source: CropItemSource;
   catalog_code: string | null;
   category: string | null;
@@ -318,6 +328,19 @@ export interface LandAllocation {
   project?: Project;
 }
 
+// Field Block (split field / multiple crops per parcel per season)
+export interface FieldBlock {
+  id: string;
+  tenant_id: string;
+  crop_cycle_id: string;
+  land_parcel_id: string;
+  tenant_crop_item_id: string;
+  name?: string | null;
+  area?: string | number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Project
 export type ProjectStatus = 'ACTIVE' | 'CLOSED';
 
@@ -328,11 +351,14 @@ export interface Project {
   party_id: string;
   crop_cycle_id: string;
   land_allocation_id?: string;
+  field_block_id?: string | null;
   status: ProjectStatus;
+  closed_at?: string | null;
   created_at: string;
   crop_cycle?: CropCycle;
   party?: Party;
   land_allocation?: LandAllocation;
+  field_block?: FieldBlock | null;
 }
 
 // Project Rule
@@ -788,6 +814,9 @@ export interface MachineWorkLogCostLine {
   party?: Party;
 }
 
+/** Beneficiary scope for machinery work: My farm only / Shared / Hari only */
+export type MachineWorkLogPoolScope = 'LANDLORD_ONLY' | 'SHARED' | 'HARI_ONLY';
+
 export interface MachineWorkLog {
   id: string;
   tenant_id: string;
@@ -796,6 +825,7 @@ export interface MachineWorkLog {
   machine_id: string;
   project_id: string;
   crop_cycle_id: string;
+  pool_scope?: MachineWorkLogPoolScope | null;
   work_date?: string | null;
   meter_start?: string | null;
   meter_end?: string | null;
@@ -856,6 +886,7 @@ export interface MachineWorkLogCostLineInput {
 export interface CreateMachineWorkLogPayload {
   machine_id: string;
   project_id: string;
+  pool_scope?: MachineWorkLogPoolScope | null;
   work_date?: string | null;
   meter_start?: number | null;
   meter_end?: number | null;
@@ -866,6 +897,7 @@ export interface CreateMachineWorkLogPayload {
 export interface UpdateMachineWorkLogPayload {
   machine_id?: string;
   project_id?: string;
+  pool_scope?: MachineWorkLogPoolScope | null;
   work_date?: string | null;
   meter_start?: number | null;
   meter_end?: number | null;
@@ -969,7 +1001,7 @@ export interface MachineryCharge {
   landlord_party_id: string;
   project_id: string;
   crop_cycle_id: string;
-  pool_scope: 'SHARED' | 'HARI_ONLY';
+  pool_scope: 'LANDLORD_ONLY' | 'SHARED' | 'HARI_ONLY';
   charge_date: string;
   posting_date?: string | null;
   posted_at?: string | null;
@@ -991,7 +1023,7 @@ export interface GenerateChargesPayload {
   landlord_party_id?: string | null;
   from: string;
   to: string;
-  pool_scope?: 'SHARED' | 'HARI_ONLY';
+  pool_scope?: 'LANDLORD_ONLY' | 'SHARED' | 'HARI_ONLY';
   charge_date?: string;
 }
 
@@ -1094,9 +1126,9 @@ export interface PostMachineMaintenanceJobResult {
   job: MachineMaintenanceJob;
 }
 
-// Machinery Services (internal service posted to project with allocation_scope SHARED | HARI_ONLY)
+// Machinery Services (internal service posted to project with allocation_scope)
 export type MachineryServiceStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
-export type MachineryServiceAllocationScope = 'SHARED' | 'HARI_ONLY';
+export type MachineryServiceAllocationScope = 'LANDLORD_ONLY' | 'SHARED' | 'HARI_ONLY';
 
 export interface MachineryService {
   id: string;
@@ -1988,6 +2020,8 @@ export interface InvItem {
   updated_at: string;
   category?: InvItemCategory;
   uom?: InvUom;
+  /** True only when item has no transactions (safe to delete). */
+  can_delete?: boolean;
 }
 
 export interface InvStore {

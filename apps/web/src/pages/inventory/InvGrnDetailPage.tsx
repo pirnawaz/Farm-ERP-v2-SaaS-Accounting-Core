@@ -19,6 +19,8 @@ import { v4 as uuidv4 } from 'uuid';
 import type { UpdateInvGrnPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import toast from 'react-hot-toast';
 
 type Line = { item_id: string; qty: string; unit_cost: string };
 
@@ -50,12 +52,15 @@ export default function InvGrnDetailPage() {
   const [doc_date, setDocDate] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
 
+  /** Normalize API date to YYYY-MM-DD for input[type=date]. */
+  const toDateOnly = (d: string | undefined): string => (d ? String(d).slice(0, 10) : '');
+
   useEffect(() => {
     if (grn) {
       setDocNo(grn.doc_no);
       setSupplierPartyId(grn.supplier_party_id || '');
       setStoreId(grn.store_id);
-      setDocDate(grn.doc_date);
+      setDocDate(toDateOnly(grn.doc_date));
       setLines(
         (grn.lines || []).map((l) => ({
           item_id: l.item_id,
@@ -85,11 +90,16 @@ export default function InvGrnDetailPage() {
       .filter((l) => l.item_id && parseFloat(l.qty) > 0 && parseFloat(l.unit_cost) >= 0)
       .map((l) => ({ item_id: l.item_id, qty: parseFloat(l.qty), unit_cost: parseFloat(l.unit_cost) }));
     if (validLines.length === 0) return;
+    const docDateValue = doc_date || toDateOnly(grn?.doc_date);
+    if (!docDateValue) {
+      toast.error('Doc date is required');
+      return;
+    }
     const payload: UpdateInvGrnPayload = {
       doc_no,
       supplier_party_id: supplier_party_id || undefined,
       store_id,
-      doc_date,
+      doc_date: docDateValue,
       lines: validLines,
     };
     await updateM.mutateAsync({ id, payload });
@@ -154,7 +164,7 @@ export default function InvGrnDetailPage() {
           <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
-            <FormField label="Doc Date"><input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+            <FormField label="Doc Date" required><input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Store">
               <select value={store_id} onChange={(e) => setStoreId(e.target.value)} className="w-full px-3 py-2 border rounded">
                 {stores?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -191,7 +201,7 @@ export default function InvGrnDetailPage() {
             <p className="mt-2 text-sm font-medium">Total: <span className="tabular-nums">{formatMoney(lines.reduce((a, l) => a + (parseFloat(l.qty) || 0) * (parseFloat(l.unit_cost) || 0), 0))}</span></p>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
+            <button onClick={handleSave} disabled={updateM.isPending || !(doc_date || toDateOnly(grn?.doc_date))} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
             {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
           </div>
         </div>
@@ -202,7 +212,7 @@ export default function InvGrnDetailPage() {
             <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
             <tbody>
               {(grn.lines || []).map((l) => (
-                <tr key={l.id}><td className="px-3 py-2">{l.item?.name}</td><td>{l.qty}</td><td>{l.unit_cost}</td><td><span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span></td></tr>
+                <tr key={l.id}><td className="px-3 py-2">{formatItemDisplayName(l.item)}</td><td>{l.qty}</td><td>{l.unit_cost}</td><td><span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span></td></tr>
               ))}
             </tbody>
           </table>

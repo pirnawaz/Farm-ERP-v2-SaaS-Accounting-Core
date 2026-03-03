@@ -21,6 +21,7 @@ class MachineryCharge extends Model
     // Pool scope constants (matching MachineWorkLog)
     public const POOL_SCOPE_SHARED = 'SHARED';
     public const POOL_SCOPE_HARI_ONLY = 'HARI_ONLY';
+    public const POOL_SCOPE_LANDLORD_ONLY = 'LANDLORD_ONLY';
 
     protected $fillable = [
         'tenant_id',

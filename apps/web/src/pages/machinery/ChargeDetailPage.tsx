@@ -180,8 +180,10 @@ export default function ChargeDetailPage() {
             <dd className="text-sm text-gray-900">{charge.crop_cycle?.name || 'N/A'}</dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-gray-500">Pool Scope</dt>
-            <dd className="text-sm text-gray-900">{charge.pool_scope}</dd>
+            <dt className="text-sm font-medium text-gray-500">Beneficiary</dt>
+            <dd className="text-sm text-gray-900">
+              {charge.pool_scope === 'LANDLORD_ONLY' ? 'My farm' : charge.pool_scope === 'HARI_ONLY' ? 'Hari only' : charge.pool_scope === 'SHARED' ? 'Shared' : charge.pool_scope ?? '—'}
+            </dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Charge Date</dt>

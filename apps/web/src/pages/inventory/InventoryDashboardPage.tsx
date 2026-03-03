@@ -4,6 +4,7 @@ import { term } from '../../config/terminology';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 import type { InvStockBalance } from '../../types';
 
 export default function InventoryDashboardPage() {
@@ -12,7 +13,7 @@ export default function InventoryDashboardPage() {
 
   const columns: Column<InvStockBalance>[] = [
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
-    { header: term('inventoryItemSingular'), accessor: (r) => r.item?.name || r.item_id },
+    { header: term('inventoryItemSingular'), accessor: (r) => formatItemDisplayName(r.item) },
     { header: 'Qty', accessor: (r) => String(r.qty_on_hand) },
     { header: 'Value', accessor: (r) => <span className="tabular-nums">{formatMoney(r.value_on_hand)}</span> },
     { header: 'WAC', accessor: (r) => <span className="tabular-nums">{formatMoney(r.wac_cost)}</span> },

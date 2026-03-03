@@ -15,7 +15,11 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { CreateMachineryServicePayload, UpdateMachineryServicePayload, MachineryServiceAllocationScope } from '../../types';
 
-const ALLOCATION_SCOPES: MachineryServiceAllocationScope[] = ['SHARED', 'HARI_ONLY'];
+const BENEFICIARY_OPTIONS: { value: MachineryServiceAllocationScope; label: string }[] = [
+  { value: 'LANDLORD_ONLY', label: 'My farm' },
+  { value: 'SHARED', label: 'Shared' },
+  { value: 'HARI_ONLY', label: 'Hari only' },
+];
 
 export default function MachineryServiceFormPage() {
   const navigate = useNavigate();
@@ -210,15 +214,15 @@ export default function MachineryServiceFormPage() {
               placeholder="e.g. 10"
             />
           </FormField>
-          <FormField label="Allocation scope" required>
+          <FormField label="Beneficiary" required>
             <select
               value={allocation_scope}
               onChange={(e) => setAllocationScope(e.target.value as MachineryServiceAllocationScope)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
-              {ALLOCATION_SCOPES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+              {BENEFICIARY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>

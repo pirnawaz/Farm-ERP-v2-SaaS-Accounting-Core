@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Dev;
 use App\Http\Controllers\Controller;
 use App\Models\Farm;
 use App\Models\Tenant;
+use App\Services\TenantCropItemProvisioner;
 use App\Models\Account;
 use Database\Seeders\SystemAccountsSeeder;
 use Illuminate\Http\Request;
@@ -85,6 +86,8 @@ class DevTenantController extends Controller
 
             // Initialize system accounts for the new tenant (must succeed or entire create rolls back)
             $this->initializeSystemAccounts($tenant->id);
+
+            app(TenantCropItemProvisioner::class)->syncTenant($tenant->id);
 
             return $tenant;
         });

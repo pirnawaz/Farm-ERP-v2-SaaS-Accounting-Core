@@ -134,7 +134,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             'usage_qty' => 6,
             'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
         ]);
-        $machineryPostingService = new MachineryPostingService();
+        $machineryPostingService = app(MachineryPostingService::class);
         $machineryPostingService->postWorkLog($workLog->id, $tenant->id, $postingDate);
         $workLog->refresh();
 
@@ -166,7 +166,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             MachineWorkLog::POOL_SCOPE_SHARED
         );
 
-        $chargePostingService = new MachineryChargePostingService();
+        $chargePostingService = app(MachineryChargePostingService::class);
         $chargePostingService->postCharge($charge->id, $tenant->id, $postingDate);
         $charge->refresh();
 
@@ -207,10 +207,10 @@ class MachineryProfitabilityReportsTest extends TestCase
             'line_total' => 150,
         ]);
 
-        $inventoryPostingService = new InventoryPostingService();
+        $inventoryPostingService = app(InventoryPostingService::class);
         $inventoryPostingService->postGRN($grn->id, $tenant->id, '2024-06-01', 'grn-1');
 
-        // Create and post issue with machine_id
+        // Create and post issue with machine_id (SHARED requires landlord_share_pct + hari_share_pct summing to 100)
         $issue = InvIssue::create([
             'tenant_id' => $tenant->id,
             'doc_no' => 'ISS-1',
@@ -220,6 +220,9 @@ class MachineryProfitabilityReportsTest extends TestCase
             'machine_id' => $machine->id,
             'doc_date' => $postingDate,
             'status' => 'DRAFT',
+            'allocation_mode' => 'SHARED',
+            'landlord_share_pct' => 50,
+            'hari_share_pct' => 50,
         ]);
         InvIssueLine::create([
             'tenant_id' => $tenant->id,
@@ -235,7 +238,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             'tenant_id' => $tenant->id,
             'name' => 'Worker 1',
             'worker_no' => 'W-001',
-            'worker_type' => 'CASUAL',
+            'worker_type' => 'STAFF',
             'rate_basis' => 'DAILY',
             'default_rate' => 100,
             'is_active' => true,
@@ -256,7 +259,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             'status' => 'DRAFT',
         ]);
 
-        $labourPostingService = new LabourPostingService();
+        $labourPostingService = app(LabourPostingService::class);
         $labourPostingService->postWorkLog($labWorkLog->id, $tenant->id, $postingDate);
         $expectedLabourCost = 100.00;
 
@@ -279,20 +282,17 @@ class MachineryProfitabilityReportsTest extends TestCase
             'amount' => 150.00,
         ]);
 
-        $maintenancePostingService = new MachineMaintenancePostingService();
+        $maintenancePostingService = app(MachineMaintenancePostingService::class);
         $maintenancePostingService->postJob($maintenanceJob->id, $tenant->id, $postingDate);
         $expectedMaintenanceCost = 150.00;
 
         // Total expected costs: fuel (30) + labour (100) + maintenance (150) = 280
         $expectedTotalCosts = $expectedFuelCost + $expectedLabourCost + $expectedMaintenanceCost;
 
-        // Call profitability report
+        // Call profitability report (GET: from/to must be query params)
         $response = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/v1/machinery/reports/profitability', [
-                'from' => $postingDate,
-                'to' => $postingDate,
-            ]);
+            ->getJson('/api/v1/machinery/reports/profitability?from=' . $postingDate . '&to=' . $postingDate);
 
         $response->assertStatus(200);
         $data = $response->json();
@@ -393,7 +393,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             'usage_qty' => 6,
             'pool_scope' => MachineWorkLog::POOL_SCOPE_SHARED,
         ]);
-        $machineryPostingService = new MachineryPostingService();
+        $machineryPostingService = app(MachineryPostingService::class);
         $machineryPostingService->postWorkLog($workLog->id, $tenant->id, $postingDate);
 
         // Create rate card and generate/post charge
@@ -424,19 +424,16 @@ class MachineryProfitabilityReportsTest extends TestCase
             MachineWorkLog::POOL_SCOPE_SHARED
         );
 
-        $chargePostingService = new MachineryChargePostingService();
+        $chargePostingService = app(MachineryChargePostingService::class);
         $chargePostingService->postCharge($charge->id, $tenant->id, $postingDate);
 
         $expectedUsageQty = 6.0;
         $expectedChargesTotal = 6.0 * 50.00;
 
-        // Call charges-by-machine report
+        // Call charges-by-machine report (GET: from/to must be query params)
         $response = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/v1/machinery/reports/charges-by-machine', [
-                'from' => $postingDate,
-                'to' => $postingDate,
-            ]);
+            ->getJson('/api/v1/machinery/reports/charges-by-machine?from=' . $postingDate . '&to=' . $postingDate);
 
         $response->assertStatus(200);
         $data = $response->json();
@@ -529,7 +526,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             'line_total' => 150,
         ]);
 
-        $inventoryPostingService = new InventoryPostingService();
+        $inventoryPostingService = app(InventoryPostingService::class);
         $inventoryPostingService->postGRN($grn->id, $tenant->id, '2024-06-01', 'grn-1');
 
         $issue = InvIssue::create([
@@ -541,6 +538,9 @@ class MachineryProfitabilityReportsTest extends TestCase
             'machine_id' => $machine->id,
             'doc_date' => $postingDate,
             'status' => 'DRAFT',
+            'allocation_mode' => 'SHARED',
+            'landlord_share_pct' => 50,
+            'hari_share_pct' => 50,
         ]);
         InvIssueLine::create([
             'tenant_id' => $tenant->id,
@@ -556,7 +556,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             'tenant_id' => $tenant->id,
             'name' => 'Worker 1',
             'worker_no' => 'W-001',
-            'worker_type' => 'CASUAL',
+            'worker_type' => 'STAFF',
             'rate_basis' => 'DAILY',
             'default_rate' => 100,
             'is_active' => true,
@@ -577,7 +577,7 @@ class MachineryProfitabilityReportsTest extends TestCase
             'status' => 'DRAFT',
         ]);
 
-        $labourPostingService = new LabourPostingService();
+        $labourPostingService = app(LabourPostingService::class);
         $labourPostingService->postWorkLog($labWorkLog->id, $tenant->id, $postingDate);
         $expectedLabourCost = 100.00;
 
@@ -600,19 +600,16 @@ class MachineryProfitabilityReportsTest extends TestCase
             'amount' => 150.00,
         ]);
 
-        $maintenancePostingService = new MachineMaintenancePostingService();
+        $maintenancePostingService = app(MachineMaintenancePostingService::class);
         $maintenancePostingService->postJob($maintenanceJob->id, $tenant->id, $postingDate);
         $expectedMaintenanceCost = 150.00;
 
         $expectedTotalCosts = $expectedFuelCost + $expectedLabourCost + $expectedMaintenanceCost;
 
-        // Call costs-by-machine report
+        // Call costs-by-machine report (GET: from/to must be query params)
         $response = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/v1/machinery/reports/costs-by-machine', [
-                'from' => $postingDate,
-                'to' => $postingDate,
-            ]);
+            ->getJson('/api/v1/machinery/reports/costs-by-machine?from=' . $postingDate . '&to=' . $postingDate);
 
         $response->assertStatus(200);
         $data = $response->json();

@@ -1,11 +1,21 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useInventoryItems, useCreateItem, useUoms, useCategories } from '../../hooks/useInventory';
+import {
+  useInventoryItems,
+  useCreateItem,
+  useUpdateItem,
+  useDeactivateItem,
+  useActivateItem,
+  useDeleteItem,
+  useUoms,
+  useCategories,
+} from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useRole } from '../../hooks/useRole';
 import { term } from '../../config/terminology';
 import type { InvItem } from '../../types';
@@ -15,16 +25,24 @@ export default function InvItemsPage() {
   const { data: uoms } = useUoms();
   const { data: categories } = useCategories();
   const createM = useCreateItem();
+  const updateM = useUpdateItem();
+  const deactivateM = useDeactivateItem();
+  const activateM = useActivateItem();
+  const deleteM = useDeleteItem();
   const { hasRole } = useRole();
-  const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InvItem | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ action: 'deactivate' | 'activate' | 'delete'; item: InvItem } | null>(null);
   const [form, setForm] = useState({
     name: '',
     sku: '',
     category_id: '' as string,
     uom_id: '',
-    valuation_method: 'WAC',
+    valuation_method: 'WAC' as string,
     is_active: true,
   });
+
+  const canAct = hasRole(['tenant_admin', 'accountant', 'operator']);
 
   const cols: Column<InvItem>[] = [
     { header: 'Name', accessor: 'name' },
@@ -33,6 +51,60 @@ export default function InvItemsPage() {
     { header: 'UoM', accessor: (r) => r.uom?.code || r.uom_id },
     { header: 'Valuation', accessor: 'valuation_method' },
     { header: 'Active', accessor: (r) => (r.is_active ? 'Yes' : 'No') },
+    ...(canAct
+      ? [
+          {
+            header: 'Actions',
+            accessor: (row: InvItem) => (
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingItem(row);
+                    setForm({
+                      name: row.name,
+                      sku: row.sku ?? '',
+                      category_id: row.category_id ?? '',
+                      uom_id: row.uom_id,
+                      valuation_method: row.valuation_method,
+                      is_active: row.is_active,
+                    });
+                  }}
+                  className="text-sm text-[#1F6F5C] hover:underline"
+                >
+                  Edit
+                </button>
+                {row.is_active ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction({ action: 'deactivate', item: row })}
+                    className="text-sm text-amber-700 hover:underline"
+                  >
+                    Deactivate
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction({ action: 'activate', item: row })}
+                    className="text-sm text-[#1F6F5C] hover:underline"
+                  >
+                    Activate
+                  </button>
+                )}
+                {row.can_delete && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction({ action: 'delete', item: row })}
+                    className="text-sm text-red-600 hover:underline"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            ),
+          } as Column<InvItem>,
+        ]
+      : []),
   ];
 
   const handleCreate = async () => {
@@ -45,8 +117,34 @@ export default function InvItemsPage() {
       valuation_method: form.valuation_method,
       is_active: form.is_active,
     });
-    setShowModal(false);
+    setShowCreateModal(false);
     setForm({ name: '', sku: '', category_id: '', uom_id: '', valuation_method: 'WAC', is_active: true });
+  };
+
+  const handleUpdate = async () => {
+    if (!editingItem || !form.name || !form.uom_id) return;
+    await updateM.mutateAsync({
+      id: editingItem.id,
+      payload: {
+        name: form.name,
+        sku: form.sku || null,
+        category_id: form.category_id || null,
+        uom_id: form.uom_id,
+        valuation_method: form.valuation_method,
+        is_active: form.is_active,
+      },
+    });
+    setEditingItem(null);
+    setForm({ name: '', sku: '', category_id: '', uom_id: '', valuation_method: 'WAC', is_active: true });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return;
+    const { action, item } = confirmAction;
+    if (action === 'deactivate') await deactivateM.mutateAsync(item.id);
+    if (action === 'activate') await activateM.mutateAsync(item.id);
+    if (action === 'delete') await deleteM.mutateAsync(item.id);
+    setConfirmAction(null);
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
@@ -57,14 +155,16 @@ export default function InvItemsPage() {
         title={term('inventoryItem')}
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('inventoryItem') }]}
-        right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('inventoryItemSingular')}</button>
+        right={canAct ? (
+          <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('inventoryItemSingular')}</button>
         ) : undefined}
       />
       <div className="bg-white rounded-lg shadow">
         <DataTable data={items || []} columns={cols} emptyMessage={`No ${term('inventoryItem').toLowerCase()}. Create one.`} />
       </div>
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={`New ${term('inventoryItemSingular')}`}>
+
+      {/* Create modal */}
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title={`New ${term('inventoryItemSingular')}`}>
         <div className="space-y-4">
           <FormField label="Name" required><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="SKU"><input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Optional" /></FormField>
@@ -88,17 +188,76 @@ export default function InvItemsPage() {
           <FormField label="Valuation">
             <select value={form.valuation_method} onChange={e => setForm(f => ({ ...f, valuation_method: e.target.value }))} className="w-full px-3 py-2 border rounded">
               <option value="WAC">WAC</option>
+              <option value="FIFO">FIFO</option>
             </select>
           </FormField>
           <FormField label="Active">
             <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
           </FormField>
           <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowModal(false)} className="px-4 py-2 border rounded">Cancel</button>
+            <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border rounded">Cancel</button>
             <button onClick={handleCreate} disabled={!form.name || !form.uom_id || createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Create</button>
           </div>
         </div>
       </Modal>
+
+      {/* Edit modal */}
+      <Modal isOpen={!!editingItem} onClose={() => setEditingItem(null)} title={`Edit ${term('inventoryItemSingular')}`}>
+        <div className="space-y-4">
+          <FormField label="Name" required><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border rounded" /></FormField>
+          <FormField label="SKU"><input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Optional" /></FormField>
+          <FormField label={term('inventoryCategorySingular')}>
+            <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
+              <option value="">—</option>
+              {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Unit of Measure" required>
+            <select value={form.uom_id} onChange={e => setForm(f => ({ ...f, uom_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
+              <option value="">Select UoM</option>
+              {uoms?.map(u => <option key={u.id} value={u.id}>{u.code} ({u.name})</option>)}
+            </select>
+          </FormField>
+          <FormField label="Valuation">
+            <select value={form.valuation_method} onChange={e => setForm(f => ({ ...f, valuation_method: e.target.value }))} className="w-full px-3 py-2 border rounded">
+              <option value="WAC">WAC</option>
+              <option value="FIFO">FIFO</option>
+            </select>
+          </FormField>
+          <FormField label="Active">
+            <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
+          </FormField>
+          <div className="flex gap-2 pt-4">
+            <button onClick={() => setEditingItem(null)} className="px-4 py-2 border rounded">Cancel</button>
+            <button onClick={handleUpdate} disabled={!form.name || !form.uom_id || updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Deactivate / Activate / Delete confirm */}
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleConfirmAction}
+        title={
+          confirmAction?.action === 'deactivate'
+            ? 'Deactivate item'
+            : confirmAction?.action === 'activate'
+              ? 'Activate item'
+              : 'Delete item'
+        }
+        message={
+          confirmAction?.action === 'deactivate'
+            ? `Deactivate "${confirmAction.item.name}"? It will no longer appear in selection lists for new documents.`
+            : confirmAction?.action === 'activate'
+              ? `Activate "${confirmAction.item.name}"? It will appear in selection lists again.`
+              : confirmAction
+                ? `Delete "${confirmAction.item.name}"? This cannot be undone.`
+                : ''
+        }
+        confirmText={confirmAction?.action === 'delete' ? 'Delete' : confirmAction?.action === 'deactivate' ? 'Deactivate' : 'Activate'}
+        variant={confirmAction?.action === 'delete' ? 'danger' : 'default'}
+      />
     </div>
   );
 }

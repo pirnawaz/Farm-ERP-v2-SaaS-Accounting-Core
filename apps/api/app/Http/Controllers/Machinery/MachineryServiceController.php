@@ -66,7 +66,7 @@ class MachineryServiceController extends Controller
             'project_id' => ['required', 'uuid', 'exists:projects,id'],
             'rate_card_id' => ['required', 'uuid', 'exists:machine_rate_cards,id'],
             'quantity' => ['required', 'numeric', 'gt:0'],
-            'allocation_scope' => ['required', Rule::in([MachineryService::ALLOCATION_SCOPE_SHARED, MachineryService::ALLOCATION_SCOPE_HARI_ONLY])],
+            'allocation_scope' => ['required', Rule::in([MachineryService::ALLOCATION_SCOPE_SHARED, MachineryService::ALLOCATION_SCOPE_HARI_ONLY, MachineryService::ALLOCATION_SCOPE_LANDLORD_ONLY])],
             'in_kind_item_id' => ['nullable', 'uuid', 'exists:inv_items,id'],
             'in_kind_rate_per_unit' => ['nullable', 'numeric', 'gte:0', 'required_if:in_kind_item_id,*'],
             'in_kind_store_id' => ['nullable', 'uuid', 'exists:inv_stores,id', 'required_if:in_kind_item_id,*'],
@@ -74,6 +74,9 @@ class MachineryServiceController extends Controller
 
         Machine::where('id', $validated['machine_id'])->where('tenant_id', $tenantId)->firstOrFail();
         $project = Project::where('id', $validated['project_id'])->where('tenant_id', $tenantId)->firstOrFail();
+        if ($project->status === 'CLOSED') {
+            return response()->json(['message' => 'Project is closed.'], 422);
+        }
         MachineRateCard::where('id', $validated['rate_card_id'])->where('tenant_id', $tenantId)->firstOrFail();
 
         $service = DB::transaction(function () use ($tenantId, $validated) {
@@ -108,7 +111,7 @@ class MachineryServiceController extends Controller
         $validated = $request->validate([
             'rate_card_id' => ['sometimes', 'uuid', 'exists:machine_rate_cards,id'],
             'quantity' => ['sometimes', 'numeric', 'gt:0'],
-            'allocation_scope' => ['sometimes', Rule::in([MachineryService::ALLOCATION_SCOPE_SHARED, MachineryService::ALLOCATION_SCOPE_HARI_ONLY])],
+            'allocation_scope' => ['sometimes', Rule::in([MachineryService::ALLOCATION_SCOPE_SHARED, MachineryService::ALLOCATION_SCOPE_HARI_ONLY, MachineryService::ALLOCATION_SCOPE_LANDLORD_ONLY])],
             'in_kind_item_id' => ['nullable', 'uuid', 'exists:inv_items,id'],
             'in_kind_rate_per_unit' => ['nullable', 'numeric', 'gte:0', 'required_if:in_kind_item_id,*'],
             'in_kind_store_id' => ['nullable', 'uuid', 'exists:inv_stores,id', 'required_if:in_kind_item_id,*'],

@@ -18,6 +18,7 @@ class MachineryService extends Model
 
     public const ALLOCATION_SCOPE_SHARED = 'SHARED';
     public const ALLOCATION_SCOPE_HARI_ONLY = 'HARI_ONLY';
+    public const ALLOCATION_SCOPE_LANDLORD_ONLY = 'LANDLORD_ONLY';
 
     protected $fillable = [
         'tenant_id',

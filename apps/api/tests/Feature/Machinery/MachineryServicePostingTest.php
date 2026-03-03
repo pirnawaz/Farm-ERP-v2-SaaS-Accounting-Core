@@ -14,6 +14,7 @@ use App\Models\MachineryService;
 use App\Models\PostingGroup;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
+use App\Models\Account;
 use App\Services\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -146,8 +147,16 @@ class MachineryServicePostingTest extends TestCase
         $this->assertCount(1, $allocationRows);
         $this->assertEquals('MACHINERY_SERVICE', $allocationRows->first()->allocation_type);
 
-        $ledgerEntries = LedgerEntry::where('posting_group_id', $pg->id)->get();
+        $ledgerEntries = LedgerEntry::with('account')->where('posting_group_id', $pg->id)->get();
         $this->assertCount(2, $ledgerEntries);
+        $expShared = Account::where('tenant_id', $tenant->id)->where('code', 'EXP_SHARED')->firstOrFail();
+        $incomeAccount = Account::where('tenant_id', $tenant->id)->where('code', 'MACHINERY_SERVICE_INCOME')->firstOrFail();
+        $debitEntry = $ledgerEntries->first(fn ($e) => (float) $e->debit_amount > 0);
+        $creditEntry = $ledgerEntries->first(fn ($e) => (float) $e->credit_amount > 0);
+        $this->assertNotNull($debitEntry);
+        $this->assertNotNull($creditEntry);
+        $this->assertEquals($expShared->id, $debitEntry->account_id, 'Debit should be to EXP_SHARED');
+        $this->assertEquals($incomeAccount->id, $creditEntry->account_id, 'Credit should be to MACHINERY_SERVICE_INCOME');
 
         $reverseRes = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
@@ -261,5 +270,67 @@ class MachineryServicePostingTest extends TestCase
             ]);
         $res->assertStatus(422);
         $res->assertJsonStructure(['message']);
+    }
+
+    public function test_posting_landlord_only_debits_exp_landlord_only_credits_machinery_income(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableMachinery($tenant);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $projectParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'P',
+            'party_types' => ['LANDLORD'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $projectParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Proj',
+            'status' => 'ACTIVE',
+        ]);
+        $machine = Machine::create([
+            'tenant_id' => $tenant->id,
+            'code' => 'TRK',
+            'name' => 'Tractor',
+            'machine_type' => 'Tractor',
+            'ownership_type' => 'Owned',
+            'status' => 'Active',
+            'meter_unit' => 'HOURS',
+            'opening_meter' => 0,
+        ]);
+
+        $service = $this->createDraftMachineryService($tenant, $cropCycle, $project, $machine, MachineryService::ALLOCATION_SCOPE_LANDLORD_ONLY, 5.0, 20.00);
+
+        $postRes = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/machinery/machinery-services/{$service->id}/post", [
+                'posting_date' => '2024-06-15',
+            ]);
+        $postRes->assertStatus(201);
+
+        $service->refresh();
+        $pg = PostingGroup::where('id', $service->posting_group_id)->where('tenant_id', $tenant->id)->firstOrFail();
+        $ledgerEntries = LedgerEntry::with('account')->where('posting_group_id', $pg->id)->get();
+        $this->assertCount(2, $ledgerEntries);
+        $expLandlordOnly = Account::where('tenant_id', $tenant->id)->where('code', 'EXP_LANDLORD_ONLY')->firstOrFail();
+        $incomeAccount = Account::where('tenant_id', $tenant->id)->where('code', 'MACHINERY_SERVICE_INCOME')->firstOrFail();
+        $debitEntry = $ledgerEntries->first(fn ($e) => (float) $e->debit_amount > 0);
+        $creditEntry = $ledgerEntries->first(fn ($e) => (float) $e->credit_amount > 0);
+        $this->assertEquals($expLandlordOnly->id, $debitEntry->account_id);
+        $this->assertEquals($incomeAccount->id, $creditEntry->account_id);
+        $allocationRows = AllocationRow::where('posting_group_id', $pg->id)->get();
+        $this->assertCount(1, $allocationRows);
+        $this->assertEquals('LANDLORD_ONLY', $allocationRows->first()->allocation_scope);
     }
 }

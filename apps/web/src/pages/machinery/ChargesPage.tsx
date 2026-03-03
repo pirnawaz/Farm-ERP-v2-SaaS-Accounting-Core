@@ -79,7 +79,10 @@ export default function ChargesPage() {
       header: 'Crop Cycle',
       accessor: (row) => row.crop_cycle?.name || 'N/A',
     },
-    { header: 'Pool Scope', accessor: 'pool_scope' },
+    {
+      header: 'Beneficiary',
+      accessor: (row) => (row.pool_scope === 'LANDLORD_ONLY' ? 'My farm' : row.pool_scope === 'HARI_ONLY' ? 'Hari only' : row.pool_scope === 'SHARED' ? 'Shared' : row.pool_scope ?? '—'),
+    },
     { header: 'Charge Date', accessor: (row) => formatDate(row.charge_date) },
     {
       header: 'Total Amount',
@@ -241,7 +244,7 @@ function GenerateChargesModal({
     project_id: '',
     from: '',
     to: '',
-    pool_scope: '' as 'SHARED' | 'HARI_ONLY' | '',
+    pool_scope: '' as 'LANDLORD_ONLY' | 'SHARED' | 'HARI_ONLY' | '',
     charge_date: new Date().toISOString().split('T')[0],
   });
 
@@ -300,17 +303,18 @@ function GenerateChargesModal({
           />
         </FormField>
 
-        <FormField label="Pool Scope">
+        <FormField label="Beneficiary">
           <select
             value={formData.pool_scope}
             onChange={(e) =>
-              setFormData({ ...formData, pool_scope: e.target.value as 'SHARED' | 'HARI_ONLY' | '' })
+              setFormData({ ...formData, pool_scope: e.target.value as 'LANDLORD_ONLY' | 'SHARED' | 'HARI_ONLY' | '' })
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
           >
             <option value="">All (create separate charges if mixed)</option>
-            <option value="SHARED">SHARED</option>
-            <option value="HARI_ONLY">HARI_ONLY</option>
+            <option value="LANDLORD_ONLY">My farm</option>
+            <option value="SHARED">Shared</option>
+            <option value="HARI_ONLY">Hari only</option>
           </select>
         </FormField>
 

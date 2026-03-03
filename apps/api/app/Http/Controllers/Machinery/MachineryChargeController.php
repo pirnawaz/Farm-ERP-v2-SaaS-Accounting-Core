@@ -82,7 +82,7 @@ class MachineryChargeController extends Controller
             'landlord_party_id' => ['nullable', 'uuid', 'exists:parties,id'],
             'from' => ['required', 'date'],
             'to' => ['required', 'date', 'after_or_equal:from'],
-            'pool_scope' => ['nullable', 'string', Rule::in([MachineryCharge::POOL_SCOPE_SHARED, MachineryCharge::POOL_SCOPE_HARI_ONLY])],
+            'pool_scope' => ['nullable', 'string', Rule::in([MachineryCharge::POOL_SCOPE_SHARED, MachineryCharge::POOL_SCOPE_HARI_ONLY, MachineryCharge::POOL_SCOPE_LANDLORD_ONLY])],
             'charge_date' => ['nullable', 'date'],
         ]);
 

@@ -93,6 +93,9 @@ class OperationalTransactionController extends Controller
             $project = Project::where('id', $request->project_id)
                 ->where('tenant_id', $tenantId)
                 ->firstOrFail();
+            if ($project->status === 'CLOSED') {
+                return response()->json(['message' => 'Project is closed.'], 422);
+            }
         }
 
         $cropCycle = null;

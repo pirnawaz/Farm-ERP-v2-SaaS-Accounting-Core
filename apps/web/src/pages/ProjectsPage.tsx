@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Modal } from '../components/Modal';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProjects, useCreateProjectFromAllocation } from '../hooks/useProjects';
+import { useProjects, useCreateProjectFromAllocation, useCloseProject, useReopenProject } from '../hooks/useProjects';
 import { useLandAllocations } from '../hooks/useLandAllocations';
 import { DataTable, type Column } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
 import { EmptyState } from '../components/EmptyState';
@@ -18,8 +18,11 @@ export default function ProjectsPage() {
   const { data: projects, isLoading } = useProjects();
   const { data: allocations } = useLandAllocations();
   const createFromAllocationMutation = useCreateProjectFromAllocation();
+  const closeProjectMutation = useCloseProject();
+  const reopenProjectMutation = useReopenProject();
   const { hasRole } = useRole();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [projectToClose, setProjectToClose] = useState<Project | null>(null);
   const [formData, setFormData] = useState<CreateProjectFromAllocationPayload>({
     land_allocation_id: '',
     name: '',
@@ -48,8 +51,38 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleCloseConfirm = async () => {
+    if (!projectToClose) return;
+    try {
+      await closeProjectMutation.mutateAsync(projectToClose.id);
+      toast.success('Project closed');
+      setProjectToClose(null);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message ?? error.message ?? 'Failed to close project');
+    }
+  };
+
+  const handleReopen = async (project: Project) => {
+    try {
+      await reopenProjectMutation.mutateAsync(project.id);
+      toast.success('Project reopened');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message ?? error.message ?? 'Failed to reopen project');
+    }
+  };
+
   const columns: Column<Project>[] = [
-    { header: 'Name', accessor: 'name' },
+    {
+      header: 'Name',
+      accessor: (row) => (
+        <span className={row.status === 'CLOSED' ? 'text-gray-500' : ''}>
+          {row.name}
+          {row.status === 'CLOSED' && (
+            <span className="ml-2 text-xs font-medium text-gray-400">(Closed)</span>
+          )}
+        </span>
+      ),
+    },
     {
       header: 'Crop Cycle',
       accessor: (row) => row.crop_cycle?.name || 'N/A',
@@ -58,11 +91,16 @@ export default function ProjectsPage() {
       header: 'HARI',
       accessor: (row) => row.party?.name || 'N/A',
     },
-    { header: 'Status', accessor: 'status' },
+    {
+      header: 'Status',
+      accessor: (row) => (
+        <span className={row.status === 'CLOSED' ? 'text-gray-500' : ''}>{row.status}</span>
+      ),
+    },
     {
       header: 'Actions',
       accessor: (row) => (
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <Link
             to={`/app/projects/${row.id}`}
             className="text-[#1F6F5C] hover:text-[#1a5a4a]"
@@ -75,6 +113,24 @@ export default function ProjectsPage() {
           >
             Rules
           </Link>
+          {canCreate && row.status === 'ACTIVE' && (
+            <button
+              type="button"
+              onClick={() => setProjectToClose(row)}
+              className="text-amber-600 hover:text-amber-700"
+            >
+              Close
+            </button>
+          )}
+          {canCreate && row.status === 'CLOSED' && (
+            <button
+              type="button"
+              onClick={() => handleReopen(row)}
+              className="text-[#1F6F5C] hover:text-[#1a5a4a]"
+            >
+              Reopen
+            </button>
+          )}
         </div>
       ),
     },
@@ -170,6 +226,34 @@ export default function ProjectsPage() {
               {createFromAllocationMutation.isPending ? 'Creating...' : 'Create'}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!projectToClose}
+        onClose={() => setProjectToClose(null)}
+        title="Close Project"
+      >
+        <p className="text-gray-600 mb-4">
+          Closing prevents new work/harvest entries and rule changes.
+        </p>
+        <p className="text-sm text-gray-500 mb-4">
+          Are you sure you want to close <strong>{projectToClose?.name}</strong>?
+        </p>
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => setProjectToClose(null)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCloseConfirm}
+            disabled={closeProjectMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {closeProjectMutation.isPending ? 'Closing...' : 'Close Project'}
+          </button>
         </div>
       </Modal>
     </div>

@@ -17,6 +17,16 @@ import { QuickActions } from '../components/QuickActions';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useFormatting } from '../hooks/useFormatting';
 import { getActiveCropCycleId } from '../utils/formDefaults';
+import { term } from '../config/terminology';
+
+/** Normalize a date string to Y-m-d for API (from/to). */
+function toYmd(dateStr: string): string {
+  if (!dateStr) return dateStr;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toISOString().slice(0, 10);
+}
 
 function HeroCard({
   title,
@@ -74,17 +84,20 @@ export default function FarmPulsePage() {
   );
 
   const cycleStart = useMemo(() => {
-    if (viewBy === 'production_unit' && selectedUnit) {
-      return selectedUnit.start_date;
-    }
-    return activeCycle?.start_date ?? today;
+    const raw =
+      viewBy === 'production_unit' && selectedUnit
+        ? selectedUnit.start_date
+        : activeCycle?.start_date ?? today;
+    return toYmd(raw ?? today);
   }, [viewBy, selectedUnit, activeCycle, today]);
   const cycleEnd = useMemo(() => {
+    const todayYmd = toYmd(today);
     if (viewBy === 'production_unit' && selectedUnit) {
-      const end = selectedUnit.end_date;
-      return end && end < today ? end : today;
+      const end = selectedUnit.end_date ? toYmd(selectedUnit.end_date) : null;
+      return end && end < todayYmd ? end : todayYmd;
     }
-    return activeCycle?.end_date && activeCycle.end_date < today ? activeCycle.end_date : today;
+    const end = activeCycle?.end_date ? toYmd(activeCycle.end_date) : null;
+    return end && end < todayYmd ? end : todayYmd;
   }, [viewBy, selectedUnit, activeCycle, today]);
 
   const { data: accountBalances, isLoading: balancesLoading } = useQuery({
@@ -185,6 +198,7 @@ export default function FarmPulsePage() {
   const pendingCount = draftTransactions.length;
   const showReviewQueue = (hasRole('tenant_admin') || hasRole('accountant')) && pendingCount >= 0;
 
+
   const { alerts, isLoading: alertsLoading } = useAlerts();
   const topAlerts = alerts.slice(0, 3);
 
@@ -197,6 +211,8 @@ export default function FarmPulsePage() {
     isModuleEnabled('projects_crop_cycles') &&
     (viewBy === 'crop_cycle' || !selectedProductionUnitId);
 
+  const hasActiveSeason = isModuleEnabled('projects_crop_cycles') && (viewBy === 'crop_cycle' ? activeCycle : viewBy === 'production_unit' && selectedUnit);
+
   return (
     <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
       <PageHeader
@@ -208,76 +224,220 @@ export default function FarmPulsePage() {
         ]}
       />
 
-      {/* View by: Crop Cycle | Production Unit */}
-      {isModuleEnabled('projects_crop_cycles') && (
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <span className="text-sm font-medium text-gray-700">View by:</span>
-          <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
-            <button
-              type="button"
-              onClick={() => setViewBy('crop_cycle')}
-              className={`px-3 py-1.5 text-sm rounded-md ${viewBy === 'crop_cycle' ? 'bg-white shadow text-[#1F6F5C] font-medium' : 'text-gray-600 hover:text-gray-900'}`}
-            >
-              Crop Cycle
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewBy('production_unit')}
-              className={`px-3 py-1.5 text-sm rounded-md ${viewBy === 'production_unit' ? 'bg-white shadow text-[#1F6F5C] font-medium' : 'text-gray-600 hover:text-gray-900'}`}
-            >
-              Production Unit
-            </button>
-          </div>
-          {viewBy === 'production_unit' && (() => {
-            const units = productionUnits ?? [];
-            const orchardUnits = units.filter((u) => u.category === 'ORCHARD');
-            const livestockUnits = units.filter((u) => u.category === 'LIVESTOCK');
-            const otherUnits = units.filter((u) => u.category !== 'ORCHARD' && u.category !== 'LIVESTOCK');
-            return (
-              <select
-                value={selectedProductionUnitId}
-                onChange={(e) => setSelectedProductionUnitId(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
-              >
-                <option value="">Select unit</option>
-                {orchardUnits.length > 0 && (
-                  <optgroup label="Orchards">
-                    {orchardUnits.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {livestockUnits.length > 0 && (
-                  <optgroup label="Livestock">
-                    {livestockUnits.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {otherUnits.length > 0 && (
-                  <optgroup label={orchardUnits.length > 0 || livestockUnits.length > 0 ? 'Other units' : 'Production units'}>
-                    {otherUnits.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            );
-          })()}
-        </div>
-      )}
-
       <div className="space-y-6">
-        {/* A) Cash & Dues */}
+        {/* 1) Today on the farm — drafts + review queue */}
         <section>
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
-            Cash & Dues
+            {term('todayOnFarm')}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Link
+              to="/app/transactions"
+              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-[#1F6F5C]/30 block"
+            >
+              <p className="text-sm font-medium text-gray-500">Drafts awaiting approval</p>
+              <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{pendingCount}</p>
+              <span className="text-sm text-[#1F6F5C] font-medium">Open drafts →</span>
+            </Link>
+            {showReviewQueue && (
+              <Link
+                to="/app/review-queue"
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-[#1F6F5C]/30 block"
+              >
+                <p className="text-sm font-medium text-gray-500">{term('reviewQueue')}</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">
+                  {pendingCount} draft{pendingCount !== 1 ? 's' : ''}
+                </p>
+                <span className="text-sm text-[#1F6F5C] font-medium">Open queue →</span>
+              </Link>
+            )}
+          </div>
+        </section>
+
+        {/* View by: Crop Cycle | Production Unit */}
+        {isModuleEnabled('projects_crop_cycles') && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-gray-700">View by:</span>
+            <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setViewBy('crop_cycle')}
+                className={`px-3 py-1.5 text-sm rounded-md ${viewBy === 'crop_cycle' ? 'bg-white shadow text-[#1F6F5C] font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Crop Cycle
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewBy('production_unit')}
+                className={`px-3 py-1.5 text-sm rounded-md ${viewBy === 'production_unit' ? 'bg-white shadow text-[#1F6F5C] font-medium' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Production Unit
+              </button>
+            </div>
+            {viewBy === 'production_unit' && (() => {
+              const units = productionUnits ?? [];
+              const orchardUnits = units.filter((u) => u.category === 'ORCHARD');
+              const livestockUnits = units.filter((u) => u.category === 'LIVESTOCK');
+              const otherUnits = units.filter((u) => u.category !== 'ORCHARD' && u.category !== 'LIVESTOCK');
+              return (
+                <select
+                  value={selectedProductionUnitId}
+                  onChange={(e) => setSelectedProductionUnitId(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
+                >
+                  <option value="">Select unit</option>
+                  {orchardUnits.length > 0 && (
+                    <optgroup label="Orchards">
+                      {orchardUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {livestockUnits.length > 0 && (
+                    <optgroup label="Livestock">
+                      {livestockUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherUnits.length > 0 && (
+                    <optgroup label={orchardUnits.length > 0 || livestockUnits.length > 0 ? 'Other units' : 'Production units'}>
+                      {otherUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* 2) Season snapshot — or no active season CTA */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+            {term('seasonSnapshot')}
+          </h2>
+          {!hasActiveSeason ? (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              <p className="font-medium text-gray-700">{term('noActiveSeason')}</p>
+              <Link
+                to="/app/crop-cycles"
+                className="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg bg-[#1F6F5C] text-white text-sm font-medium hover:bg-[#1a5a4a]"
+              >
+                {term('createCropCycleCta')}
+              </Link>
+            </div>
+          ) : !showSeason ? (
+            <p className="text-sm text-gray-500">Select a production unit above, or switch to Crop Cycle view.</p>
+          ) : profitabilityLoading ? (
+            <div className="flex justify-center py-6">
+              <LoadingSpinner />
+            </div>
+          ) : profitability?.totals ? (
+            <Link
+              to={`/app/reports/crop-profitability?from=${cycleStart}&to=${cycleEnd}`}
+              className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 hover:border-[#1F6F5C]/30"
+            >
+              <p className="font-medium text-gray-900">
+                {activeCycle?.name} ({activeCycle?.start_date} – {cycleEnd})
+              </p>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-500">Cost so far</p>
+                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.cost))}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Revenue so far</p>
+                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.revenue))}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Margin so far</p>
+                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.margin))}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">From posted season activity</p>
+              <span className="text-sm text-[#1F6F5C] hover:underline">View crop profitability →</span>
+            </Link>
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
+              No profitability data for this period.
+            </div>
+          )}
+        </section>
+
+        {/* 3) Field Status */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+            Field Status
+          </h2>
+          {!showFieldStatus ? (
+            <p className="text-sm text-gray-500">
+              {viewBy === 'production_unit' && selectedProductionUnitId
+                ? 'Unit reporting: Field status by unit coming soon. Tag activities and harvests with a production unit to use Unit Snapshot above.'
+                : 'Reports and crop cycles required.'}
+            </p>
+          ) : projectPLLoading ? (
+            <div className="flex justify-center py-6">
+              <LoadingSpinner />
+            </div>
+          ) : fieldRows.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
+              No project data for this period.
+            </div>
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Field / Project</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Cost so far</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Revenue so far</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fieldRows.map((row) => (
+                      <tr key={row.project_id} className="border-t border-gray-100">
+                        <td className="px-3 py-2">
+                          <Link
+                            to={`/app/projects/${row.project_id}`}
+                            className="text-[#1F6F5C] hover:underline font-medium"
+                          >
+                            {row.name}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.cost)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.revenue)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.margin)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-3 py-2 bg-gray-50 border-t text-center">
+                <Link
+                  to="/app/reports/project-pl"
+                  className="text-sm text-[#1F6F5C] hover:underline"
+                >
+                  View Project P&L →
+                </Link>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 4) Money snapshot (secondary) */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+            {term('moneySnapshot')}
           </h2>
           {!showCashSection ? (
             <p className="text-sm text-gray-500">Reports module is required for cash summary.</p>
@@ -374,142 +534,6 @@ export default function FarmPulsePage() {
           )}
         </section>
 
-        {/* B) Season / Unit Snapshot */}
-        <section>
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
-            {viewBy === 'production_unit' ? 'Unit Snapshot' : 'Season Snapshot'}
-            {viewBy === 'production_unit' && selectedUnit && (
-              <span className="ml-2 font-normal text-gray-600">— {selectedUnit.name}</span>
-            )}
-          </h2>
-          {!showSeason ? (
-            <p className="text-sm text-gray-500">
-              {viewBy === 'production_unit'
-                ? 'Select a production unit above, or switch to Crop Cycle view.'
-                : 'No active crop cycle or reports module disabled.'}
-            </p>
-          ) : profitabilityLoading ? (
-            <div className="flex justify-center py-6">
-              <LoadingSpinner />
-            </div>
-          ) : profitability?.totals ? (
-            <Link
-              to={`/app/reports/crop-profitability?from=${cycleStart}&to=${cycleEnd}`}
-              className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 hover:border-[#1F6F5C]/30"
-            >
-              <p className="font-medium text-gray-900">
-                {activeCycle?.name} ({activeCycle?.start_date} – {cycleEnd})
-              </p>
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500">Cost so far</p>
-                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.cost))}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Revenue so far</p>
-                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.revenue))}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Margin so far</p>
-                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.margin))}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">From posted season activity</p>
-              <span className="text-sm text-[#1F6F5C] hover:underline">View crop profitability →</span>
-            </Link>
-          ) : (
-            <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-              No profitability data for this period.
-            </div>
-          )}
-        </section>
-
-        {/* C) Field Status */}
-        <section>
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
-            Field Status
-          </h2>
-          {!showFieldStatus ? (
-            <p className="text-sm text-gray-500">
-              {viewBy === 'production_unit' && selectedProductionUnitId
-                ? 'Unit reporting: Field status by unit coming soon. Tag activities and harvests with a production unit to use Unit Snapshot above.'
-                : 'Reports and crop cycles required.'}
-            </p>
-          ) : projectPLLoading ? (
-            <div className="flex justify-center py-6">
-              <LoadingSpinner />
-            </div>
-          ) : fieldRows.length === 0 ? (
-            <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-              No project data for this period.
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">Field / Project</th>
-                      <th className="px-3 py-2 text-right font-medium text-gray-600">Cost so far</th>
-                      <th className="px-3 py-2 text-right font-medium text-gray-600">Revenue so far</th>
-                      <th className="px-3 py-2 text-right font-medium text-gray-600">Margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fieldRows.map((row) => (
-                      <tr key={row.project_id} className="border-t border-gray-100">
-                        <td className="px-3 py-2">
-                          <Link
-                            to={`/app/projects/${row.project_id}`}
-                            className="text-[#1F6F5C] hover:underline font-medium"
-                          >
-                            {row.name}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.cost)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.revenue)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.margin)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="px-3 py-2 bg-gray-50 border-t text-center">
-                <Link
-                  to="/app/reports/project-pl"
-                  className="text-sm text-[#1F6F5C] hover:underline"
-                >
-                  View Project P&L →
-                </Link>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* D) Pending Review & Review Queue */}
-        <section>
-          {pendingCount > 0 && (
-            <Link
-              to="/app/transactions"
-              className="block rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800"
-            >
-              {pendingCount} record{pendingCount !== 1 ? 's' : ''} pending review
-            </Link>
-          )}
-          {showReviewQueue && (
-            <Link
-              to="/app/review-queue"
-              className="mt-3 block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-[#1F6F5C]/30"
-            >
-              <p className="text-sm font-medium text-gray-700">Review Queue</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-gray-900">
-                {pendingCount} draft{pendingCount !== 1 ? 's' : ''}
-              </p>
-              <span className="text-sm text-[#1F6F5C] hover:underline">Open queue →</span>
-            </Link>
-          )}
-        </section>
-
         {/* Daily Admin Review (admin only; deletes not logged, skipped) */}
         {isAdmin && (
           <section>
@@ -541,10 +565,10 @@ export default function FarmPulsePage() {
           </section>
         )}
 
-        {/* E) Quick Actions */}
+        {/* Quick actions */}
         <section>
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
-            Quick actions
+            {term('quickActions')}
           </h2>
           <QuickActions />
         </section>

@@ -5,6 +5,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
+import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 import type { InvStockMovement } from '../../types';
 
 export default function StockMovementsPage() {
@@ -26,7 +27,7 @@ export default function StockMovementsPage() {
     { header: 'Occurred at', accessor: (r) => formatDate(r.occurred_at) },
     { header: 'Type', accessor: 'movement_type' },
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
-    { header: 'Item', accessor: (r) => r.item?.name || r.item_id },
+    { header: 'Item', accessor: (r) => formatItemDisplayName(r.item) },
     { header: 'Qty delta', accessor: (r) => String(r.qty_delta) },
     { header: 'Value delta', accessor: (r) => <span className="tabular-nums">{formatMoney(r.value_delta)}</span> },
     { header: 'Source', accessor: (r) => `${r.source_type} ${r.source_id}` },

@@ -69,7 +69,7 @@ class MachineWorkLogController extends Controller
             'meter_start' => ['nullable', 'numeric', 'min:0'],
             'meter_end' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
-            'pool_scope' => ['nullable', 'string', Rule::in([MachineWorkLog::POOL_SCOPE_SHARED, MachineWorkLog::POOL_SCOPE_HARI_ONLY])],
+            'pool_scope' => ['nullable', 'string', Rule::in([MachineWorkLog::POOL_SCOPE_SHARED, MachineWorkLog::POOL_SCOPE_HARI_ONLY, MachineWorkLog::POOL_SCOPE_LANDLORD_ONLY])],
         ]);
 
         if (isset($validated['meter_start']) && isset($validated['meter_end']) && $validated['meter_end'] < $validated['meter_start']) {
@@ -134,7 +134,7 @@ class MachineWorkLogController extends Controller
             'meter_start' => ['nullable', 'numeric', 'min:0'],
             'meter_end' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
-            'pool_scope' => ['nullable', 'string', Rule::in([MachineWorkLog::POOL_SCOPE_SHARED, MachineWorkLog::POOL_SCOPE_HARI_ONLY])],
+            'pool_scope' => ['nullable', 'string', Rule::in([MachineWorkLog::POOL_SCOPE_SHARED, MachineWorkLog::POOL_SCOPE_HARI_ONLY, MachineWorkLog::POOL_SCOPE_LANDLORD_ONLY])],
         ];
         $validated = $request->validate($rules);
 
