@@ -213,6 +213,13 @@ In production (or when `APP_ENV` is not `local`/`testing` and `DEV_IDENTITY_ENAB
 - **Header-only requests fail:** API calls that rely only on `X-User-Id` / `X-User-Role` (e.g. from scripts or Postman without a real auth cookie) return **401** or **403**.
 - **Platform admin:** Must sign in via platform login (cookie); the cookie is then used to resolve identity. E2E and PHPUnit use `DEV_IDENTITY_ENABLED=true` in `.env.testing` so header auth continues to work in tests.
 
+### Destructive Artisan commands and migration rollback safety
+
+To avoid accidental data loss in staging or production:
+
+- **Blocked Artisan commands:** When `APP_ENV` is not `local` or `testing`, the following commands are **blocked** (the process exits with an error before running): `migrate:fresh`, `migrate:refresh`, `migrate:reset`, `db:wipe`. This is enforced by `App\Providers\ConsoleSafetyServiceProvider` (registered in `apps/api/bootstrap/app.php`). In `local` or `testing` these commands are allowed.
+- **Seed migration rollbacks:** Migrations that seed catalog or tenant data (e.g. crop catalog and crop-cycle migration) implement a **data safety rule**: their `down()` methods do **not** delete or overwrite data when run outside `local` or `testing`. Destructive rollback (e.g. clearing seeded tables) runs only in `local`/`testing`. In staging or production, `php artisan migrate:rollback` will not remove real accounting or tenant data from these migrations.
+
 ---
 
 ## Running the Application
@@ -386,6 +393,7 @@ Platform admin flows (tenant list, impersonation, audit logs) require a profile 
 │   │   ├── app/Http/Controllers/
 │   │   ├── app/Http/Middleware/
 │   │   ├── app/Models/
+│   │   ├── app/Providers/      # ConsoleSafetyServiceProvider, EnvironmentValidation, PerformanceMonitoring
 │   │   ├── database/migrations/
 │   │   ├── routes/api.php, web.php
 │   │   └── tests/

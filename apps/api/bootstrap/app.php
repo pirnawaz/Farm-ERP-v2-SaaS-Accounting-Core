@@ -8,6 +8,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         \App\Providers\EnvironmentValidationServiceProvider::class,
         \App\Providers\PerformanceMonitoringServiceProvider::class,
+        \App\Providers\ConsoleSafetyServiceProvider::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',

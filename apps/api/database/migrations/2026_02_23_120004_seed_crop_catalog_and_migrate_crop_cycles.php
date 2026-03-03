@@ -1,5 +1,15 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| IMPORTANT: Data Safety Rule
+|--------------------------------------------------------------------------
+| This migration seeds core catalog data.
+| Rollbacks MUST NOT delete production data.
+| Destructive rollback is allowed only in local/testing environments.
+|--------------------------------------------------------------------------
+*/
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
@@ -136,7 +146,16 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('crop_cycles')->update(['tenant_crop_item_id' => null, 'crop_variety_id' => null]);
+        // Never delete real data outside local/testing
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
+        DB::table('crop_cycles')->update([
+            'tenant_crop_item_id' => null,
+            'crop_variety_id' => null,
+        ]);
+
         DB::table('tenant_crop_items')->delete();
         DB::table('crop_catalog_items')->delete();
     }
