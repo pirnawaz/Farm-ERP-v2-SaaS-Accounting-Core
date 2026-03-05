@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Auth\UnifiedAuthController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\PartyController;
@@ -83,13 +84,15 @@ Route::prefix('internal')->middleware(['role:tenant_admin'])->group(function () 
     Route::get('daily-admin-review', [FarmIntegrityController::class, 'dailyAdminReview']);
 });
 
-// Dashboard and tenant addon modules (read-only, all tenant roles)
+// Dashboard, tenant modules list (read-only), and tenant addon modules (read-only; all tenant roles need module state for sidebar)
 Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () {
     Route::get('dashboard/summary', [DashboardController::class, 'summary']);
+    Route::get('tenant/modules', [TenantModuleController::class, 'index']);
     Route::get('tenant/addon-modules', [TenantAddonModulesController::class, 'index']);
 });
 
-Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth.tenant.login');
+Route::post('/auth/login', [UnifiedAuthController::class, 'login'])->middleware('throttle:auth.tenant.login');
+Route::post('/auth/select-tenant', [UnifiedAuthController::class, 'selectTenant']);
 Route::post('/auth/logout', [AuthController::class, 'logout']);
 Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
 Route::get('/auth/me', [AuthController::class, 'me']);
@@ -584,10 +587,9 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
     Route::get('settings/tenant', [SettingsController::class, 'show']);
 });
 
-// tenant_admin only: settings update, tenant modules, farm profile, users, addon modules
+// tenant_admin only: settings update, tenant modules update, farm profile, users, addon modules (accountant/operator cannot manage users or toggle modules).
 Route::middleware(['role:tenant_admin'])->group(function () {
     Route::put('settings/tenant', [SettingsController::class, 'update']);
-    Route::get('tenant/modules', [TenantModuleController::class, 'index']);
     Route::put('tenant/modules', [TenantModuleController::class, 'update']);
     Route::patch('tenant/addon-modules/{module_key}', [TenantAddonModulesController::class, 'update']);
     Route::get('tenant/onboarding', [TenantOnboardingController::class, 'show']);
@@ -600,5 +602,6 @@ Route::middleware(['role:tenant_admin'])->group(function () {
     Route::get('tenant/audit-logs', [TenantAuditLogController::class, 'index']);
     Route::post('tenant/invitations', [TenantInvitationController::class, 'store'])->middleware('throttle:auth.invitations');
     Route::put('tenant/users/{id}', [TenantUserAdminController::class, 'update']);
+    Route::post('tenant/users/{id}/reset-password', [TenantUserAdminController::class, 'resetPassword']);
     Route::delete('tenant/users/{id}', [TenantUserAdminController::class, 'destroy']);
 });

@@ -2,12 +2,17 @@
 
 namespace App\Helpers;
 
+use App\Models\Identity;
 use App\Models\User;
 
 /**
  * Create and parse signed auth tokens (payload includes v=token_version, iat, exp).
  * Used for farm_erp_auth_token cookie. Verification ensures signature, expiry, and
  * (when loading user) token_version and is_enabled.
+ *
+ * Two token types:
+ * - Legacy: user_id, tenant_id, role (from User model).
+ * - Identity: identity_id, active_tenant_id (tenant_id), role, optional user_id for tenant context.
  */
 class AuthToken
 {
@@ -30,11 +35,47 @@ class AuthToken
             $payload['impersonator_user_id'] = $impersonatorUserId;
         }
 
+        return self::signPayload($payload);
+    }
+
+    /**
+     * Create token for Identity (global login). Use for platform or tenant context.
+     *
+     * @param string $role 'platform_admin' or tenant role (tenant_admin, accountant, operator)
+     * @param string|null $userId Optional: tenant-scoped user id for backward compatibility
+     */
+    public static function createForIdentity(Identity $identity, ?string $activeTenantId, string $role, ?string $userId = null, ?string $impersonatorUserId = null, ?int $ttlHours = null): string
+    {
+        $ttlHours = $ttlHours ?? (int) config('auth.auth_token_ttl_hours', 168);
+        $now = now();
+        $exp = $now->copy()->addHours($ttlHours)->timestamp;
+
+        $payload = [
+            'identity_id' => $identity->id,
+            'tenant_id' => $activeTenantId,
+            'active_tenant_id' => $activeTenantId,
+            'role' => $role,
+            'email' => $identity->email,
+            'v' => (int) $identity->token_version,
+            'iat' => $now->timestamp,
+            'exp' => $exp,
+        ];
+        if ($userId !== null) {
+            $payload['user_id'] = $userId;
+        }
+        if ($impersonatorUserId !== null) {
+            $payload['impersonator_user_id'] = $impersonatorUserId;
+        }
+
+        return self::signPayload($payload);
+    }
+
+    private static function signPayload(array $payload): string
+    {
         $payloadJson = json_encode($payload);
         $payloadB64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payloadJson));
         $sig = hash_hmac('sha256', $payloadB64, config('app.key'), true);
         $sigB64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($sig));
-
         return $payloadB64 . '.' . $sigB64;
     }
 

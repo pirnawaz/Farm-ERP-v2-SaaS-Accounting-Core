@@ -9,6 +9,7 @@ import {
   useCreateTenantUser,
   useUpdateTenantUser,
   useDisableTenantUser,
+  useResetTenantUserPassword,
   useInviteUser,
 } from '../hooks/useTenantUsers';
 import { useFormatting } from '../hooks/useFormatting';
@@ -22,6 +23,7 @@ export default function AdminUsersPage() {
   const createMutation = useCreateTenantUser();
   const updateMutation = useUpdateTenantUser();
   const disableMutation = useDisableTenantUser();
+  const resetPasswordMutation = useResetTenantUserPassword();
   const inviteMutation = useInviteUser();
   const { formatDate } = useFormatting();
 
@@ -30,6 +32,8 @@ export default function AdminUsersPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [disableTarget, setDisableTarget] = useState<User | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<User | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [form, setForm] = useState({ name: '', email: '', role: 'operator' as UserRole });
   const [inviteForm, setInviteForm] = useState({ email: '', role: 'operator' as UserRole });
 
@@ -105,6 +109,23 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordTarget || !resetPasswordValue.trim() || resetPasswordValue.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    try {
+      await resetPasswordMutation.mutateAsync({ id: resetPasswordTarget.id, newPassword: resetPasswordValue });
+      toast.success('Password updated. User can sign in with the new password.');
+      setResetPasswordTarget(null);
+      setResetPasswordValue('');
+    } catch (e: unknown) {
+      const err = e as Error & { message?: string };
+      toast.error(err?.message || 'Failed to reset password');
+    }
+  };
+
   const columns = [
     { header: 'Name', accessor: 'name' as const },
     { header: 'Email', accessor: 'email' as const },
@@ -146,6 +167,13 @@ export default function AdminUsersPage() {
       header: 'Actions',
       accessor: (row: User) => (
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setResetPasswordTarget(row); setResetPasswordValue(''); }}
+            className="text-sm px-2 py-1 rounded text-blue-600 hover:bg-blue-50"
+          >
+            Reset password
+          </button>
           <button
             type="button"
             onClick={() => handleToggleEnabled(row)}
@@ -349,6 +377,48 @@ export default function AdminUsersPage() {
         confirmText="Disable"
         variant="danger"
       />
+
+      <Modal
+        isOpen={!!resetPasswordTarget}
+        onClose={() => { setResetPasswordTarget(null); setResetPasswordValue(''); }}
+        title="Reset password"
+        size="md"
+      >
+        {resetPasswordTarget && (
+          <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Set a new password for {resetPasswordTarget.name} ({resetPasswordTarget.email}). They can sign in with it immediately.
+            </p>
+            <FormField label="New password" required>
+              <input
+                type="password"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                placeholder="Min 8 characters"
+                minLength={8}
+                autoComplete="new-password"
+              />
+            </FormField>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setResetPasswordTarget(null); setResetPasswordValue(''); }}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={resetPasswordValue.length < 8 || resetPasswordMutation.isPending}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+              >
+                {resetPasswordMutation.isPending ? 'Updating...' : 'Update password'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }

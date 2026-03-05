@@ -8,6 +8,36 @@ export interface TenantLoginResponse {
   tenant: { id: string; name: string; slug?: string } | null;
 }
 
+/** Unified login response (single login screen, no tenant header). */
+export type UnifiedLoginResponse =
+  | { mode: 'platform'; identity: { id: string; email: string }; token: string; tenant: null }
+  | {
+      mode: 'tenant';
+      identity: { id: string; email: string };
+      tenant: { id: string; name: string; slug?: string };
+      user: { id: string; name: string; email: string; role: string; must_change_password?: boolean };
+      token: string;
+    }
+  | {
+      mode: 'select_tenant';
+      identity: { id: string; email: string };
+      tenants: Array<{ id: string; slug: string | null; name: string; role: string }>;
+      token: string;
+    };
+
+export async function unifiedLogin(email: string, password: string): Promise<UnifiedLoginResponse> {
+  return apiClient.post<UnifiedLoginResponse>('/api/auth/login', { email: email.trim().toLowerCase(), password });
+}
+
+export async function selectTenant(tenantId: string): Promise<{
+  mode: 'tenant';
+  identity: { id: string; email: string };
+  tenant: { id: string; name: string; slug?: string };
+  user: { id: string; name: string; email: string; role: string; must_change_password?: boolean };
+}> {
+  return apiClient.post('/api/auth/select-tenant', { tenant_id: tenantId });
+}
+
 /**
  * Complete first-login password update (user with must_change_password). Sends new_password; returns new cookie.
  */

@@ -32,6 +32,7 @@ class User extends Model implements AuthenticatableContract
     }
 
     protected $fillable = [
+        'identity_id',
         'tenant_id',
         'name',
         'email',
@@ -64,6 +65,11 @@ class User extends Model implements AuthenticatableContract
     public function scopePlatformAdmins($query)
     {
         return $query->whereNull('tenant_id')->where('role', 'platform_admin');
+    }
+
+    public function identity(): BelongsTo
+    {
+        return $this->belongsTo(Identity::class);
     }
 
     public function tenant(): BelongsTo

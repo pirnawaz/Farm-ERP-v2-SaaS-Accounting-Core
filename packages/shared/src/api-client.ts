@@ -42,11 +42,12 @@ async function request<T>(
   const tenantId = getTenantId()
   const userRole = getUserRole()
   
-  // For non-dev and non-platform routes, tenant is required (from storage OR from request options, e.g. login form).
+  // For non-dev, non-platform, and non-auth-unified routes, tenant is required.
   const isDevRoute = endpoint.includes('/api/dev/') || endpoint.includes('api/dev/')
   const isPlatformRoute = endpoint.includes('/api/platform/') || endpoint.includes('api/platform/')
+  const isAuthUnifiedRoute = endpoint.includes('/api/auth/login') || endpoint.includes('/api/auth/select-tenant')
   const tenantInOptions = getOptionHeader(options, 'X-Tenant-Slug') || getOptionHeader(options, 'X-Tenant-Id')
-  if (!isDevRoute && !isPlatformRoute && !tenantId && !tenantInOptions) {
+  if (!isDevRoute && !isPlatformRoute && !isAuthUnifiedRoute && !tenantId && !tenantInOptions) {
     throw new Error('No tenant selected. Please select a tenant.')
   }
   

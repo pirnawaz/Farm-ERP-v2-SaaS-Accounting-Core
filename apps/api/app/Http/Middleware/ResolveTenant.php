@@ -29,6 +29,17 @@ class ResolveTenant
         if ($request->is('api/auth/set-password-with-token') || $request->is('api/auth/accept-invite')) {
             return $next($request);
         }
+        // Unified login and select-tenant: no tenant required unless client sent identifier (legacy or explicit tenant)
+        if ($request->is('api/auth/login') || $request->is('api/auth/select-tenant')) {
+            $tenant = $this->resolver->resolve($request);
+            if (!$tenant && $this->hasTenantIdentifier($request)) {
+                return response()->json(['error' => 'Tenant not found'], 404);
+            }
+            if ($tenant) {
+                $request->attributes->set('tenant_id', $tenant->id);
+            }
+            return $next($request);
+        }
 
         $tenant = $this->resolver->resolve($request);
 
@@ -42,6 +53,13 @@ class ResolveTenant
 
         $request->attributes->set('tenant_id', $tenant->id);
         return $next($request);
+    }
+
+    private function hasTenantIdentifier(Request $request): bool
+    {
+        return $request->header('X-Tenant-Id') !== null
+            || $request->header('X-Tenant-Slug') !== null
+            || $this->hasSubdomainSlug($request);
     }
 
     private function hasSubdomainSlug(Request $request): bool

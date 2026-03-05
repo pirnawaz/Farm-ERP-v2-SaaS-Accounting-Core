@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Helpers\AuthCookie;
 use App\Helpers\AuthToken;
+use App\Models\Identity;
 use App\Models\PasswordResetToken;
 use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Models\User;
 use App\Services\IdentityAuditLogger;
 use App\Services\TenantContext;
@@ -183,6 +185,46 @@ class AuthController extends Controller
         if (!$data) {
             return response()->json(['error' => 'Token expired or invalid'], 401);
         }
+
+        if (!empty($data['identity_id'])) {
+            $identity = Identity::find($data['identity_id']);
+            if (!$identity || !$identity->is_enabled) {
+                return response()->json(['error' => 'User not found or disabled'], 403);
+            }
+            $version = (int) ($data['v'] ?? 1);
+            if ($identity->token_version !== $version) {
+                return response()->json(['error' => 'Session invalidated. Please log in again.'], 401);
+            }
+            $tenantId = $data['tenant_id'] ?? $data['active_tenant_id'] ?? null;
+            $tenant = $tenantId ? Tenant::find($tenantId) : null;
+            if ($tenant && $tenant->status !== Tenant::STATUS_ACTIVE) {
+                return response()->json(['error' => 'Tenant suspended'], 403);
+            }
+            $role = $data['role'] ?? null;
+            if ($tenant) {
+                $membership = TenantMembership::where('identity_id', $identity->id)->where('tenant_id', $tenant->id)->where('is_enabled', true)->first();
+                $role = $membership?->role ?? $role;
+            }
+            $user = $data['user_id'] ? User::find($data['user_id']) : null;
+            if (!$user && $tenant) {
+                $user = User::where('identity_id', $identity->id)->where('tenant_id', $tenant->id)->first();
+            }
+            return response()->json([
+                'user' => [
+                    'id' => $user?->id ?? $identity->id,
+                    'name' => $user?->name ?? $identity->email,
+                    'email' => $identity->email,
+                    'role' => $role ?? '',
+                    'must_change_password' => (bool) ($user?->must_change_password ?? false),
+                ],
+                'tenant' => $tenant ? [
+                    'id' => $tenant->id,
+                    'name' => $tenant->name,
+                    'slug' => $tenant->slug ?? null,
+                ] : null,
+            ]);
+        }
+
         $user = User::find($data['user_id'] ?? null);
         if (!$user || !$user->is_enabled) {
             return response()->json(['error' => 'User not found or disabled'], 403);
@@ -324,11 +366,47 @@ class AuthController extends Controller
         }
 
         $user = User::findOrFail($record->user_id);
+        $passwordHash = Hash::make($validated['new_password']);
         $user->update([
-            'password' => Hash::make($validated['new_password']),
+            'password' => $passwordHash,
             'last_password_change_at' => now(),
             'token_version' => $user->token_version + 1,
         ]);
+
+        // Update Identity so unified login works with the new password.
+        $identity = $user->identity_id ? Identity::find($user->identity_id) : null;
+        if (!$identity && $user->email) {
+            $email = strtolower(trim((string) $user->email));
+            $identity = Identity::whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
+            if (!$identity) {
+                $identity = Identity::create([
+                    'email' => $email,
+                    'password_hash' => $passwordHash,
+                    'is_enabled' => (bool) $user->is_enabled,
+                    'is_platform_admin' => false,
+                    'token_version' => 1,
+                ]);
+                $user->update(['identity_id' => $identity->id]);
+            } else {
+                $user->update(['identity_id' => $identity->id]);
+            }
+            $membership = TenantMembership::where('identity_id', $identity->id)
+                ->where('tenant_id', $user->tenant_id)->first();
+            if (!$membership) {
+                TenantMembership::create([
+                    'identity_id' => $identity->id,
+                    'tenant_id' => $user->tenant_id,
+                    'role' => $user->role,
+                    'is_enabled' => (bool) $user->is_enabled,
+                ]);
+            }
+        }
+        if ($identity) {
+            $identity->update([
+                'password_hash' => $passwordHash,
+                'token_version' => $identity->token_version + 1,
+            ]);
+        }
 
         return response()->json(['message' => 'Password updated successfully']);
     }

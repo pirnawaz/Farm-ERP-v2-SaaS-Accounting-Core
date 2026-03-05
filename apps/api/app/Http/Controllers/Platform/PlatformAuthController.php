@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Platform;
 use App\Helpers\AuthCookie;
 use App\Helpers\AuthToken;
 use App\Http\Controllers\Controller;
+use App\Models\Identity;
 use App\Models\IdentityAuditLog;
 use App\Models\User;
 use App\Services\IdentityAuditLogger;
@@ -179,9 +180,23 @@ class PlatformAuthController extends Controller
     /**
      * Current platform user from cookie (or from request attributes when already resolved by middleware).
      * GET /api/platform/auth/me
+     * Supports both legacy User and Identity-based auth.
      */
     public function me(Request $request): JsonResponse
     {
+        $identity = $request->attributes->get('identity');
+        if ($identity) {
+            return response()->json([
+                'user' => [
+                    'id' => $identity->id,
+                    'name' => $identity->email,
+                    'email' => $identity->email,
+                    'role' => 'platform_admin',
+                ],
+                'tenant' => null,
+            ]);
+        }
+
         $userId = $request->attributes->get('user_id');
         if ($userId) {
             $user = User::find($userId);

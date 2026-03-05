@@ -1,5 +1,6 @@
 import { useAuth } from './useAuth';
 import type { UserRole } from '../types';
+import { can as canPermission, type PermissionKey } from '../config/permissions';
 
 export function useRole() {
   const { userRole } = useAuth();
@@ -21,6 +22,9 @@ export function useRole() {
     return userRole === role;
   };
 
+  /** Check permission by capability key (uses shared role→permission mapping). */
+  const can = (permission: PermissionKey) => canPermission(userRole ?? undefined, permission);
+
   return {
     userRole,
     isTenantAdmin,
@@ -31,5 +35,6 @@ export function useRole() {
     canManageUsers,
     canCloseCropCycle,
     hasRole,
+    can,
   };
 }

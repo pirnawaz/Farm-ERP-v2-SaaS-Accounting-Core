@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useCallback, useMemo, useEffect, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTenantModulesQuery } from '../hooks/useModules';
 import type { TenantModuleItem } from '@farm-erp/shared';
@@ -26,6 +26,15 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
   const loading = forceAllModules ? false : status === 'pending';
 
   const modules = data?.modules ?? [];
+
+  const enabledModuleKeys = useMemo(() => modules.filter((m: TenantModuleItem) => m.enabled).map((m: TenantModuleItem) => m.key), [modules]);
+
+  useEffect(() => {
+    if (import.meta.env.VITE_DEBUG_MODULES === 'true' || import.meta.env.VITE_DEBUG_MODULES === '1') {
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('farm_erp_tenant_id') ?? '' : '';
+      console.log('[VITE_DEBUG_MODULES]', { tenantId, enabledModules: enabledModuleKeys, modulesCount: modules.length });
+    }
+  }, [enabledModuleKeys, modules.length]);
 
   const isModuleEnabled = useCallback(
     (key: string): boolean => {

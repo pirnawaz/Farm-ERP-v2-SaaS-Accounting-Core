@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Domains\Tenant\User\TenantUserManagementService;
 use App\Http\Requests\StoreTenantUserRequest;
 use App\Http\Requests\UpdateTenantUserRequest;
 use App\Models\IdentityAuditLog;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\IdentityAuditLogger;
 use App\Services\InvitationService;
@@ -19,7 +21,8 @@ class TenantUserAdminController extends Controller
     private const LAST_ADMIN_MESSAGE = 'Cannot disable or change the role of the last enabled tenant admin';
 
     public function __construct(
-        protected InvitationService $invitationService
+        protected InvitationService $invitationService,
+        protected TenantUserManagementService $userManagement
     ) {}
 
     /**
@@ -85,6 +88,11 @@ class TenantUserAdminController extends Controller
             'must_change_password' => true,
         ]);
 
+        $tenant = TenantContext::getTenant($request);
+        if ($tenant) {
+            $this->userManagement->resolveOrCreateIdentity($user, $tenant, $user->role);
+        }
+
         IdentityAuditLogger::log(
             IdentityAuditLog::ACTION_TENANT_USER_CREATED_MANUAL,
             $tenantId,
@@ -133,10 +141,22 @@ class TenantUserAdminController extends Controller
 
         $oldRole = $user->role;
         $roleChanged = isset($data['role']) && $data['role'] !== $oldRole;
+
         $user->update($data);
+
+        $tenant = TenantContext::getTenant($request);
+        if ($tenant) {
+            if (array_key_exists('is_enabled', $data)) {
+                $this->userManagement->setEnabled($user, $tenant, (bool) $user->is_enabled);
+            }
+            if (array_key_exists('role', $data)) {
+                $this->userManagement->updateRole($user, $tenant, $user->role);
+            }
+        }
+
         if ($roleChanged) {
-            \App\Services\IdentityAuditLogger::log(
-                \App\Models\IdentityAuditLog::ACTION_USER_ROLE_CHANGED,
+            IdentityAuditLogger::log(
+                IdentityAuditLog::ACTION_USER_ROLE_CHANGED,
                 $tenantId,
                 $request->attributes->get('user_id'),
                 ['target_user_id' => $user->id, 'old_role' => $oldRole, 'new_role' => $user->role],
@@ -156,20 +176,20 @@ class TenantUserAdminController extends Controller
     }
 
     /**
-     * Soft-disable a user (set is_enabled=false). Does not hard-delete.
+     * Remove user from farm: disable TenantMembership and User (soft). Does not hard-delete Identity.
      * DELETE /api/tenant/users/{id}
      */
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $tenantId = TenantContext::getTenantId($request);
-        if (!$tenantId) {
+        $tenant = TenantContext::getTenant($request);
+        if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);
         }
 
-        $user = User::where('tenant_id', $tenantId)->where('id', $id)->firstOrFail();
+        $user = User::where('tenant_id', $tenant->id)->where('id', $id)->firstOrFail();
 
         if ($user->role === 'tenant_admin') {
-            $count = User::where('tenant_id', $tenantId)
+            $count = User::where('tenant_id', $tenant->id)
                 ->where('role', 'tenant_admin')
                 ->where('is_enabled', true)
                 ->count();
@@ -178,8 +198,31 @@ class TenantUserAdminController extends Controller
             }
         }
 
-        $user->update(['is_enabled' => false]);
+        $this->userManagement->removeFromTenant($user, $tenant);
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Reset password for a tenant user. Updates Identity.password_hash so unified login works.
+     * POST /api/tenant/users/{id}/reset-password
+     * Body: { new_password }
+     */
+    public function resetPassword(Request $request, string $id): JsonResponse
+    {
+        $tenant = TenantContext::getTenant($request);
+        if (!$tenant) {
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
+
+        $user = User::where('tenant_id', $tenant->id)->where('id', $id)->firstOrFail();
+
+        $validated = $request->validate([
+            'new_password' => ['required', 'string', 'min:8', 'max:255'],
+        ]);
+
+        $this->userManagement->setPassword($user, $validated['new_password']);
+
+        return response()->json(['message' => 'Password updated.']);
     }
 }

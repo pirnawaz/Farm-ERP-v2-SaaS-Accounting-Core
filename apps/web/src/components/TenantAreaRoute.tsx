@@ -21,6 +21,12 @@ export function TenantAreaRoute({ children }: TenantAreaRouteProps) {
   const isPlatformAdminWithoutTenant = userRole === 'platform_admin' && !tenantId;
   const isImpersonating = Boolean(impersonationStatus?.is_impersonating && impersonationStatus?.tenant);
 
+  const tenantRoles = ['tenant_admin', 'accountant', 'operator'];
+  const isTenantRole = userRole != null && tenantRoles.includes(userRole);
+  if (isTenantRole && !tenantId) {
+    return <Navigate to="/login" replace state={{ needsTenantSelection: true }} />;
+  }
+
   useEffect(() => {
     if (isPlatformAdminWithoutTenant && isImpersonating && impersonationStatus?.tenant?.id) {
       setTenantIdFromImpersonation(impersonationStatus.tenant.id);

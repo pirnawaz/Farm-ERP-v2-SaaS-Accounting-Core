@@ -44,6 +44,17 @@ export function useDisableTenantUser() {
   });
 }
 
+export function useResetTenantUserPassword() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, newPassword }: { id: string; newPassword: string }) =>
+      tenantUsersApi.resetPassword(id, newPassword),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenantUsers'] });
+    },
+  });
+}
+
 export function useInviteUser() {
   const queryClient = useQueryClient();
   return useMutation({

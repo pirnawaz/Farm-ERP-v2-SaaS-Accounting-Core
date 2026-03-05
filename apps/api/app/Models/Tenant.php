@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
@@ -53,6 +53,11 @@ class Tenant extends Model
     public function farm(): HasOne
     {
         return $this->hasOne(Farm::class);
+    }
+
+    public function tenantMemberships(): HasMany
+    {
+        return $this->hasMany(TenantMembership::class);
     }
 
     public function tenantModules(): HasMany

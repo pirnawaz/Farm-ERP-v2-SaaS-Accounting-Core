@@ -13,21 +13,22 @@ class TenantLoginRequiresTenantHeaderTest extends TestCase
     use RefreshDatabase;
 
     /** @test */
-    public function tenant_login_without_tenant_identifier_returns_422(): void
+    public function login_without_tenant_identifier_uses_unified_login_returns_401_for_invalid_credentials(): void
     {
+        // Unified login: no tenant header → identity-based login; invalid credentials → 401
         $response = $this->postJson('/api/auth/login', [
             'email' => 'any@test.test',
             'password' => 'secret',
         ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonPath('error', 'Tenant identifier required. Send X-Tenant-Id or X-Tenant-Slug.');
+        $response->assertStatus(401);
+        $response->assertJsonPath('error', 'Invalid credentials');
     }
 
     /** @test */
     public function tenant_login_with_invalid_uuid_returns_404(): void
     {
-        $response = $this->withHeader('X-Tenant-Id', 'not-a-valid-uuid')
+        $response = $this->withHeader('X-Tenant-Id', '550e8400-e29b-41d4-a716-446655440000')
             ->postJson('/api/auth/login', [
                 'email' => 'any@test.test',
                 'password' => 'secret',

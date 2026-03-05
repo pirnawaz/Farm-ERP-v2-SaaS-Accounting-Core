@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Identity;
 use App\Models\PasswordResetToken;
 use App\Models\PlatformAuditLog;
 use App\Models\Tenant;
@@ -9,10 +10,12 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
+use Tests\Traits\MakesAuthenticatedRequests;
 
 class PlatformTenantLifecycleTest extends TestCase
 {
     use RefreshDatabase;
+    use MakesAuthenticatedRequests;
 
     private function platformAdminHeaders(string $userId): array
     {
@@ -54,10 +57,114 @@ class PlatformTenantLifecycleTest extends TestCase
 
         $this->assertDatabaseCount('platform_audit_log', 1);
         $log = PlatformAuditLog::first();
+        $this->assertSame($platformUser->id, $log->actor_user_id, 'Legacy platform auth should set actor_user_id');
         $this->assertSame(PlatformAuditLog::ACTION_TENANT_PASSWORD_RESET, $log->action);
         $this->assertSame($tenant->id, $log->target_tenant_id);
         $this->assertSame($admin->id, $log->target_entity_id);
         $this->assertTrue($log->metadata['token_returned'] ?? false);
+    }
+
+    /** @test */
+    public function reset_admin_password_with_identity_based_platform_auth_logs_actor_identity(): void
+    {
+        $identity = Identity::create([
+            'email' => 'platform@test.test',
+            'password_hash' => Hash::make('secret'),
+            'is_enabled' => true,
+            'is_platform_admin' => true,
+            'token_version' => 1,
+        ]);
+        $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
+        $admin = User::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Admin',
+            'email' => 'admin@t1.test',
+            'password' => Hash::make('old'),
+            'role' => 'tenant_admin',
+            'is_enabled' => true,
+        ]);
+
+        $login = $this->postJson('/api/auth/login', [
+            'email' => 'platform@test.test',
+            'password' => 'secret',
+        ]);
+        $login->assertStatus(200);
+        $login->assertJsonPath('mode', 'platform');
+
+        $r = $this->withAuthCookieFrom($login)
+            ->postJson('/api/platform/tenants/' . $tenant->id . '/reset-admin-password', ['new_password' => 'newpass123']);
+
+        $r->assertStatus(200);
+        $r->assertJsonPath('message', 'Password updated.');
+        $admin->refresh();
+        $this->assertTrue(Hash::check('newpass123', $admin->password));
+
+        // Identity for tenant admin must be updated so unified login works.
+        $adminIdentity = Identity::whereRaw('LOWER(TRIM(email)) = ?', ['admin@t1.test'])->first();
+        $this->assertNotNull($adminIdentity);
+        $this->assertTrue(Hash::check('newpass123', $adminIdentity->password_hash));
+        $loginRes = $this->postJson('/api/auth/login', [
+            'email' => 'admin@t1.test',
+            'password' => 'newpass123',
+        ]);
+        $loginRes->assertStatus(200);
+        $this->assertContains($loginRes->json('mode'), ['tenant', 'select_tenant']);
+
+        $this->assertDatabaseCount('platform_audit_log', 1);
+        $log = PlatformAuditLog::first();
+        $this->assertNull($log->actor_user_id, 'Identity-based platform auth must not set actor_user_id');
+        $this->assertSame($identity->id, $log->metadata['actor_identity_id'] ?? null);
+        $this->assertSame('platform@test.test', $log->metadata['actor_email'] ?? null);
+        $this->assertSame(PlatformAuditLog::ACTION_TENANT_PASSWORD_RESET, $log->action);
+        $this->assertSame($tenant->id, $log->target_tenant_id);
+        $this->assertSame($admin->id, $log->target_entity_id);
+    }
+
+    /** @test */
+    public function reset_admin_password_with_new_password_updates_identity_and_unified_login_succeeds(): void
+    {
+        $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
+        $admin = User::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Admin',
+            'email' => 'admin@farm.test',
+            'password' => Hash::make('old'),
+            'role' => 'tenant_admin',
+            'is_enabled' => true,
+        ]);
+        $this->assertNull($admin->identity_id);
+
+        $platformUser = User::create([
+            'tenant_id' => null,
+            'name' => 'Platform',
+            'email' => 'p@test.test',
+            'password' => null,
+            'role' => 'platform_admin',
+            'is_enabled' => true,
+        ]);
+
+        $r = $this->withHeaders($this->platformAdminHeaders($platformUser->id))
+            ->postJson('/api/platform/tenants/' . $tenant->id . '/reset-admin-password', [
+                'new_password' => 'newpass456',
+            ]);
+
+        $r->assertStatus(200);
+        $r->assertJsonPath('message', 'Password updated.');
+        $admin->refresh();
+        $this->assertTrue(Hash::check('newpass456', $admin->password));
+        $this->assertNotNull($admin->identity_id);
+
+        $identity = Identity::find($admin->identity_id);
+        $this->assertNotNull($identity);
+        $this->assertSame('admin@farm.test', $identity->email);
+        $this->assertTrue(Hash::check('newpass456', $identity->password_hash));
+
+        $loginRes = $this->postJson('/api/auth/login', [
+            'email' => 'admin@farm.test',
+            'password' => 'newpass456',
+        ]);
+        $loginRes->assertStatus(200);
+        $this->assertContains($loginRes->json('mode'), ['tenant', 'select_tenant']);
     }
 
     /** @test */
@@ -89,6 +196,17 @@ class PlatformTenantLifecycleTest extends TestCase
         $admin->refresh();
         $this->assertTrue(Hash::check('newsecret123', $admin->password));
         $this->assertDatabaseCount('password_reset_tokens', 0);
+
+        // Identity must be created/updated so unified login works.
+        $adminIdentity = Identity::whereRaw('LOWER(TRIM(email)) = ?', ['admin@t1.test'])->first();
+        $this->assertNotNull($adminIdentity);
+        $this->assertTrue(Hash::check('newsecret123', $adminIdentity->password_hash));
+        $loginRes = $this->postJson('/api/auth/login', [
+            'email' => 'admin@t1.test',
+            'password' => 'newsecret123',
+        ]);
+        $loginRes->assertStatus(200);
+        $this->assertContains($loginRes->json('mode'), ['tenant', 'select_tenant']);
     }
 
     /** @test */

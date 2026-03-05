@@ -1,51 +1,14 @@
 import type { UserRole } from '../types';
-import { term } from '../config/terminology';
+import { ALL_PERMISSION_KEYS, PERMISSION_LABELS, getPermissionsForRole } from '../config/permissions';
 
 const ROLES: UserRole[] = ['platform_admin', 'tenant_admin', 'accountant', 'operator'];
 
-const POST_LABEL = term('postAction');
-const REVERSE_LABEL = term('reverseAction');
-
-const PERMISSIONS = {
-  platform_admin: {
-    'Manage tenants': true,
-    'View all tenants': true,
-    'Enable/disable modules per tenant': true,
-  },
-  tenant_admin: {
-    'Manage users': true,
-    'Assign roles': true,
-    'Enable/disable modules': true,
-    [POST_LABEL]: true,
-    [REVERSE_LABEL]: true,
-    'Manage share rules & settlements': true,
-    'Close/open crop cycles': true,
-    'View all data': true,
-  },
-  accountant: {
-    [POST_LABEL]: true,
-    [REVERSE_LABEL]: true,
-    'Manage share rules & settlements': true,
-    'View all data': true,
-    'Create/edit transactions': true,
-  },
-  operator: {
-    'Create/edit own transactions': true,
-    'View data': true,
-  },
-};
-
 export default function AdminRolesPage() {
-  const allPermissions = new Set<string>();
-  Object.values(PERMISSIONS).forEach(rolePerms => {
-    Object.keys(rolePerms).forEach(perm => allPermissions.add(perm));
-  });
-
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Role Permissions Matrix</h1>
-        <p className="text-sm text-gray-500 mt-1">Overview of permissions for each role. This is a read-only reference.</p>
+        <p className="text-sm text-gray-500 mt-1">Overview of permissions for each role. This is a read-only reference and matches backend enforcement.</p>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -69,18 +32,21 @@ export default function AdminRolesPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {Array.from(allPermissions).sort().map((permission) => (
+              {ALL_PERMISSION_KEYS.map((permission) => (
                 <tr key={permission}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{permission}</td>
-                  {ROLES.map((role) => (
-                    <td key={role} className="px-6 py-4 whitespace-nowrap text-center">
-                      {(PERMISSIONS[role] as Record<string, boolean> | undefined)?.[permission] ? (
-                        <span className="text-green-600 font-semibold">✓</span>
-                      ) : (
-                        <span className="text-gray-300">-</span>
-                      )}
-                    </td>
-                  ))}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{PERMISSION_LABELS[permission]}</td>
+                  {ROLES.map((role) => {
+                    const allowed = getPermissionsForRole(role).has(permission);
+                    return (
+                      <td key={role} className="px-6 py-4 whitespace-nowrap text-center">
+                        {allowed ? (
+                          <span className="text-green-600 font-semibold">✓</span>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -91,10 +57,10 @@ export default function AdminRolesPage() {
       <div className="mt-6 bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-[#2D3A3A] mb-2">Important Notes</h3>
         <ul className="text-sm text-[#2D3A3A] space-y-1 list-disc list-inside">
-          <li>{POST_LABEL} and {REVERSE_LABEL} are restricted to tenant_admin and accountant roles only.</li>
-          <li>Only tenant_admin can manage users and assign roles.</li>
-          <li>Only tenant_admin can close/open crop cycles.</li>
-          <li>Operators can create and edit their own transactions but cannot post to accounts.</li>
+          <li>Platform admin is the only role that can manage tenants, view all tenants, and enable/disable modules per tenant.</li>
+          <li>Tenant admin has full access within their tenant (users, roles, modules, cycles, post/reverse, settlements).</li>
+          <li>Accountant can post, reverse, manage settlements, and create/edit transactions; they cannot manage users, assign roles, or enable/disable modules.</li>
+          <li>Operators can create/edit their own transactions and view data; they cannot post, reverse, or manage users/modules/cycles.</li>
         </ul>
       </div>
     </div>

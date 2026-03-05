@@ -20,5 +20,7 @@ export const tenantUsersApi = {
     apiClient.post<InviteUserResponse>('/api/tenant/invitations', payload),
   update: (id: string, payload: UpdateTenantUserPayload) =>
     apiClient.put<User>(`/api/tenant/users/${id}`, payload),
+  resetPassword: (id: string, newPassword: string) =>
+    apiClient.post<{ message: string }>(`/api/tenant/users/${id}/reset-password`, { new_password: newPassword }),
   disable: (id: string) => apiClient.delete(`/api/tenant/users/${id}`),
 };

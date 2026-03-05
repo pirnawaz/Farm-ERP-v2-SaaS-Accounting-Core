@@ -34,7 +34,7 @@ A multi-tenant SaaS accounting and farm management system (Terrava) built as a m
 
 - **Multi-tenant SaaS** — Tenant isolation, platform admin, and tenant-level modules
 - **Platform admin** — Tenant list, activate/suspend/archive, minimal plan field (no billing), controlled impersonation with audit logging; **platform audit log viewer** (tenant audit logs with filters); **tenant lifecycle**: reset tenant admin password (token or direct), archive/unarchive (platform_audit_log); production safety: header-based auth disabled unless `DEV_IDENTITY_ENABLED` or local/testing
-- **Roles** — `platform_admin`, `tenant_admin`, `accountant`, `operator`
+- **Roles & permissions** — `platform_admin`, `tenant_admin`, `accountant`, `operator`. Single source: `apps/web/src/config/permissions.ts` (capabilities + role mapping). **Platform admin** only: view/manage all tenants, enable/disable modules per tenant. **Tenant admin** only: manage users, assign roles, enable/disable tenant modules, close crop cycles. **Accountant**: full operational/accounting in tenant (post, reverse, settlements, reports) but cannot manage users/modules. **Operator**: create/edit own transactions and view data; cannot post/reverse or manage users/modules. Backend enforces via route middleware; frontend uses `can(permission)` and Role Permissions Matrix (`/app/admin/roles`) for reference.
 - **Land & Projects** — Land parcels, crop cycles (close/reopen with preview), land allocations (owner and Hari), projects, project rules
 - **Land Leases (Maqada)** — Land leases per project/parcel/landlord, accruals (draft/post), posting to DUE_TO_LANDLORD and expense; reversal of posted accruals (new posting group, no mutation); **Landlord Statement** report (ledger-backed, read-only); traceability from accrual to posting group and reversal
 - **Operational Transactions** — Draft/post workflow, posting groups, reversals
@@ -55,7 +55,7 @@ A multi-tenant SaaS accounting and farm management system (Terrava) built as a m
 - **Reconciliation** — Project settlement reconciliation, supplier AP reconciliation, reconciliation dashboard; ledger reconciliation for audit and debugging
 - **Crop Cycle Close** — Close crop cycle with preview; **Accounting Period Close (v2)**: full closing entries that zero all income/expense accounts for the cycle period, clear via CURRENT_EARNINGS, and roll to RETAINED_EARNINGS in one PERIOD_CLOSE posting group; idempotent (one close run per cycle); crop cycle lock enforced (no posting after CLOSED); `POST crop-cycles/{id}/close`, `GET crop-cycles/{id}/close-run`; crop-cycle-based settlements (preview and post); accounting corrections and guards
 - **Dashboard (Accounting Overview)** — Role-based dashboard at **Finance & Review → Accounting Overview**; widgets, quick actions, onboarding panel for new users, empty states. **Global crop cycle scope**: header-level selector (All Crop Cycles / single cycle); scope persists per tenant in `localStorage`; dashboard summary API accepts optional `scope_type` and `scope_id` (read-only, no ledger writes); default selection is the active OPEN cycle when present. **Farm Pulse** and **Today** are the primary daily entry points under Farm Operations.
-- **Navigation & UX** — Farm-first sidebar (three groups). **FARM OPERATIONS**: Farm Pulse, Today, Alerts, Land Parcels, Land Leases (Maqada), Crop Cycles, Production Units, Orchards, Livestock, Land Allocation, People & Partners, Projects, **Pending Review** (operational records; route `/app/transactions`), Crop Ops, Harvests, Labour, **Machinery** submenu (Machines, Work Logs, Services, Charges, Maintenance, Maintenance Setup, Rate Cards), Inventory, Sales & Money, Payments, Advances. **FINANCE & REVIEW**: **Accounting Overview** (dashboard), Review Queue, Account Balances, Crop Profitability, AR Ageing, Bank Reconciliation, Trial Balance, Governance, P&L, Balance Sheet, Cashbook, Project P&L, Crop Cycle P&L, Profitability Trend, Machinery Profitability, Sales Margin, Party Ledger, Landlord Statement, Party Summary, Party Ageing, Reconcile Accounts, General Ledger, General Journal, Settlement Packs, Accounting Periods. **ADMIN**: Farm Profile, Users, Roles, Modules, Farm Integrity, Localisation. **Breadcrumbs**: `PageHeader` with breadcrumb trail on list/detail/form pages; hierarchy matches sidebar. **Farm-first terminology**: `apps/web/src/config/terminology.ts` and `<Term>` component provide dual farm/accounting labels (e.g. "Post to Accounts" vs "POST", "Field Work" vs "Activities"); use `term('key')` for farmer-facing copy.
+- **Navigation & UX** — Farm-first sidebar driven by **permissions only** (modules never hide items; they only disable). Central config: `apps/web/src/config/nav.ts` (`getNavGroups`) with `requiredPermission`, `requiredModules`; canonical module keys in `apps/web/src/config/moduleKeys.ts`. **FARM OPERATIONS**: Farm Pulse, Today, Alerts, Land Parcels, Land Leases (Maqada), Crop Cycles, Production Units, Orchards, Livestock, Land Allocation, People & Partners, Projects, **Pending Review** (operational records; route `/app/transactions`), Crop Ops, Harvests, Labour, **Machinery** submenu (Machines, Work Logs, Services, Charges, Maintenance, Maintenance Setup, Rate Cards), Inventory, Sales & Money, Payments, Advances. **FINANCE & REVIEW**: **Accounting Overview** (dashboard), Review Queue, Account Balances, Crop Profitability, AR Ageing, Bank Reconciliation, Trial Balance, Governance, P&L, Balance Sheet, Cashbook, Project P&L, Crop Cycle P&L, Profitability Trend, Machinery Profitability, Sales Margin, Party Ledger, Landlord Statement, Party Summary, Party Ageing, Reconcile Accounts, General Ledger, General Journal, Settlement Packs, Accounting Periods. **ADMIN**: Farm Profile, Users, Roles, Modules, Farm Integrity, Localisation. If a user has permission but a required module is off, the nav item is shown **disabled** (grey, tooltip "Module not enabled"); click sends tenant admin to Modules page or shows "Ask a tenant admin to enable &lt;module&gt;". **Breadcrumbs**: `PageHeader` with breadcrumb trail; hierarchy matches sidebar. **Farm-first terminology**: `apps/web/src/config/terminology.ts` and `<Term>` component; use `term('key')` for farmer-facing copy.
 - **Settings** — Tenant settings, farm profile (create when missing), modules, users
 
 ---
@@ -176,24 +176,49 @@ For a condensed checklist, see [docs/QUICK_START.md](docs/QUICK_START.md).
 
 - **Option A — migrations.sql:** Seed data in `docs/migrations.sql` includes tenant  
   `00000000-0000-0000-0000-000000000001`.
-- **Option B — Staging seeder (staging/droplet):** From `apps/api` run:
+- **Option B — Staging seeder (recommended after plain migrate):** From `apps/api` run:
   ```bash
   php artisan db:seed --class=StagingSeeder
   ```
-  This upserts a **Staging** tenant (id `11111111-1111-1111-1111-111111111111`), an admin user with known credentials, then runs `SystemAccountsSeeder` and `ModulesSeeder`. Idempotent (safe to run multiple times).
+  This upserts a **Staging Farm** tenant (slug `staging`, id `11111111-1111-1111-1111-111111111111`), an admin user with known credentials, then runs `ModulesSeeder` and `SystemAccountsSeeder`. Idempotent (safe to run multiple times).
   - **Staging login:** Tenant ID `11111111-1111-1111-1111-111111111111`, email `admin@staging.local`, password `StagingAdmin1!` (change in production).
-- The web app uses `X-Tenant-Id` (and/or auth); ensure the chosen tenant exists when testing.
+- The web app and API require a tenant identifier on login: send header **`X-Tenant-Slug: staging`** or **`X-Tenant-Id: 11111111-1111-1111-1111-111111111111`**. In the UI, select Tenant and use slug `staging` or the UUID above.
+
+#### Quick start: create farm + user (one command after migrate)
+
+After a normal build (e.g. `build.bat` runs only migrations), the DB has no tenant or user. To get a working farm login in one step:
+
+```bash
+cd apps/api
+php artisan migrate
+php artisan db:seed --class=StagingSeeder
+```
+
+Then log in with:
+
+| Field | Value |
+|-------|--------|
+| **Farm / Tenant** | `staging` (or UUID `11111111-1111-1111-1111-111111111111`) |
+| **Email** | `admin@staging.local` |
+| **Password** | `StagingAdmin1!` |
+
+The login request must identify the tenant (e.g. the web UI sends `X-Tenant-Slug` or `X-Tenant-Id`). Use slug **staging** or the tenant UUID when selecting the farm.
 
 ---
 
 ## Configuration
 
 - **API env:** `apps/api/.env` — app key, DB, Supabase, etc.
-- **Key env vars:**
+- **Key env vars (API):**
   - `APP_ENV` — `local`, `staging`, or `production`; affects auth cookie `secure` flag and validation.
   - `APP_URL` — Base URL of the API (e.g. `https://api.example.com`). Auth cookie is set `secure=true` only when `APP_ENV=production` or `APP_URL` begins with `https://`, so staging over HTTP works.
   - `DEV_IDENTITY_ENABLED` — When `false` (default), `X-User-Id` and `X-User-Role` headers are **ignored** in production-like environments; header-only requests return 401/403. Set `true` only for dev/testing. In `local` or `testing` env, header auth is always allowed. See [Production access & safety](#production-access--safety).
-  - `VITE_API_URL` (optional, in `apps/web`) — When set, the frontend uses this as the API base. When unset, the frontend uses same-origin (`''`) so Nginx (or the same host) can proxy `/api` in production.
+- **Key env vars (Web, `apps/web`):**
+  - `VITE_API_URL` (optional) — When set, the frontend uses this as the API base. When unset, uses same-origin so Nginx can proxy `/api` in production.
+  - `VITE_FORCE_ALL_MODULES_ENABLED` — When `true`, all modules are treated as enabled (E2E / dev). Sidebar and module gating skip real module state.
+  - `VITE_DEBUG_NAV` — When `true` or `1`, console logs per nav item: key, requiredPermission, canResult, requiredModules, modulesEnabledResult.
+  - `VITE_DEBUG_MODULES` — When `true` or `1`, console logs tenantId, enabledModules array (ModulesContext), and per nav item requiredModules and isEnabled (sidebar).
+  - `VITE_ENABLE_ORCHARDS` / `VITE_ENABLE_LIVESTOCK` — Force show Orchards/Livestock in sidebar when addon API is not used.
 - **Cookie auth:** The app uses a **custom auth cookie** (`farm_erp_auth_token`), not Laravel Sanctum SPA. There is no CSRF cookie flow; mitigation is `httpOnly`, `Secure` in production, and `SameSite` (see below). The frontend must send credentials with API calls: the shared `api-client` uses `credentials: 'include'` so the cookie is sent on same-origin or configured CORS origins.
 - **Token lifecycle:** Tokens include `exp` (expiry, configurable via `AUTH_TOKEN_TTL_HOURS`, default 7 days) and `v` (token version). `POST /api/auth/logout` clears the cookie; `POST /api/auth/logout-all` increments the user's token version (invalidating all existing tokens) and clears the cookie; `POST /api/auth/change-password` (tenant) and `POST /api/platform/auth/change-password` (platform) update password, set `last_password_change_at`, increment token version, and issue a new token.
 - **Rate limiting:** Login (platform and tenant), accept-invite, and create-invitation are rate-limited (configurable via `RATE_LIMIT_*` env vars). Responses return **429** with message "Too many attempts. Try again in X seconds."
@@ -258,11 +283,13 @@ From repo root:
 
 All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middleware apply as in `routes/api.php`.
 
+**Login (Phase 1 — Global Identity):** One login screen. Call `POST /api/auth/login` with `{ email, password }` and no tenant header. Response is `mode: "platform"` (route to platform), `mode: "tenant"` (single farm; route to dashboard), or `mode: "select_tenant"` (show farm picker, then `POST /api/auth/select-tenant` with `{ tenant_id }`). Run `php artisan identities:backfill-from-users` to backfill identities from existing users.
+
 | Area            | Examples                                                                 |
 |-----------------|---------------------------------------------------------------------------|
 | **Health**      | `GET /api/health`                                                        |
 | **Dashboard**   | `GET /api/dashboard/summary` — optional query: `scope_type=crop_cycle`, `scope_id=<uuid>` (read-only; scopes metrics to one crop cycle) |
-| **Auth**        | `POST /api/auth/login`, `POST /api/auth/set-password-with-token` (body: `token`, `new_password`; no tenant; for platform-issued reset tokens) |
+| **Auth**        | `POST /api/auth/login` (unified: email + password; no tenant header), `POST /api/auth/select-tenant` (body: `tenant_id`; after multi-farm login), `POST /api/auth/logout`, `GET /api/auth/me`; `POST /api/auth/set-password-with-token` (body: `token`, `new_password`; no tenant; for platform-issued reset tokens) |
 | **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`; `GET /api/platform/tenants/{id}/modules`, `PUT .../modules`; `POST .../reset-admin-password` (body optional: `new_password`; else returns one-time token), `POST .../archive`, `POST .../unarchive` (platform_admin only, audited in `platform_audit_log`); `GET /api/platform/audit-logs` (identity audit; query: `tenant_id`, `action`, `from`, `to`, `q`, `per_page`, `page`; platform_admin only); `GET /api/platform/config-health` (platform_admin only); `GET /api/platform/impersonation`, `POST .../start`, `POST .../stop` (platform_admin only, audited) |
 | **Dev**         | `GET/POST /api/dev/tenants`, `POST /api/dev/tenants/{id}/activate`        |
 | **Users**       | `apiResource('users')`                                                   |
@@ -290,9 +317,9 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Bank reconciliation** | `GET/POST bank-reconciliations`, `GET bank-reconciliations/{id}`, `POST .../clear`, `.../unclear`, `.../finalize`, `.../statement-lines`, `.../statement-lines/{lineId}/match`, `.../unmatch`, `.../void` |
 | **Accounting**  | `GET/POST journals`, `GET/PUT journals/{id}`, `POST journals/{id}/post`, `POST journals/{id}/reverse`; `GET/POST accounting-periods`, `POST accounting-periods/{id}/close`, `POST .../reopen`, `GET .../events`; **Period close**: `POST crop-cycles/{id}/close` (body: optional `as_of` date), `GET crop-cycles/{id}/close-run` (returns period_close_run or 404) |
 | **Reconciliation** | `GET /reconciliation/project/{id}`, `GET /reconciliation/supplier/{party_id}` |
-| **Settings**    | `GET/PUT /settings/tenant`; `tenant/modules`; `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` |
+| **Settings**    | `GET/PUT /settings/tenant`; **tenant modules**: `GET /api/tenant/modules` (read-only for all tenant roles — tenant_admin, accountant, operator; used by sidebar for module state), `PUT /api/tenant/modules` (tenant_admin only); `tenant/farm-profile` (GET → `{exists,farm}`, POST create, PUT update); `tenant/users` (tenant_admin only) |
 
-Exact routes, methods, and middleware are in `apps/api/routes/api.php`.
+Exact routes, methods, and middleware are in `apps/api/routes/api.php`. Module keys are canonical in backend (`modules` table / ModulesSeeder) and frontend `apps/web/src/config/moduleKeys.ts`; sidebar and Modules page use the same list so enabled state is consistent.
 
 ---
 
@@ -314,7 +341,7 @@ The web app includes pages (and routes) for:
 - **Settings:** tenant, modules, farm profile (admin), users (admin), localisation
 - **Platform (platform_admin only):** tenant list at `/app/platform/tenants` (status badge: active/suspended/archived, plan dropdown, impersonate); **Audit Logs** at `/app/platform/audit-logs` (table, filters: tenant, actor user ID, action, date range, pagination); tenant detail with plan, modules, **Support actions** (Reset admin password — generate token or set directly; Archive / Unarchive tenant), and impersonate; impersonation banner in tenant app with “Impersonating: {tenant}” and exit; tenant detail with plan and impersonate
 
-Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, `land_leases`, `inventory`, `labour`, `machinery`, `crop_ops`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`, `projects_crop_cycles` for crop reports).
+Access to some areas is gated by **roles** and **tenant modules**. Module keys (e.g. `projects_crop_cycles`, `crop_ops`, `inventory`, `land`, `land_leases`, `labour`, `machinery`, `ar_sales`, `treasury_payments`, `treasury_advances`, `settlements`, `reports`) are defined in backend `modules` table and frontend `apps/web/src/config/moduleKeys.ts`; GET `/api/tenant/modules` returns enabled state for the current tenant so accountant and operator see correct sidebar state (disabled items when a module is off).
 
 ---
 
@@ -367,6 +394,12 @@ To run production-safety and platform feature tests:
 php artisan test tests/Feature/DevIdentityProductionGuardTest.php
 php artisan test tests/Feature/PlatformAuditLogTest.php
 php artisan test tests/Feature/PlatformTenantLifecycleTest.php
+```
+
+**Role permission enforcement** (RolePermissionEnforcementTest): accountant cannot access tenant users or update tenant modules but can GET tenant modules (for sidebar) and dashboard; operator cannot post/reverse; non–platform_admin cannot access platform tenants.
+
+```bash
+php artisan test tests/Feature/RolePermissionEnforcementTest.php
 ```
 
 Tests expect PostgreSQL (see `apps/api/tests/README.md`). Create the test DB once (e.g. `scripts/create-test-db.ps1` on Windows). Feature tests include **Inventory Items (InvItemCrudTest):** can_update_item, can_deactivate_item, can_activate_item, cannot_delete_used_item_returns_422, can_delete_unused_item_returns_204, index_includes_can_delete. Other coverage: **Crop Cycle Close** (CropCycleCloseTest: full closing entries zero income/expense, multiple accounts zeroed, loss scenario, idempotency, lock enforcement, tenant isolation, snapshot/rule_snapshot), **Settlement Pack** (generate returns expected shape/totals, GET returns register rows, tenant isolation, idempotency), **Land Lease accrual posting and reversal** (post creates PG/ledger, reverse creates reversal PG and negates entries, idempotent second reverse, tenant isolation), **Landlord Statement** (ledger-backed report, opening/closing balance, lines ordered by date), **Payments** (posting creates posting group with `source_type=PAYMENT`, allocation row `PAYMENT`, ledger entries; method BANK credits BANK account; reverse creates reversal posting group and negated allocation row; cannot reverse twice), **Payment apply/unapply** (PaymentApplySalesTest: preview FIFO, apply FIFO/manual, unapply voids allocations, reversed sale/payment excluded from open sales), **Reversal guards** (ReversalGuardsTest: cannot reverse payment or sale while ACTIVE allocations exist; 409 until unapplied), **AR Statement** (ARStatementTest), **AR Aging report** (ARAgingReportTest: buckets per customer and grand totals, apply payment reduces open balance, unapply restores it, reversed sale excluded, default as_of), **Financial Statements** (FinancialStatementsTest: Profit & Loss for range with income/expense totals and net profit, Balance Sheet as-of with equation check, compare period deltas, tenant isolation), **Accounting period locking** (AccountingPeriodLockingTest), and **Bank reconciliation** (BankReconciliationTest, BankStatementLinesTest):
@@ -428,8 +461,9 @@ From `apps/web`: `npm run test` (Vitest), `npm run test:ui` for UI mode; `npm ru
 │   └── web/                    # React + Vite
 │       ├── src/
 │       │   ├── api/             # API clients
-│       │   ├── components/     # PageHeader, CropCycleScopeSelector, etc.
-│       │   ├── contexts/      # Auth, Modules, CropCycleScope (scope + localStorage)
+│       │   ├── components/     # AppLayout, AppSidebar, PageHeader, CropCycleScopeSelector, etc.
+│       │   ├── config/         # permissions.ts, nav.ts, moduleKeys.ts, terminology.ts
+│       │   ├── contexts/       # Auth, Modules, CropCycleScope (scope + localStorage)
 │       │   ├── hooks/
 │       │   ├── pages/
 │       │   ├── types/

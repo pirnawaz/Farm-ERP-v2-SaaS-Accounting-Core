@@ -29,14 +29,34 @@ npm install
 npm run build
 ```
 
-### 2. Database Setup (Supabase)
+### 2. Database Setup
+
+**Option A — Supabase (SQL):**
 
 1. Go to your Supabase project dashboard
 2. Open SQL Editor
 3. Copy and paste contents of `docs/migrations.sql`
 4. Run the SQL
 
-**Note**: The seed tenant ID is `00000000-0000-0000-0000-000000000001`
+**Note:** The seed tenant ID in that file is `00000000-0000-0000-0000-000000000001`.
+
+**Option B — Migrate + Staging seeder (recommended for local/dev):**
+
+If you only run migrations (e.g. via `build.bat`), the DB has no tenant or user. Create a farm and admin in one step:
+
+```bash
+cd apps/api
+php artisan migrate
+php artisan db:seed --class=StagingSeeder
+```
+
+Then log in with:
+
+- **Farm / Tenant:** `staging` (or UUID `11111111-1111-1111-1111-111111111111`)
+- **Email:** `admin@staging.local`
+- **Password:** `StagingAdmin1!`
+
+Login requires the client to send the tenant (e.g. `X-Tenant-Slug: staging` or `X-Tenant-Id: 11111111-1111-1111-1111-111111111111`). In the web UI, select Tenant and use slug **staging** or the UUID.
 
 ### 3. Configure Laravel
 
