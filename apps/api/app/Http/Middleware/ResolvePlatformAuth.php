@@ -2,7 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Helpers\AuthCookie;
+use App\Helpers\AuthToken;
 use App\Helpers\DevIdentity;
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,25 +37,36 @@ class ResolvePlatformAuth
             return $next($request);
         }
 
-        $token = $request->cookie('farm_erp_auth_token');
+        $token = $request->cookie(AuthCookie::NAME);
+        // In testing, also accept the same token via Authorization so tests can forward cookie value
+        if (!$token && app()->environment('testing')) {
+            $token = $request->bearerToken();
+        }
         if (!$token) {
             return $next($request);
         }
 
-        try {
-            $data = json_decode(base64_decode($token), true);
-            if (!is_array($data) || !isset($data['expires_at']) || $data['expires_at'] < now()->timestamp) {
-                return $next($request);
-            }
-            $userId = $data['user_id'] ?? '';
-            $userRole = $data['role'] ?? '';
-            $request->headers->set('X-User-Id', $userId);
-            $request->headers->set('X-User-Role', $userRole);
-            $request->attributes->set('user_id', $userId);
-            $request->attributes->set('user_role', $userRole);
-        } catch (\Throwable $e) {
-            // ignore
+        $data = AuthToken::parse($token);
+        if (!$data) {
+            return $next($request);
         }
+        if (array_key_exists('tenant_id', $data) && $data['tenant_id'] !== null) {
+            return $next($request);
+        }
+        $user = User::find($data['user_id'] ?? null);
+        if (!$user || !$user->is_enabled) {
+            return $next($request);
+        }
+        $version = (int) ($data['v'] ?? $data['token_version'] ?? 1);
+        if ($user->token_version !== $version) {
+            return $next($request);
+        }
+        $userId = $data['user_id'] ?? '';
+        $userRole = $data['role'] ?? '';
+        $request->headers->set('X-User-Id', $userId);
+        $request->headers->set('X-User-Role', $userRole);
+        $request->attributes->set('user_id', $userId);
+        $request->attributes->set('user_role', $userRole);
 
         return $next($request);
     }

@@ -25,7 +25,10 @@ use App\Http\Controllers\TenantModuleController;
 use App\Http\Controllers\PlatformTenantController;
 use App\Http\Controllers\Platform\ImpersonationController;
 use App\Http\Controllers\Platform\PlatformAuthController;
+use App\Http\Controllers\Platform\PlatformTenantInvitationController;
+use App\Http\Controllers\Platform\PlatformTenantUserController;
 use App\Http\Controllers\Platform\PlatformAuditLogController;
+use App\Http\Controllers\Platform\PlatformConfigHealthController;
 use App\Http\Controllers\Platform\PlatformTenantModulesController;
 use App\Http\Controllers\Platform\PlatformTenantLifecycleController;
 use App\Http\Controllers\TenantFarmProfileController;
@@ -68,6 +71,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandLeaseAccrualController;
 use App\Http\Controllers\Internal\FarmIntegrityController;
 use App\Http\Controllers\Tenant\TenantAddonModulesController;
+use App\Http\Controllers\Tenant\TenantAuditLogController;
+use App\Http\Controllers\TenantInvitationController;
+use App\Http\Controllers\AcceptInviteController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -83,19 +89,34 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
     Route::get('tenant/addon-modules', [TenantAddonModulesController::class, 'index']);
 });
 
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth.tenant.login');
 Route::post('/auth/logout', [AuthController::class, 'logout']);
+Route::post('/auth/logout-all', [AuthController::class, 'logoutAll']);
 Route::get('/auth/me', [AuthController::class, 'me']);
+Route::get('/auth/whoami', [AuthController::class, 'whoami']);
+Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+Route::post('/auth/complete-first-login-password', [AuthController::class, 'completeFirstLoginPassword']);
 Route::post('/auth/set-password-with-token', [AuthController::class, 'setPasswordWithToken']);
+Route::post('/auth/accept-invite', AcceptInviteController::class)->middleware('throttle:auth.accept-invite');
 
 // Platform auth: login does not require tenant or role; logout/me require platform_admin (cookie or headers)
 Route::prefix('platform')->group(function () {
-    Route::post('auth/login', [PlatformAuthController::class, 'login']);
+    Route::post('auth/login', [PlatformAuthController::class, 'login'])->middleware('throttle:auth.platform.login');
+    // Impersonation status: callable by platform_admin OR when impersonation cookie is set (so tenant app can show banner)
+    Route::get('impersonation/status', [ImpersonationController::class, 'statusForUi'])->middleware('platform_admin_or_impersonation');
+    // Force-stop: clear impersonation cookies; callable by platform_admin OR when impersonation cookie present (so tenant app can force stop)
+    Route::post('impersonation/force-stop', [ImpersonationController::class, 'forceStop'])->middleware('platform_admin_or_impersonation');
     Route::middleware(['role:platform_admin'])->group(function () {
         Route::post('auth/logout', [PlatformAuthController::class, 'logout']);
+        Route::post('auth/logout-all', [PlatformAuthController::class, 'logoutAll']);
         Route::get('auth/me', [PlatformAuthController::class, 'me']);
+        Route::post('auth/change-password', [PlatformAuthController::class, 'changePassword']);
         Route::get('tenants', [PlatformTenantController::class, 'index']);
         Route::post('tenants', [PlatformTenantController::class, 'store']);
+        Route::get('tenants/{tenant}/users', [PlatformTenantController::class, 'users']);
+        Route::post('tenants/{tenant}/invitations', [PlatformTenantInvitationController::class, 'store'])->middleware('throttle:auth.platform.invitations');
+        Route::post('tenants/{tenant}/users', [PlatformTenantUserController::class, 'store'])->middleware('throttle:auth.manual_user_create');
+        Route::patch('tenants/{tenant}/users/{user}', [PlatformTenantUserController::class, 'update'])->middleware('throttle:auth.platform_user_update');
         Route::get('tenants/{id}', [PlatformTenantController::class, 'show']);
         Route::put('tenants/{id}', [PlatformTenantController::class, 'update']);
         Route::post('tenants/{id}/reset-admin-password', [PlatformTenantLifecycleController::class, 'resetAdminPassword']);
@@ -106,7 +127,9 @@ Route::prefix('platform')->group(function () {
         Route::get('impersonation', [ImpersonationController::class, 'status']);
         Route::post('impersonation/start', [ImpersonationController::class, 'start']);
         Route::post('impersonation/stop', [ImpersonationController::class, 'stop']);
+        Route::post('tenants/{tenant}/impersonate', [ImpersonationController::class, 'impersonate']);
         Route::get('audit-logs', [PlatformAuditLogController::class, 'index']);
+        Route::get('config-health', [PlatformConfigHealthController::class, '__invoke']);
     });
 });
 
@@ -573,7 +596,9 @@ Route::middleware(['role:tenant_admin'])->group(function () {
     Route::post('tenant/farm-profile', [TenantFarmProfileController::class, 'store']);
     Route::put('tenant/farm-profile', [TenantFarmProfileController::class, 'update']);
     Route::get('tenant/users', [TenantUserAdminController::class, 'index']);
-    Route::post('tenant/users', [TenantUserAdminController::class, 'store']);
+    Route::post('tenant/users', [TenantUserAdminController::class, 'store'])->middleware('throttle:auth.manual_user_create');
+    Route::get('tenant/audit-logs', [TenantAuditLogController::class, 'index']);
+    Route::post('tenant/invitations', [TenantInvitationController::class, 'store'])->middleware('throttle:auth.invitations');
     Route::put('tenant/users/{id}', [TenantUserAdminController::class, 'update']);
     Route::delete('tenant/users/{id}', [TenantUserAdminController::class, 'destroy']);
 });

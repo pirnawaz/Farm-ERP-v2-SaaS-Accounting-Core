@@ -3,54 +3,59 @@
 namespace App\Http\Controllers\Platform;
 
 use App\Http\Controllers\Controller;
-use App\Models\AuditLog;
+use App\Models\IdentityAuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PlatformAuditLogController extends Controller
 {
     /**
-     * List audit logs (platform_admin only). Cross-tenant with optional filters.
+     * List identity audit logs (platform_admin only). Cross-tenant with optional filters.
      * GET /api/platform/audit-logs
-     * Query: tenant_id, actor_user_id (user_id), action, date_from, date_to, per_page, page
+     * Query: tenant_id, action, from, to, q (search metadata), per_page, page
      */
     public function index(Request $request): JsonResponse
     {
-        $query = AuditLog::query()
-            ->with(['tenant:id,name', 'user:id,name,email'])
+        $query = IdentityAuditLog::query()
+            ->with(['tenant:id,name', 'actor:id,name,email'])
             ->orderByDesc('created_at');
 
         if ($request->filled('tenant_id')) {
             $query->where('tenant_id', $request->input('tenant_id'));
         }
-        if ($request->filled('actor_user_id')) {
-            $query->where('user_id', $request->input('actor_user_id'));
-        }
         if ($request->filled('action')) {
             $query->where('action', $request->input('action'));
         }
-        if ($request->filled('date_from')) {
-            $query->where('created_at', '>=', $request->input('date_from'));
+        if ($request->filled('from')) {
+            $query->where('created_at', '>=', $request->input('from'));
         }
-        if ($request->filled('date_to')) {
-            $query->where('created_at', '<=', $request->input('date_to') . ' 23:59:59');
+        if ($request->filled('to')) {
+            $query->where('created_at', '<=', $request->input('to') . ' 23:59:59');
+        }
+        if ($request->filled('q')) {
+            $q = '%' . $request->input('q') . '%';
+            $query->where(function ($qry) use ($q) {
+                $qry->whereRaw("metadata::text ILIKE ?", [$q]);
+            });
         }
 
         $perPage = min((int) $request->input('per_page', 15), 100);
         $paginator = $query->paginate($perPage);
 
-        $items = $paginator->getCollection()->map(fn (AuditLog $log) => [
+        $items = $paginator->getCollection()->map(fn (IdentityAuditLog $log) => [
             'id' => $log->id,
+            'created_at' => $log->created_at?->toIso8601String(),
+            'actor' => $log->actor ? [
+                'id' => $log->actor->id,
+                'email' => $log->actor->email,
+                'name' => $log->actor->name,
+            ] : null,
+            'action' => $log->action,
+            'metadata' => $log->metadata,
+            'ip' => $log->ip,
+            'user_agent' => $log->user_agent,
             'tenant_id' => $log->tenant_id,
             'tenant_name' => $log->tenant?->name,
-            'entity_type' => $log->entity_type,
-            'entity_id' => $log->entity_id,
-            'action' => $log->action,
-            'user_id' => $log->user_id,
-            'user_email' => $log->user_email,
-            'actor_name' => $log->user?->name,
-            'metadata' => $log->metadata,
-            'created_at' => $log->created_at?->toIso8601String(),
         ]);
 
         return response()->json([

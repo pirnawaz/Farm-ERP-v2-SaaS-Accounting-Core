@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Tenant extends Model
 {
@@ -18,6 +19,7 @@ class Tenant extends Model
 
     protected $fillable = [
         'name',
+        'slug',
         'status',
         'currency_code',
         'locale',
@@ -30,6 +32,23 @@ class Tenant extends Model
         'created_at' => 'datetime',
         'settings' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Tenant $tenant) {
+            if (empty($tenant->slug) && !empty($tenant->name)) {
+                $base = Str::slug($tenant->name);
+                $base = $base ?: 'tenant';
+                $slug = $base;
+                $n = 2;
+                while (static::where('slug', $slug)->exists()) {
+                    $slug = $base . '-' . $n;
+                    $n++;
+                }
+                $tenant->slug = substr($slug, 0, 100);
+            }
+        });
+    }
 
     public function farm(): HasOne
     {

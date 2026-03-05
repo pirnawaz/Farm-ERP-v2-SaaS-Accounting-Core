@@ -6,11 +6,14 @@ class DevIdentity
 {
     /**
      * Whether header-based identity (X-User-Id, X-User-Role) is allowed.
-     * Allowed when APP_ENV is local/testing, or when DEV_IDENTITY_ENABLED=true.
-     * In production with DEV_IDENTITY_ENABLED=false, header-only requests must fail.
+     * In production, always false (dev identity headers are never trusted).
+     * In local/testing, always true. Otherwise follows DEV_IDENTITY_ENABLED.
      */
     public static function isAllowed(): bool
     {
+        if (app()->environment('production')) {
+            return false;
+        }
         if (app()->environment('local', 'testing')) {
             return true;
         }

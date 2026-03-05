@@ -9,7 +9,6 @@ import { CropCycleScopeProvider } from '../contexts/CropCycleScopeContext';
 import { BrandLogo } from './BrandLogo';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingChecklist } from './OnboardingChecklist';
-import { ImpersonationBanner } from './ImpersonationBanner';
 import { CropCycleScopeSelector } from './CropCycleScopeSelector';
 import type { UserRole } from '../types';
 import { term } from '../config/terminology';
@@ -125,6 +124,7 @@ function getNavigationGroups(showOrchards: boolean, showLivestock: boolean): Nav
       { name: 'Farm Profile', href: '/app/admin/farm', roles: ['tenant_admin'] },
       { name: 'Users', href: '/app/admin/users', roles: ['tenant_admin'] },
       { name: 'Roles', href: '/app/admin/roles', roles: ['tenant_admin'] },
+      { name: 'Audit Logs', href: '/app/admin/audit-logs', roles: ['tenant_admin'] },
       { name: 'Modules', href: '/app/admin/modules', roles: ['tenant_admin'] },
       { name: 'Farm Integrity', href: '/app/internal/farm-integrity', roles: ['tenant_admin'] },
       { name: 'Localisation', href: '/app/settings/localisation', roles: ['tenant_admin'] },
@@ -331,7 +331,6 @@ export function AppLayout() {
   return (
     <CropCycleScopeProvider tenantId={tenantId}>
     <div className="min-h-screen bg-gray-50" data-testid="app-shell">
-      <ImpersonationBanner enabled={isTenantApp} />
       {/* Readiness marker for E2E: state encoded in data-state (loading | error | ready) */}
       <div
         data-testid="modules-ready"

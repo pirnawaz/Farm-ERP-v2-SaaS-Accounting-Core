@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\AuditLog;
+use App\Models\IdentityAuditLog;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,36 +28,46 @@ class PlatformAuditLogTest extends TestCase
     }
 
     /** @test */
-    public function platform_admin_can_list_audit_logs_with_filters(): void
+    public function platform_admin_can_list_identity_audit_logs_with_filters(): void
     {
         $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
         $user = User::create([
             'tenant_id' => $tenant->id,
-            'name' => 'Platform',
+            'name' => 'Admin',
             'email' => 'p@test.test',
+            'password' => null,
+            'role' => 'tenant_admin',
+            'is_enabled' => true,
+        ]);
+
+        IdentityAuditLog::create([
+            'tenant_id' => $tenant->id,
+            'actor_user_id' => $user->id,
+            'action' => IdentityAuditLog::ACTION_TENANT_LOGIN_SUCCESS,
+            'metadata' => ['email' => $user->email],
+            'ip' => '127.0.0.1',
+            'user_agent' => 'Test',
+        ]);
+
+        $platformUser = User::create([
+            'tenant_id' => null,
+            'name' => 'Platform',
+            'email' => 'platform@test.test',
             'password' => null,
             'role' => 'platform_admin',
             'is_enabled' => true,
         ]);
 
-        AuditLog::create([
-            'tenant_id' => $tenant->id,
-            'entity_type' => 'Sale',
-            'entity_id' => (string) \Illuminate\Support\Str::uuid(),
-            'action' => 'POST',
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-            'metadata' => null,
-        ]);
-
-        $r = $this->withHeaders($this->platformAdminHeaders($user->id))
+        $r = $this->withHeaders($this->platformAdminHeaders($platformUser->id))
             ->getJson('/api/platform/audit-logs');
 
         $r->assertStatus(200);
         $r->assertJsonStructure(['data', 'meta' => ['current_page', 'last_page', 'per_page', 'total']]);
         $this->assertCount(1, $r->json('data'));
-        $this->assertSame('POST', $r->json('data.0.action'));
-        $this->assertSame('Sale', $r->json('data.0.entity_type'));
+        $this->assertSame(IdentityAuditLog::ACTION_TENANT_LOGIN_SUCCESS, $r->json('data.0.action'));
+        $this->assertArrayHasKey('actor', $r->json('data.0'));
+        $this->assertSame($user->id, $r->json('data.0.actor.id'));
+        $this->assertSame('127.0.0.1', $r->json('data.0.ip'));
     }
 
     /** @test */
@@ -66,31 +76,29 @@ class PlatformAuditLogTest extends TestCase
         $t1 = Tenant::create(['name' => 'T1', 'status' => 'active']);
         $t2 = Tenant::create(['name' => 'T2', 'status' => 'active']);
         $platformUser = User::create([
-            'tenant_id' => $t1->id,
+            'tenant_id' => null,
             'name' => 'Platform',
             'email' => 'p@test.test',
             'password' => null,
             'role' => 'platform_admin',
             'is_enabled' => true,
         ]);
-        $uid = (string) \Illuminate\Support\Str::uuid();
-        AuditLog::create([
+
+        IdentityAuditLog::create([
             'tenant_id' => $t1->id,
-            'entity_type' => 'Sale',
-            'entity_id' => $uid,
-            'action' => 'POST',
-            'user_id' => $platformUser->id,
-            'user_email' => $platformUser->email,
-            'metadata' => null,
+            'actor_user_id' => $platformUser->id,
+            'action' => IdentityAuditLog::ACTION_INVITATION_CREATED,
+            'metadata' => ['invite_email' => 'a@t1.test'],
+            'ip' => null,
+            'user_agent' => null,
         ]);
-        AuditLog::create([
+        IdentityAuditLog::create([
             'tenant_id' => $t2->id,
-            'entity_type' => 'Payment',
-            'entity_id' => (string) \Illuminate\Support\Str::uuid(),
-            'action' => 'POST',
-            'user_id' => $platformUser->id,
-            'user_email' => $platformUser->email,
-            'metadata' => null,
+            'actor_user_id' => $platformUser->id,
+            'action' => IdentityAuditLog::ACTION_INVITATION_CREATED,
+            'metadata' => ['invite_email' => 'b@t2.test'],
+            'ip' => null,
+            'user_agent' => null,
         ]);
 
         $r = $this->withHeaders($this->platformAdminHeaders($platformUser->id))
@@ -99,7 +107,7 @@ class PlatformAuditLogTest extends TestCase
         $r->assertStatus(200);
         $this->assertCount(1, $r->json('data'));
         $this->assertSame($t2->id, $r->json('data.0.tenant_id'));
-        $this->assertSame('Payment', $r->json('data.0.entity_type'));
+        $this->assertSame('b@t2.test', $r->json('data.0.metadata.invite_email'));
     }
 
     /** @test */
@@ -107,7 +115,7 @@ class PlatformAuditLogTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
         $user = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform',
             'email' => 'p@test.test',
             'password' => null,
@@ -115,14 +123,13 @@ class PlatformAuditLogTest extends TestCase
             'is_enabled' => true,
         ]);
         for ($i = 0; $i < 5; $i++) {
-            AuditLog::create([
+            IdentityAuditLog::create([
                 'tenant_id' => $tenant->id,
-                'entity_type' => 'Sale',
-                'entity_id' => (string) \Illuminate\Support\Str::uuid(),
-                'action' => 'POST',
-                'user_id' => $user->id,
-                'user_email' => $user->email,
+                'actor_user_id' => $user->id,
+                'action' => IdentityAuditLog::ACTION_TENANT_LOGIN_SUCCESS,
                 'metadata' => null,
+                'ip' => null,
+                'user_agent' => null,
             ]);
         }
 

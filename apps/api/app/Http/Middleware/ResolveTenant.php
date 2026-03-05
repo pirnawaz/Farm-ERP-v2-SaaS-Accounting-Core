@@ -2,62 +2,57 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\TenantResolver;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class ResolveTenant
 {
+    public function __construct(
+        protected TenantResolver $resolver
+    ) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         \App\Services\TenantContext::clear();
 
-        // Skip tenant check for health endpoint
         if ($request->is('api/health')) {
             return $next($request);
         }
-        
-        // Skip tenant check for dev endpoints
         if ($request->is('api/dev/*')) {
             return $next($request);
         }
-
-        // Skip tenant check for platform admin endpoints
         if ($request->is('api/platform/*')) {
             return $next($request);
         }
-
-        // Skip tenant check for auth set-password-with-token (no tenant context)
-        if ($request->is('api/auth/set-password-with-token')) {
+        if ($request->is('api/auth/set-password-with-token') || $request->is('api/auth/accept-invite')) {
             return $next($request);
         }
-        
-        $tenantId = $request->header('X-Tenant-Id');
-        
-        if (!$tenantId) {
-            return response()->json([
-                'error' => 'X-Tenant-Id header is required'
-            ], 400);
-        }
-        
-        // Validate UUID format
-        if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $tenantId)) {
-            return response()->json([
-                'error' => 'X-Tenant-Id must be a valid UUID'
-            ], 400);
-        }
-        
-        // Verify tenant exists (active/suspended enforced by EnsureTenantActive)
-        $tenant = \App\Models\Tenant::find($tenantId);
+
+        $tenant = $this->resolver->resolve($request);
+
         if (!$tenant) {
-            return response()->json([
-                'error' => 'Tenant not found'
-            ], 404);
+            $hasIdentifier = $request->header('X-Tenant-Id') || $request->header('X-Tenant-Slug') || $this->hasSubdomainSlug($request);
+            if ($hasIdentifier) {
+                return response()->json(['error' => 'Tenant not found'], 404);
+            }
+            return response()->json(['error' => 'Tenant identifier required. Send X-Tenant-Id or X-Tenant-Slug.'], 422);
         }
 
-        // Attach tenant_id to request attributes for use in controllers and downstream middleware
-        $request->attributes->set('tenant_id', $tenantId);
-        
+        $request->attributes->set('tenant_id', $tenant->id);
         return $next($request);
+    }
+
+    private function hasSubdomainSlug(Request $request): bool
+    {
+        $host = $request->header('Host');
+        $rootDomain = config('app.root_domain');
+        if (!$host || !$rootDomain || !is_string($rootDomain) || trim($rootDomain) === '') {
+            return false;
+        }
+        $suffix = '.' . strtolower(trim($rootDomain));
+        $host = strtolower(trim($host));
+        return $host !== $rootDomain && str_ends_with($host, $suffix) && substr($host, 0, -strlen($suffix)) !== '';
     }
 }

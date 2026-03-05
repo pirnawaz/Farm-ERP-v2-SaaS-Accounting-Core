@@ -1,26 +1,63 @@
-import { useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useState, useCallback, useMemo } from 'react';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlatformTenant, useUpdatePlatformTenant } from '../../hooks/usePlatformTenants';
-import { useStartImpersonation } from '../../hooks/useImpersonation';
 import { useTenant } from '../../hooks/useTenant';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { useFormatting } from '../../hooks/useFormatting';
 import { platformApi, type PlatformTenantModuleItem } from '../../api/platform';
+import { useImpersonation, IMPERSONATION_STATUS_UI_QUERY_KEY } from '../../hooks/useImpersonation';
+import { getApiErrorMessage } from '../../utils/api';
 import toast from 'react-hot-toast';
 import type { UpdatePlatformTenantPayload } from '../../types';
 
+const IMPERSONATION_RETURN_TO_KEY = 'impersonation.return_to';
+
 export default function PlatformTenantDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { setTenantId } = useTenant();
   const { data: tenant, isLoading, error } = usePlatformTenant(id || null);
   const updateMutation = useUpdatePlatformTenant();
-  const startImpersonation = useStartImpersonation();
   const { formatDate } = useFormatting();
+
+  const { data: usersData, isLoading: usersLoading } = useQuery({
+    queryKey: ['platformTenantUsers', id],
+    queryFn: () => platformApi.getTenantUsers(id!),
+    enabled: !!id,
+  });
+
+  const users = usersData?.users ?? [];
+  const enabledUsers = useMemo(() => users.filter((u) => u.is_enabled), [users]);
+  const defaultUserId = useMemo(() => {
+    const admin = users.find((u) => u.role === 'tenant_admin' && u.is_enabled);
+    if (admin) return admin.id;
+    return enabledUsers[0]?.id ?? null;
+  }, [users, enabledUsers]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const effectiveUserId = selectedUserId || defaultUserId;
+
+  const { isImpersonating, stop: stopImpersonation, forceStop: forceStopImpersonation, status: impersonationStatus } = useImpersonation(true);
+  const [stopImpersonationFailed, setStopImpersonationFailed] = useState(false);
+
+  const impersonateMutation = useMutation({
+    mutationFn: ({ tenantId, userId }: { tenantId: string; userId?: string }) =>
+      platformApi.impersonateTenant(tenantId, userId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['platform', 'impersonation'] });
+      queryClient.invalidateQueries({ queryKey: IMPERSONATION_STATUS_UI_QUERY_KEY });
+      const userName = variables.userId ? users.find((u) => u.id === variables.userId)?.name : tenant?.name;
+      toast.success(`Now impersonating ${userName ?? 'tenant'}`);
+      navigate('/app/dashboard');
+    },
+  });
+  const storeReturnTo = useCallback(() => {
+    sessionStorage.setItem(IMPERSONATION_RETURN_TO_KEY, location.pathname);
+  }, [location.pathname]);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<UpdatePlatformTenantPayload>({});
@@ -28,6 +65,80 @@ export default function PlatformTenantDetailPage() {
   const [resetPasswordMode, setResetPasswordMode] = useState<'token' | 'direct'>('token');
   const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [resetTokenResult, setResetTokenResult] = useState<string | null>(null);
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteLockInitialAdmin, setInviteLockInitialAdmin] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: '', role: 'operator' as 'tenant_admin' | 'accountant' | 'operator' });
+  const [inviteResult, setInviteResult] = useState<{
+    invite_link: string;
+    expires_in_hours: number;
+    email: string;
+    role: string;
+  } | null>(null);
+
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({ name: '', email: '', role: 'operator' as 'tenant_admin' | 'accountant' | 'operator' });
+  const [createUserResult, setCreateUserResult] = useState<{ user: { name: string; email: string }; temporary_password: string } | null>(null);
+  const createUserMutation = useMutation({
+    mutationFn: (payload: { name: string; email: string; role: 'tenant_admin' | 'accountant' | 'operator' }) =>
+      platformApi.createTenantUser(id!, payload),
+    onSuccess: (data) => {
+      setCreateUserResult({ user: data.user, temporary_password: data.temporary_password });
+      queryClient.invalidateQueries({ queryKey: ['platformTenantUsers', id] });
+    },
+    onError: (e: Error) => {
+      toast.error(e?.message ?? 'Failed to create user');
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: (payload: { userId: string; role?: 'tenant_admin' | 'accountant' | 'operator'; is_enabled?: boolean }) => {
+      const body = { role: payload.role, is_enabled: payload.is_enabled };
+      if (import.meta.env.DEV) {
+        console.log('[PlatformTenantDetail] updateUser', { userId: payload.userId, payload: body });
+      }
+      return platformApi.updateTenantUser(id!, payload.userId, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platformTenantUsers', id] });
+      toast.success('User updated');
+    },
+    onError: (e: unknown) => {
+      const msg = getApiErrorMessage(e, 'Failed to update user');
+      toast.error(msg);
+    },
+  });
+
+  const lastEnabledAdminId = useMemo(() => {
+    const admins = users.filter((u) => u.role === 'tenant_admin' && u.is_enabled);
+    return admins.length === 1 ? admins[0].id : null;
+  }, [users]);
+
+  const platformInviteMutation = useMutation({
+    mutationFn: (payload: { email: string; role?: 'tenant_admin' | 'accountant' | 'operator' }) =>
+      platformApi.platformInviteTenantUser(id!, payload),
+    onSuccess: (data) => {
+      setInviteResult({
+        invite_link: data.invite_link,
+        expires_in_hours: data.expires_in_hours,
+        email: data.email,
+        role: data.role,
+      });
+      queryClient.invalidateQueries({ queryKey: ['platformTenantUsers', id] });
+    },
+    onError: (e: Error) => {
+      const msg = e?.message ?? '';
+      if (msg.includes('already exists') || msg.includes('User already exists')) {
+        toast.error('User already exists in this tenant.');
+      } else if (msg.includes('platform admin') || msg.includes('Cannot invite')) {
+        toast.error(msg);
+      } else if (msg.includes('Too many') || msg.includes('429')) {
+        toast.error(msg || 'Too many attempts. Try again later.');
+      } else {
+        toast.error(msg || 'Failed to create invitation');
+      }
+    },
+  });
 
   const { data: modulesData, isLoading: modulesLoading } = useQuery({
     queryKey: ['platformTenantModules', id],
@@ -141,29 +252,150 @@ export default function PlatformTenantDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{tenant.name}</h1>
           <p className="text-sm text-gray-500 mt-1">Tenant ID: {tenant.id}</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await startImpersonation.mutateAsync({ tenantId: tenant.id });
-                setTenantId(tenant.id);
-                toast.success(`Impersonating ${tenant.name}`);
-                navigate('/app/dashboard');
-              } catch (e) {
-                toast.error((e as Error)?.message || 'Failed to start impersonation');
-              }
-            }}
-            disabled={startImpersonation.isPending}
-            className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
-            data-testid="impersonate-tenant-detail"
-          >
-            Impersonate
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {usersLoading ? (
+            <span className="text-sm text-gray-500">Loading users…</span>
+          ) : users.length === 0 ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <span>No users exist in this tenant yet.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setInviteLockInitialAdmin(true);
+                  setInviteForm({ email: '', role: 'tenant_admin' });
+                  setInviteResult(null);
+                  setInviteOpen(true);
+                }}
+                className="px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 font-medium"
+                data-testid="invite-initial-admin"
+              >
+                Invite initial admin
+              </button>
+              <span>or</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetTokenResult(null);
+                  setResetPasswordValue('');
+                  setResetPasswordOpen(true);
+                }}
+                className="font-medium text-amber-700 underline hover:no-underline"
+              >
+                Reset admin password
+              </button>
+            </div>
+          ) : (
+            <>
+              {isImpersonating ? (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm text-amber-800">
+                    Impersonating {impersonationStatus?.user?.email ?? 'user'} in {impersonationStatus?.tenant?.name ?? tenant.name}
+                  </span>
+                  {stopImpersonationFailed && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setStopImpersonationFailed(false);
+                        try {
+                          await forceStopImpersonation();
+                          queryClient.invalidateQueries({ queryKey: IMPERSONATION_STATUS_UI_QUERY_KEY });
+                          queryClient.invalidateQueries({ queryKey: ['platformTenantUsers', id] });
+                          toast.success('Stopped impersonation');
+                        } catch (e: unknown) {
+                          toast.error((e as Error)?.message ?? 'Force stop failed');
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium"
+                      data-testid="force-stop-impersonation-tenant-detail"
+                    >
+                      Force stop
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setStopImpersonationFailed(false);
+                      try {
+                        await stopImpersonation(impersonationStatus?.tenant?.id);
+                        queryClient.invalidateQueries({ queryKey: IMPERSONATION_STATUS_UI_QUERY_KEY });
+                        queryClient.invalidateQueries({ queryKey: ['platformTenantUsers', id] });
+                        toast.success('Stopped impersonation');
+                      } catch {
+                        setStopImpersonationFailed(true);
+                        toast.error('Stop failed. Try "Force stop".');
+                      }
+                    }}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 font-medium"
+                    data-testid="stop-impersonation-tenant-detail"
+                  >
+                    Stop impersonation
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <span>Impersonate as</span>
+                    <select
+                      value={effectiveUserId ?? ''}
+                      onChange={(e) => setSelectedUserId(e.target.value || null)}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                      data-testid="impersonate-user-select"
+                    >
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id} disabled={!u.is_enabled}>
+                          {u.name} ({u.email}) {u.role !== 'tenant_admin' ? ` · ${u.role}` : ''}
+                          {!u.is_enabled ? ' · disabled' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!effectiveUserId) return;
+                      try {
+                        storeReturnTo();
+                        await impersonateMutation.mutateAsync({
+                          tenantId: tenant.id,
+                          userId: effectiveUserId,
+                        });
+                        setTenantId(tenant.id);
+                      } catch (e: unknown) {
+                        const msg = (e as Error)?.message ?? '';
+                        if (msg.includes('impersonation_nesting_not_allowed') || msg.includes('Already impersonating')) {
+                          toast.error("Already impersonating. Click 'Stop impersonation' first.");
+                        } else if (msg.includes('No users exist') || msg.includes('no_users_to_impersonate')) {
+                          toast.error('No users exist in this tenant to impersonate. Use Reset admin password below to set access.');
+                        } else {
+                          toast.error(msg || 'Failed to start impersonation');
+                        }
+                      }
+                    }}
+                    disabled={
+                      impersonateMutation.isPending ||
+                      !effectiveUserId ||
+                      !users.find((u) => u.id === effectiveUserId)?.is_enabled
+                    }
+                    className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
+                    data-testid="impersonate-tenant-detail"
+                  >
+                    Impersonate
+                  </button>
+                </>
+              )}
+            </>
+          )}
           <button
             type="button"
             onClick={() => {
-              setEditForm({ name: tenant.name, status: tenant.status, plan_key: tenant.plan_key ?? undefined });
+              setEditForm({
+                name: tenant.name,
+                slug: tenant.slug ?? undefined,
+                plan_key: tenant.plan_key ?? undefined,
+                currency_code: tenant.currency_code,
+                locale: tenant.locale,
+                timezone: tenant.timezone,
+              });
               setEditOpen(true);
             }}
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
@@ -194,6 +426,12 @@ export default function PlatformTenantDetailPage() {
                 </span>
               </dd>
             </div>
+            {tenant.slug != null && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Slug</dt>
+                <dd className="mt-1 text-sm text-gray-900 font-mono">{tenant.slug}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-sm font-medium text-gray-500">Plan</dt>
               <dd className="mt-1 text-sm text-gray-900">{tenant.plan_key || '—'}</dd>
@@ -250,10 +488,119 @@ export default function PlatformTenantDetailPage() {
           </div>
         )}
 
+        {/* Users */}
+        <div className="bg-white rounded-lg shadow p-6 md:col-span-2">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Users</h2>
+            {updateUserMutation.isPending && (
+              <span className="text-sm text-amber-700 font-medium">Saving…</span>
+            )}
+          </div>
+          {isImpersonating && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+              Stop impersonation to manage users from the platform.
+            </p>
+          )}
+          {usersLoading ? (
+            <div className="flex justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : users.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4">No users yet. Invite initial admin to get started.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {users.map((u) => {
+                    const isLastEnabledAdmin = lastEnabledAdminId === u.id;
+                    const cannotChange = isLastEnabledAdmin || isImpersonating;
+                    return (
+                      <tr key={u.id}>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{u.name}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{u.email}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <select
+                            value={u.role}
+                            disabled={cannotChange || updateUserMutation.isPending}
+                            title={isImpersonating ? 'Stop impersonation to manage users.' : isLastEnabledAdmin ? 'Cannot remove the last tenant admin.' : undefined}
+                            onChange={(e) => {
+                              const newRole = e.target.value as 'tenant_admin' | 'accountant' | 'operator';
+                              if (newRole !== u.role) {
+                                updateUserMutation.mutate({ userId: u.id, role: newRole });
+                              }
+                            }}
+                            className="rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <option value="tenant_admin">tenant_admin</option>
+                            <option value="accountant">accountant</option>
+                            <option value="operator">operator</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <label className="flex items-center gap-2" title={isImpersonating ? 'Stop impersonation to manage users.' : isLastEnabledAdmin ? 'Cannot remove the last tenant admin.' : undefined}>
+                            <input
+                              type="checkbox"
+                              checked={u.is_enabled}
+                              disabled={cannotChange || updateUserMutation.isPending}
+                              onChange={(e) => {
+                                if (cannotChange) return;
+                                updateUserMutation.mutate({ userId: u.id, is_enabled: e.target.checked });
+                              }}
+                              className="rounded border-gray-300 text-[#1F6F5C] focus:ring-[#1F6F5C] disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                            <span className={`text-xs font-semibold ${u.is_enabled ? 'text-green-800' : 'text-gray-600'}`}>
+                              {u.is_enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </label>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{formatDate(u.created_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         {/* Support actions */}
         <div className="bg-white rounded-lg shadow p-6 md:col-span-2">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Support actions</h2>
           <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setInviteLockInitialAdmin(false);
+                setInviteForm({ email: '', role: 'operator' });
+                setInviteResult(null);
+                setInviteOpen(true);
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+              data-testid="invite-user"
+            >
+              Invite user
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreateUserForm({ name: '', email: '', role: 'operator' });
+                setCreateUserResult(null);
+                setCreateUserOpen(true);
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+              data-testid="create-user"
+            >
+              Create user
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -452,7 +799,7 @@ export default function PlatformTenantDetailPage() {
         )}
       </Modal>
 
-      {/* Edit Modal */}
+      {/* Edit Modal — name, slug, timezone, locale, currency, plan. Status (archive/suspend) is in Support actions. */}
       <Modal isOpen={editOpen} onClose={() => { setEditOpen(false); setEditForm({}); }} title="Edit tenant" size="md">
         <form onSubmit={handleUpdate} className="space-y-4">
           <FormField label="Name">
@@ -463,16 +810,45 @@ export default function PlatformTenantDetailPage() {
               className="w-full border border-gray-300 rounded-md px-3 py-2"
             />
           </FormField>
-          <FormField label="Status">
-            <select
-              value={editForm.status ?? tenant.status}
-              onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'active' | 'suspended' | 'archived' })}
+          <FormField label="Slug">
+            <input
+              type="text"
+              value={editForm.slug ?? tenant.slug ?? ''}
+              onChange={(e) => setEditForm({ ...editForm, slug: e.target.value || undefined })}
+              placeholder="e.g. acme-farm"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 font-mono text-sm"
+            />
+            <p className="mt-1 text-xs text-amber-700">
+              Lowercase, hyphens only. Changing slug affects subdomain login.
+            </p>
+          </FormField>
+          <FormField label="Timezone">
+            <input
+              type="text"
+              value={editForm.timezone ?? tenant.timezone}
+              onChange={(e) => setEditForm({ ...editForm, timezone: e.target.value })}
+              placeholder="e.g. Europe/London"
               className="w-full border border-gray-300 rounded-md px-3 py-2"
-            >
-              <option value="active">active</option>
-              <option value="suspended">suspended</option>
-              <option value="archived">archived</option>
-            </select>
+            />
+          </FormField>
+          <FormField label="Locale">
+            <input
+              type="text"
+              value={editForm.locale ?? tenant.locale}
+              onChange={(e) => setEditForm({ ...editForm, locale: e.target.value })}
+              placeholder="e.g. en-GB"
+              className="w-full border border-gray-300 rounded-md px-3 py-2"
+            />
+          </FormField>
+          <FormField label="Currency">
+            <input
+              type="text"
+              value={editForm.currency_code ?? tenant.currency_code}
+              onChange={(e) => setEditForm({ ...editForm, currency_code: e.target.value })}
+              placeholder="e.g. GBP"
+              className="w-full border border-gray-300 rounded-md px-3 py-2"
+              maxLength={10}
+            />
           </FormField>
           <FormField label="Plan">
             <select
@@ -503,6 +879,214 @@ export default function PlatformTenantDetailPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Invite user / Invite initial admin modal */}
+      <Modal
+        isOpen={inviteOpen}
+        onClose={() => {
+          setInviteOpen(false);
+          setInviteResult(null);
+        }}
+        title={inviteLockInitialAdmin ? 'Invite initial admin' : 'Invite user'}
+        size="md"
+      >
+        {inviteResult ? (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Share this link with <strong>{inviteResult.email}</strong> (role: {inviteResult.role}). Expires in {inviteResult.expires_in_hours} hours.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={inviteResult.invite_link}
+                className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-50 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(inviteResult.invite_link);
+                  toast.success('Link copied');
+                }}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setInviteOpen(false);
+                  setInviteResult(null);
+                }}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const email = inviteForm.email.trim();
+              if (!email) return;
+              platformInviteMutation.mutate({
+                email,
+                role: inviteLockInitialAdmin ? 'tenant_admin' : inviteForm.role,
+              });
+            }}
+            className="space-y-4"
+          >
+            <FormField label="Email">
+              <input
+                type="email"
+                value={inviteForm.email}
+                onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                placeholder="user@example.com"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </FormField>
+            <FormField label="Role">
+              {inviteLockInitialAdmin ? (
+                <input type="text" readOnly value="tenant_admin" className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50" />
+              ) : (
+                <select
+                  value={inviteForm.role}
+                  onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value as 'tenant_admin' | 'accountant' | 'operator' })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                >
+                  <option value="tenant_admin">tenant_admin</option>
+                  <option value="accountant">accountant</option>
+                  <option value="operator">operator</option>
+                </select>
+              )}
+            </FormField>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setInviteOpen(false); setInviteResult(null); }}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={platformInviteMutation.isPending || !inviteForm.email.trim()}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+              >
+                {platformInviteMutation.isPending ? 'Creating...' : 'Create invitation'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Create user modal (platform) */}
+      <Modal
+        isOpen={createUserOpen}
+        onClose={() => { setCreateUserOpen(false); setCreateUserResult(null); }}
+        title="Create user"
+        size="md"
+      >
+        {createUserResult ? (
+          <div className="space-y-4">
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
+              This password is shown only once. Share it securely with {createUserResult.user.name}. They must change it on first login.
+            </p>
+            <FormField label="Temporary password">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={createUserResult.temporary_password}
+                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono bg-gray-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createUserResult.temporary_password);
+                    toast.success('Copied');
+                  }}
+                  className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+                >
+                  Copy
+                </button>
+              </div>
+            </FormField>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setCreateUserOpen(false); setCreateUserResult(null); }}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!createUserForm.name.trim() || !createUserForm.email.trim()) return;
+              createUserMutation.mutate({
+                name: createUserForm.name.trim(),
+                email: createUserForm.email.trim(),
+                role: createUserForm.role,
+              });
+            }}
+            className="space-y-4"
+          >
+            <FormField label="Name" required>
+              <input
+                type="text"
+                value={createUserForm.name}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, name: e.target.value })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </FormField>
+            <FormField label="Email" required>
+              <input
+                type="email"
+                value={createUserForm.email}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </FormField>
+            <FormField label="Role" required>
+              <select
+                value={createUserForm.role}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, role: e.target.value as 'tenant_admin' | 'accountant' | 'operator' })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+              >
+                <option value="tenant_admin">tenant_admin</option>
+                <option value="accountant">accountant</option>
+                <option value="operator">operator</option>
+              </select>
+            </FormField>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setCreateUserOpen(false); setCreateUserResult(null); }}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createUserMutation.isPending}
+                className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+              >
+                {createUserMutation.isPending ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

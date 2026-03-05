@@ -1,9 +1,10 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ModuleProtectedRoute } from './components/ModuleProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import { AppLanding } from './components/AppLanding';
 import LoginPage from './pages/LoginPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
 import DashboardPage from './pages/DashboardPage';
 import FarmPulsePage from './pages/FarmPulsePage';
 import CashDrilldownPage from './pages/farmPulse/CashDrilldownPage';
@@ -126,20 +127,30 @@ import ModuleTogglePage from './pages/ModuleTogglePage';
 import AdminFarmProfilePage from './pages/AdminFarmProfilePage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminRolesPage from './pages/AdminRolesPage';
+import TenantAuditLogsPage from './pages/TenantAuditLogsPage';
 import FarmIntegrityPage from './pages/internal/FarmIntegrityPage';
 import ReviewQueuePage from './pages/ReviewQueuePage';
 import PlatformTenantsPage from './pages/PlatformTenantsPage';
 import PlatformTenantDetailPage from './pages/platform/PlatformTenantDetailPage';
 import PlatformAuditLogsPage from './pages/platform/PlatformAuditLogsPage';
+import SetPasswordPage from './pages/SetPasswordPage';
 import PostingGroupDetailPage from './pages/PostingGroupDetailPage';
 import { ModulesProvider } from './contexts/ModulesContext';
 import { PlatformLayout } from './components/PlatformLayout';
 import { PlatformAdminRoute } from './components/PlatformAdminRoute';
+import { TenantAreaRoute } from './components/TenantAreaRoute';
+import { ImpersonationBanner } from './components/ImpersonationBanner';
 
 function App() {
+  const location = useLocation();
+  const showImpersonationBanner = location.pathname.startsWith('/app');
+
   return (
-    <Routes>
+    <>
+      <ImpersonationBanner enabled={showImpersonationBanner} />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route
         path="/app/platform"
         element={
@@ -159,13 +170,16 @@ function App() {
         path="/app"
         element={
           <ProtectedRoute>
-            <ModulesProvider>
-              <AppLayout />
-            </ModulesProvider>
+            <TenantAreaRoute>
+              <ModulesProvider>
+                <AppLayout />
+              </ModulesProvider>
+            </TenantAreaRoute>
           </ProtectedRoute>
         }
       >
         <Route index element={<AppLanding />} />
+        <Route path="set-password" element={<SetPasswordPage />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="farm-pulse" element={<FarmPulsePage />} />
         <Route path="farm-pulse/cash" element={<CashDrilldownPage />} />
@@ -297,12 +311,14 @@ function App() {
         <Route path="admin/farm" element={<AdminFarmProfilePage />} />
         <Route path="admin/users" element={<AdminUsersPage />} />
         <Route path="admin/roles" element={<AdminRolesPage />} />
+        <Route path="admin/audit-logs" element={<TenantAuditLogsPage />} />
         <Route path="admin/modules" element={<ModuleTogglePage />} />
         <Route path="internal/farm-integrity" element={<FarmIntegrityPage />} />
         <Route path="review-queue" element={<ReviewQueuePage />} />
       </Route>
       <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
+    </>
   );
 }
 

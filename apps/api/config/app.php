@@ -9,6 +9,9 @@ return [
     'env' => env('APP_ENV', 'production'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'http://localhost'),
+    'root_domain' => env('APP_ROOT_DOMAIN'), // e.g. "app.example.com" for subdomain resolution: <slug>.app.example.com
+    'front_url' => env('APP_FRONT_URL', env('APP_URL', 'http://localhost')), // Base URL for invite links (SPA)
+    'invitation_ttl_hours' => (int) env('INVITATION_TTL_HOURS', 168),
     'timezone' => env('APP_TIMEZONE', 'UTC'),
     'locale' => env('APP_LOCALE', 'en'),
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),

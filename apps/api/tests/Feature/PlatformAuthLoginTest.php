@@ -7,17 +7,18 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
+use Tests\Traits\MakesAuthenticatedRequests;
 
 class PlatformAuthLoginTest extends TestCase
 {
     use RefreshDatabase;
+    use MakesAuthenticatedRequests;
 
     /** @test */
     public function platform_login_works_without_x_tenant_id_for_platform_admin(): void
     {
-        $tenant = Tenant::create(['name' => 'Platform Tenant', 'status' => 'active']);
         $user = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform Admin',
             'email' => 'platform@test.test',
             'password' => Hash::make('secret'),
@@ -31,9 +32,8 @@ class PlatformAuthLoginTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJsonPath('role', 'platform_admin');
-        $response->assertJsonPath('is_platform_admin', true);
-        $response->assertJsonPath('tenant_id', null);
+        $response->assertJsonPath('user.role', 'platform_admin');
+        $response->assertJsonPath('tenant', null);
         $response->assertCookie('farm_erp_auth_token');
     }
 
@@ -73,9 +73,8 @@ class PlatformAuthLoginTest extends TestCase
     /** @test */
     public function platform_me_returns_is_platform_admin_without_tenant(): void
     {
-        $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
         $user = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform Admin',
             'email' => 'platform@test.test',
             'password' => Hash::make('secret'),
@@ -88,16 +87,13 @@ class PlatformAuthLoginTest extends TestCase
             'password' => 'secret',
         ]);
         $login->assertStatus(200);
-        $body = $login->json();
+        $this->assertNotEmpty($login->json('token'));
 
-        $me = $this->withHeaders([
-            'X-User-Id' => $body['user_id'],
-            'X-User-Role' => $body['role'],
-        ])->getJson('/api/platform/auth/me');
+        $me = $this->withAuthCookieFrom($login)->getJson('/api/platform/auth/me');
 
         $me->assertStatus(200);
-        $me->assertJsonPath('is_platform_admin', true);
-        $me->assertJsonPath('user_id', $user->id);
-        $me->assertJsonPath('email', 'platform@test.test');
+        $me->assertJsonPath('user.id', $user->id);
+        $me->assertJsonPath('user.email', 'platform@test.test');
+        $me->assertJsonPath('tenant', null);
     }
 }

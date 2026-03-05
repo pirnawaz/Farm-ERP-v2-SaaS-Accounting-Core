@@ -28,9 +28,31 @@ class EnvironmentValidationServiceProvider extends ServiceProvider
     {
         $this->validateEnvironment();
         $this->validateDatabaseConnection();
+        $this->warnProductionGuardrails();
 
         Gate::policy(LandLease::class, LandLeasePolicy::class);
         Gate::policy(LandLeaseAccrual::class, LandLeaseAccrualPolicy::class);
+    }
+
+    /**
+     * Log warnings when production has risky configuration (do not throw).
+     */
+    private function warnProductionGuardrails(): void
+    {
+        if (!app()->environment('production')) {
+            return;
+        }
+        if (config('app.debug') === true) {
+            Log::warning('Production guardrail: APP_DEBUG=true in production. Set APP_DEBUG=false.');
+        }
+        if (filter_var(env('DEV_IDENTITY_ENABLED'), FILTER_VALIDATE_BOOLEAN)) {
+            Log::warning('Production guardrail: DEV_IDENTITY_ENABLED is set in production. Dev identity headers are ignored when APP_ENV=production, but this env should be unset or false.');
+        }
+        $sessionDomain = env('SESSION_DOMAIN');
+        $rootDomain = config('app.root_domain');
+        if (!empty($sessionDomain) && (empty($rootDomain) || trim((string) $rootDomain) === '')) {
+            Log::warning('Production guardrail: SESSION_DOMAIN is set (subdomain cookie) but APP_ROOT_DOMAIN is missing. Set APP_ROOT_DOMAIN for tenant subdomain resolution.');
+        }
     }
 
     /**

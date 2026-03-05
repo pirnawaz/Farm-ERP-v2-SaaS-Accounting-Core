@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\AuthCookie;
+use App\Helpers\AuthToken;
 use App\Models\PasswordResetToken;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Services\IdentityAuditLogger;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Cookie;
+use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
@@ -25,44 +29,60 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
+        $email = strtolower(trim((string) $validated['email']));
 
-        $tenantId = $request->header('X-Tenant-Id') ?? TenantContext::getTenantId($request);
+        $tenantId = $request->attributes->get('tenant_id');
         if (!$tenantId) {
-            return response()->json(['error' => 'X-Tenant-Id header is required'], 400);
+            return response()->json(['error' => 'Tenant identifier required'], 422);
         }
 
-        $user = User::where('tenant_id', $tenantId)->where('email', $validated['email'])->first();
+        $user = User::where('tenant_id', $tenantId)->whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
 
         if (!$user) {
+            $platformUser = User::whereNull('tenant_id')->whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
+            if ($platformUser) {
+                IdentityAuditLogger::log(\App\Models\IdentityAuditLog::ACTION_TENANT_LOGIN_FAILURE, $tenantId, null, ['reason' => 'use_platform_login', 'email' => $email], $request);
+                return response()->json(['error' => 'Use platform admin login for this account'], 403);
+            }
+            IdentityAuditLogger::log(\App\Models\IdentityAuditLog::ACTION_TENANT_LOGIN_FAILURE, $tenantId, null, ['reason' => 'invalid_credentials', 'email' => $email], $request);
             return response()->json(['error' => 'Invalid credentials'], 401);
         }
 
         if (!$user->password || !Hash::check($validated['password'], $user->password)) {
+            IdentityAuditLogger::log(\App\Models\IdentityAuditLog::ACTION_TENANT_LOGIN_FAILURE, $tenantId, null, ['reason' => 'invalid_credentials', 'email' => $email], $request);
             return response()->json(['error' => 'Invalid credentials'], 401);
         }
 
+        if ($user->role === 'platform_admin' || $user->tenant_id === null) {
+            IdentityAuditLogger::log(\App\Models\IdentityAuditLog::ACTION_TENANT_LOGIN_FAILURE, $tenantId, null, ['reason' => 'use_platform_login', 'email' => $email], $request);
+            return response()->json(['error' => 'Use platform admin login for this account'], 403);
+        }
+
         if (!$user->is_enabled) {
+            IdentityAuditLogger::log(\App\Models\IdentityAuditLog::ACTION_TENANT_LOGIN_FAILURE, $tenantId, $user->id, ['reason' => 'user_disabled', 'email' => $email], $request);
             return response()->json(['error' => 'User is disabled'], 403);
         }
 
-        // Create a simple token (user_id:tenant_id:role signed)
-        $token = base64_encode(json_encode([
-            'user_id' => $user->id,
-            'tenant_id' => $user->tenant_id,
-            'role' => $user->role,
-            'email' => $user->email,
-            'expires_at' => now()->addDays(7)->timestamp,
-        ]));
+        $token = AuthToken::create($user, $user->tenant_id);
+        $cookie = AuthCookie::make($token);
+        $tenant = Tenant::find($user->tenant_id);
 
-        // Set httpOnly cookie; secure only when production or HTTPS (so staging over HTTP works)
-        $secure = config('app.env') === 'production' || str_starts_with(config('app.url'), 'https://');
-        $cookie = cookie('farm_erp_auth_token', $token, 60 * 24 * 7, '/', null, $secure, true); // 7 days, httpOnly=true
+        IdentityAuditLogger::log(\App\Models\IdentityAuditLog::ACTION_TENANT_LOGIN_SUCCESS, $tenantId, $user->id, ['email' => strtolower(trim($user->email ?? ''))], $request);
 
         return response()->json([
-            'user_id' => $user->id,
-            'role' => $user->role,
-            'tenant_id' => $user->tenant_id,
-            'email' => $user->email,
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'must_change_password' => (bool) $user->must_change_password,
+            ],
+            'tenant' => $tenant ? [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'slug' => $tenant->slug ?? null,
+            ] : null,
         ])->cookie($cookie);
     }
 
@@ -72,9 +92,77 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $secure = config('app.env') === 'production' || str_starts_with(config('app.url'), 'https://');
-        $cookie = cookie('farm_erp_auth_token', '', -1, '/', null, $secure, true); // expire, same flags as login
-        return response()->json(['message' => 'Logged out successfully'])->cookie($cookie);
+        return response()->json(['message' => 'Logged out successfully'])
+            ->cookie(AuthCookie::make('', true));
+    }
+
+    /**
+     * Logout everywhere: increment token_version (invalidates all existing tokens), then clear cookie.
+     * POST /api/auth/logout-all
+     */
+    public function logoutAll(Request $request): JsonResponse
+    {
+        $token = $request->cookie(AuthCookie::NAME);
+        if (app()->environment('testing')) {
+            $token = $token ?: $request->bearerToken();
+        }
+        $tenantId = $request->attributes->get('tenant_id');
+        $userId = null;
+        if ($token) {
+            $data = AuthToken::parse($token);
+            if ($data && !empty($data['user_id'])) {
+                $userId = $data['user_id'];
+                User::where('id', $userId)->increment('token_version');
+            }
+        }
+        if ($userId && $tenantId) {
+            IdentityAuditLogger::log(\App\Models\IdentityAuditLog::ACTION_TENANT_LOGOUT_ALL, $tenantId, $userId, [], $request);
+        }
+        return response()->json(['message' => 'Logged out from all devices'])
+            ->cookie(AuthCookie::make('', true));
+    }
+
+    /**
+     * Change password (tenant user). Updates password, last_password_change_at, increments token_version.
+     * POST /api/auth/change-password
+     * Body: { current_password, new_password }
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'confirmed', Password::defaults()],
+        ]);
+
+        $token = $request->cookie(AuthCookie::NAME);
+        if (app()->environment('testing')) {
+            $token = $token ?: $request->bearerToken();
+        }
+        if (!$token) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
+        $data = AuthToken::parse($token);
+        if (!$data || empty($data['user_id']) || ($data['tenant_id'] ?? null) === null) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
+
+        $user = User::find($data['user_id']);
+        if (!$user || !$user->is_enabled || $user->tenant_id === null) {
+            return response()->json(['error' => 'User not found or disabled'], 403);
+        }
+        if (!Hash::check($validated['current_password'], $user->password ?? '')) {
+            return response()->json(['error' => 'Current password is incorrect'], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($validated['new_password']),
+            'last_password_change_at' => now(),
+            'token_version' => $user->token_version + 1,
+        ]);
+
+        $newToken = AuthToken::create($user, $user->tenant_id);
+        return response()->json(['message' => 'Password changed. You have been signed in with a new session.'])
+            ->cookie(AuthCookie::make($newToken));
     }
 
     /**
@@ -83,28 +171,139 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        $token = $request->cookie('farm_erp_auth_token');
-        
+        $token = $request->cookie(AuthCookie::NAME);
+        if (app()->environment('testing')) {
+            $token = $token ?: $request->bearerToken();
+        }
         if (!$token) {
             return response()->json(['error' => 'Not authenticated'], 401);
         }
 
-        try {
-            $data = json_decode(base64_decode($token), true);
-            
-            if (!isset($data['expires_at']) || $data['expires_at'] < now()->timestamp) {
-                return response()->json(['error' => 'Token expired'], 401);
-            }
-
-            return response()->json([
-                'user_id' => $data['user_id'],
-                'role' => $data['role'],
-                'tenant_id' => $data['tenant_id'],
-                'email' => $data['email'] ?? null,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Invalid token'], 401);
+        $data = AuthToken::parse($token);
+        if (!$data) {
+            return response()->json(['error' => 'Token expired or invalid'], 401);
         }
+        $user = User::find($data['user_id'] ?? null);
+        if (!$user || !$user->is_enabled) {
+            return response()->json(['error' => 'User not found or disabled'], 403);
+        }
+        $version = (int) ($data['v'] ?? $data['token_version'] ?? 1);
+        if ($user->token_version !== $version) {
+            return response()->json(['error' => 'Session invalidated. Please log in again.'], 401);
+        }
+        $tenant = $user->tenant_id ? Tenant::find($user->tenant_id) : null;
+        if ($tenant && $tenant->status !== Tenant::STATUS_ACTIVE) {
+            return response()->json(['error' => 'Tenant suspended'], 403);
+        }
+        return response()->json([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'must_change_password' => (bool) $user->must_change_password,
+            ],
+            'tenant' => $tenant ? [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'slug' => $tenant->slug ?? null,
+            ] : null,
+        ]);
+    }
+
+    /**
+     * Diagnostic: current request identity from auth token. Tenant-scoped.
+     * GET /api/auth/whoami
+     * Returns user_id, user_role, tenant_id, impersonator_user_id (when impersonating).
+     * Reads token from cookie or (in testing) Bearer so it works regardless of middleware attribute order.
+     */
+    public function whoami(Request $request): JsonResponse
+    {
+        $token = $request->cookie(AuthCookie::NAME);
+        if (app()->environment('testing')) {
+            $token = $token ?: $request->bearerToken();
+        }
+        if (!$token) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
+        $data = AuthToken::parse($token);
+        if (!$data) {
+            return response()->json(['error' => 'Token expired or invalid'], 401);
+        }
+        $userId = $data['user_id'] ?? null;
+        $tenantId = $data['tenant_id'] ?? null;
+        if (!$userId || !$tenantId) {
+            return response()->json(['error' => 'Not authenticated as tenant user'], 401);
+        }
+        $user = User::find($userId);
+        if (!$user || !$user->is_enabled) {
+            return response()->json(['error' => 'User not found or disabled'], 403);
+        }
+        $version = (int) ($data['v'] ?? $data['token_version'] ?? 1);
+        if ($user->token_version !== $version) {
+            return response()->json(['error' => 'Session invalidated'], 401);
+        }
+        $tenant = Tenant::find($tenantId);
+        if (!$tenant || $tenant->status !== Tenant::STATUS_ACTIVE) {
+            return response()->json(['error' => 'Tenant not found or inactive'], 403);
+        }
+        return response()->json([
+            'user_id' => $userId,
+            'user_role' => $data['role'] ?? $user->role,
+            'tenant_id' => $tenantId,
+            'impersonator_user_id' => $data['impersonator_user_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Complete first-login password update (user with must_change_password=true).
+     * POST /api/auth/complete-first-login-password
+     * Body: { new_password, new_password_confirmation }
+     */
+    public function completeFirstLoginPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'new_password' => ['required', 'string', 'confirmed', Password::defaults()],
+        ]);
+
+        $token = $request->cookie(AuthCookie::NAME);
+        if (app()->environment('testing')) {
+            $token = $token ?: $request->bearerToken();
+        }
+        if (!$token) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
+        $data = AuthToken::parse($token);
+        if (!$data || empty($data['user_id']) || ($data['tenant_id'] ?? null) === null) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
+
+        $user = User::find($data['user_id']);
+        if (!$user || !$user->is_enabled || $user->tenant_id === null) {
+            return response()->json(['error' => 'User not found or disabled'], 403);
+        }
+        if (!$user->must_change_password) {
+            return response()->json(['error' => 'Password was already set'], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($validated['new_password']),
+            'must_change_password' => false,
+            'last_password_change_at' => now(),
+            'token_version' => $user->token_version + 1,
+        ]);
+
+        IdentityAuditLogger::log(
+            \App\Models\IdentityAuditLog::ACTION_FIRST_LOGIN_PASSWORD_SET,
+            $user->tenant_id,
+            $user->id,
+            ['user_id' => $user->id],
+            $request
+        );
+
+        $newToken = AuthToken::create($user, $user->tenant_id);
+        return response()->json(['message' => 'Password set. You can now use the app.'])
+            ->cookie(AuthCookie::make($newToken));
     }
 
     /**
@@ -116,7 +315,7 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'token' => ['required', 'string'],
-            'new_password' => ['required', 'string', 'min:8'],
+            'new_password' => ['required', 'string', Password::defaults()],
         ]);
 
         $record = PasswordResetToken::consumeToken($validated['token']);
@@ -125,7 +324,11 @@ class AuthController extends Controller
         }
 
         $user = User::findOrFail($record->user_id);
-        $user->update(['password' => Hash::make($validated['new_password'])]);
+        $user->update([
+            'password' => Hash::make($validated['new_password']),
+            'last_password_change_at' => now(),
+            'token_version' => $user->token_version + 1,
+        ]);
 
         return response()->json(['message' => 'Password updated successfully']);
     }

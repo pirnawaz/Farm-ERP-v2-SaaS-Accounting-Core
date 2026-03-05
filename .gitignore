@@ -25,9 +25,10 @@ Thumbs.db
 apps/*/.env
 apps/*/.env.local
 
-# IDE
+# IDE / tools
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

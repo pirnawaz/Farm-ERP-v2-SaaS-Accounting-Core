@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useTenant } from '../hooks/useTenant';
 import { devApi } from '../api/dev';
 import { platformApi } from '../api/platform';
+import { tenantLogin } from '../api/auth';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { BrandLogo } from '../components/BrandLogo';
 import toast from 'react-hot-toast';
@@ -11,6 +12,19 @@ import type { UserRole } from '../types';
 import type { Tenant } from '@farm-erp/shared';
 
 const TENANT_ID_KEY = 'farm_erp_tenant_id';
+// Dev-only: picker must be impossible in production (require DEV and explicit env flag)
+const DEV_TENANT_PICKER = import.meta.env.DEV === true && import.meta.env.VITE_DEV_TENANT_PICKER === 'true';
+
+/** Normalize user input to slug: trim, lower, spaces/underscores → hyphens, strip invalid, collapse/trim hyphens. */
+function normalizeSlugInput(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
 type LoginMode = 'tenant' | 'platform';
 
@@ -22,6 +36,11 @@ export default function LoginPage() {
   const [platformEmail, setPlatformEmail] = useState('');
   const [platformPassword, setPlatformPassword] = useState('');
   const [platformSubmitting, setPlatformSubmitting] = useState(false);
+  const [tenantIdInput, setTenantIdInput] = useState('');
+  const [useTenantId, setUseTenantId] = useState(false);
+  const [tenantEmail, setTenantEmail] = useState('');
+  const [tenantPassword, setTenantPassword] = useState('');
+  const [tenantSubmitting, setTenantSubmitting] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>('operator');
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -32,7 +51,11 @@ export default function LoginPage() {
   const [newFarmName, setNewFarmName] = useState('');
 
   useEffect(() => {
-    loadTenants();
+    if (DEV_TENANT_PICKER) {
+      loadTenants();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const loadTenants = async () => {
@@ -40,8 +63,6 @@ export default function LoginPage() {
       setLoading(true);
       const response = await devApi.listTenants();
       setTenants(response.tenants);
-      
-      // Auto-select if there's a stored tenant
       const stored = localStorage.getItem(TENANT_ID_KEY);
       if (stored && response.tenants.some(t => t.id === stored)) {
         setSelectedTenantId(stored);
@@ -131,7 +152,7 @@ export default function LoginPage() {
       const res = await platformApi.login(platformEmail.trim(), platformPassword);
       setDevIdentity({
         role: 'platform_admin',
-        userId: res.user_id,
+        userId: res.user.id,
         tenantId: null,
       });
       setTenantId('');
@@ -141,6 +162,46 @@ export default function LoginPage() {
       toast.error((err as Error)?.message ?? 'Platform login failed');
     } finally {
       setPlatformSubmitting(false);
+    }
+  };
+
+  const handleTenantLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = tenantEmail.trim();
+    if (!email || !tenantPassword) {
+      toast.error('Email and password are required');
+      return;
+    }
+    let slugOrId: string;
+    if (useTenantId) {
+      slugOrId = tenantIdInput.trim();
+      if (!slugOrId) {
+        toast.error('Tenant ID is required');
+        return;
+      }
+    } else {
+      slugOrId = normalizeSlugInput(tenantIdInput);
+      if (!slugOrId) {
+        toast.error('Enter your farm name or URL.');
+        return;
+      }
+    }
+    setTenantSubmitting(true);
+    try {
+      const res = await tenantLogin(slugOrId, email, tenantPassword, { useTenantId });
+      setDevIdentity({
+        role: res.user.role as UserRole,
+        userId: res.user.id,
+        tenantId: res.tenant?.id ?? null,
+        mustChangePassword: res.user.must_change_password === true,
+      });
+      setTenantId(res.tenant?.id ?? '');
+      toast.success('Signed in');
+      navigate(res.user.must_change_password ? '/app/set-password' : '/app/dashboard');
+    } catch (err: unknown) {
+      toast.error((err as Error)?.message ?? 'Tenant login failed');
+    } finally {
+      setTenantSubmitting(false);
     }
   };
 
@@ -176,7 +237,7 @@ export default function LoginPage() {
             Welcome back to Terrava
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            {loginMode === 'platform' ? 'Platform Admin sign in' : 'Select Farm (Tenant) - Development Mode'}
+            {loginMode === 'platform' ? 'Platform Admin sign in' : DEV_TENANT_PICKER ? 'Select Farm (Tenant) - Development' : 'Tenant sign in'}
           </p>
           <div className="mt-2 flex justify-center gap-2">
             <button
@@ -184,7 +245,7 @@ export default function LoginPage() {
               onClick={() => setLoginMode('platform')}
               className={`text-sm font-medium ${loginMode === 'platform' ? 'text-[#1F6F5C] underline' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              Platform Admin Login
+              Platform Admin
             </button>
             <span className="text-gray-300">|</span>
             <button
@@ -192,7 +253,7 @@ export default function LoginPage() {
               onClick={() => setLoginMode('tenant')}
               className={`text-sm font-medium ${loginMode === 'tenant' ? 'text-[#1F6F5C] underline' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              Tenant / Dev Login
+              Tenant
             </button>
           </div>
         </div>
@@ -232,9 +293,9 @@ export default function LoginPage() {
                 {platformSubmitting ? 'Signing in...' : 'Sign in (Platform Admin)'}
               </button>
             </form>
-          ) : (
+          ) : DEV_TENANT_PICKER ? (
             <>
-          {/* Section 1: Existing Farms */}
+          {/* Dev picker: Existing Farms */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Existing Farms</h3>
             {loading ? (
@@ -377,6 +438,69 @@ export default function LoginPage() {
             </button>
           </div>
             </>
+          ) : (
+            <form onSubmit={handleTenantLogin} className="space-y-4">
+              <div>
+                <label htmlFor="tenant-slug-or-id" className="block text-sm font-medium text-gray-700 mb-1">
+                  {useTenantId ? 'Tenant ID' : 'Farm'}
+                </label>
+                <input
+                  id="tenant-slug-or-id"
+                  type="text"
+                  value={tenantIdInput}
+                  onChange={(e) => setTenantIdInput(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#1F6F5C] focus:border-[#1F6F5C] font-mono text-sm"
+                  placeholder={useTenantId ? 'UUID e.g. 550e8400-e29b-41d4-a716-446655440000' : 'e.g. demo-farm or demo farm'}
+                  autoComplete="off"
+                />
+                {!useTenantId && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    If your farm URL is demo-farm, enter demo-farm (spaces are OK).
+                  </p>
+                )}
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    id="use-tenant-id"
+                    type="checkbox"
+                    checked={useTenantId}
+                    onChange={(e) => setUseTenantId(e.target.checked)}
+                    className="rounded border-gray-300 text-[#1F6F5C] focus:ring-[#1F6F5C]"
+                  />
+                  <label htmlFor="use-tenant-id" className="text-xs text-gray-500">Use Tenant ID (power users)</label>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="tenant-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  id="tenant-email"
+                  type="email"
+                  value={tenantEmail}
+                  onChange={(e) => setTenantEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <label htmlFor="tenant-password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  id="tenant-password"
+                  type="password"
+                  value={tenantPassword}
+                  onChange={(e) => setTenantPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
+                  autoComplete="current-password"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={tenantSubmitting}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#1F6F5C] hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="tenant-login-submit"
+              >
+                {tenantSubmitting ? 'Signing in...' : 'Sign in (Tenant)'}
+              </button>
+            </form>
           )}
         </div>
       </div>

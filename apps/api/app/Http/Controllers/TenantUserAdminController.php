@@ -4,15 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreTenantUserRequest;
 use App\Http\Requests\UpdateTenantUserRequest;
+use App\Models\IdentityAuditLog;
 use App\Models\User;
+use App\Services\IdentityAuditLogger;
+use App\Services\InvitationService;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class TenantUserAdminController extends Controller
 {
-    private const LAST_ADMIN_MESSAGE = 'Cannot disable or change the role of the last enabled tenant admin.';
+    private const LAST_ADMIN_MESSAGE = 'Cannot disable or change the role of the last enabled tenant admin';
+
+    public function __construct(
+        protected InvitationService $invitationService
+    ) {}
 
     /**
      * List users for the current tenant.
@@ -41,8 +49,8 @@ class TenantUserAdminController extends Controller
     }
 
     /**
-     * Create a user in the current tenant.
-     * POST /api/tenant/users
+     * Create a user in the current tenant (manual creation). Optional temporary_password; if omitted, one is generated.
+     * User must change password on first login. POST /api/tenant/users
      */
     public function store(StoreTenantUserRequest $request): JsonResponse
     {
@@ -51,24 +59,48 @@ class TenantUserAdminController extends Controller
             return response()->json(['error' => 'Tenant not found'], 404);
         }
 
+        $actorUserId = $request->attributes->get('user_id');
+        if (!$actorUserId) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
         $v = $request->validated();
+        $email = $this->invitationService->normalizeEmail($v['email']);
+
+        if (User::where('tenant_id', $tenantId)->whereRaw('LOWER(TRIM(email)) = ?', [$email])->exists()) {
+            return response()->json(['error' => 'A user with this email already exists in this tenant'], 409);
+        }
+
+        $temporaryPassword = isset($v['temporary_password']) && $v['temporary_password'] !== ''
+            ? $v['temporary_password']
+            : Str::random(14);
+
         $user = User::create([
             'tenant_id' => $tenantId,
-            'name' => $v['name'],
-            'email' => $v['email'],
-            'password' => Hash::make($v['password']),
+            'name' => trim($v['name']),
+            'email' => $email,
+            'password' => Hash::make($temporaryPassword),
             'role' => $v['role'],
             'is_enabled' => true,
+            'must_change_password' => true,
         ]);
 
+        IdentityAuditLogger::log(
+            IdentityAuditLog::ACTION_TENANT_USER_CREATED_MANUAL,
+            $tenantId,
+            $actorUserId,
+            ['target_user_id' => $user->id, 'email' => $user->email, 'role' => $user->role],
+            $request
+        );
+
         return response()->json([
-            'id' => $user->id,
-            'tenant_id' => $user->tenant_id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role,
-            'is_enabled' => $user->is_enabled,
-            'created_at' => $user->created_at->toIso8601String(),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+            ],
+            'temporary_password' => $temporaryPassword,
         ], 201);
     }
 
@@ -99,7 +131,18 @@ class TenantUserAdminController extends Controller
             }
         }
 
+        $oldRole = $user->role;
+        $roleChanged = isset($data['role']) && $data['role'] !== $oldRole;
         $user->update($data);
+        if ($roleChanged) {
+            \App\Services\IdentityAuditLogger::log(
+                \App\Models\IdentityAuditLog::ACTION_USER_ROLE_CHANGED,
+                $tenantId,
+                $request->attributes->get('user_id'),
+                ['target_user_id' => $user->id, 'old_role' => $oldRole, 'new_role' => $user->role],
+                $request
+            );
+        }
 
         return response()->json([
             'id' => $user->id,

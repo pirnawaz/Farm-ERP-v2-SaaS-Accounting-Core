@@ -35,7 +35,7 @@ class PlatformTenantLifecycleTest extends TestCase
             'is_enabled' => true,
         ]);
         $platformUser = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform',
             'email' => 'p@test.test',
             'password' => null,
@@ -104,7 +104,7 @@ class PlatformTenantLifecycleTest extends TestCase
             'is_enabled' => true,
         ]);
         $platformUser = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform',
             'email' => 'p@test.test',
             'password' => null,
@@ -131,7 +131,7 @@ class PlatformTenantLifecycleTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
         $platformUser = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform',
             'email' => 'p@test.test',
             'password' => null,
@@ -174,7 +174,7 @@ class PlatformTenantLifecycleTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'T1', 'status' => 'archived']);
         $platformUser = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform',
             'email' => 'p@test.test',
             'password' => null,
@@ -201,7 +201,7 @@ class PlatformTenantLifecycleTest extends TestCase
         $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
         // No tenant_admin user
         $platformUser = User::create([
-            'tenant_id' => $tenant->id,
+            'tenant_id' => null,
             'name' => 'Platform',
             'email' => 'p@test.test',
             'password' => null,
@@ -214,5 +214,39 @@ class PlatformTenantLifecycleTest extends TestCase
 
         $r->assertStatus(404);
         $r->assertJsonPath('error', 'Tenant has no admin user');
+    }
+
+    /** @test */
+    public function creating_platform_admin_with_tenant_id_throws(): void
+    {
+        $tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Platform admin must have tenant_id null.');
+
+        User::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Platform',
+            'email' => 'p@test.test',
+            'password' => null,
+            'role' => 'platform_admin',
+            'is_enabled' => true,
+        ]);
+    }
+
+    /** @test */
+    public function creating_tenant_admin_with_null_tenant_id_throws(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('User without tenant must have role platform_admin.');
+
+        User::create([
+            'tenant_id' => null,
+            'name' => 'Tenant Admin',
+            'email' => 'admin@t1.test',
+            'password' => \Illuminate\Support\Facades\Hash::make('secret'),
+            'role' => 'tenant_admin',
+            'is_enabled' => true,
+        ]);
     }
 }

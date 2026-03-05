@@ -24,7 +24,7 @@ class StoreTenantUserRequest extends FormRequest
                 'max:255',
                 Rule::unique('users', 'email')->where('tenant_id', $tenantId),
             ],
-            'password' => ['required', 'string', 'min:8'],
+            'temporary_password' => ['nullable', 'string', 'min:8', 'max:255'],
             'role' => ['required', 'string', 'in:tenant_admin,accountant,operator'],
         ];
     }

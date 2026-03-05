@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@farm-erp/shared';
 import { useAuth } from '../hooks/useAuth';
+import { getApiErrorMessage } from '../utils/api';
+import toast from 'react-hot-toast';
 import { useCropCycleScope } from '../contexts/CropCycleScopeContext';
 import { useOnboardingState } from '../hooks/useOnboardingState';
 import { OnboardingPanel } from '../components/OnboardingPanel';
@@ -52,6 +54,12 @@ export default function DashboardPage() {
     gcTime: 5 * 60 * 1000,
   });
 
+  useEffect(() => {
+    if (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to load dashboard'));
+    }
+  }, [error]);
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -69,7 +77,24 @@ export default function DashboardPage() {
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          Failed to load dashboard. Please try again.
+          <p>{getApiErrorMessage(error, 'Failed to load dashboard. Please try again.')}</p>
+          {import.meta.env.DEV && (
+            <details className="mt-2">
+              <summary className="cursor-pointer font-medium">Details</summary>
+              <pre className="mt-1 overflow-auto rounded bg-red-100 p-2 text-xs">
+                {error && typeof error === 'object' && 'response' in error
+                  ? JSON.stringify(
+                      {
+                        status: (error as { response?: { status?: number } }).response?.status,
+                        data: (error as { response?: { data?: unknown } }).response?.data,
+                      },
+                      null,
+                      2
+                    )
+                  : String(error)}
+              </pre>
+            </details>
+          )}
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenantUsersApi } from '../api/tenantUsers';
 import type { CreateTenantUserPayload, UpdateTenantUserPayload } from '../types';
+import type { InviteUserPayload } from '../api/tenantUsers';
 
 export function useTenantUsers() {
   return useQuery({
@@ -37,6 +38,16 @@ export function useDisableTenantUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => tenantUsersApi.disable(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenantUsers'] });
+    },
+  });
+}
+
+export function useInviteUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: InviteUserPayload) => tenantUsersApi.invite(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenantUsers'] });
     },

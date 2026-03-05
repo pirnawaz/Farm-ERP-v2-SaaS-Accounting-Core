@@ -65,8 +65,8 @@ class MachineryChargeGenerationTest extends TestCase
             'pool_scope' => $poolScope,
         ]);
 
-        // Post the work log
-        $postingService = new MachineryPostingService();
+        // Post the work log (resolve from container so OperationalPostingGuard is injected)
+        $postingService = app(MachineryPostingService::class);
         $postingService->postWorkLog($workLog->id, $tenant, $postingDate);
 
         return $workLog->fresh();

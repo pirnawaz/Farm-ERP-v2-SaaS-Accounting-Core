@@ -16,6 +16,25 @@ function getUserId(): string | null {
   return localStorage.getItem(USER_ID_KEY)
 }
 
+/** Read a single header value from RequestInit.headers (Headers, array, or record). */
+function getOptionHeader(options: RequestInit, name: string): string | null {
+  const h = options.headers
+  if (!h) return null
+  if (h instanceof Headers) {
+    const v = h.get(name)
+    return v && v.trim() ? v.trim() : null
+  }
+  if (Array.isArray(h)) {
+    const entry = h.find(([k]) => k.toLowerCase() === name.toLowerCase())
+    const v = entry ? entry[1] : undefined
+    return v !== undefined && v !== null && String(v).trim() ? String(v).trim() : null
+  }
+  const key = Object.keys(h).find((k) => k.toLowerCase() === name.toLowerCase())
+  const record = h as Record<string, string>
+  const v = key != null ? record[key] : undefined
+  return v !== undefined && v !== null && String(v).trim() ? String(v).trim() : null
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -23,10 +42,11 @@ async function request<T>(
   const tenantId = getTenantId()
   const userRole = getUserRole()
   
-  // For non-dev and non-platform routes, tenant is required
+  // For non-dev and non-platform routes, tenant is required (from storage OR from request options, e.g. login form).
   const isDevRoute = endpoint.includes('/api/dev/') || endpoint.includes('api/dev/')
   const isPlatformRoute = endpoint.includes('/api/platform/') || endpoint.includes('api/platform/')
-  if (!isDevRoute && !isPlatformRoute && !tenantId) {
+  const tenantInOptions = getOptionHeader(options, 'X-Tenant-Slug') || getOptionHeader(options, 'X-Tenant-Id')
+  if (!isDevRoute && !isPlatformRoute && !tenantId && !tenantInOptions) {
     throw new Error('No tenant selected. Please select a tenant.')
   }
   
@@ -61,10 +81,11 @@ async function request<T>(
     }
   }
   
-  // Always set tenant and role headers if available (they override any existing values)
-  // Do not send X-Tenant-Id for platform routes
-  if (!isPlatformRoute && tenantId && tenantId.trim()) {
-    headers['X-Tenant-Id'] = tenantId.trim()
+  // Tenant header: use options (e.g. login form) if present; otherwise use localStorage. Do not send for platform routes.
+  if (!isPlatformRoute) {
+    if (!headers['X-Tenant-Slug'] && !headers['X-Tenant-Id'] && tenantId && tenantId.trim()) {
+      headers['X-Tenant-Id'] = tenantId.trim()
+    }
   }
   
   if (userRole && userRole.trim()) {
@@ -148,8 +169,9 @@ export const apiClient = {
     return request<T>(endpoint, { method: 'GET', cache: 'no-store' })
   },
 
-  post: <T>(endpoint: string, data: unknown): Promise<T> => {
+  post: <T>(endpoint: string, data: unknown, options?: RequestInit): Promise<T> => {
     return request<T>(endpoint, {
+      ...options,
       method: 'POST',
       body: JSON.stringify(data),
     })

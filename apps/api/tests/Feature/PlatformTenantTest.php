@@ -67,4 +67,40 @@ class PlatformTenantTest extends TestCase
         $this->assertEquals('Updated', $tenant->name);
         $this->assertEquals('suspended', $tenant->status);
     }
+
+    public function test_platform_admin_can_update_tenant_name_slug_timezone_locale_currency(): void
+    {
+        $tenant = Tenant::create(['name' => 'T1', 'slug' => 't1', 'status' => 'active']);
+
+        $response = $this->withHeaders($this->platformHeaders())
+            ->putJson('/api/platform/tenants/' . $tenant->id, [
+                'name' => 'Acme Farm',
+                'slug' => 'acme-farm',
+                'timezone' => 'Asia/Karachi',
+                'locale' => 'en-PK',
+                'currency_code' => 'PKR',
+            ]);
+
+        $response->assertStatus(200);
+        $this->assertEquals('Acme Farm', $response->json('name'));
+        $this->assertEquals('acme-farm', $response->json('slug'));
+        $this->assertEquals('Asia/Karachi', $response->json('timezone'));
+        $this->assertEquals('en-PK', $response->json('locale'));
+        $this->assertEquals('PKR', $response->json('currency_code'));
+        $tenant->refresh();
+        $this->assertEquals('acme-farm', $tenant->slug);
+    }
+
+    public function test_platform_tenant_update_invalid_slug_rejected(): void
+    {
+        $tenant = Tenant::create(['name' => 'T1', 'slug' => 't1', 'status' => 'active']);
+
+        $r = $this->withHeaders($this->platformHeaders())
+            ->putJson('/api/platform/tenants/' . $tenant->id, ['slug' => 'admin']);
+        $r->assertStatus(422);
+
+        $r2 = $this->withHeaders($this->platformHeaders())
+            ->putJson('/api/platform/tenants/' . $tenant->id, ['slug' => 'UPPERCASE']);
+        $r2->assertStatus(422);
+    }
 }

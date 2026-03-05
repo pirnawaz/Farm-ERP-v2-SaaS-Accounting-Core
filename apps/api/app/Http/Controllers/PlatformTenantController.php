@@ -46,12 +46,40 @@ class PlatformTenantController extends Controller
             'tenants' => $tenants->map(fn ($t) => [
                 'id' => $t->id,
                 'name' => $t->name,
+                'slug' => $t->slug,
                 'status' => $t->status,
                 'plan_key' => $t->plan_key,
                 'currency_code' => $t->currency_code,
                 'locale' => $t->locale,
                 'timezone' => $t->timezone,
                 'created_at' => $t->created_at->toIso8601String(),
+            ]),
+        ]);
+    }
+
+    /**
+     * List users in a tenant. Platform admin only. Enabled users first.
+     * GET /api/platform/tenants/{tenant}/users
+     */
+    public function users(string $tenant): JsonResponse
+    {
+        $tenantModel = Tenant::find($tenant);
+        if (!$tenantModel) {
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
+        $users = User::where('tenant_id', $tenantModel->id)
+            ->orderByRaw('is_enabled DESC')
+            ->orderBy('created_at')
+            ->get(['id', 'name', 'email', 'role', 'is_enabled', 'created_at']);
+
+        return response()->json([
+            'users' => $users->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'role' => $u->role,
+                'is_enabled' => $u->is_enabled,
+                'created_at' => $u->created_at->toIso8601String(),
             ]),
         ]);
     }
@@ -67,6 +95,7 @@ class PlatformTenantController extends Controller
         return response()->json([
             'id' => $tenant->id,
             'name' => $tenant->name,
+            'slug' => $tenant->slug,
             'status' => $tenant->status,
             'plan_key' => $tenant->plan_key,
             'currency_code' => $tenant->currency_code,
@@ -175,6 +204,7 @@ class PlatformTenantController extends Controller
         return response()->json([
             'id' => $tenant->id,
             'name' => $tenant->name,
+            'slug' => $tenant->slug,
             'status' => $tenant->status,
             'plan_key' => $tenant->plan_key,
             'currency_code' => $tenant->currency_code,

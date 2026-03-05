@@ -50,8 +50,13 @@ export interface UpdateFarmProfilePayload {
 export interface CreateTenantUserPayload {
   name: string;
   email: string;
-  password: string;
   role: UserRole;
+  temporary_password?: string;
+}
+
+export interface CreateTenantUserResponse {
+  user: { id: string; name: string; email: string; role: string };
+  temporary_password: string;
 }
 
 export interface UpdateTenantUserPayload {
@@ -65,6 +70,7 @@ export interface UpdateTenantUserPayload {
 export interface PlatformTenant {
   id: string;
   name: string;
+  slug?: string | null;
   status: 'active' | 'suspended' | 'archived';
   plan_key?: string | null;
   currency_code: string;
@@ -81,6 +87,13 @@ export interface ImpersonationStatus {
   target_user_email?: string | null;
 }
 
+/** Response from GET /api/platform/impersonation/status (callable when impersonation cookie present). */
+export interface ImpersonationStatusForUi {
+  is_impersonating: boolean;
+  tenant?: { id: string; name: string; slug?: string } | null;
+  user?: { id: string; name: string; email: string } | null;
+}
+
 export interface CreatePlatformTenantPayload {
   name: string;
   country?: string | null;
@@ -94,6 +107,7 @@ export interface CreatePlatformTenantPayload {
 
 export interface UpdatePlatformTenantPayload {
   name?: string;
+  slug?: string | null;
   status?: 'active' | 'suspended' | 'archived';
   plan_key?: string | null;
   currency_code?: string;

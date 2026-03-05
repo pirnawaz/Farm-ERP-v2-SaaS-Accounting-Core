@@ -4,6 +4,7 @@ import type {
   CreatePlatformTenantPayload,
   UpdatePlatformTenantPayload,
   ImpersonationStatus,
+  ImpersonationStatusForUi,
 } from '../types';
 
 export interface PlatformTenantDetail extends PlatformTenant {
@@ -21,20 +22,14 @@ export interface PlatformTenantDetail extends PlatformTenant {
 }
 
 export interface PlatformLoginResponse {
-  user_id: string;
-  role: string;
-  tenant_id: null;
-  email: string;
-  name?: string;
-  is_platform_admin: boolean;
+  token: string;
+  user: { id: string; name: string; email: string; role: string };
+  tenant: null;
 }
 
 export interface PlatformMeResponse {
-  user_id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  is_platform_admin: boolean;
+  user: { id: string; name: string; email: string; role: string };
+  tenant: null;
 }
 
 export interface PlatformTenantModuleItem {
@@ -55,26 +50,33 @@ export interface PlatformTenantModulesResponse {
   plan_key: string | null;
 }
 
+export interface PlatformTenantUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_enabled: boolean;
+  created_at: string;
+}
+
 export interface PlatformAuditLogItem {
   id: string;
-  tenant_id: string;
-  tenant_name?: string;
-  entity_type: string;
-  entity_id: string;
-  action: string;
-  user_id: string;
-  user_email: string | null;
-  actor_name?: string | null;
-  metadata: Record<string, unknown> | null;
   created_at: string;
+  actor: { id: string; email: string; name: string } | null;
+  action: string;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  tenant_id: string | null;
+  tenant_name?: string | null;
 }
 
 export interface PlatformAuditLogsParams {
   tenant_id?: string;
-  actor_user_id?: string;
   action?: string;
-  date_from?: string;
-  date_to?: string;
+  from?: string;
+  to?: string;
+  q?: string;
   per_page?: number;
   page?: number;
 }
@@ -100,6 +102,8 @@ export const platformApi = {
     apiClient.get<{ tenants: PlatformTenant[] }>('/api/platform/tenants'),
   getTenant: (id: string) =>
     apiClient.get<PlatformTenantDetail>('/api/platform/tenants/' + id),
+  getTenantUsers: (tenantId: string) =>
+    apiClient.get<{ users: PlatformTenantUser[] }>('/api/platform/tenants/' + tenantId + '/users'),
   getTenantModules: (tenantId: string) =>
     apiClient.get<PlatformTenantModulesResponse>('/api/platform/tenants/' + tenantId + '/modules'),
   updateTenantModules: (tenantId: string, payload: { modules: Array<{ key: string; enabled: boolean }> }) =>
@@ -110,16 +114,28 @@ export const platformApi = {
     apiClient.put<PlatformTenant>('/api/platform/tenants/' + id, payload),
   getImpersonationStatus: () =>
     apiClient.get<ImpersonationStatus>('/api/platform/impersonation'),
+  /** For UI banner: callable when impersonation cookie is set (e.g. in tenant app). */
+  getImpersonationStatusForUi: () =>
+    apiClient.get<ImpersonationStatusForUi>('/api/platform/impersonation/status'),
   startImpersonation: (tenantId: string, userId?: string) =>
     apiClient.post<{ message: string; target_tenant_id: string; target_user_id?: string }>(
       '/api/platform/impersonation/start',
       userId ? { tenant_id: tenantId, user_id: userId } : { tenant_id: tenantId }
+    ),
+  /** Tenant-scoped impersonate: POST /api/platform/tenants/{tenantId}/impersonate with optional user_id */
+  impersonateTenant: (tenantId: string, userId?: string) =>
+    apiClient.post<{ message: string; target_tenant_id: string; target_user_id: string }>(
+      '/api/platform/tenants/' + tenantId + '/impersonate',
+      userId ? { user_id: userId } : {}
     ),
   stopImpersonation: (targetTenantId?: string) =>
     apiClient.post<{ message: string }>(
       '/api/platform/impersonation/stop',
       targetTenantId ? { target_tenant_id: targetTenantId } : {}
     ),
+  /** Clears impersonation cookies unconditionally (platform_admin). Use when normal stop fails. */
+  forceStopImpersonation: () =>
+    apiClient.post<{ message: string }>('/api/platform/impersonation/force-stop', {}),
   getAuditLogs: (params?: PlatformAuditLogsParams) => {
     if (!params) return apiClient.get<PlatformAuditLogsResponse>('/api/platform/audit-logs');
     const sp = new URLSearchParams();
@@ -144,4 +160,34 @@ export const platformApi = {
       '/api/platform/tenants/' + tenantId + '/unarchive',
       {}
     ),
+  /** Create a user in a tenant (manual, no email). Returns user + temporary_password. */
+  createTenantUser: (
+    tenantId: string,
+    payload: { name: string; email: string; role: 'tenant_admin' | 'accountant' | 'operator'; temporary_password?: string }
+  ) =>
+    apiClient.post<{ user: { id: string; name: string; email: string; role: string }; temporary_password: string }>(
+      '/api/platform/tenants/' + tenantId + '/users',
+      payload
+    ),
+  /** Update a tenant user (role and/or is_enabled). */
+  updateTenantUser: (
+    tenantId: string,
+    userId: string,
+    payload: { role?: 'tenant_admin' | 'accountant' | 'operator'; is_enabled?: boolean }
+  ) =>
+    apiClient.patch<PlatformTenantUser>(
+      '/api/platform/tenants/' + tenantId + '/users/' + userId,
+      payload
+    ),
+  /** Platform invite a user into a tenant. Returns invite_link, expires_in_hours, email, role. */
+  platformInviteTenantUser: (
+    tenantId: string,
+    payload: { email: string; role?: 'tenant_admin' | 'accountant' | 'operator' }
+  ) =>
+    apiClient.post<{
+      invite_link: string;
+      expires_in_hours: number;
+      email: string;
+      role: string;
+    }>('/api/platform/tenants/' + tenantId + '/invitations', payload),
 };

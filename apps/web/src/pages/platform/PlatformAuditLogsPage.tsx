@@ -12,10 +12,10 @@ export default function PlatformAuditLogsPage() {
     per_page: 15,
   });
   const [tenantId, setTenantId] = useState<string>('');
-  const [actorUserId, setActorUserId] = useState<string>('');
   const [action, setAction] = useState<string>('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
+  const [searchQ, setSearchQ] = useState<string>('');
 
   const { data: tenantsData } = usePlatformTenants();
   const tenants = tenantsData?.tenants ?? [];
@@ -24,10 +24,10 @@ export default function PlatformAuditLogsPage() {
     page: filters.page,
     per_page: filters.per_page ?? 15,
     ...(filters.tenant_id ? { tenant_id: filters.tenant_id } : {}),
-    ...(filters.actor_user_id ? { actor_user_id: filters.actor_user_id } : {}),
     ...(filters.action ? { action: filters.action } : {}),
-    ...(filters.date_from ? { date_from: filters.date_from } : {}),
-    ...(filters.date_to ? { date_to: filters.date_to } : {}),
+    ...(filters.from ? { from: filters.from } : {}),
+    ...(filters.to ? { to: filters.to } : {}),
+    ...(filters.q ? { q: filters.q } : {}),
   };
 
   const { data, isLoading, isFetching } = useQuery({
@@ -40,19 +40,19 @@ export default function PlatformAuditLogsPage() {
       page: 1,
       per_page: 15,
       tenant_id: tenantId || undefined,
-      actor_user_id: actorUserId || undefined,
       action: action || undefined,
-      date_from: dateFrom || undefined,
-      date_to: dateTo || undefined,
+      from: dateFrom || undefined,
+      to: dateTo || undefined,
+      q: searchQ?.trim() || undefined,
     });
-  }, [tenantId, actorUserId, action, dateFrom, dateTo]);
+  }, [tenantId, action, dateFrom, dateTo, searchQ]);
 
   const clearFilters = useCallback(() => {
     setTenantId('');
-    setActorUserId('');
     setAction('');
     setDateFrom('');
     setDateTo('');
+    setSearchQ('');
     setFilters({ page: 1, per_page: 15 });
   }, []);
 
@@ -87,24 +87,33 @@ export default function PlatformAuditLogsPage() {
             </select>
           </div>
           <div>
-            <label htmlFor="filter-actor" className="block text-xs text-gray-500 mb-1">Actor user ID</label>
-            <input
-              id="filter-actor"
-              type="text"
-              value={actorUserId}
-              onChange={(e) => setActorUserId(e.target.value)}
-              placeholder="UUID"
-              className="w-full rounded border border-gray-300 text-sm"
-            />
-          </div>
-          <div>
             <label htmlFor="filter-action" className="block text-xs text-gray-500 mb-1">Action</label>
-            <input
+            <select
               id="filter-action"
-              type="text"
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              placeholder="e.g. Post to Accounts, Reverse Posting"
+              className="w-full rounded border border-gray-300 text-sm"
+            >
+              <option value="">All</option>
+              <option value="platform_login_success">Platform login success</option>
+              <option value="platform_login_failure">Platform login failure</option>
+              <option value="tenant_login_success">Tenant login success</option>
+              <option value="tenant_login_failure">Tenant login failure</option>
+              <option value="invitation_created">Invitation created</option>
+              <option value="invitation_accepted">Invitation accepted</option>
+              <option value="user_role_changed">User role changed</option>
+              <option value="impersonation_start">Impersonation start</option>
+              <option value="impersonation_stop">Impersonation stop</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="filter-q" className="block text-xs text-gray-500 mb-1">Search metadata</label>
+            <input
+              id="filter-q"
+              type="text"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Text in metadata"
               className="w-full rounded border border-gray-300 text-sm"
             />
           </div>
@@ -160,9 +169,9 @@ export default function PlatformAuditLogsPage() {
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Entity</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actor</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">IP / Agent</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Metadata</th>
                   </tr>
                 </thead>
@@ -180,16 +189,16 @@ export default function PlatformAuditLogsPage() {
                           {formatDate(log.created_at)}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-600">
-                          {log.tenant_name ?? log.tenant_id}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
-                          {log.entity_type} ({log.entity_id.slice(0, 8)}…)
+                          {log.tenant_name ?? log.tenant_id ?? '—'}
                         </td>
                         <td className="px-4 py-2 text-sm">
                           <span className="font-medium text-gray-900">{log.action}</span>
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-600">
-                          {log.actor_name ?? log.user_email ?? log.user_id?.slice(0, 8)}
+                          {log.actor ? `${log.actor.name ?? log.actor.email} (${log.actor.email})` : '—'}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-500 max-w-[200px] truncate" title={log.user_agent ?? undefined}>
+                          {[log.ip, log.user_agent].filter(Boolean).join(' · ') || '—'}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500 max-w-xs truncate">
                           {log.metadata ? JSON.stringify(log.metadata) : '—'}
