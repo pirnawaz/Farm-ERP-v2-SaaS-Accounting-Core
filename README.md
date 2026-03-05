@@ -1,6 +1,6 @@
 # Terrava Farm ERP v2 — SaaS Accounting Core
 
-A multi-tenant SaaS accounting and farm management system (Terrava) built as a monorepo: **Laravel API** (backend), **React + Vite** (frontend), and a shared **TypeScript** package. Supports Supabase Postgres (and optionally MySQL for local/Laragon).
+A multi-tenant SaaS accounting and farm management system (Terrava) built as a monorepo: **Laravel API** (backend), **React + Vite** (frontend), and a shared **TypeScript** package. Supports Supabase Postgres (and optionally MySQL for local/Laragon). The repo uses **npm workspaces**; running `npm install` at the root also builds the shared package (`postinstall`).
 
 [![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php)](https://php.net)
 [![Laravel](https://img.shields.io/badge/Laravel-11+-FF2D20?logo=laravel)](https://laravel.com)
@@ -91,6 +91,8 @@ A multi-tenant SaaS accounting and farm management system (Terrava) built as a m
 ---
 
 ## Quick Start
+
+For a condensed checklist, see [docs/QUICK_START.md](docs/QUICK_START.md).
 
 ### Windows (Laragon)
 
@@ -192,8 +194,13 @@ A multi-tenant SaaS accounting and farm management system (Terrava) built as a m
   - `APP_URL` — Base URL of the API (e.g. `https://api.example.com`). Auth cookie is set `secure=true` only when `APP_ENV=production` or `APP_URL` begins with `https://`, so staging over HTTP works.
   - `DEV_IDENTITY_ENABLED` — When `false` (default), `X-User-Id` and `X-User-Role` headers are **ignored** in production-like environments; header-only requests return 401/403. Set `true` only for dev/testing. In `local` or `testing` env, header auth is always allowed. See [Production access & safety](#production-access--safety).
   - `VITE_API_URL` (optional, in `apps/web`) — When set, the frontend uses this as the API base. When unset, the frontend uses same-origin (`''`) so Nginx (or the same host) can proxy `/api` in production.
+- **Cookie auth:** The app uses a **custom auth cookie** (`farm_erp_auth_token`), not Laravel Sanctum SPA. There is no CSRF cookie flow; mitigation is `httpOnly`, `Secure` in production, and `SameSite` (see below). The frontend must send credentials with API calls: the shared `api-client` uses `credentials: 'include'` so the cookie is sent on same-origin or configured CORS origins.
+- **Token lifecycle:** Tokens include `exp` (expiry, configurable via `AUTH_TOKEN_TTL_HOURS`, default 7 days) and `v` (token version). `POST /api/auth/logout` clears the cookie; `POST /api/auth/logout-all` increments the user's token version (invalidating all existing tokens) and clears the cookie; `POST /api/auth/change-password` (tenant) and `POST /api/platform/auth/change-password` (platform) update password, set `last_password_change_at`, increment token version, and issue a new token.
+- **Rate limiting:** Login (platform and tenant), accept-invite, and create-invitation are rate-limited (configurable via `RATE_LIMIT_*` env vars). Responses return **429** with message "Too many attempts. Try again in X seconds."
+- **Cookie security (production):** Set `SESSION_SECURE_COOKIE=true`, `SESSION_SAME_SITE=lax` (or `none` only if you need cross-site subdomain cookies), and optionally `SESSION_DOMAIN` for subdomains (see [Deploying with subdomains](#deploying-with-subdomains)).
 - **Web:** `apps/web` reads from API; tenant and auth are applied via shared client / context.
 - **CORS:** Laravel CORS is set for `http://localhost:3000`; adjust in `apps/api/config/cors.php` if needed.
+- **Full env reference:** See `apps/api/.env.example` for all API environment variables.
 
 ---
 
@@ -204,6 +211,16 @@ The app is set up for droplet/staging deployment with the following behaviour:
 - **Auth cookie:** The login cookie is `secure=true` only when `APP_ENV=production` or `APP_URL` begins with `https://`. Otherwise it is `secure=false` so staging over HTTP works. `httpOnly` stays `true`.
 - **Frontend API base:** When `VITE_API_URL` is not set, the shared API client uses same-origin (`''`), so you can serve the web app and API from the same host and proxy `/api` with Nginx to the Laravel backend. Set `VITE_API_URL` only when the API is on a different origin.
 - **Staging seed:** Run `php artisan db:seed --class=StagingSeeder` from `apps/api` to create/update the Staging tenant and admin user (see [Seed / default tenant](#seed--default-tenant)). Use the documented staging credentials only for staging; change the admin password in production.
+
+### Deploying with subdomains
+
+When tenants are reached via subdomains (e.g. `acme.terrava.app`):
+
+1. **API:** Set `APP_ROOT_DOMAIN` (e.g. `terrava.app`) so tenant resolution can use the subdomain slug. Set `SESSION_DOMAIN` to the leading-dot root (e.g. `.terrava.app`) so the auth cookie is sent to all subdomains. Ensure `SESSION_SECURE_COOKIE=true` and `SESSION_SAME_SITE=lax` (or `none` if the SPA is on a different subdomain than the API and you need cross-site cookies).
+2. **CORS:** If the web app is on a different subdomain than the API, configure CORS to allow that origin explicitly (no wildcard `*` when using credentials). Ensure the API sends `Access-Control-Allow-Credentials: true`. The shared API client uses `credentials: 'include'`.
+3. **Cookie name scope:** The auth cookie (`farm_erp_auth_token`) and platform restore cookie (`farm_erp_platform_saved`) are httpOnly and use the same `SESSION_DOMAIN`; avoid name collisions with other apps on the same root domain.
+4. **Config health (platform admin):** `GET /api/platform/config-health` returns runtime booleans and values: `root_domain_set`, `session_domain_set`, `secure_cookie_on`, `same_site`, `auth_token_ttl_hours`. Use this to verify subdomain/cookie configuration.
+5. **Nginx:** Proxy both the SPA and `/api` (or your API path) so that cookie and tenant resolution work; alternatively serve API and SPA from the same subdomain.
 
 ### Production access & safety
 
@@ -246,7 +263,7 @@ All tenant-scoped APIs use `X-Tenant-Id` (and/or auth). Role and module middlewa
 | **Health**      | `GET /api/health`                                                        |
 | **Dashboard**   | `GET /api/dashboard/summary` — optional query: `scope_type=crop_cycle`, `scope_id=<uuid>` (read-only; scopes metrics to one crop cycle) |
 | **Auth**        | `POST /api/auth/login`, `POST /api/auth/set-password-with-token` (body: `token`, `new_password`; no tenant; for platform-issued reset tokens) |
-| **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`; `GET /api/platform/tenants/{id}/modules`, `PUT .../modules`; `POST .../reset-admin-password` (body optional: `new_password`; else returns one-time token), `POST .../archive`, `POST .../unarchive` (platform_admin only, audited in `platform_audit_log`); `GET /api/platform/audit-logs` (query: `tenant_id`, `actor_user_id`, `action`, `date_from`, `date_to`, `per_page`, `page`; platform_admin only); `GET /api/platform/impersonation`, `POST .../start`, `POST .../stop` (platform_admin only, audited) |
+| **Platform**    | `GET/POST /api/platform/tenants`, `GET/PUT /api/platform/tenants/{id}`; `GET /api/platform/tenants/{id}/modules`, `PUT .../modules`; `POST .../reset-admin-password` (body optional: `new_password`; else returns one-time token), `POST .../archive`, `POST .../unarchive` (platform_admin only, audited in `platform_audit_log`); `GET /api/platform/audit-logs` (identity audit; query: `tenant_id`, `action`, `from`, `to`, `q`, `per_page`, `page`; platform_admin only); `GET /api/platform/config-health` (platform_admin only); `GET /api/platform/impersonation`, `POST .../start`, `POST .../stop` (platform_admin only, audited) |
 | **Dev**         | `GET/POST /api/dev/tenants`, `POST /api/dev/tenants/{id}/activate`        |
 | **Users**       | `apiResource('users')`                                                   |
 | **Parties**     | `apiResource('parties')`, `.../balances`, `.../statement`, `.../receivables/open-sales` |
@@ -306,9 +323,10 @@ Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, 
 | Script / command       | Purpose                                    |
 |------------------------|--------------------------------------------|
 | `enable-php-extensions.ps1` | Enable OpenSSL, fileinfo for Laravel |
+| `enable-openssl.ps1`       | Enable OpenSSL in php.ini (Laragon); restart Laragon after |
 | `build.bat` / `build.ps1`   | Full build (env, composer, shared, web, migrate, frontend build) |
-| `build-and-start.bat`      | Build and start API + web                  |
-| `start-servers.bat` / `start-servers.ps1` | Start API and web              |
+| `build-and-start.bat`      | Build then start API + web in separate windows (checks OpenSSL first) |
+| `start-servers.bat` / `start-servers.ps1` | Start API and web in separate windows (no build) |
 | `setup-api.ps1`            | API .env and composer setup               |
 | `scripts/create-test-db.ps1` | Create test DB (see script for target)  |
 | `npm run build`             | Build shared package + web app (root: `npm run build`; runs `build:shared` then `build:web`) |
@@ -321,6 +339,7 @@ Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, 
 | `npm run e2e`               | Start API then run Playwright E2E (uses `E2E_PROFILE` or default) |
 | `npm run e2e:core`          | E2E with profile `core`                   |
 | `npm run e2e:all`           | E2E with profile `all` (e.g. platform admin flows) |
+| `npx playwright install` (from `apps/web`) | First-time: install Playwright browsers for E2E |
 | `php artisan db:seed --class=StagingSeeder` (from `apps/api`) | Seed/upsert Staging tenant + admin, system accounts, modules |
 
 ---
@@ -328,6 +347,8 @@ Access to some areas is gated by **roles** and **tenant modules** (e.g. `land`, 
 ## Testing
 
 ### Backend (Laravel)
+
+Backend tests require **PostgreSQL**. See [apps/api/tests/README.md](apps/api/tests/README.md) for test DB setup (including Windows: `.\scripts\create-test-db.ps1` from repo root).
 
 ```bash
 cd apps/api
@@ -374,12 +395,19 @@ php artisan test tests/Feature/CropProfitabilityTrendReportTest.php
 Playwright specs live under `apps/web/playwright/`. Run from repo root:
 
 ```bash
+# First time only: install browsers
+cd apps/web && npx playwright install && cd ../..
+
 npm run e2e          # starts API, then runs E2E (default profile)
 npm run e2e:core     # E2E with profile "core"
 npm run e2e:all      # E2E with profile "all" (includes platform admin)
 ```
 
 Platform admin flows (tenant list, impersonation, audit logs) require a profile that logs in as `platform_admin` (e.g. set `E2E_PROFILE=all` or use seed that creates a platform admin). Specs: `apps/web/playwright/specs/15_platform_tenant_impersonation.spec.ts`, `16_platform_login_and_modules.spec.ts` (includes audit logs page load).
+
+### Frontend unit tests (Vitest)
+
+From `apps/web`: `npm run test` (Vitest), `npm run test:ui` for UI mode; `npm run lint` for ESLint.
 
 ---
 
@@ -418,11 +446,12 @@ Platform admin flows (tenant list, impersonation, audit logs) require a profile 
 │   ├── FILE_TREE.md
 │   ├── PHASE_*.md
 │   └── QUICK_START.md
-├── scripts/
+├── scripts/              # create-test-db.ps1, etc.
 ├── .gitignore
-├── package.json
-├── build.bat, build.ps1
-├── setup-api.ps1
+├── package.json          # workspaces: apps/*, packages/*; dev, build, e2e scripts
+├── build.bat, build.ps1, build-and-start.bat
+├── start-servers.bat, start-servers.ps1
+├── setup-api.ps1, enable-php-extensions.ps1, enable-openssl.ps1
 └── README.md (this file)
 ```
 
@@ -439,6 +468,7 @@ Platform admin flows (tenant list, impersonation, audit logs) require a profile 
 | **Shared package errors** | `cd packages/shared && npm run build`; in `apps/web`: `npm install` |
 | **CORS** | `apps/api/config/cors.php`; ensure origin matches frontend (e.g. `http://localhost:3000`) |
 | **Port in use** | Free 8000 (API) and 3000 (web) or change in respective configs |
+| **Playwright E2E fails / browsers missing** | From `apps/web` run `npx playwright install` once to install browsers. |
 | **API slow / performance** | See [Performance monitoring](#performance-monitoring) below. |
 
 ### Performance monitoring
