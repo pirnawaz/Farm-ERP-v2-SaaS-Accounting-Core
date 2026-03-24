@@ -9,12 +9,12 @@ use App\Models\InvItemCategory;
 use App\Models\InvStore;
 use App\Models\InvUom;
 use App\Models\Module;
-use App\Models\Tenant;
 use App\Models\TenantModule;
 use App\Models\User;
 use Database\Seeders\ModulesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Tests\Traits\CreatesTenantWithRoleUsers;
 
 /**
  * Role permission enforcement: accountant cannot manage users/modules or access platform;
@@ -22,14 +22,12 @@ use Tests\TestCase;
  */
 class RolePermissionEnforcementTest extends TestCase
 {
+    use CreatesTenantWithRoleUsers;
     use RefreshDatabase;
 
     private function tenantHeaders(string $role): array
     {
-        return [
-            'X-Tenant-Id' => $this->tenant->id,
-            'X-User-Role' => $role,
-        ];
+        return $this->tenantRoleHeaders($role);
     }
 
     private function platformHeaders(string $role): array
@@ -44,7 +42,7 @@ class RolePermissionEnforcementTest extends TestCase
     {
         parent::setUp();
         (new ModulesSeeder)->run();
-        $this->tenant = Tenant::create(['name' => 'T1', 'status' => 'active']);
+        $this->tenantWithRoleUsers();
     }
 
     public function test_accountant_cannot_access_tenant_users_index(): void
@@ -69,7 +67,7 @@ class RolePermissionEnforcementTest extends TestCase
     public function test_accountant_cannot_update_tenant_user(): void
     {
         $user = User::create([
-            'tenant_id' => $this->tenant->id,
+            'tenant_id' => $this->tenant()->id,
             'name' => 'U',
             'email' => 'u@t1.test',
             'password' => null,
@@ -85,7 +83,7 @@ class RolePermissionEnforcementTest extends TestCase
     public function test_accountant_cannot_delete_tenant_user(): void
     {
         $user = User::create([
-            'tenant_id' => $this->tenant->id,
+            'tenant_id' => $this->tenant()->id,
             'name' => 'U',
             'email' => 'u@t1.test',
             'password' => null,
@@ -182,14 +180,17 @@ class RolePermissionEnforcementTest extends TestCase
         $r->assertStatus(200);
     }
 
-    private ?Tenant $tenant = null;
+    private function tenant(): \App\Models\Tenant
+    {
+        return $this->tenantWithRoleUsers()['tenant'];
+    }
 
     private function enableInventory(): void
     {
         $m = Module::where('key', 'inventory')->first();
         if ($m) {
             TenantModule::firstOrCreate(
-                ['tenant_id' => $this->tenant->id, 'module_id' => $m->id],
+                ['tenant_id' => $this->tenant()->id, 'module_id' => $m->id],
                 ['status' => 'ENABLED', 'enabled_at' => now(), 'disabled_at' => null, 'enabled_by_user_id' => null]
             );
         }
@@ -197,26 +198,27 @@ class RolePermissionEnforcementTest extends TestCase
 
     private function createDraftGrn(): InvGrn
     {
-        $uom = InvUom::create(['tenant_id' => $this->tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
-        $cat = InvItemCategory::create(['tenant_id' => $this->tenant->id, 'name' => 'Cat']);
+        $tid = $this->tenant()->id;
+        $uom = InvUom::create(['tenant_id' => $tid, 'code' => 'BAG', 'name' => 'Bag']);
+        $cat = InvItemCategory::create(['tenant_id' => $tid, 'name' => 'Cat']);
         $item = InvItem::create([
-            'tenant_id' => $this->tenant->id,
+            'tenant_id' => $tid,
             'name' => 'Item',
             'uom_id' => $uom->id,
             'category_id' => $cat->id,
             'valuation_method' => 'WAC',
             'is_active' => true,
         ]);
-        $store = InvStore::create(['tenant_id' => $this->tenant->id, 'name' => 'S1', 'type' => 'MAIN', 'is_active' => true]);
+        $store = InvStore::create(['tenant_id' => $tid, 'name' => 'S1', 'type' => 'MAIN', 'is_active' => true]);
         $grn = InvGrn::create([
-            'tenant_id' => $this->tenant->id,
+            'tenant_id' => $tid,
             'doc_no' => 'GRN-1',
             'store_id' => $store->id,
             'doc_date' => '2024-06-15',
             'status' => 'DRAFT',
         ]);
         InvGrnLine::create([
-            'tenant_id' => $this->tenant->id,
+            'tenant_id' => $tid,
             'grn_id' => $grn->id,
             'item_id' => $item->id,
             'qty' => 10,

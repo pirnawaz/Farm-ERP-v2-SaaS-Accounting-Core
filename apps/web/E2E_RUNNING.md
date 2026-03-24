@@ -1,5 +1,10 @@
 # Running E2E (Playwright)
 
+## Prerequisites
+
+- **API must be running** and reachable at `API_BASE_URL` (default `http://localhost:8000`). Global-setup calls `POST /api/dev/e2e/seed` and `POST /api/dev/e2e/auth-cookie`; specs that use storage state (e.g. 50_role_accountant, 51_role_operator) need the API for tenant modules and data. Specs 52 (tenant login), 53 (select-tenant), and 54 (accept-invite) perform real login or invite flows and also require the API.
+- Start the API (e.g. `cd apps/api && php artisan serve`) before running Playwright, or use your usual dev stack.
+
 ## Force-all-modules flag (TEMP)
 
 For system completion and Playwright testing we support a **temporary** override that makes all modules appear enabled for all tenants and bypasses module enforcement. This simplifies development and keeps E2E stable (e.g. `modules-ready` reaches `ready` immediately).

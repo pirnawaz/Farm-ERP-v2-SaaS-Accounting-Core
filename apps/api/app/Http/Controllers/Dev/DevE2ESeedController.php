@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Dev;
 
+use App\Helpers\AuthCookie;
+use App\Helpers\AuthToken;
 use App\Http\Controllers\Controller;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
@@ -9,7 +11,6 @@ use App\Models\User;
 use App\Services\Dev\E2ESeedService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cookie;
 
 class DevE2ESeedController extends Controller
 {
@@ -73,39 +74,32 @@ class DevE2ESeedController extends Controller
     public function authCookie(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'tenant_id' => ['required', 'uuid'],
+            'tenant_id' => ['nullable', 'uuid'],
             'role' => ['required', 'string', 'in:tenant_admin,accountant,operator,platform_admin'],
             'user_id' => ['required', 'uuid'],
         ]);
 
-        $user = User::where('id', $validated['user_id'])
-            ->where('tenant_id', $validated['tenant_id'])
-            ->where('role', $validated['role'])
-            ->first();
+        if ($validated['role'] === 'platform_admin') {
+            $user = User::where('id', $validated['user_id'])
+                ->whereNull('tenant_id')
+                ->where('role', 'platform_admin')
+                ->first();
+        } else {
+            if (empty($validated['tenant_id'])) {
+                return response()->json(['error' => 'tenant_id required for non-platform roles'], 422);
+            }
+            $user = User::where('id', $validated['user_id'])
+                ->where('tenant_id', $validated['tenant_id'])
+                ->where('role', $validated['role'])
+                ->first();
+        }
 
         if (!$user) {
             return response()->json(['error' => 'User not found for given tenant_id, role, user_id'], 404);
         }
 
-        $token = base64_encode(json_encode([
-            'user_id' => $user->id,
-            'tenant_id' => $user->tenant_id,
-            'role' => $user->role,
-            'email' => $user->email,
-            'expires_at' => now()->addHours(24)->timestamp,
-        ]));
-
-        $cookie = cookie(
-            'farm_erp_auth_token',
-            $token,
-            60 * 24,
-            '/',
-            null,
-            false,
-            true,
-            false,
-            'lax'
-        );
+        $token = AuthToken::create($user, $user->tenant_id, null, 24);
+        $cookie = AuthCookie::make($token);
 
         return response()->json(['ok' => true])->cookie($cookie);
     }

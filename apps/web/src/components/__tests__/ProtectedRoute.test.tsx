@@ -33,9 +33,26 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
-  it('renders children when authenticated', () => {
+  it('renders children when authenticated as tenant_admin', () => {
     (useAuth as any).mockReturnValue({
       userRole: 'tenant_admin',
+      isLoading: false,
+    });
+
+    render(
+      <BrowserRouter>
+        <ProtectedRoute>
+          <div>Protected Content</div>
+        </ProtectedRoute>
+      </BrowserRouter>
+    );
+
+    expect(screen.getByText('Protected Content')).toBeInTheDocument();
+  });
+
+  it('renders children when authenticated as operator (auth-only gate; role gating is per-page)', () => {
+    (useAuth as any).mockReturnValue({
+      userRole: 'operator',
       isLoading: false,
     });
 

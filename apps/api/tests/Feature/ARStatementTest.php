@@ -288,6 +288,13 @@ class ARStatementTest extends TestCase
         $responseBefore->assertStatus(200);
         $this->assertCount(2, $responseBefore->json('lines'));
 
+        // Posting Payment IN auto-allocates to open sales; reverse requires no allocations (API returns 409 otherwise).
+        // Unapply the payment from the sale first, then reverse.
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/payments/{$payment->id}/unapply-sales", [])
+            ->assertStatus(200);
+
         $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->postJson("/api/payments/{$payment->id}/reverse", [
@@ -304,5 +311,82 @@ class ARStatementTest extends TestCase
         $this->assertCount(1, $data['lines'], 'Only Sale line must remain after Payment IN is reversed');
         $this->assertEquals('SALE', $data['lines'][0]['source_type']);
         $this->assertEquals('800.00', $data['totals']['closing_balance']);
+    }
+
+    /**
+     * Payment reverse returns 409 when payment has applied sales allocations (API contract).
+     * Posting Payment IN auto-allocates to open sales; reverse must be preceded by unapply.
+     */
+    public function test_payment_reverse_returns_409_when_sales_allocations_exist(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableModules($tenant, ['ar_sales', 'treasury_payments']);
+
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle 1',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $party = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Buyer',
+            'party_types' => ['BUYER'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $party->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project 1',
+            'status' => 'ACTIVE',
+        ]);
+
+        $sale = Sale::create([
+            'tenant_id' => $tenant->id,
+            'buyer_party_id' => $party->id,
+            'project_id' => $project->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'amount' => 500.00,
+            'posting_date' => '2024-06-10',
+            'sale_date' => '2024-06-10',
+            'status' => 'DRAFT',
+        ]);
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/sales/{$sale->id}/post", [
+                'posting_date' => '2024-06-10',
+                'idempotency_key' => 'ar-409-sale',
+            ])
+            ->assertStatus(201);
+
+        $payment = Payment::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $party->id,
+            'direction' => 'IN',
+            'amount' => 100.00,
+            'payment_date' => '2024-06-18',
+            'method' => 'CASH',
+            'status' => 'DRAFT',
+        ]);
+        $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/payments/{$payment->id}/post", [
+                'posting_date' => '2024-06-18',
+                'idempotency_key' => 'ar-409-pmt',
+                'crop_cycle_id' => $cropCycle->id,
+            ])
+            ->assertStatus(201);
+
+        // Do not unapply; payment has allocations. Reverse must return 409.
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/payments/{$payment->id}/reverse", [
+                'posting_date' => '2024-06-19',
+                'reason' => 'Should be blocked',
+            ]);
+        $response->assertStatus(409);
+        $response->assertJsonPath('message', 'Payment has applied allocations. Unapply sales allocations before reversing.');
     }
 }

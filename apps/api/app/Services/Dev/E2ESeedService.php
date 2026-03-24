@@ -4,12 +4,15 @@ namespace App\Services\Dev;
 
 use App\Models\CropCycle;
 use App\Models\Farm;
+use App\Models\Identity;
 use App\Models\OperationalTransaction;
 use App\Models\Party;
 use App\Models\PostingGroup;
 use App\Models\Project;
 use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Models\User;
+use App\Models\UserInvitation;
 use Database\Seeders\SystemAccountsSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -42,6 +45,8 @@ class E2ESeedService
 
             $this->ensureBootstrapAccounts($tenantId);
             $userIds = $this->ensureUsersPerRole($tenantId);
+            $userIds['platform_admin'] = $this->ensurePlatformAdminUser();
+            $this->ensureMultiTenantIdentityForE2E($tenantId);
 
             $openCycle = $this->ensureOpenCropCycle($tenantId);
             $project = $this->ensureProject($tenantId, $openCycle->id);
@@ -50,6 +55,8 @@ class E2ESeedService
             [$reversalTxn, $reversalPg] = $this->ensureReversalReadyTransaction($tenantId, $openCycle->id, $project->id);
 
             [$closedCycle, $draftInClosedCycleTxn] = $this->ensureClosedCropCycleWithDraft($tenantId);
+
+            $inviteToken = $this->ensureE2EInviteToken($tenantId, $userIds['tenant_admin']);
 
             $this->persistSeedState($tenantId, [
                 'draft_transaction_id' => $draftTxn->id,
@@ -67,6 +74,7 @@ class E2ESeedService
 
             return [
                 'tenant_id' => $tenantId,
+                'invite_token' => $inviteToken,
                 'crop_cycle_id' => $openCycle->id,
                 'open_crop_cycle_id' => $openCycle->id,
                 'closed_crop_cycle_id' => $closedCycle->id,
@@ -86,6 +94,21 @@ class E2ESeedService
                 'posted_machinery_posting_group_id' => null,
             ];
         });
+    }
+
+    /**
+     * Create an E2E invite for e2e-invited@e2e.local (accountant) so accept-invite E2E can run.
+     * Returns the plain token or null if creation failed (e.g. user already exists).
+     */
+    private function ensureE2EInviteToken(string $tenantId, string $invitedByUserId): ?string
+    {
+        $email = 'e2e-invited@e2e.local';
+        if (User::where('tenant_id', $tenantId)->where('email', $email)->exists()) {
+            $existing = UserInvitation::findExistingNotExpired($tenantId, $email);
+            return $existing?->token_plain;
+        }
+        [$plain] = UserInvitation::createOrReuseInvitation($tenantId, $email, 'accountant', $invitedByUserId, 168);
+        return $plain;
     }
 
     /**
@@ -201,33 +224,147 @@ class E2ESeedService
     }
 
     /**
-     * Ensure one enabled user per role; return map of role => user_id.
+     * Ensure one enabled user per tenant role with Identity + TenantMembership so unified login works.
+     * Does not create platform_admin (use ensurePlatformAdminUser).
      * @return array<string, string>
      */
     private function ensureUsersPerRole(string $tenantId): array
     {
-        $roles = ['tenant_admin', 'accountant', 'operator', 'platform_admin'];
+        $roles = ['tenant_admin', 'accountant', 'operator'];
         $userIds = [];
         foreach ($roles as $role) {
-            $email = "e2e-{$role}@e2e.local";
-            $user = User::where('tenant_id', $tenantId)->where('email', $email)->first();
-            if (!$user) {
-                $user = User::create([
-                    'tenant_id' => $tenantId,
-                    'name' => 'E2E ' . str_replace('_', ' ', ucfirst($role)),
-                    'email' => $email,
-                    'password' => Hash::make('password'),
-                    'role' => $role,
-                    'is_enabled' => true,
-                ]);
-            } else {
-                if (!$user->is_enabled) {
-                    $user->update(['is_enabled' => true]);
-                }
-            }
-            $userIds[$role] = $user->id;
+            $userIds[$role] = $this->ensureIdentityMembershipAndUserForRole($tenantId, $role);
         }
         return $userIds;
+    }
+
+    /**
+     * Ensure Identity, TenantMembership, and User exist for a tenant role so unified login succeeds.
+     * Returns user_id for the tenant user.
+     */
+    private function ensureIdentityMembershipAndUserForRole(string $tenantId, string $role): string
+    {
+        $email = "e2e-{$role}@e2e.local";
+        $passwordHash = Hash::make('password');
+        $name = 'E2E ' . str_replace('_', ' ', ucfirst($role));
+
+        $identity = Identity::firstOrCreate(
+            ['email' => $email],
+            [
+                'password_hash' => $passwordHash,
+                'is_enabled' => true,
+                'is_platform_admin' => false,
+                'token_version' => 1,
+            ]
+        );
+        if ($identity->wasRecentlyCreated === false) {
+            $identity->update(['password_hash' => $passwordHash, 'is_enabled' => true]);
+        }
+
+        $membership = TenantMembership::where('identity_id', $identity->id)
+            ->where('tenant_id', $tenantId)
+            ->first();
+        if (!$membership) {
+            TenantMembership::create([
+                'identity_id' => $identity->id,
+                'tenant_id' => $tenantId,
+                'role' => $role,
+                'is_enabled' => true,
+            ]);
+        } else {
+            $membership->update(['role' => $role, 'is_enabled' => true]);
+        }
+
+        $user = User::where('tenant_id', $tenantId)->where('email', $email)->first();
+        if (!$user) {
+            $user = User::create([
+                'identity_id' => $identity->id,
+                'tenant_id' => $tenantId,
+                'name' => $name,
+                'email' => $email,
+                'password' => $passwordHash,
+                'role' => $role,
+                'is_enabled' => true,
+            ]);
+        } else {
+            $user->update([
+                'identity_id' => $identity->id,
+                'is_enabled' => true,
+            ]);
+        }
+
+        return $user->id;
+    }
+
+    /**
+     * Ensure one identity (e2e-multi@e2e.local) with two tenant memberships so select-tenant E2E can run.
+     * Creates second tenant "E2E Farm 2" if needed, then Identity + 2 TenantMemberships + 2 Users.
+     */
+    private function ensureMultiTenantIdentityForE2E(string $firstTenantId): void
+    {
+        $secondTenant = $this->resolveTenant(null, 'E2E Farm 2');
+        $secondTenantId = $secondTenant->id;
+        $this->markOnboardingCompleted($secondTenant);
+
+        $email = 'e2e-multi@e2e.local';
+        $passwordHash = Hash::make('password');
+
+        $identity = Identity::firstOrCreate(
+            ['email' => $email],
+            [
+                'password_hash' => $passwordHash,
+                'is_enabled' => true,
+                'is_platform_admin' => false,
+                'token_version' => 1,
+            ]
+        );
+        if (!$identity->wasRecentlyCreated) {
+            $identity->update(['password_hash' => $passwordHash, 'is_enabled' => true]);
+        }
+
+        foreach ([$firstTenantId => 'E2E Farm', $secondTenantId => 'E2E Farm 2'] as $tid => $_name) {
+            $membership = TenantMembership::firstOrCreate(
+                ['identity_id' => $identity->id, 'tenant_id' => $tid],
+                ['role' => 'tenant_admin', 'is_enabled' => true]
+            );
+            $membership->update(['role' => 'tenant_admin', 'is_enabled' => true]);
+
+            $user = User::firstOrCreate(
+                ['tenant_id' => $tid, 'email' => $email],
+                [
+                    'identity_id' => $identity->id,
+                    'name' => 'E2E Multi',
+                    'password' => $passwordHash,
+                    'role' => 'tenant_admin',
+                    'is_enabled' => true,
+                ]
+            );
+            $user->update(['identity_id' => $identity->id, 'is_enabled' => true]);
+        }
+    }
+
+    /**
+     * Ensure one enabled platform_admin user (tenant_id null). Return user_id.
+     */
+    private function ensurePlatformAdminUser(): string
+    {
+        $email = 'e2e-platform_admin@e2e.local';
+        $user = User::whereNull('tenant_id')->where('email', $email)->where('role', 'platform_admin')->first();
+        if (!$user) {
+            $user = User::create([
+                'tenant_id' => null,
+                'name' => 'E2E Platform Admin',
+                'email' => $email,
+                'password' => Hash::make('password'),
+                'role' => 'platform_admin',
+                'is_enabled' => true,
+            ]);
+        } else {
+            if (!$user->is_enabled) {
+                $user->update(['is_enabled' => true]);
+            }
+        }
+        return $user->id;
     }
 
     private function ensureOpenCropCycle(string $tenantId): CropCycle

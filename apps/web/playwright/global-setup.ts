@@ -46,7 +46,7 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      tenant_id,
+      tenant_id: isPlatformProfile ? null : tenant_id,
       role,
       user_id: userId,
     }),
@@ -107,6 +107,53 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     JSON.stringify({ profile, enabled_modules: enabledModules }, null, 2),
     'utf-8'
   );
+
+  // Role-based storage states for accountant and operator (same tenant; used by 50_*, 51_* specs).
+  const accountantUserId = seedData.accountant_user_id as string;
+  const operatorUserId = seedData.operator_user_id as string;
+  const hostname = new URL(BASE_URL).hostname;
+
+  for (const { role, userId, filename } of [
+    { role: 'accountant', userId: accountantUserId, filename: 'accountant.json' },
+    { role: 'operator', userId: operatorUserId, filename: 'operator.json' },
+  ]) {
+    const res = await fetch(`${API_BASE_URL}/api/dev/e2e/auth-cookie`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenant_id, role, user_id: userId }),
+    });
+    if (!res.ok) {
+      continue;
+    }
+    const roleCookie = parseSetCookieHeaders(res.headers);
+    const roleState = {
+      cookies: roleCookie
+        ? [
+            {
+              name: roleCookie.name,
+              value: roleCookie.value,
+              domain: hostname,
+              path: '/',
+              expires: -1,
+              httpOnly: true,
+              secure: false,
+              sameSite: 'Lax' as const,
+            },
+          ]
+        : [],
+      origins: [
+        {
+          origin: new URL(BASE_URL).origin,
+          localStorage: [
+            { name: 'farm_erp_tenant_id', value: tenant_id },
+            { name: 'farm_erp_user_role', value: role },
+            { name: 'farm_erp_user_id', value: userId },
+          ],
+        },
+      ],
+    };
+    fs.writeFileSync(path.join(authDir, filename), JSON.stringify(roleState), 'utf-8');
+  }
 }
 
 export default globalSetup;
