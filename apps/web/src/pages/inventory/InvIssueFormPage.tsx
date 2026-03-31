@@ -328,7 +328,7 @@ export default function InvIssueFormPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-5xl mx-auto space-y-6">
       <PageHeader
         title={`New ${term('issueSingular')}`}
         backTo="/app/inventory/issues"
@@ -358,7 +358,7 @@ export default function InvIssueFormPage() {
         )}
         <section className="space-y-4">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Header</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Doc No">
             <input value={doc_no} onChange={(e) => setDocNo(e.target.value)} disabled={!canEdit} placeholder={generateDocNo('ISS')} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg disabled:bg-gray-50" />
           </FormField>
@@ -568,7 +568,7 @@ export default function InvIssueFormPage() {
           <div className="space-y-3">
             {lines.map((line, i) => (
               <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FormField label="Item">
                     <select
                       value={line.item_id}

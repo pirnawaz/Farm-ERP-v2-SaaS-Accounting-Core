@@ -9,6 +9,7 @@ import { BrandLogo } from './BrandLogo';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OnboardingChecklist } from './OnboardingChecklist';
 import { CropCycleScopeSelector } from './CropCycleScopeSelector';
+import { CropCycleScopeRouteNotice } from './CropCycleScopeRouteNotice';
 import { AppSidebar } from './AppSidebar';
 
 export function AppLayout() {
@@ -101,10 +102,10 @@ export function AppLayout() {
       {/* Main content */}
       <div className="md:pl-64 flex flex-col flex-1">
         {/* Header */}
-        <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow">
+        <div className="sticky top-0 z-10 flex-shrink-0 flex min-h-16 py-2 bg-white shadow">
           <button
             type="button"
-            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#1F6F5C] md:hidden"
+            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#1F6F5C] md:hidden self-stretch flex items-center"
             onClick={() => setSidebarOpen(true)}
           >
             <span className="sr-only">Open sidebar</span>
@@ -112,28 +113,31 @@ export function AppLayout() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
             </svg>
           </button>
-            <div className="flex-1 px-4 flex justify-between items-center">
-            <div className="flex-1 flex items-center gap-4">
+          <div className="flex-1 px-4 flex flex-wrap justify-between items-center gap-y-2 gap-x-4 min-w-0">
+            <div className="flex flex-1 items-center min-w-0 gap-4">
               {isTenantApp && <CropCycleScopeSelector />}
-              <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-600">
-                  Tenant ID: <span className="font-mono text-xs text-gray-500">{tenantId ? `${tenantId.substring(0, 8)}...` : 'None'}</span>
-                </div>
-                <div className="text-sm text-gray-600">
-                  Role: <span className="font-medium text-gray-900">{userRole || 'None'}</span>
-                </div>
-              </div>
             </div>
-            <div className="ml-4 flex items-center space-x-2 md:ml-6">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div
+                className="hidden sm:block text-right text-[11px] leading-tight text-gray-400 max-w-[14rem]"
+                title={tenantId ? `Tenant ${tenantId}` : undefined}
+              >
+                <div className="font-mono truncate">
+                  {tenantId ? `${tenantId.substring(0, 8)}…` : '—'}
+                </div>
+                <div className="text-gray-500 truncate">{userRole || '—'}</div>
+              </div>
               <button
+                type="button"
                 onClick={handleSwitchFarm}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
               >
                 Switch Farm
               </button>
               <button
+                type="button"
                 onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
               >
                 Logout
               </button>
@@ -145,6 +149,7 @@ export function AppLayout() {
         <main className="flex-1">
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+              {isTenantApp && <CropCycleScopeRouteNotice />}
               {hasRole(['tenant_admin']) && <OnboardingChecklist />}
               <ErrorBoundary>
                 <Outlet />

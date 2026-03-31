@@ -60,60 +60,66 @@ export default function WorkersPage() {
     setCreateParty(true);
   };
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Workers"
         backTo="/app/labour"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Labour', to: '/app/labour' }, { label: 'Workers' }]}
         right={
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Worker</button>
+          <button type="button" onClick={() => setShowModal(true)} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Worker</button>
         }
       />
-      <div className="flex gap-4 mb-4 flex-wrap">
-        <select value={String(isActive)} onChange={(e) => setIsActive(e.target.value === '' ? '' : e.target.value === 'true')} className="px-3 py-2 border rounded text-sm">
-          <option value="">All active</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
-        <select value={workerType} onChange={(e) => setWorkerType(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All types</option>
-          <option value="HARI">HARI</option>
-          <option value="STAFF">STAFF</option>
-          <option value="CONTRACT">CONTRACT</option>
-        </select>
-        <input type="text" placeholder="Search name" value={q} onChange={(e) => setQ(e.target.value)} className="px-3 py-2 border rounded text-sm w-48" />
-      </div>
-      <div className="bg-white rounded-lg shadow">
-        <DataTable data={workers || []} columns={cols} emptyMessage="No workers. Create one." />
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <select value={String(isActive)} onChange={(e) => setIsActive(e.target.value === '' ? '' : e.target.value === 'true')} className="px-3 py-2 border rounded text-sm">
+            <option value="">All active</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+          <select value={workerType} onChange={(e) => setWorkerType(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All types</option>
+            <option value="HARI">HARI</option>
+            <option value="STAFF">STAFF</option>
+            <option value="CONTRACT">CONTRACT</option>
+          </select>
+          <input type="text" placeholder="Search name" value={q} onChange={(e) => setQ(e.target.value)} className="px-3 py-2 border rounded text-sm min-w-[12rem]" />
+        </div>
+        <div className="bg-white rounded-lg shadow">
+          {isLoading ? (
+            <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
+          ) : (
+            <DataTable data={workers || []} columns={cols} emptyMessage="No workers. Create one." />
+          )}
+        </div>
       </div>
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Worker">
         <div className="space-y-4">
-          <FormField label="Name" required><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
-          <FormField label="Worker No"><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} className="w-full px-3 py-2 border rounded" placeholder="Leave blank to auto-generate" /></FormField>
-          <FormField label="Type">
-            <select value={workerTypeVal} onChange={(e) => setWorkerTypeVal(e.target.value as 'HARI' | 'STAFF' | 'CONTRACT')} className="w-full px-3 py-2 border rounded">
-              <option value="HARI">HARI</option>
-              <option value="STAFF">STAFF</option>
-              <option value="CONTRACT">CONTRACT</option>
-            </select>
-          </FormField>
-          <FormField label="Rate basis">
-            <select value={rateBasis} onChange={(e) => setRateBasis(e.target.value as 'DAILY' | 'HOURLY' | 'PIECE')} className="w-full px-3 py-2 border rounded">
-              <option value="DAILY">DAILY</option>
-              <option value="HOURLY">HOURLY</option>
-              <option value="PIECE">PIECE</option>
-            </select>
-          </FormField>
-          <FormField label="Default rate"><input type="number" step="any" min="0" value={defaultRate} onChange={(e) => setDefaultRate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
-          <FormField label="Phone"><input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
-          <FormField label="Active"><label><input type="checkbox" checked={isActiveVal} onChange={(e) => setIsActiveVal(e.target.checked)} /> Active</label></FormField>
-          <FormField label="Create as Party for payments"><label><input type="checkbox" checked={createParty} onChange={(e) => setCreateParty(e.target.checked)} /> Create Party (for wage payments)</label></FormField>
-          <div className="flex gap-2 pt-4">
-            <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">Create</button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Name" required><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+            <FormField label="Worker No"><input value={workerNo} onChange={(e) => setWorkerNo(e.target.value)} className="w-full px-3 py-2 border rounded" placeholder="Leave blank to auto-generate" /></FormField>
+            <FormField label="Type">
+              <select value={workerTypeVal} onChange={(e) => setWorkerTypeVal(e.target.value as 'HARI' | 'STAFF' | 'CONTRACT')} className="w-full px-3 py-2 border rounded">
+                <option value="HARI">HARI</option>
+                <option value="STAFF">STAFF</option>
+                <option value="CONTRACT">CONTRACT</option>
+              </select>
+            </FormField>
+            <FormField label="Rate basis">
+              <select value={rateBasis} onChange={(e) => setRateBasis(e.target.value as 'DAILY' | 'HOURLY' | 'PIECE')} className="w-full px-3 py-2 border rounded">
+                <option value="DAILY">DAILY</option>
+                <option value="HOURLY">HOURLY</option>
+                <option value="PIECE">PIECE</option>
+              </select>
+            </FormField>
+            <FormField label="Default rate"><input type="number" step="any" min="0" value={defaultRate} onChange={(e) => setDefaultRate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+            <FormField label="Phone"><input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+            <FormField label="Active" className="md:col-span-2"><label><input type="checkbox" checked={isActiveVal} onChange={(e) => setIsActiveVal(e.target.checked)} /> Active</label></FormField>
+            <FormField label="Create as Party for payments" className="md:col-span-2"><label><input type="checkbox" checked={createParty} onChange={(e) => setCreateParty(e.target.checked)} /> Create Party (for wage payments)</label></FormField>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+            <button type="button" onClick={() => setShowModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">Create</button>
           </div>
         </div>
       </Modal>

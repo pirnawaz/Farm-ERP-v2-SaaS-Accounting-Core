@@ -34,7 +34,7 @@ export default function MachineryServiceFormPage() {
   const { data: machines } = useMachinesQuery();
   const { data: inventoryItems } = useInventoryItems(true);
   const { data: inventoryStores } = useInventoryStores(true);
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
 
   const [project_id, setProjectId] = useState(projectIdFromQuery);
   const [machine_id, setMachineId] = useState('');
@@ -121,19 +121,42 @@ export default function MachineryServiceFormPage() {
 
   if (isEdit && loadingService) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6">
+        <PageHeader
+          title={isEdit ? 'Edit Service' : 'New Service'}
+          backTo="/app/machinery/services"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Services', to: '/app/machinery/services' },
+            { label: isEdit ? 'Edit' : 'New' },
+          ]}
+        />
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
       </div>
     );
   }
 
   if (isEdit && service?.status !== 'DRAFT') {
     return (
-      <div className="p-6">
+      <div className="space-y-6">
+        <PageHeader
+          title="Edit Service"
+          backTo={`/app/machinery/services/${id}`}
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Services', to: '/app/machinery/services' },
+            { label: 'Edit' },
+          ]}
+        />
         <p className="text-red-600">Only draft services can be edited.</p>
         <button
+          type="button"
           onClick={() => navigate(`/app/machinery/services/${id}`)}
-          className="mt-4 text-[#1F6F5C] hover:underline"
+          className="text-[#1F6F5C] font-medium hover:underline"
         >
           Back to detail
         </button>
@@ -142,7 +165,7 @@ export default function MachineryServiceFormPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6 pb-8">
       <PageHeader
         title={isEdit ? 'Edit Service' : 'New Service'}
         backTo="/app/machinery/services"
@@ -198,7 +221,7 @@ export default function MachineryServiceFormPage() {
               <option value="">Select rate card</option>
               {cards?.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.effective_from} – {r.rate_unit} @ {formatMoney(r.base_rate)}
+                  {formatDate(r.effective_from)} – {r.rate_unit} @ {formatMoney(r.base_rate)}
                 </option>
               ))}
             </select>
@@ -316,19 +339,21 @@ export default function MachineryServiceFormPage() {
           <p className="text-sm text-gray-500">Amount will be calculated on posting.</p>
         )}
 
-        <div className="flex gap-2 pt-4">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
           <button
-            onClick={handleSubmit}
-            disabled={createM.isPending || updateM.isPending}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
-          >
-            {isEdit ? (updateM.isPending ? 'Saving...' : 'Save') : createM.isPending ? 'Creating...' : 'Create'}
-          </button>
-          <button
+            type="button"
             onClick={() => navigate(isEdit && id ? `/app/machinery/services/${id}` : '/app/machinery/services')}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+            className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
           >
             Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={createM.isPending || updateM.isPending}
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+          >
+            {isEdit ? (updateM.isPending ? 'Saving...' : 'Save') : createM.isPending ? 'Creating...' : 'Create'}
           </button>
         </div>
       </div>

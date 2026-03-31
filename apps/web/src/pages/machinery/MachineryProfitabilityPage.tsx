@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMachineryProfitabilityQuery } from '../../hooks/useMachinery';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageHeader } from '../../components/PageHeader';
 import { DataTable, type Column } from '../../components/DataTable';
 import { useFormatting } from '../../hooks/useFormatting';
 import { Modal } from '../../components/Modal';
@@ -132,22 +133,6 @@ export default function MachineryProfitabilityPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-        {error instanceof Error ? error.message : 'Failed to load profitability report'}
-      </div>
-    );
-  }
-
   const totals = report
     ? report.reduce(
         (acc, row) => ({
@@ -160,19 +145,44 @@ export default function MachineryProfitabilityPage() {
       )
     : null;
 
-  return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Machinery Profitability Report</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Shows usage, charges, costs, and margins per machine
-        </p>
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Machinery Profitability Report"
+          backTo="/app/machinery"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Profitability' },
+          ]}
+        />
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error instanceof Error ? error.message : 'Failed to load profitability report'}
+        </div>
       </div>
+    );
+  }
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Machinery Profitability Report"
+        backTo="/app/machinery"
+        breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
+          { label: 'Machinery', to: '/app/machinery' },
+          { label: 'Profitability' },
+        ]}
+      />
+      <p className="text-sm text-gray-600">
+        Shows usage, charges, costs, and margins per machine
+      </p>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">From Date</label>
             <input
               type="date"
               value={filters.from}
@@ -180,8 +190,8 @@ export default function MachineryProfitabilityPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">To Date</label>
             <input
               type="date"
               value={filters.to}
@@ -192,59 +202,61 @@ export default function MachineryProfitabilityPage() {
         </div>
       </div>
 
-      {report && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6">
-            {report.length > 0 ? (
-              <>
-                <DataTable
-                  data={report.map((r, i) => ({ ...r, id: r.machine_id || String(i) }))}
-                  columns={columns}
-                  onRowClick={handleRowClick}
-                />
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <div className="p-6">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner size="lg" />
+            </div>
+          ) : report && report.length > 0 ? (
+            <>
+              <DataTable
+                data={report.map((r, i) => ({ ...r, id: r.machine_id || String(i) }))}
+                columns={columns}
+                onRowClick={handleRowClick}
+              />
 
-                {totals && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h3 className="text-md font-medium text-gray-900 mb-4">Totals</h3>
-                    <div className="grid grid-cols-4 gap-4">
-                      <div>
-                        <div className="text-sm text-gray-500">Total Usage</div>
-                        <div className="text-lg font-semibold tabular-nums">
-                          {totals.usage_qty.toFixed(2)}
-                        </div>
+              {totals && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h3 className="text-md font-medium text-gray-900 mb-4">Totals</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-500">Total Usage</div>
+                      <div className="text-lg font-semibold tabular-nums">
+                        {totals.usage_qty.toFixed(2)}
                       </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Total Charges</div>
-                        <div className="text-lg font-semibold tabular-nums">
-                          {formatMoney(totals.charges_total.toFixed(2))}
-                        </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Total Charges</div>
+                      <div className="text-lg font-semibold tabular-nums">
+                        {formatMoney(totals.charges_total.toFixed(2))}
                       </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Total Costs</div>
-                        <div className="text-lg font-semibold tabular-nums">
-                          {formatMoney(totals.costs_total.toFixed(2))}
-                        </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Total Costs</div>
+                      <div className="text-lg font-semibold tabular-nums">
+                        {formatMoney(totals.costs_total.toFixed(2))}
                       </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Total Margin</div>
-                        <div
-                          className={`text-lg font-semibold tabular-nums ${
-                            totals.margin >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {formatMoney(totals.margin.toFixed(2))}
-                        </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Total Margin</div>
+                      <div
+                        className={`text-lg font-semibold tabular-nums ${
+                          totals.margin >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {formatMoney(totals.margin.toFixed(2))}
                       </div>
                     </div>
                   </div>
-                )}
-              </>
-            ) : (
-              <p className="text-gray-500">No data found for the selected date range</p>
-            )}
-          </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-gray-500">No data found for the selected date range</p>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Drilldown Modal */}
       {showDrilldown && selectedMachine && (

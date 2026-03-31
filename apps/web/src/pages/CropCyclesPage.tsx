@@ -9,6 +9,7 @@ import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useRole } from '../hooks/useRole';
+import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
 import type { CropCycle, CreateCropCyclePayload } from '../types';
 
@@ -27,6 +28,7 @@ export default function CropCyclesPage() {
   const closeMutation = useCloseCropCycle();
   const openMutation = useOpenCropCycle();
   const { hasRole, canCloseCropCycle } = useRole();
+  const { formatDate } = useFormatting();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAddCropModal, setShowAddCropModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: 'close' | 'open'; id: string } | null>(null);
@@ -101,8 +103,14 @@ export default function CropCyclesPage() {
       header: 'Crop',
       accessor: (row) => row.crop_display_name ?? row.crop_type ?? '—',
     },
-    { header: 'Start Date', accessor: 'start_date' },
-    { header: 'End Date', accessor: (r) => r.end_date ?? '—' },
+    {
+      header: 'Start Date',
+      accessor: (r) => formatDate(r.start_date, { variant: 'medium' }),
+    },
+    {
+      header: 'End Date',
+      accessor: (r) => (r.end_date ? formatDate(r.end_date, { variant: 'medium' }) : '—'),
+    },
     { header: 'Status', accessor: 'status' },
     {
       header: 'Actions',

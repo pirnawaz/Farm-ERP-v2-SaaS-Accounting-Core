@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
+import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
 import type { CreateLandParcelPayload } from '../types';
 
@@ -26,6 +27,7 @@ export default function LandParcelDetailPage() {
   const { data: parcel, isLoading } = useLandParcel(parcelId);
   const updateMutation = useUpdateLandParcel();
   const { hasRole } = useRole();
+  const { formatDateTime, formatNumber } = useFormatting();
   const canEdit = hasRole(['tenant_admin', 'accountant']);
   const { data: auditLogs, isLoading: auditLoading, isError: auditError } = useLandParcelAudit(parcelId, { enabled: canEdit });
   const [showEditModal, setShowEditModal] = useState(false);
@@ -114,11 +116,18 @@ export default function LandParcelDetailPage() {
           <dl className="space-y-2">
             <div>
               <dt className="text-sm font-medium text-gray-500">Total Acres</dt>
-              <dd className="text-sm text-gray-900">{parcel.total_acres}</dd>
+              <dd className="text-sm text-gray-900">
+                {formatNumber(parseFloat(String(parcel.total_acres)), {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}
+              </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Remaining Acres</dt>
-              <dd className="text-sm text-gray-900">{remainingAcres.toFixed(2)}</dd>
+              <dd className="text-sm text-gray-900">
+                {formatNumber(remainingAcres, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </dd>
             </div>
             {parcel.notes && (
               <div>
@@ -205,7 +214,7 @@ export default function LandParcelDetailPage() {
                   {auditLogs.map((log) => (
                     <tr key={log.id}>
                       <td className="px-3 py-2 text-gray-600">
-                        {log.changed_at ? new Date(log.changed_at).toLocaleString() : '—'}
+                        {log.changed_at ? formatDateTime(log.changed_at) : '—'}
                       </td>
                       <td className="px-3 py-2 text-gray-600">
                         {log.changed_by_user_id || '—'} / {log.changed_by_role || '—'}

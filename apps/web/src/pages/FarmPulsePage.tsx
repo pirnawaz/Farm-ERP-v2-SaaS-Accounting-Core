@@ -17,6 +17,8 @@ import { QuickActions } from '../components/QuickActions';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useFormatting } from '../hooks/useFormatting';
 import { getActiveCropCycleId } from '../utils/formDefaults';
+import { computeNetPositionSigned } from '../utils/netPosition';
+import { getMoneyColorClass } from '../utils/moneyStyles';
 import { term } from '../config/terminology';
 
 /** Normalize a date string to Y-m-d for API (from/to). */
@@ -31,12 +33,15 @@ function toYmd(dateStr: string): string {
 function HeroCard({
   title,
   value,
+  valueColorClass,
   sub,
   link,
   howCalculated,
 }: {
   title: string;
   value: string;
+  /** Tailwind text color for the value line; empty string uses parent default gray. */
+  valueColorClass?: string;
   sub?: string;
   link?: string;
   howCalculated?: string;
@@ -44,7 +49,9 @@ function HeroCard({
   const content = (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <p className="text-sm font-medium text-gray-500">{title}</p>
-      <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{value}</p>
+      <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">
+        <span className={valueColorClass}>{value}</span>
+      </p>
       {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
       {howCalculated && <p className="mt-0.5 text-xs text-gray-400">{howCalculated}</p>}
     </div>
@@ -54,7 +61,7 @@ function HeroCard({
 }
 
 export default function FarmPulsePage() {
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDateRange } = useFormatting();
   const { isModuleEnabled } = useModules();
   const { hasRole } = useRole();
   const asOf = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -135,13 +142,17 @@ export default function FarmPulsePage() {
     [payablesRows]
   );
 
-  const netPosition = useMemo(() => {
-    const cashVal = cash ?? 0;
-    const bankVal = bank ?? 0;
-    const arVal = receivables ?? 0;
-    const apVal = payables ?? 0;
-    return cashVal + bankVal + arVal - apVal - labourOwed;
-  }, [cash, bank, receivables, payables, labourOwed]);
+  const netPosition = useMemo(
+    () =>
+      computeNetPositionSigned(
+        cash ?? 0,
+        bank ?? 0,
+        receivables ?? 0,
+        payables ?? 0,
+        labourOwed
+      ),
+    [cash, bank, receivables, payables, labourOwed]
+  );
 
   const { data: profitability, isLoading: profitabilityLoading } = useCropProfitability(
     {
@@ -346,7 +357,7 @@ export default function FarmPulsePage() {
               className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 hover:border-[#1F6F5C]/30"
             >
               <p className="font-medium text-gray-900">
-                {activeCycle?.name} ({activeCycle?.start_date} – {cycleEnd})
+                {activeCycle?.name} ({formatDateRange(activeCycle?.start_date, cycleEnd)})
               </p>
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
@@ -470,6 +481,7 @@ export default function FarmPulsePage() {
               <HeroCard
                 title={payables != null ? 'I owe suppliers' : 'Bills to pay'}
                 value={payables != null ? formatMoney(payables) : formatMoney(0)}
+                valueColorClass={getMoneyColorClass(payables ?? 0)}
                 sub={payables == null ? 'Coming soon' : undefined}
                 link="/app/farm-pulse/payables"
                 howCalculated={payables != null ? 'From account balances (as of today)' : undefined}
@@ -478,6 +490,7 @@ export default function FarmPulsePage() {
                 <HeroCard
                   title="Labour owed"
                   value={formatMoney(labourOwed)}
+                  valueColorClass={getMoneyColorClass(labourOwed)}
                   link="/app/farm-pulse/labour-owed"
                   howCalculated="From outstanding wages"
                 />
@@ -485,9 +498,11 @@ export default function FarmPulsePage() {
               <div className="rounded-xl border-2 border-[#1F6F5C]/20 bg-[#1F6F5C]/5 p-4">
                 <p className="text-sm font-medium text-gray-600">Net position</p>
                 <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">
-                  {formatMoney(netPosition)}
+                  <span className={getMoneyColorClass(netPosition)}>{formatMoney(netPosition)}</span>
                 </p>
-                <p className="mt-0.5 text-xs text-gray-500">Cash + Bank + Receivables − Payables − Labour</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Cash + bank + receivables + payables + labour (each balance signed; liabilities negative)
+                </p>
               </div>
             </div>
           )}

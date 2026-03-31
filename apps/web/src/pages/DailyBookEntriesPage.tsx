@@ -4,6 +4,11 @@ import { DailyBookEntry, Project, apiClient } from '@farm-erp/shared'
 import { PostModal } from '../components/PostModal'
 import { useFormatting } from '../hooks/useFormatting'
 
+/**
+ * LEGACY / ORPHANED UI: Not registered in `App.tsx`, so unreachable via the normal `/app/...` router.
+ * Links like `/daily-book-entries/...` omit the `/app` prefix and assume legacy top-level routes.
+ * Kept for API/feature reference or eventual removal; register under `/app/...` before use.
+ */
 function DailyBookEntriesPage() {
   const { formatMoney, formatDate } = useFormatting()
   const navigate = useNavigate()
@@ -88,8 +93,8 @@ function DailyBookEntriesPage() {
     }
     fetchData()
     
-    // Navigate to posting group detail
-    navigate(`/posting-groups/${postingGroupId}`)
+    // Navigate to posting group detail (must match `/app` shell when this page is routed)
+    navigate(`/app/posting-groups/${postingGroupId}`)
   }
 
   return (

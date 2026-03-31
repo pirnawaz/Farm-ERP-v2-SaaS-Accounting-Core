@@ -3,6 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { DailyBookEntry, Project, apiClient } from '@farm-erp/shared'
 import { useTenantSettings } from '../hooks/useTenantSettings'
 
+/**
+ * LEGACY / ORPHANED UI: Not registered in `App.tsx`; unreachable in the normal app.
+ * Navigation targets (`/daily-book-entries`) omit the `/app` prefix used by the shell.
+ * Kept for API/feature reference or eventual removal; wire into `App.tsx` before use.
+ */
 function DailyBookEntryFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()

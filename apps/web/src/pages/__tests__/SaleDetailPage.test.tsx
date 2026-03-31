@@ -8,13 +8,23 @@ vi.mock('../../hooks/useSales', () => ({
   useSale: vi.fn(),
   useDeleteSale: vi.fn(),
   usePostSale: vi.fn(),
+  useReverseSale: vi.fn(),
 }));
 
 vi.mock('../../hooks/useRole', () => ({
   useRole: vi.fn(),
 }));
 
-import { useSale, usePostSale } from '../../hooks/useSales';
+vi.mock('../../hooks/useFormatting', () => ({
+  useFormatting: () => ({
+    formatMoney: (v: unknown) => String(v ?? ''),
+    formatDate: (v: unknown) => String(v ?? ''),
+    formatDateTime: (v: unknown) => String(v ?? ''),
+    formatNumber: (v: unknown) => String(v ?? ''),
+  }),
+}));
+
+import { useSale, usePostSale, useDeleteSale, useReverseSale } from '../../hooks/useSales';
 import { useRole } from '../../hooks/useRole';
 
 describe('SaleDetailPage', () => {
@@ -45,14 +55,17 @@ describe('SaleDetailPage', () => {
       isPending: false,
     });
 
+    (useDeleteSale as any).mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    (useReverseSale as any).mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
     render(
       <BrowserRouter>
         <SaleDetailPage />
       </BrowserRouter>
     );
 
-    // Check for warning message about closed cycle
+    // Check for warning message about closed cycle (copy matches SaleDetailPage)
     expect(screen.getByText(/Cannot post/i)).toBeInTheDocument();
-    expect(screen.getByText(/Crop cycle is closed/i)).toBeInTheDocument();
+    expect(screen.getByText(/is closed/i)).toBeInTheDocument();
   });
 });

@@ -1,45 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi, type UpdateTenantSettingsPayload } from '../api/settings';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { useRole } from '../hooks/useRole';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ReopenOnboardingButton } from '../components/OnboardingChecklist';
+import { SearchableSelect } from '../components/SearchableSelect';
+import {
+  CURRENCY_OPTIONS,
+  LOCALE_OPTIONS,
+  TIMEZONE_OPTIONS,
+  TENANT_LOCALISATION_DEFAULTS,
+  mergeSelectedOption,
+} from '../config/localisationOptions';
 import toast from 'react-hot-toast';
-
-const CURRENCIES = [
-  { code: 'PKR', name: 'Pakistani Rupee (PKR)' },
-  { code: 'GBP', name: 'British Pound (GBP)' },
-  { code: 'USD', name: 'US Dollar (USD)' },
-  { code: 'EUR', name: 'Euro (EUR)' },
-];
-
-const LOCALES = [
-  { code: 'en-PK', name: 'English (Pakistan)' },
-  { code: 'ur-PK', name: 'Urdu (Pakistan)' },
-  { code: 'en-GB', name: 'English (United Kingdom)' },
-  { code: 'en-US', name: 'English (United States)' },
-];
-
-const TIMEZONES = [
-  { code: 'Asia/Karachi', name: 'Asia/Karachi (Pakistan)' },
-  { code: 'Europe/London', name: 'Europe/London (UK)' },
-  { code: 'America/New_York', name: 'America/New_York (US Eastern)' },
-  { code: 'America/Los_Angeles', name: 'America/Los_Angeles (US Pacific)' },
-  { code: 'Europe/Paris', name: 'Europe/Paris (Central Europe)' },
-  { code: 'Asia/Dubai', name: 'Asia/Dubai (UAE)' },
-];
 
 export default function LocalisationSettingsPage() {
   const { settings, loading, error, refresh } = useTenantSettings();
   const { hasRole } = useRole();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<UpdateTenantSettingsPayload>({
-    currency_code: 'GBP',
-    locale: 'en-GB',
-    timezone: 'Europe/London',
+    currency_code: TENANT_LOCALISATION_DEFAULTS.currency_code,
+    locale: TENANT_LOCALISATION_DEFAULTS.locale,
+    timezone: TENANT_LOCALISATION_DEFAULTS.timezone,
   });
   const [saving, setSaving] = useState(false);
+
+  const currencyOptions = useMemo(
+    () => mergeSelectedOption(CURRENCY_OPTIONS, formData.currency_code),
+    [formData.currency_code],
+  );
+  const localeOptions = useMemo(
+    () => mergeSelectedOption(LOCALE_OPTIONS, formData.locale),
+    [formData.locale],
+  );
+  const timezoneOptions = useMemo(
+    () => mergeSelectedOption(TIMEZONE_OPTIONS, formData.timezone),
+    [formData.timezone],
+  );
 
   const canEdit = hasRole(['tenant_admin']);
 
@@ -61,8 +59,9 @@ export default function LocalisationSettingsPage() {
       toast.success('Localisation settings updated successfully');
       setSaving(false);
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to update settings');
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Failed to update settings';
+      toast.error(message);
       setSaving(false);
     },
   });
@@ -77,7 +76,7 @@ export default function LocalisationSettingsPage() {
     setSaving(true);
     try {
       await updateMutation.mutateAsync(formData);
-    } catch (error) {
+    } catch {
       // Error handled in mutation
     }
   };
@@ -103,7 +102,8 @@ export default function LocalisationSettingsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Localisation Settings</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Configure currency, locale, and timezone for your tenant. These settings affect how money and dates are displayed throughout the application.
+          Configure currency, locale, and timezone for your tenant. These settings control how monetary amounts,
+          numbers, dates, and times are displayed. They do not change accounting facts or stored ledger data.
         </p>
       </div>
 
@@ -119,65 +119,52 @@ export default function LocalisationSettingsPage() {
         <form onSubmit={handleSubmit}>
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="localisation-currency" className="block text-sm font-medium text-gray-700 mb-2">
                 Currency
               </label>
-              <select
+              <SearchableSelect
+                id="localisation-currency"
                 value={formData.currency_code}
-                onChange={(e) => setFormData({ ...formData, currency_code: e.target.value })}
+                onChange={(currency_code) => setFormData({ ...formData, currency_code })}
+                options={currencyOptions}
                 disabled={!canEdit || saving}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                {CURRENCIES.map((currency) => (
-                  <option key={currency.code} value={currency.code}>
-                    {currency.name}
-                  </option>
-                ))}
-              </select>
+              />
               <p className="text-xs text-gray-500 mt-1">
-                This currency will be used for displaying all monetary amounts in the UI.
+                Used for displaying monetary amounts in the UI and generated documents.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="localisation-locale" className="block text-sm font-medium text-gray-700 mb-2">
                 Locale
               </label>
-              <select
+              <SearchableSelect
+                id="localisation-locale"
                 value={formData.locale}
-                onChange={(e) => setFormData({ ...formData, locale: e.target.value })}
+                onChange={(locale) => setFormData({ ...formData, locale })}
+                options={localeOptions}
                 disabled={!canEdit || saving}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                {LOCALES.map((locale) => (
-                  <option key={locale.code} value={locale.code}>
-                    {locale.name}
-                  </option>
-                ))}
-              </select>
+              />
               <p className="text-xs text-gray-500 mt-1">
-                Locale affects number and date formatting (e.g., decimal separators, date order).
+                Controls date, number, and decimal formatting. Full UI translation only applies when translation
+                resources exist for the chosen locale; otherwise interface copy may remain in English while
+                formatting still follows this locale.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="localisation-timezone" className="block text-sm font-medium text-gray-700 mb-2">
                 Timezone
               </label>
-              <select
+              <SearchableSelect
+                id="localisation-timezone"
                 value={formData.timezone}
-                onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                onChange={(timezone) => setFormData({ ...formData, timezone })}
+                options={timezoneOptions}
                 disabled={!canEdit || saving}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                {TIMEZONES.map((tz) => (
-                  <option key={tz.code} value={tz.code}>
-                    {tz.name}
-                  </option>
-                ))}
-              </select>
+              />
               <p className="text-xs text-gray-500 mt-1">
-                All dates and times will be displayed in this timezone.
+                Controls how dates and times are displayed across the application.
               </p>
             </div>
           </div>
@@ -198,7 +185,8 @@ export default function LocalisationSettingsPage() {
 
       <div className="mt-6 bg-[#E6ECEA] border border-[#1F6F5C]/20 rounded-lg p-4">
         <p className="text-sm text-[#2D3A3A]">
-          <strong>Note:</strong> Changes to these settings will immediately affect how money and dates are displayed throughout the application. No page reload is required.
+          <strong>Note:</strong> Changes apply to how values are displayed (including money and timestamps). No page
+          reload is required. Underlying accounting and posting data are not modified.
         </p>
       </div>
 

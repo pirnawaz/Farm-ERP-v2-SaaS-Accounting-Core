@@ -50,41 +50,49 @@ export default function HarvestsPage() {
     },
   ];
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Harvests"
         backTo="/app/crop-ops"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Harvests' }]}
+        breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
+          { label: 'Crop Ops', to: '/app/crop-ops' },
+          { label: 'Harvests' },
+        ]}
         right={
-          <button onClick={() => navigate('/app/harvests/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
+          <button type="button" onClick={() => navigate('/app/harvests/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">
             New Harvest
           </button>
         }
       />
-      <div className="flex gap-4 mb-4 flex-wrap">
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All statuses</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="POSTED">POSTED</option>
-          <option value="REVERSED">REVERSED</option>
-        </select>
-        <select value={cropCycleId} onChange={(e) => setCropCycleId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All crop cycles</option>
-          {cropCycles?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="From" />
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="To" />
-      </div>
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={(harvests ?? []) as Harvest[]}
-          columns={cols}
-          onRowClick={(r) => navigate(`/app/harvests/${r.id}`, { state: { from: location.pathname + location.search } })}
-          emptyMessage="No harvests. Create one."
-        />
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All statuses</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="POSTED">POSTED</option>
+            <option value="REVERSED">REVERSED</option>
+          </select>
+          <select value={cropCycleId} onChange={(e) => setCropCycleId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All crop cycles</option>
+            {cropCycles?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="From" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="To" />
+        </div>
+        <div className="bg-white rounded-lg shadow">
+          {isLoading ? (
+            <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
+          ) : (
+            <DataTable
+              data={(harvests ?? []) as Harvest[]}
+              columns={cols}
+              onRowClick={(r) => navigate(`/app/harvests/${r.id}`, { state: { from: location.pathname + location.search } })}
+              emptyMessage="No harvests. Create one."
+            />
+          )}
+        </div>
       </div>
     </div>
   );

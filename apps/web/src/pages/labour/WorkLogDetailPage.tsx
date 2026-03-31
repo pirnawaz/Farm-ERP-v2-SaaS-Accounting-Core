@@ -112,7 +112,7 @@ export default function WorkLogDetailPage() {
   if (!log) return <div>Work log not found.</div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`Work Log ${log.doc_no}`}
         backTo={backTo}
@@ -124,7 +124,7 @@ export default function WorkLogDetailPage() {
         ]}
       />
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{log.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Worker</dt><dd>{log.worker?.name || log.worker_id}</dd></div>
@@ -154,7 +154,7 @@ export default function WorkLogDetailPage() {
       </div>
 
       {isDraft && canEdit ? (
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
           <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
@@ -202,16 +202,16 @@ export default function WorkLogDetailPage() {
             <FormField label="Rate"><input type="number" step="any" min="0" value={rate} onChange={(e) => setRate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Notes"><input value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           </div>
-          <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
-            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
+          <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap gap-2">
+            <button type="button" onClick={handleSave} disabled={updateM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
+            {canPost && <button type="button" onClick={() => setShowPostModal(true)} className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
           </div>
         </div>
       ) : null}
 
       {isPosted && canPost && (
-        <div className="mb-6">
-          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
+        <div>
+          <button type="button" onClick={() => setShowReverseModal(true)} className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
         </div>
       )}
 
@@ -219,9 +219,9 @@ export default function WorkLogDetailPage() {
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowPostModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">{postM.isPending ? term('postActionPending') : term('postAction')}</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+            <button type="button" onClick={() => setShowPostModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handlePost} disabled={postM.isPending} className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded">{postM.isPending ? term('postActionPending') : term('postAction')}</button>
           </div>
         </div>
       </Modal>
@@ -230,9 +230,9 @@ export default function WorkLogDetailPage() {
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Reason" required><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowReverseModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">{reverseM.isPending ? term('reverseActionPending') : term('reverseAction')}</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+            <button type="button" onClick={() => setShowReverseModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded">{reverseM.isPending ? term('reverseActionPending') : term('reverseAction')}</button>
           </div>
         </div>
       </Modal>

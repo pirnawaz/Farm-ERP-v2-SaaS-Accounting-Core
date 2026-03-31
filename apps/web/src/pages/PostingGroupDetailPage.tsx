@@ -4,6 +4,12 @@ import { PostingGroup, apiClient } from '@farm-erp/shared'
 import { useFormatting } from '../hooks/useFormatting'
 import { term } from '../config/terminology'
 import { Term } from '../components/Term'
+import { PageHeader } from '../components/PageHeader'
+import { Modal } from '../components/Modal'
+import { FormField } from '../components/FormField'
+import { LoadingSpinner } from '../components/LoadingSpinner'
+
+const GL_LIST_PATH = '/app/reports/general-ledger'
 
 function PostingGroupDetailPage() {
   const { id } = useParams()
@@ -36,6 +42,11 @@ function PostingGroupDetailPage() {
     }
   }, [id])
 
+  const closeReverseModal = () => {
+    setShowReverseModal(false)
+    setReverseReason('')
+  }
+
   const handleReverse = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!postingGroup || !reverseReason.trim()) return
@@ -49,8 +60,7 @@ function PostingGroupDetailPage() {
           reason: reverseReason,
         }
       )
-      setShowReverseModal(false)
-      setReverseReason('')
+      closeReverseModal()
       navigate(`/app/posting-groups/${reversal.id}`)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to reverse posting group')
@@ -60,48 +70,67 @@ function PostingGroupDetailPage() {
   }
 
   if (loading) {
-    return <div className="text-gray-600">Loading…</div>
-  }
-
-  if (error || !postingGroup) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded p-4">
-        <p className="text-red-800">{error || 'Not found'}</p>
-        <Link to="/daily-book-entries" className="text-[#1F6F5C] hover:underline mt-2 inline-block">
-          Back to Entries
-        </Link>
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner size="lg" />
       </div>
     )
   }
 
+  if (error || !postingGroup) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title={term('postingGroup')}
+          backTo={GL_LIST_PATH}
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Profit & Reports', to: '/app/reports' },
+            { label: 'General ledger', to: GL_LIST_PATH },
+            { label: 'Not found' },
+          ]}
+        />
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">{error || 'Not found'}</p>
+          <Link to={GL_LIST_PATH} className="text-[#1F6F5C] hover:underline mt-2 inline-block text-sm font-medium">
+            Back to General ledger
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const titleLabel = `${term('postingGroup')} · ${postingGroup.id.length > 12 ? `${postingGroup.id.slice(0, 8)}…` : postingGroup.id}`
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold"><Term k="postingGroup" showHint /> Details</h2>
-        <Link
-          to="/daily-book-entries"
-          className="text-[#1F6F5C] hover:text-[#1a5a4a]"
-        >
-          ← Back to Entries
-        </Link>
-      </div>
+      <PageHeader
+        title={titleLabel}
+        backTo={GL_LIST_PATH}
+        breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
+          { label: 'Profit & Reports', to: '/app/reports' },
+          { label: 'General ledger', to: GL_LIST_PATH },
+          { label: postingGroup.id.length > 12 ? `${postingGroup.id.slice(0, 8)}…` : postingGroup.id },
+        ]}
+      />
 
       {/* Posting Group Info */}
       <div className="bg-white rounded-lg shadow p-6" data-testid="posting-group-panel">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
           <h3 className="text-lg font-semibold"><Term k="postingGroup" showHint /> Information</h3>
           {postingGroup.source_type !== 'REVERSAL' && (
             <button
               type="button"
               data-testid="create-correction-btn"
               onClick={() => setShowReverseModal(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shrink-0"
             >
               {term('reverseAction')}
             </button>
           )}
         </div>
-        <dl className="grid grid-cols-2 gap-4">
+        <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Posting Date</dt>
             <dd className="mt-1 text-sm text-gray-900">{formatDate(postingGroup.posting_date)}</dd>
@@ -218,119 +247,112 @@ function PostingGroupDetailPage() {
           <h3 className="text-lg font-semibold"><Term k="ledgerEntries" showHint /></h3>
         </div>
         {postingGroup.ledger_entries && postingGroup.ledger_entries.length > 0 ? (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-[#E6ECEA]">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Account
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Debit
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Credit
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Currency
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {postingGroup.ledger_entries.map((entry) => (
-                <tr key={entry.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {entry.account?.name || entry.account?.code || 'N/A'}
-                    <span className="text-gray-500 ml-2">({entry.account?.code || 'N/A'})</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                    {parseFloat(entry.debit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.debit)}</span> : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                    {parseFloat(entry.credit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.credit)}</span> : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {entry.currency_code}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-[#E6ECEA]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Account
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Debit
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Credit
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Currency
+                  </th>
                 </tr>
-              ))}
-              <tr className="bg-gray-50 font-semibold">
-                <td className="px-6 py-4 whitespace-nowrap text-sm">Total</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                  <span className="tabular-nums">{formatMoney(
-                    postingGroup.ledger_entries
-                      .reduce((sum, e) => sum + parseFloat(e.debit.toString()), 0)
-                  )}</span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                  <span className="tabular-nums">{formatMoney(
-                    postingGroup.ledger_entries
-                      .reduce((sum, e) => sum + parseFloat(e.credit.toString()), 0)
-                  )}</span>
-                </td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {postingGroup.ledger_entries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {entry.account?.name || entry.account?.code || 'N/A'}
+                      <span className="text-gray-500 ml-2">({entry.account?.code || 'N/A'})</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                      {parseFloat(entry.debit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.debit)}</span> : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                      {parseFloat(entry.credit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.credit)}</span> : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {entry.currency_code}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-gray-50 font-semibold">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">Total</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                    <span className="tabular-nums">{formatMoney(
+                      postingGroup.ledger_entries
+                        .reduce((sum, e) => sum + parseFloat(e.debit.toString()), 0)
+                    )}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                    <span className="tabular-nums">{formatMoney(
+                      postingGroup.ledger_entries
+                        .reduce((sum, e) => sum + parseFloat(e.credit.toString()), 0)
+                    )}</span>
+                  </td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="px-6 py-4 text-sm text-gray-500">No {term('ledgerEntries').toLowerCase()}</div>
         )}
       </div>
 
-      {/* Reverse Modal */}
-      {showReverseModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4"><Term k="reversalPostingGroup" showHint /></h3>
-            <form onSubmit={handleReverse}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Posting Date
-                </label>
-                <input
-                  type="date"
-                  value={reversePostingDate}
-                  onChange={(e) => setReversePostingDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reason
-                </label>
-                <textarea
-                  value={reverseReason}
-                  onChange={(e) => setReverseReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  rows={4}
-                  required
-                  placeholder="Enter reason for reversal..."
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowReverseModal(false)
-                    setReverseReason('')
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                  disabled={reversing}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                  disabled={reversing}
-                >
-                  {reversing ? term('reverseActionPending') : term('reverseAction')}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showReverseModal}
+        onClose={closeReverseModal}
+        title={term('reversalPostingGroup')}
+        size="md"
+        testId="posting-group-reverse-modal"
+      >
+        <form onSubmit={handleReverse} className="space-y-4">
+          <FormField label="Posting Date" required>
+            <input
+              type="date"
+              value={reversePostingDate}
+              onChange={(e) => setReversePostingDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              required
+            />
+          </FormField>
+          <FormField label="Reason" required>
+            <textarea
+              value={reverseReason}
+              onChange={(e) => setReverseReason(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              rows={4}
+              required
+              placeholder="Enter reason for reversal..."
+            />
+          </FormField>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={closeReverseModal}
+              className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              disabled={reversing}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+              disabled={reversing}
+            >
+              {reversing ? term('reverseActionPending') : term('reverseAction')}
+            </button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   )
 }

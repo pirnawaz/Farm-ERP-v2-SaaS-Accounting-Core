@@ -193,7 +193,7 @@ export default function InvIssueDetailPage() {
   if (!issue) return <div>{term('issueSingular')} not found.</div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`${term('issueSingular')} ${issue.doc_no}`}
         backTo={backTo}
@@ -407,6 +407,7 @@ export default function InvIssueDetailPage() {
           </div>
           <div className="mb-4">
             <div className="flex justify-between mb-2"><h4 className="font-medium">Lines</h4><button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add</button></div>
+            <div className="overflow-x-auto">
             <table className="min-w-full border">
               <thead className="bg-[#E6ECEA]">
                 <tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr>
@@ -427,6 +428,7 @@ export default function InvIssueDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
           {canPost && !allocationValid() && (
             <p className="text-amber-700 text-sm mb-2">Set cost ownership above and save before posting.</p>
@@ -447,6 +449,7 @@ export default function InvIssueDetailPage() {
       ) : (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="font-medium mb-2">Lines</h3>
+          <div className="overflow-x-auto">
           <table className="min-w-full border">
             <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
             <tbody>
@@ -460,6 +463,7 @@ export default function InvIssueDetailPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {issue.lines && issue.lines.some((l) => l.line_total) && (
             <p className="mt-2 font-medium">Total: <span className="tabular-nums">{formatMoney((issue.lines || []).reduce((a, l) => a + parseFloat(String(l.line_total || 0)), 0))}</span></p>
           )}
@@ -469,6 +473,7 @@ export default function InvIssueDetailPage() {
       {isPosted && issue.posting_group?.allocation_rows && issue.posting_group.allocation_rows.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="font-medium mb-4">Cost Allocations</h3>
+          <div className="overflow-x-auto">
           <table className="min-w-full border">
             <thead className="bg-[#E6ECEA]">
               <tr>
@@ -489,6 +494,7 @@ export default function InvIssueDetailPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

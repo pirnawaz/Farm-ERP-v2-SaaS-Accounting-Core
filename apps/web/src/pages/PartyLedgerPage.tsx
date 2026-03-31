@@ -3,14 +3,18 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '@farm-erp/shared';
 import { reportsApi } from '../api/reports';
 import { exportToCSV } from '../utils/csvExport';
+import { exportAmountForSpreadsheet, exportDateIsoYmd, exportNullableString } from '../utils/exportFormatting';
+import { metaReportingPeriodLabel } from '../utils/reportPresentation';
 import { useFormatting } from '../hooks/useFormatting';
+import { useTenantSettings } from '../hooks/useTenantSettings';
 import { useParties } from '../hooks/useParties';
 import { PrintableReport } from '../components/print/PrintableReport';
 import type { PartyLedgerResponse, Party, Project, CropCycle } from '../types';
 import { Term } from '../components/Term';
 
 function PartyLedgerPage() {
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatMoney, formatDate, formatDateRange } = useFormatting();
+  const { settings } = useTenantSettings();
   const { data: parties = [] } = useParties();
   const [data, setData] = useState<PartyLedgerResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -71,27 +75,42 @@ function PartyLedgerPage() {
 
   const handleExport = () => {
     if (!data?.rows?.length || !filters.party_id) return;
-    exportToCSV(
-      data.rows,
-      '',
-      [
-        'posting_date',
-        'posting_group_id',
-        'source_type',
-        'source_id',
-        'description',
-        'project_id',
-        'crop_cycle_id',
-        'debit',
-        'credit',
-        'running_balance',
+    const mapped = data.rows.map((row) => ({
+      posting_date: exportDateIsoYmd(row.posting_date),
+      posting_group_id: row.posting_group_id,
+      source_type: row.source_type,
+      source_id: row.source_id,
+      description: exportNullableString(row.description),
+      project_id: exportNullableString(row.project_id),
+      crop_cycle_id: exportNullableString(row.crop_cycle_id),
+      debit: exportAmountForSpreadsheet(row.debit),
+      credit: exportAmountForSpreadsheet(row.credit),
+      running_balance: exportAmountForSpreadsheet(row.running_balance),
+    }));
+    const headers = [
+      'posting_date',
+      'posting_group_id',
+      'source_type',
+      'source_id',
+      'description',
+      'project_id',
+      'crop_cycle_id',
+      'debit',
+      'credit',
+      'running_balance',
+    ];
+    exportToCSV(mapped, '', headers, {
+      reportName: 'PartyLedger',
+      fromDate: filters.from,
+      toDate: filters.to,
+      metadataRows: [
+        ['export', 'Terrava Party Ledger'],
+        ['party_id', filters.party_id],
+        ['reporting_period_start', filters.from],
+        ['reporting_period_end', filters.to],
+        ['base_currency', settings?.currency_code ?? 'PKR'],
       ],
-      {
-        reportName: 'PartyLedger',
-        fromDate: filters.from,
-        toDate: filters.to,
-      }
-    );
+    });
   };
 
   const selectedParty = parties.find((p: Party) => p.id === filters.party_id);
@@ -293,11 +312,8 @@ function PartyLedgerPage() {
 
           <PrintableReport
             title="Party Ledger"
-            metaLeft={
-              selectedParty
-                ? `${selectedParty.name} • From ${formatDate(filters.from)} to ${formatDate(filters.to)}`
-                : `From ${formatDate(filters.from)} to ${formatDate(filters.to)}`
-            }
+            subtitle={selectedParty?.name}
+            metaLeft={metaReportingPeriodLabel(formatDateRange(filters.from, filters.to))}
           >
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
@@ -328,14 +344,18 @@ function PartyLedgerPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {rows.map((row, idx) => (
                   <tr key={`${row.posting_group_id}-${idx}`}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{row.posting_date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{formatDate(row.posting_date)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{row.posting_group_id?.substring(0, 8)}...</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{row.source_type}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{row.description ?? '—'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{row.debit}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{row.credit}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                      {row.running_balance}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                      {formatMoney(row.debit)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                      {formatMoney(row.credit)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium tabular-nums">
+                      {formatMoney(row.running_balance)}
                     </td>
                   </tr>
                 ))}

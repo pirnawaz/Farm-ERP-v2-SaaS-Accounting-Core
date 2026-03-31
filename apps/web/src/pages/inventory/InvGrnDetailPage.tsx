@@ -125,7 +125,7 @@ export default function InvGrnDetailPage() {
   const total = lineTotals.reduce((a, b) => a + b, 0);
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`${term('grnSingular')} ${grn.doc_no}`}
         backTo={backTo}
@@ -179,25 +179,27 @@ export default function InvGrnDetailPage() {
           </div>
           <div className="mb-4">
             <div className="flex justify-between mb-2"><h4 className="font-medium">Lines</h4><button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add</button></div>
-            <table className="min-w-full border">
-              <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th><th className="w-10" /></tr></thead>
-              <tbody>
-                {lines.map((line, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2">
-                      <select value={line.item_id} onChange={(e) => updateLine(i, { item_id: e.target.value })} className="w-full px-2 py-1 border rounded text-sm">
-                        <option value="">Select</option>
-                        {items?.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2"><input type="number" step="any" min="0" value={line.qty} onChange={(e) => updateLine(i, { qty: e.target.value })} className="w-24 px-2 py-1 border rounded text-sm" /></td>
-                    <td className="px-3 py-2"><input type="number" step="any" min="0" value={line.unit_cost} onChange={(e) => updateLine(i, { unit_cost: e.target.value })} className="w-24 px-2 py-1 border rounded text-sm" /></td>
-                    <td className="px-3 py-2 text-sm"><span className="tabular-nums">{formatMoney((parseFloat(line.qty) || 0) * (parseFloat(line.unit_cost) || 0))}</span></td>
-                    <td><button type="button" onClick={() => removeLine(i)} className="text-red-600 text-sm">Del</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border">
+                <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th><th className="w-10" /></tr></thead>
+                <tbody>
+                  {lines.map((line, i) => (
+                    <tr key={i}>
+                      <td className="px-3 py-2">
+                        <select value={line.item_id} onChange={(e) => updateLine(i, { item_id: e.target.value })} className="w-full px-2 py-1 border rounded text-sm">
+                          <option value="">Select</option>
+                          {items?.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2"><input type="number" step="any" min="0" value={line.qty} onChange={(e) => updateLine(i, { qty: e.target.value })} className="w-24 px-2 py-1 border rounded text-sm" /></td>
+                      <td className="px-3 py-2"><input type="number" step="any" min="0" value={line.unit_cost} onChange={(e) => updateLine(i, { unit_cost: e.target.value })} className="w-24 px-2 py-1 border rounded text-sm" /></td>
+                      <td className="px-3 py-2 text-sm"><span className="tabular-nums">{formatMoney((parseFloat(line.qty) || 0) * (parseFloat(line.unit_cost) || 0))}</span></td>
+                      <td><button type="button" onClick={() => removeLine(i)} className="text-red-600 text-sm">Del</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <p className="mt-2 text-sm font-medium">Total: <span className="tabular-nums">{formatMoney(lines.reduce((a, l) => a + (parseFloat(l.qty) || 0) * (parseFloat(l.unit_cost) || 0), 0))}</span></p>
           </div>
           <div className="flex gap-2">
@@ -208,14 +210,16 @@ export default function InvGrnDetailPage() {
       ) : (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="font-medium mb-2">Lines</h3>
-          <table className="min-w-full border">
-            <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
-            <tbody>
-              {(grn.lines || []).map((l) => (
-                <tr key={l.id}><td className="px-3 py-2">{formatItemDisplayName(l.item)}</td><td>{l.qty}</td><td>{l.unit_cost}</td><td><span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span></td></tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border">
+              <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-left text-xs text-gray-500">Unit cost</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
+              <tbody>
+                {(grn.lines || []).map((l) => (
+                  <tr key={l.id}><td className="px-3 py-2">{formatItemDisplayName(l.item)}</td><td>{l.qty}</td><td>{l.unit_cost}</td><td><span className="tabular-nums">{formatMoney(parseFloat(String(l.line_total)))}</span></td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <p className="mt-2 font-medium">Total: <span className="tabular-nums">{formatMoney(total)}</span></p>
         </div>
       )}

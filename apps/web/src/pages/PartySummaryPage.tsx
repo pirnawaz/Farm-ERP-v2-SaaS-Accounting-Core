@@ -3,12 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@farm-erp/shared';
 import { reportsApi } from '../api/reports';
 import { exportToCSV } from '../utils/csvExport';
+import { exportAmountForSpreadsheet } from '../utils/exportFormatting';
+import { metaReportingPeriodLabel } from '../utils/reportPresentation';
 import { useFormatting } from '../hooks/useFormatting';
+import { useTenantSettings } from '../hooks/useTenantSettings';
+import { EMPTY_COPY } from '../config/presentation';
 import { PrintableReport } from '../components/print/PrintableReport';
 import type { PartySummaryResponse, PartySummaryRow, Project, CropCycle } from '../types';
 
 function PartySummaryPage() {
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatMoney, formatDateRange } = useFormatting();
+  const { settings } = useTenantSettings();
   const navigate = useNavigate();
   const [data, setData] = useState<PartySummaryResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -69,16 +74,25 @@ function PartySummaryPage() {
 
   const handleExport = () => {
     if (!data?.rows?.length) return;
-    exportToCSV(
-      data.rows,
-      '',
-      ['party_name', 'role', 'opening_balance', 'period_movement', 'closing_balance'],
-      {
-        reportName: 'RoleSummary',
-        fromDate: filters.from,
-        toDate: filters.to,
-      }
-    );
+    const mapped = data.rows.map((row) => ({
+      party_name: row.party_name,
+      role: row.role,
+      opening_balance: exportAmountForSpreadsheet(row.opening_balance),
+      period_movement: exportAmountForSpreadsheet(row.period_movement),
+      closing_balance: exportAmountForSpreadsheet(row.closing_balance),
+    }));
+    const headers = ['party_name', 'role', 'opening_balance', 'period_movement', 'closing_balance'];
+    exportToCSV(mapped, '', headers, {
+      reportName: 'RoleSummary',
+      fromDate: filters.from,
+      toDate: filters.to,
+      metadataRows: [
+        ['export', 'Terrava Party Summary'],
+        ['reporting_period_start', filters.from],
+        ['reporting_period_end', filters.to],
+        ['base_currency', settings?.currency_code ?? 'PKR'],
+      ],
+    });
   };
 
   const handleRowClick = (row: PartySummaryRow) => {
@@ -220,7 +234,7 @@ function PartySummaryPage() {
                   {rows.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                        No party balances in this period
+                        {EMPTY_COPY.noDataForPeriod}
                       </td>
                     </tr>
                   ) : (
@@ -273,7 +287,7 @@ function PartySummaryPage() {
 
           <PrintableReport
             title="Role Summary"
-            metaLeft={`From ${formatDate(filters.from)} to ${formatDate(filters.to)}`}
+            metaLeft={metaReportingPeriodLabel(formatDateRange(filters.from, filters.to))}
           >
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
@@ -296,21 +310,29 @@ function PartySummaryPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {rows.map((row) => (
-                  <tr key={`${row.party_id}-${row.role}`}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{row.party_name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{row.role}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      {row.opening_balance}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      {row.period_movement}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                      {row.closing_balance}
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                      {EMPTY_COPY.noDataForPeriod}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  rows.map((row) => (
+                    <tr key={`${row.party_id}-${row.role}`}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{row.party_name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{row.role}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                        {formatMoney(row.opening_balance)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                        {formatMoney(row.period_movement)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium tabular-nums">
+                        {formatMoney(row.closing_balance)}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
               {totals && rows.length > 0 && (
                 <tfoot className="bg-[#E6ECEA] font-medium">

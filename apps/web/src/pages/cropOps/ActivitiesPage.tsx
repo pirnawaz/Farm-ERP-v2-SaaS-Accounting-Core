@@ -68,7 +68,7 @@ export default function ActivitiesPage() {
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`Crop Ops → ${term('activities')}`}
         backTo="/app/crop-ops"
@@ -79,40 +79,42 @@ export default function ActivitiesPage() {
           </button>
         }
       />
-      <p className="text-sm text-gray-500 mb-4">{term('activities')} are field operations (e.g. ploughing, sowing, spraying) linked to a crop cycle and project.</p>
-      <div className="flex gap-4 mb-4 flex-wrap">
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All statuses</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="POSTED">POSTED</option>
-          <option value="REVERSED">REVERSED</option>
-        </select>
-        <select value={cropCycleId} onChange={(e) => { setCropCycleId(e.target.value); setProjectId(''); }} className="px-3 py-2 border rounded text-sm">
-          <option value="">All crop cycles</option>
-          {cropCycles?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All projects</option>
-          {projects?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        <select value={activityTypeId} onChange={(e) => setActivityTypeId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All types</option>
-          {activityTypes?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-        <select value={landParcelId} onChange={(e) => setLandParcelId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All land parcels</option>
-          {landParcels?.map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
-        </select>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="From" />
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="To" />
-      </div>
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={(activities ?? []) as CropActivity[]}
-          columns={cols}
-          onRowClick={(r) => navigate(`/app/crop-ops/activities/${r.id}`, { state: { from: location.pathname + location.search } })}
-          emptyMessage="No activities. Create one."
-        />
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">{term('activities')} are field operations (e.g. ploughing, sowing, spraying) linked to a crop cycle and project.</p>
+        <div className="flex flex-wrap gap-4 items-end">
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All statuses</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="POSTED">POSTED</option>
+            <option value="REVERSED">REVERSED</option>
+          </select>
+          <select value={cropCycleId} onChange={(e) => { setCropCycleId(e.target.value); setProjectId(''); }} className="px-3 py-2 border rounded text-sm">
+            <option value="">All crop cycles</option>
+            {cropCycles?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All projects</option>
+            {projects?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={activityTypeId} onChange={(e) => setActivityTypeId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All types</option>
+            {activityTypes?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <select value={landParcelId} onChange={(e) => setLandParcelId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All land parcels</option>
+            {landParcels?.map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
+          </select>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="From" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="To" />
+        </div>
+        <div className="bg-white rounded-lg shadow">
+          <DataTable
+            data={(activities ?? []) as CropActivity[]}
+            columns={cols}
+            onRowClick={(r) => navigate(`/app/crop-ops/activities/${r.id}`, { state: { from: location.pathname + location.search } })}
+            emptyMessage="No activities. Create one."
+          />
+        </div>
       </div>
     </div>
   );

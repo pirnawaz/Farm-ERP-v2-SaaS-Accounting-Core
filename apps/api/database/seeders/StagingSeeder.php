@@ -34,9 +34,9 @@ class StagingSeeder extends Seeder
                 'name' => 'Staging Farm',
                 'slug' => 'staging',
                 'status' => Tenant::STATUS_ACTIVE,
-                'currency_code' => 'GBP',
-                'locale' => 'en-GB',
-                'timezone' => 'Europe/London',
+                'currency_code' => 'PKR',
+                'locale' => 'en-PK',
+                'timezone' => 'Asia/Karachi',
             ]
         );
 

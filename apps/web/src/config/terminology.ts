@@ -49,6 +49,11 @@ export type TermKey =
   | 'navMoney'
   | 'navAccounting'
   | 'navSettings'
+  | 'navDomainFarm'
+  | 'navDomainOperations'
+  | 'navDomainFinance'
+  | 'navDomainGovernance'
+  | 'navDomainSettings'
   | 'navFields'
   | 'navWork'
   | 'navPayReceive'
@@ -73,7 +78,7 @@ export const TERMS: Record<TermKey, { farm: string; accounting: string }> = {
   reverseAction: { farm: 'Reverse Posting', accounting: 'REVERSE' },
   postActionPending: { farm: 'Posting...', accounting: 'Post' },
   reverseActionPending: { farm: 'Reversing...', accounting: 'Reverse' },
-  trialBalance: { farm: 'Account Balances', accounting: 'Trial Balance' },
+  trialBalance: { farm: 'Trial Balance', accounting: 'Trial Balance' },
   generalLedger: { farm: 'Account Activity', accounting: 'General Ledger' },
   arAgeing: { farm: 'Overdue Customers', accounting: 'AR Ageing' },
   profitAndLoss: { farm: 'Farm Profit', accounting: 'Profit & Loss' },
@@ -106,6 +111,11 @@ export const TERMS: Record<TermKey, { farm: string; accounting: string }> = {
   navMoney: { farm: 'MONEY', accounting: 'Money' },
   navAccounting: { farm: 'ACCOUNTING', accounting: 'Finance & Review' },
   navSettings: { farm: 'SETTINGS', accounting: 'Admin' },
+  navDomainFarm: { farm: 'Farm', accounting: 'Farm' },
+  navDomainOperations: { farm: 'Operations', accounting: 'Operations' },
+  navDomainFinance: { farm: 'Finance', accounting: 'Finance' },
+  navDomainGovernance: { farm: 'Governance', accounting: 'Governance' },
+  navDomainSettings: { farm: 'Settings', accounting: 'Settings' },
   navFields: { farm: 'Fields', accounting: 'Projects' },
   navWork: { farm: 'Work', accounting: 'Crop Ops' },
   navPayReceive: { farm: 'Pay & Receive', accounting: 'Payments' },

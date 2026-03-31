@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { reportsApi } from '../../api/reports';
 import { exportToCSV } from '../../utils/csvExport';
+import { exportAmountForSpreadsheet, exportDateIsoYmd, exportNullableString } from '../../utils/exportFormatting';
 import { useFormatting } from '../../hooks/useFormatting';
+import { useTenantSettings } from '../../hooks/useTenantSettings';
 import { useParties } from '../../hooks/useParties';
 import type { LandlordStatementResponse } from '@farm-erp/shared';
 import type { Party } from '../../types';
@@ -10,6 +12,7 @@ import { Term } from '../../components/Term';
 
 export default function LandlordStatementPage() {
   const { formatMoney } = useFormatting();
+  const { settings } = useTenantSettings();
   const { data: parties = [] } = useParties();
   const [data, setData] = useState<LandlordStatementResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,28 +51,44 @@ export default function LandlordStatementPage() {
 
   const handleExport = () => {
     if (!data?.lines?.length || !filters.party_id) return;
-    exportToCSV(
-      data.lines,
-      '',
-      [
-        'posting_date',
-        'description',
-        'source_type',
-        'source_id',
-        'posting_group_id',
-        'debit',
-        'credit',
-        'running_balance',
-        'lease_id',
-        'land_parcel_id',
-        'project_id',
+    const mapped = data.lines.map((row) => ({
+      posting_date: exportDateIsoYmd(row.posting_date),
+      description: row.description,
+      source_type: row.source_type,
+      source_id: row.source_id,
+      posting_group_id: row.posting_group_id,
+      debit: exportAmountForSpreadsheet(row.debit),
+      credit: exportAmountForSpreadsheet(row.credit),
+      running_balance: exportAmountForSpreadsheet(row.running_balance),
+      lease_id: exportNullableString(row.lease_id ?? undefined),
+      land_parcel_id: exportNullableString(row.land_parcel_id ?? undefined),
+      project_id: exportNullableString(row.project_id ?? undefined),
+    }));
+    const headers = [
+      'posting_date',
+      'description',
+      'source_type',
+      'source_id',
+      'posting_group_id',
+      'debit',
+      'credit',
+      'running_balance',
+      'lease_id',
+      'land_parcel_id',
+      'project_id',
+    ];
+    exportToCSV(mapped, '', headers, {
+      reportName: 'LandlordStatement',
+      fromDate: filters.date_from,
+      toDate: filters.date_to,
+      metadataRows: [
+        ['export', 'Terrava Landlord Statement'],
+        ['party_id', filters.party_id],
+        ['reporting_period_start', filters.date_from],
+        ['reporting_period_end', filters.date_to],
+        ['base_currency', settings?.currency_code ?? 'PKR'],
       ],
-      {
-        reportName: 'LandlordStatement',
-        fromDate: filters.date_from,
-        toDate: filters.date_to,
-      }
-    );
+    });
   };
 
   const lines = data?.lines ?? [];

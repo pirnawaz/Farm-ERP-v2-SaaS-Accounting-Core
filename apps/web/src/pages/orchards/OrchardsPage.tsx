@@ -60,37 +60,35 @@ export default function OrchardsPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
   const orchards = orchardUnits ?? [];
 
   return (
-    <div data-testid="orchards-page">
+    <div className="space-y-6" data-testid="orchards-page">
       <PageHeader
         title="Orchards"
+        backTo="/app/dashboard"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Orchards' },
         ]}
+        right={
+          <button
+            type="button"
+            data-testid="new-orchard-unit"
+            onClick={() => setShowNewModal(true)}
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+          >
+            New Orchard Unit
+          </button>
+        }
       />
-      <div className="flex justify-between items-center mb-6">
-        <p className="text-gray-600">Orchard production units: track costs, revenue and activities by orchard.</p>
-        <button
-          data-testid="new-orchard-unit"
-          onClick={() => setShowNewModal(true)}
-          className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
-        >
-          New Orchard Unit
-        </button>
-      </div>
+      <p className="text-gray-600">Orchard production units: track costs, revenue and activities by orchard.</p>
 
-      {orchards.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : orchards.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center text-gray-600">
           No orchard units yet. Create one to get started.
         </div>
@@ -162,8 +160,8 @@ export default function OrchardsPage() {
         }}
         title="New Orchard Unit"
       >
-        <div className="space-y-4">
-          <FormField label="Name" required>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Name" required className="md:col-span-2">
             <input
               type="text"
               value={form.name}
@@ -225,7 +223,7 @@ export default function OrchardsPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
             />
           </FormField>
-          <FormField label="Notes (optional)">
+          <FormField label="Notes (optional)" className="md:col-span-2">
             <textarea
               value={form.notes ?? ''}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value || null }))}
@@ -234,14 +232,14 @@ export default function OrchardsPage() {
             />
           </FormField>
         </div>
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
           <button
             type="button"
             onClick={() => {
               setShowNewModal(false);
               setForm(initialOrchardForm);
             }}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -249,7 +247,7 @@ export default function OrchardsPage() {
             type="button"
             onClick={handleCreate}
             disabled={createMutation.isPending || !form.name?.trim()}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
           >
             {createMutation.isPending ? 'Creating...' : 'Create'}
           </button>

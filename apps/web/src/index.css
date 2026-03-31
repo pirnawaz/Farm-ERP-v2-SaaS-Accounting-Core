@@ -42,6 +42,24 @@ body {
     display: block !important;
   }
 
+  /* Invoice / account statement templates (SaleDetail, PartyDetail) — not under #terrava-print-root */
+  .print-document,
+  .print-document * {
+    visibility: visible !important;
+  }
+
+  .print-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: block !important;
+  }
+
+  .print-document.hidden {
+    display: block !important;
+  }
+
   /* Hide navigation, sidebar, buttons, and non-essential UI elements */
   nav,
   aside,

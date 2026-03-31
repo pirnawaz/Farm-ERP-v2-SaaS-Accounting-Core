@@ -65,7 +65,7 @@ export default function OrchardDetailPage() {
   }
 
   return (
-    <div data-testid="orchard-detail-page">
+    <div className="space-y-6" data-testid="orchard-detail-page">
       <PageHeader
         title={unit.name}
         backTo="/app/orchards"
@@ -77,7 +77,7 @@ export default function OrchardDetailPage() {
       />
 
       {(unit.orchard_crop || unit.planting_year != null) && (
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-600">
           {unit.orchard_crop && <span>{unit.orchard_crop}</span>}
           {unit.planting_year != null && <span className={unit.orchard_crop ? ' ml-2' : ''}>Planted {unit.planting_year}</span>}
           {unit.area_acres != null && unit.area_acres !== '' && <span> · {unit.area_acres} acres</span>}
@@ -86,7 +86,7 @@ export default function OrchardDetailPage() {
       )}
 
       {/* Year selector */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="flex flex-wrap gap-4 items-end">
         <span className="text-sm font-medium text-gray-700">Year:</span>
         <select
           value={year}
@@ -102,7 +102,7 @@ export default function OrchardDetailPage() {
       </div>
 
       {/* Cost, Revenue, Margin */}
-      <section className="mb-8">
+      <section>
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Economics ({year})</h2>
         {summaryLoading ? (
           <div className="flex justify-center py-4">
@@ -129,7 +129,7 @@ export default function OrchardDetailPage() {
       </section>
 
       {/* Quick Actions */}
-      <section className="mb-8">
+      <section>
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
           <Link
@@ -160,13 +160,13 @@ export default function OrchardDetailPage() {
       </section>
 
       {/* Recent harvests & sales */}
-      <section className="mb-6">
+      <section>
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Recent activity ({year})</h2>
         <div className="space-y-4">
           {harvests.length > 0 && (
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase mb-2">Harvests</p>
-              <ul className="rounded-lg border border-gray-200 divide-y divide-gray-200 bg-white">
+              <ul className="rounded-lg border border-gray-200 divide-y divide-gray-200 bg-white overflow-x-auto">
                 {harvests.slice(0, 10).map((h: Harvest) => (
                   <li key={h.id} className="px-4 py-2 flex justify-between items-center">
                     <Link to={`/app/harvests/${h.id}`} className="text-[#1F6F5C] font-medium hover:underline">
@@ -181,7 +181,7 @@ export default function OrchardDetailPage() {
           {sales.length > 0 && (
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase mb-2">Sales</p>
-              <ul className="rounded-lg border border-gray-200 divide-y divide-gray-200 bg-white">
+              <ul className="rounded-lg border border-gray-200 divide-y divide-gray-200 bg-white overflow-x-auto">
                 {sales.slice(0, 10).map((s: Sale) => (
                   <li key={s.id} className="px-4 py-2 flex justify-between items-center">
                     <Link to={`/app/sales/${s.id}`} className="text-[#1F6F5C] font-medium hover:underline">

@@ -150,7 +150,7 @@ export default function InvItemsPage() {
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={term('inventoryItem')}
         backTo="/app/inventory"
@@ -165,7 +165,7 @@ export default function InvItemsPage() {
 
       {/* Create modal */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title={`New ${term('inventoryItemSingular')}`}>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Name" required><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="SKU"><input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Optional" /></FormField>
           <FormField label={term('inventoryCategorySingular')}>
@@ -194,16 +194,16 @@ export default function InvItemsPage() {
           <FormField label="Active">
             <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleCreate} disabled={!form.name || !form.uom_id || createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Create</button>
+          <div className="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handleCreate} disabled={!form.name || !form.uom_id || createM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded">Create</button>
           </div>
         </div>
       </Modal>
 
       {/* Edit modal */}
       <Modal isOpen={!!editingItem} onClose={() => setEditingItem(null)} title={`Edit ${term('inventoryItemSingular')}`}>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Name" required><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="SKU"><input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Optional" /></FormField>
           <FormField label={term('inventoryCategorySingular')}>
@@ -227,9 +227,9 @@ export default function InvItemsPage() {
           <FormField label="Active">
             <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setEditingItem(null)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleUpdate} disabled={!form.name || !form.uom_id || updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
+          <div className="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={() => setEditingItem(null)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handleUpdate} disabled={!form.name || !form.uom_id || updateM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
           </div>
         </div>
       </Modal>

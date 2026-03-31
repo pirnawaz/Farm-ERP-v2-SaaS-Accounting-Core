@@ -125,15 +125,15 @@ function EventModal({
           />
         </FormField>
       </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+      <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+        <button type="button" onClick={onClose} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSubmit}
           disabled={createM.isPending || updateM.isPending || !event_date || !quantity}
-          className="px-4 py-2 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
+          className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
         >
           {isEdit ? 'Update' : 'Add'}
         </button>
@@ -184,7 +184,7 @@ export default function LivestockDetailPage() {
   const headcount = status?.headcount_as_of ?? null;
 
   return (
-    <div data-testid="livestock-detail-page">
+    <div className="space-y-6" data-testid="livestock-detail-page">
       <PageHeader
         title={unit.name}
         backTo="/app/livestock"
@@ -196,7 +196,7 @@ export default function LivestockDetailPage() {
       />
 
       {(unit.livestock_type || unit.herd_start_count != null) && (
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-600">
           {unit.livestock_type && <span>{unit.livestock_type}</span>}
           {unit.herd_start_count != null && (
             <span className={unit.livestock_type ? ' ml-2' : ''}>Start: {unit.herd_start_count} head</span>
@@ -205,7 +205,7 @@ export default function LivestockDetailPage() {
       )}
 
       {/* Headcount */}
-      <section className="mb-8">
+      <section>
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Headcount (now)</h2>
         {statusLoading ? (
           <div className="flex justify-center py-4">
@@ -220,7 +220,7 @@ export default function LivestockDetailPage() {
       </section>
 
       {/* This year economics */}
-      <section className="mb-8">
+      <section>
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">This year ({currentYear})</h2>
         {summaryLoading ? (
           <div className="flex justify-center py-4">
@@ -247,7 +247,7 @@ export default function LivestockDetailPage() {
       </section>
 
       {/* Quick actions */}
-      <section className="mb-8">
+      <section>
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Quick actions</h2>
         <div className="flex flex-wrap gap-3">
           <Link
@@ -272,13 +272,13 @@ export default function LivestockDetailPage() {
       </section>
 
       {/* Recent events */}
-      <section className="mb-6">
-        <div className="flex justify-between items-center mb-3">
+      <section>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Events ({currentYear})</h2>
           <button
             type="button"
             onClick={() => { setEditingEvent(null); setShowEventModal(true); }}
-            className="px-3 py-1.5 bg-[#1F6F5C] text-white text-sm rounded-lg hover:bg-[#1a5a4a]"
+            className="w-full sm:w-auto px-3 py-1.5 bg-[#1F6F5C] text-white text-sm rounded-lg hover:bg-[#1a5a4a]"
           >
             Add event
           </button>

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { apiClient } from '@farm-erp/shared';
 import { useTenant } from '../hooks/useTenant';
 import { useCropCycles } from '../hooks/useCropCycles';
 import { useCropCycleScope } from '../contexts/CropCycleScopeContext';
+import { allowsAllCropCyclesForPath } from '../config/cropCycleScopePolicy';
 import type { CropCycle } from '../types';
 
 function useDashboardSummaryFetchState() {
@@ -22,12 +24,16 @@ function useDashboardSummaryFetchState() {
 }
 
 export function CropCycleScopeSelector() {
+  const location = useLocation();
   const { tenantId } = useTenant();
   const { data: cropCycles, isLoading: cyclesLoading } = useCropCycles();
   const { scopeType, cropCycleId, setScope, initializedFromStorage } = useCropCycleScope();
   const { isFetching: dashboardFetching } = useDashboardSummaryFetchState();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const allAllowedHere = allowsAllCropCyclesForPath(location.pathname);
+  const scopeMismatch = scopeType === 'all' && !allAllowedHere;
 
   const openCycle = cropCycles?.find((c: CropCycle) => c.status === 'OPEN');
 
@@ -56,17 +62,43 @@ export function CropCycleScopeSelector() {
       : 'All Crop Cycles';
 
   return (
-    <div className="relative flex items-center gap-2" ref={ref}>
-      <div className="text-sm text-gray-600">Scope:</div>
-      <div className="relative">
+    <div className="relative flex items-center gap-3 min-w-0" ref={ref}>
+      <div className="flex flex-col min-w-0 justify-center">
+        <span
+          className="text-xs font-semibold uppercase tracking-wide text-gray-800"
+          title="Sets the active crop cycle for dashboards and other scoped views. Some pages need one specific cycle."
+        >
+          Crop cycle
+        </span>
+        <span className="text-[11px] text-gray-500 max-w-[13rem] leading-tight mt-0.5 hidden md:block">
+          Operating context for farm data and reports.
+        </span>
+      </div>
+      <div className="relative flex-shrink-0">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] min-w-[180px] justify-between"
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-800 bg-white border rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] min-w-[200px] justify-between ${
+            scopeMismatch ? 'border-amber-400 ring-1 ring-amber-200' : 'border-gray-300'
+          }`}
           aria-expanded={open}
           aria-haspopup="listbox"
+          title={
+            scopeMismatch
+              ? 'This page expects a specific crop cycle — select a crop cycle below'
+              : 'Choose which crop cycle applies to dashboards and scoped views'
+          }
         >
-          <span className="truncate">{selectedLabel}</span>
+          <span className="truncate text-left flex items-center gap-2 min-w-0">
+            <span
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                scopeType === 'all' ? 'bg-gray-100 text-gray-600' : 'bg-[#E6ECEA] text-[#1F6F5C]'
+              }`}
+            >
+              {scopeType === 'all' ? 'All' : 'Cycle'}
+            </span>
+            <span className="truncate">{selectedLabel}</span>
+          </span>
           <svg
             className={`h-4 w-4 flex-shrink-0 text-gray-500 ${open ? 'rotate-180' : ''}`}
             fill="none"
@@ -77,24 +109,9 @@ export function CropCycleScopeSelector() {
           </svg>
         </button>
         {dashboardFetching && (
-          <span
-            className="absolute -right-6 top-1/2 -translate-y-1/2 text-gray-400"
-            aria-hidden
-          >
-            <svg
-              className="h-4 w-4 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
+          <span className="absolute -right-6 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden>
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path
                 className="opacity-75"
                 fill="currentColor"
@@ -111,17 +128,31 @@ export function CropCycleScopeSelector() {
             <li role="option">
               <button
                 type="button"
+                disabled={!allAllowedHere}
                 onClick={() => {
+                  if (!allAllowedHere) return;
                   setScope('all');
                   setOpen(false);
                 }}
+                title={
+                  allAllowedHere
+                    ? 'Include all crop cycles in the current context'
+                    : 'Not available on this page — pick a specific crop cycle'
+                }
                 className={`w-full text-left px-3 py-2 text-sm ${
-                  scopeType === 'all'
-                    ? 'bg-[#E6ECEA] text-[#1F6F5C] font-medium'
-                    : 'text-gray-700 hover:bg-gray-50'
+                  !allAllowedHere
+                    ? 'text-gray-400 cursor-not-allowed bg-gray-50'
+                    : scopeType === 'all'
+                      ? 'bg-[#E6ECEA] text-[#1F6F5C] font-medium'
+                      : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 All Crop Cycles
+                {!allAllowedHere && (
+                  <span className="block text-[11px] font-normal text-gray-500 mt-0.5">
+                    Not available on this page
+                  </span>
+                )}
               </button>
             </li>
             {cropCycles && cropCycles.length > 0 && (
@@ -144,9 +175,7 @@ export function CropCycleScopeSelector() {
                       <span className="truncate">{cycle.name}</span>
                       <span
                         className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
-                          cycle.status === 'OPEN'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-700'
+                          cycle.status === 'OPEN' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
                         }`}
                       >
                         {cycle.status}

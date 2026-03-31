@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { PageHeader } from '../../components/PageHeader';
 import {
   useChargeQuery,
   useUpdateCharge,
@@ -126,30 +127,60 @@ export default function ChargeDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6">
+        <PageHeader
+          title="Charge"
+          backTo="/app/machinery/charges"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Charges', to: '/app/machinery/charges' },
+            { label: '…' },
+          ]}
+        />
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
       </div>
     );
   }
 
   if (!charge) {
-    return <div>Charge not found</div>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Charge"
+          backTo="/app/machinery/charges"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Charges', to: '/app/machinery/charges' },
+            { label: 'Not found' },
+          ]}
+        />
+        <p className="text-gray-600">Charge not found.</p>
+        <Link to="/app/machinery/charges" className="text-[#1F6F5C] font-medium hover:underline">
+          Back to Charges
+        </Link>
+      </div>
+    );
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <Link
-          to="/app/machinery/charges"
-          className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block"
-        >
-          ← Back to Charges
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">Charge Details</h1>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={charge.charge_no || 'Charge'}
+        backTo="/app/machinery/charges"
+        breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
+          { label: 'Machinery', to: '/app/machinery' },
+          { label: 'Charges', to: '/app/machinery/charges' },
+          { label: charge.charge_no || 'Charge' },
+        ]}
+      />
 
       {/* Header Info */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Charge No</dt>
@@ -229,7 +260,7 @@ export default function ChargeDetailPage() {
       </div>
 
       {/* Lines Table */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Charge Lines</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -320,22 +351,24 @@ export default function ChargeDetailPage() {
 
       {/* Actions */}
       {canEdit && (
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Actions</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse sm:flex-row flex-wrap gap-3">
             {isDraft && (
               <>
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={updateMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                 >
                   {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                 </button>
                 {canPost && (
                   <button
+                    type="button"
                     onClick={() => setShowPostModal(true)}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                    className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                   >
                     Post Charge
                   </button>
@@ -344,8 +377,9 @@ export default function ChargeDetailPage() {
             )}
             {isPosted && canPost && (
               <button
+                type="button"
                 onClick={() => setShowReverseModal(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
               >
                 Reverse Charge
               </button>
@@ -367,17 +401,19 @@ export default function ChargeDetailPage() {
                 required
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
+                type="button"
                 onClick={() => setShowPostModal(false)}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={postMutation.isPending}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handlePost}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 disabled={postMutation.isPending}
               >
                 {postMutation.isPending ? 'Posting...' : 'Post'}
@@ -410,17 +446,19 @@ export default function ChargeDetailPage() {
                 placeholder="Optional reason for reversal"
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
+                type="button"
                 onClick={() => setShowReverseModal(false)}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={reverseMutation.isPending}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleReverse}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                 disabled={reverseMutation.isPending}
               >
                 {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}

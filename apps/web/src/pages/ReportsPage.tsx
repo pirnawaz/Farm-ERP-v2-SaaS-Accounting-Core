@@ -1,17 +1,24 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTrialBalance, useGeneralLedger, useProjectStatement } from '../hooks/useReports';
 import { useProjects } from '../hooks/useProjects';
 import { DataTable, type Column, type WithId } from '../components/DataTable';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useFormatting } from '../hooks/useFormatting';
 import { EmptyState } from '../components/EmptyState';
+import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock';
 import type { TrialBalanceRow, GeneralLedgerRow } from '../types';
 import { term } from '../config/terminology';
+import { EMPTY_COPY } from '../config/presentation';
+import {
+  REPORT_HUB_METADATA,
+  type ReportsHubTab,
+} from '../config/reportsHub';
+import { getReportMetadataBlockPeriodProps } from '../utils/reportPageMetadata';
 
-type Tab = 'trial-balance' | 'general-ledger' | 'project-statement';
+type Tab = ReportsHubTab;
 
 export default function ReportsPage() {
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatMoney, formatDate, formatDateRange, formatNumber } = useFormatting();
   const [activeTab, setActiveTab] = useState<Tab>('trial-balance');
   const [trialBalanceParams, setTrialBalanceParams] = useState({
     from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -35,24 +42,46 @@ export default function ReportsPage() {
   const { data: projectStatement, isLoading: loadingProjectStatement } = useProjectStatement(projectStatementParams);
   const { data: projects } = useProjects();
 
-  const trialBalanceColumns: Column<WithId<TrialBalanceRow>>[] = [
-    { header: 'Account Code', accessor: 'account_code' },
-    { header: 'Account Name', accessor: 'account_name' },
-    { header: 'Account Type', accessor: 'account_type' },
-    { header: 'Currency', accessor: 'currency_code' },
-    { header: 'Total Debit', accessor: 'total_debit' },
-    { header: 'Total Credit', accessor: 'total_credit' },
-    { header: 'Net', accessor: 'net' },
-  ];
+  const trialBalanceColumns: Column<WithId<TrialBalanceRow>>[] = useMemo(
+    () => [
+      { header: 'Account Code', accessor: 'account_code' },
+      { header: 'Account Name', accessor: 'account_name' },
+      { header: 'Account Type', accessor: 'account_type' },
+      { header: 'Currency', accessor: 'currency_code' },
+      { header: 'Total Debit', accessor: (row) => <span className="tabular-nums">{formatMoney(row.total_debit)}</span> },
+      { header: 'Total Credit', accessor: (row) => <span className="tabular-nums">{formatMoney(row.total_credit)}</span> },
+      { header: 'Net', accessor: (row) => <span className="tabular-nums">{formatMoney(row.net)}</span> },
+    ],
+    [formatMoney],
+  );
 
-  const generalLedgerColumns: Column<WithId<GeneralLedgerRow>>[] = [
-    { header: 'Date', accessor: (row) => formatDate(row.posting_date) },
-    { header: 'Account Code', accessor: 'account_code' },
-    { header: 'Account Name', accessor: 'account_name' },
-    { header: 'Debit', accessor: 'debit' },
-    { header: 'Credit', accessor: 'credit' },
-    { header: 'Net', accessor: 'net' },
-  ];
+  const generalLedgerColumns: Column<WithId<GeneralLedgerRow>>[] = useMemo(
+    () => [
+      { header: 'Date', accessor: (row) => formatDate(row.posting_date) },
+      { header: 'Account Code', accessor: 'account_code' },
+      { header: 'Account Name', accessor: 'account_name' },
+      { header: 'Debit', accessor: (row) => <span className="tabular-nums">{formatMoney(row.debit)}</span> },
+      { header: 'Credit', accessor: (row) => <span className="tabular-nums">{formatMoney(row.credit)}</span> },
+      { header: 'Net', accessor: (row) => <span className="tabular-nums">{formatMoney(row.net)}</span> },
+    ],
+    [formatDate, formatMoney],
+  );
+
+  const tbMeta = getReportMetadataBlockPeriodProps(
+    'range',
+    { mode: 'range', from: trialBalanceParams.from, to: trialBalanceParams.to },
+    { formatDate, formatDateRange },
+  );
+  const glMeta = getReportMetadataBlockPeriodProps(
+    'range',
+    { mode: 'range', from: generalLedgerParams.from, to: generalLedgerParams.to },
+    { formatDate, formatDateRange },
+  );
+  const psMeta = getReportMetadataBlockPeriodProps(
+    'asOf',
+    { mode: 'asOf', asOf: projectStatementParams.up_to_date },
+    { formatDate, formatDateRange },
+  );
 
   const renderTrialBalance = () => {
     if (loadingTrialBalance) {
@@ -65,6 +94,9 @@ export default function ReportsPage() {
 
     return (
       <div>
+        <div className="mb-4">
+          <ReportMetadataBlock {...tbMeta} />
+        </div>
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -91,20 +123,26 @@ export default function ReportsPage() {
         <div className="bg-white rounded-lg shadow">
           {trialBalance && trialBalance.length > 0 ? (
             <>
-              <DataTable<WithId<TrialBalanceRow>> data={trialBalance.map((r, i) => ({ ...r, id: r.account_id || String(i) }))} columns={trialBalanceColumns} />
+              <DataTable<WithId<TrialBalanceRow>>
+                data={trialBalance.map((r, i) => ({ ...r, id: r.account_id || String(i) }))}
+                columns={trialBalanceColumns}
+              />
               <div className="p-4 bg-gray-50 border-t">
                 <div className="grid grid-cols-3 gap-4 text-sm font-medium">
-                  <div>Total Debit: <span className="tabular-nums">{formatMoney(totalDebit)}</span></div>
-                  <div>Total Credit: <span className="tabular-nums">{formatMoney(totalCredit)}</span></div>
-                  <div>Total Net: <span className="tabular-nums">{formatMoney(totalNet)}</span></div>
+                  <div>
+                    Total Debit: <span className="tabular-nums">{formatMoney(totalDebit)}</span>
+                  </div>
+                  <div>
+                    Total Credit: <span className="tabular-nums">{formatMoney(totalCredit)}</span>
+                  </div>
+                  <div>
+                    Total Net: <span className="tabular-nums">{formatMoney(totalNet)}</span>
+                  </div>
                 </div>
               </div>
             </>
           ) : (
-            <EmptyState
-              title={`No ${term('trialBalance').toLowerCase()} data`}
-              description="Reports will appear once transactions are posted."
-            />
+            <EmptyState title={EMPTY_COPY.noDataForPeriod} description="Reports will appear once transactions are posted." />
           )}
         </div>
       </div>
@@ -118,6 +156,9 @@ export default function ReportsPage() {
 
     return (
       <div>
+        <div className="mb-4">
+          <ReportMetadataBlock {...glMeta} />
+        </div>
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -148,7 +189,9 @@ export default function ReportsPage() {
               >
                 <option value="">All Projects</option>
                 {projects?.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -156,7 +199,9 @@ export default function ReportsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
               <select
                 value={generalLedgerParams.per_page}
-                onChange={(e) => setGeneralLedgerParams({ ...generalLedgerParams, per_page: parseInt(e.target.value) })}
+                onChange={(e) =>
+                  setGeneralLedgerParams({ ...generalLedgerParams, per_page: parseInt(e.target.value, 10) })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="50">50</option>
@@ -169,21 +214,24 @@ export default function ReportsPage() {
         <div className="bg-white rounded-lg shadow">
           {generalLedger?.data && generalLedger.data.length > 0 ? (
             <>
-              <DataTable<WithId<GeneralLedgerRow>> data={generalLedger.data.map((r: GeneralLedgerRow, i: number) => ({ ...r, id: r.ledger_entry_id || String(i) }))} columns={generalLedgerColumns} />
+              <DataTable<WithId<GeneralLedgerRow>>
+                data={generalLedger.data.map((r: GeneralLedgerRow, i: number) => ({
+                  ...r,
+                  id: r.ledger_entry_id || String(i),
+                }))}
+                columns={generalLedgerColumns}
+              />
               {generalLedger.pagination && (
                 <div className="p-4 bg-gray-50 border-t">
                   <div className="text-sm text-gray-600">
-                    Page {generalLedger.pagination.page} of {generalLedger.pagination.last_page} 
-                    (Total: {generalLedger.pagination.total} entries)
+                    Page {generalLedger.pagination.page} of {generalLedger.pagination.last_page} (Total:{' '}
+                    {formatNumber(generalLedger.pagination.total)} entries)
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <EmptyState
-              title={`No ${term('generalLedger').toLowerCase()} data`}
-              description="Reports will appear once transactions are posted."
-            />
+            <EmptyState title={EMPTY_COPY.noDataForPeriod} description="Reports will appear once transactions are posted." />
           )}
         </div>
       </div>
@@ -197,6 +245,9 @@ export default function ReportsPage() {
 
     return (
       <div>
+        <div className="mb-4">
+          <ReportMetadataBlock {...psMeta} cropCycleLabel={projectStatement?.project?.crop_cycle?.name} />
+        </div>
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -209,7 +260,9 @@ export default function ReportsPage() {
               >
                 <option value="">Select Project</option>
                 {projects?.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -227,7 +280,7 @@ export default function ReportsPage() {
         {projectStatement ? (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">
-              Project Statement: {projectStatement.project.name}
+              {REPORT_HUB_METADATA['project-statement'].reportTitle}: {projectStatement.project.name}
             </h2>
             <div className="space-y-4">
               <div>
@@ -235,15 +288,15 @@ export default function ReportsPage() {
                 <dl className="grid grid-cols-3 gap-4">
                   <div>
                     <dt className="text-sm text-gray-500">Revenue</dt>
-                    <dd className="text-lg font-semibold">{projectStatement.totals.revenue}</dd>
+                    <dd className="text-lg font-semibold tabular-nums">{formatMoney(projectStatement.totals.revenue)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm text-gray-500">Shared Costs</dt>
-                    <dd className="text-lg font-semibold">{projectStatement.totals.shared_costs}</dd>
+                    <dd className="text-lg font-semibold tabular-nums">{formatMoney(projectStatement.totals.shared_costs)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm text-gray-500">HARI Only Costs</dt>
-                    <dd className="text-lg font-semibold">{projectStatement.totals.hari_only_costs}</dd>
+                    <dd className="text-lg font-semibold tabular-nums">{formatMoney(projectStatement.totals.hari_only_costs)}</dd>
                   </div>
                 </dl>
               </div>
@@ -253,31 +306,31 @@ export default function ReportsPage() {
                   <dl className="grid grid-cols-2 gap-4">
                     <div>
                       <dt className="text-sm text-gray-500">Pool Revenue</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.pool_revenue}</dd>
+                      <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.pool_revenue)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">Shared Costs</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.shared_costs}</dd>
+                      <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.shared_costs)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">Pool Profit</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.pool_profit}</dd>
+                      <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.pool_profit)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">Kamdari Amount</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.kamdari_amount}</dd>
+                      <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.kamdari_amount)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">Landlord Share</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.landlord_share}</dd>
+                      <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.landlord_share)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">HARI Share</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.hari_share}</dd>
+                      <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.hari_share)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">HARI Only Deductions</dt>
-                      <dd className="text-sm font-semibold">{projectStatement.settlement.hari_only_deductions}</dd>
+                      <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.hari_only_deductions)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm text-gray-500">Posting Date</dt>
@@ -290,23 +343,28 @@ export default function ReportsPage() {
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow">
-            <EmptyState
-              title="No project statement"
-              description="Select a project to view its statement."
-            />
+            <EmptyState title={EMPTY_COPY.noRecords} description="Select a project to view its statement." />
           </div>
         )}
       </div>
     );
   };
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Reports</h1>
+  const hubTitle = REPORT_HUB_METADATA[activeTab].pageTitle;
 
-      <div className="border-b border-gray-200 mb-6">
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{hubTitle}</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Print/export use dedicated report pages where available. This hub previews data with Terrava presentation standards.
+        </p>
+      </div>
+
+      <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
+            type="button"
             onClick={() => setActiveTab('trial-balance')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'trial-balance'
@@ -317,6 +375,7 @@ export default function ReportsPage() {
             {term('trialBalance')}
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('general-ledger')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'general-ledger'
@@ -327,6 +386,7 @@ export default function ReportsPage() {
             {term('generalLedger')}
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('project-statement')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'project-statement'

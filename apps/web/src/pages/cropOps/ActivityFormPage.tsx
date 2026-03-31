@@ -253,7 +253,7 @@ export default function ActivityFormPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-5xl mx-auto space-y-6">
       <PageHeader
         title={term('newActivity')}
         backTo="/app/crop-ops/activities"
@@ -323,7 +323,7 @@ export default function ActivityFormPage() {
         {/* Work: type, cycle, project */}
         <section className="space-y-4">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Work</h2>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Doc No" required error={errors.doc_no}>
               <input
                 value={doc_no}
@@ -398,7 +398,7 @@ export default function ActivityFormPage() {
           <div className="space-y-3">
             {labour.map((line, i) => (
               <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FormField label="Worker">
                     <select
                       value={line.worker_id}
@@ -461,7 +461,7 @@ export default function ActivityFormPage() {
           <div className="space-y-3">
             {inputs.map((line, i) => (
               <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FormField label="Store">
                     <select
                       value={line.store_id}

@@ -194,11 +194,16 @@ export default function HarvestFormPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-6 pb-8">
       <PageHeader
         title="New Harvest"
         backTo="/app/harvests"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Harvests', to: '/app/harvests' }, { label: 'New' }]}
+        breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
+          { label: 'Crop Ops', to: '/app/crop-ops' },
+          { label: 'Harvests', to: '/app/harvests' },
+          { label: 'New' },
+        ]}
       />
       {hasDraft && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex flex-wrap items-center gap-2">

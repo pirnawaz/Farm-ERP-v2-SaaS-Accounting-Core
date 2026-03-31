@@ -30,6 +30,7 @@ export default function ProfitLossPage() {
     <div className="space-y-6">
       <PageHeader
         title={term('profitAndLoss')}
+        backTo="/app/reports"
         breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: term('profitAndLoss') }]}
       />
 

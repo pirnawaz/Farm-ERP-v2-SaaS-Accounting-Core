@@ -221,7 +221,7 @@ export default function WorkLogFormPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-6 pb-8">
       <PageHeader
         title="New Work Log"
         backTo="/app/labour/work-logs"

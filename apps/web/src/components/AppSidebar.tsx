@@ -1,10 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { term } from '../config/terminology';
-import { getNavGroups, type NavGroup, type NavItem } from '../config/nav';
+import {
+  getNavDomains,
+  pruneDomainsForRole,
+  filterDomainsByPermission,
+  isSubmenuParent,
+  type NavItem,
+} from '../config/nav';
+import { domainHasActivePath, isNavItemActive, isPathUnderRoute } from '../config/navMatch';
 import { getModuleLabel } from '../config/moduleKeys';
-import { CAPABILITIES } from '../config/permissions';
+import { CAPABILITIES, can as canPermission } from '../config/permissions';
 import { useRole } from '../hooks/useRole';
 import { useModules } from '../contexts/ModulesContext';
 import { useTenantAddonModulesQuery } from '../hooks/useModules';
@@ -12,15 +19,23 @@ import { useTenantAddonModulesQuery } from '../hooks/useModules';
 const VITE_DEBUG_NAV = import.meta.env.VITE_DEBUG_NAV === 'true' || import.meta.env.VITE_DEBUG_NAV === '1';
 const VITE_DEBUG_MODULES = import.meta.env.VITE_DEBUG_MODULES === 'true' || import.meta.env.VITE_DEBUG_MODULES === '1';
 
-function isSubmenuParent(item: NavItem): item is NavItem & { children: NavItem[]; submenuKey: string } {
-  return Array.isArray((item as NavItem & { children?: NavItem[] }).children) && !!(item as NavItem & { submenuKey?: string }).submenuKey;
-}
-
 function getFirstMissingModuleKey(requiredModules: string[] | undefined, isModuleEnabled: (key: string) => boolean): string | undefined {
   if (!requiredModules?.length) return undefined;
   return requiredModules.find((k) => !isModuleEnabled(k));
 }
 
+/** Avoid setState when Set contents are unchanged (prevents redundant renders / effect loops). */
+function stringSetsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const x of a) {
+    if (!b.has(x)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export interface AppSidebarProps {
   onItemClick?: () => void;
@@ -29,7 +44,7 @@ export interface AppSidebarProps {
 export function AppSidebar({ onItemClick }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { can } = useRole();
+  const { can, userRole } = useRole();
   const { isModuleEnabled, loading: modulesLoading } = useModules();
   const { data: addonData, status: addonStatus } = useTenantAddonModulesQuery();
   const envOrchards = import.meta.env.VITE_ENABLE_ORCHARDS === 'true';
@@ -37,30 +52,15 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
   const showOrchards = envOrchards || (addonStatus === 'success' && addonData?.modules?.orchards === true);
   const showLivestock = envLivestock || (addonStatus === 'success' && addonData?.modules?.livestock === true);
 
-  const navGroups = getNavGroups(term, showOrchards, showLivestock);
+  const navDomains = useMemo(() => getNavDomains(term, showOrchards, showLivestock), [showOrchards, showLivestock]);
+  const rolePrunedDomains = useMemo(() => pruneDomainsForRole(navDomains, userRole), [navDomains, userRole]);
+  // Use userRole (stable) + canPermission — not `can` from useRole, which is a new function every render and would break useMemo.
+  const visibleDomains = useMemo(
+    () => filterDomainsByPermission(rolePrunedDomains, (p) => canPermission(userRole ?? undefined, p)),
+    [rolePrunedDomains, userRole],
+  );
 
   const canManageModules = can(CAPABILITIES.TENANT_MODULES_MANAGE);
-
-  // Permission-only visibility: show item iff can(requiredPermission). Modules never hide.
-  const visibleGroups: NavGroup[] = navGroups.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => {
-      if (isSubmenuParent(item)) {
-        const visibleChildren = item.children!.filter((c) => can(c.requiredPermission));
-        if (visibleChildren.length === 0) return false;
-        return true;
-      }
-      return can(item.requiredPermission);
-    }).map((item) => {
-      if (isSubmenuParent(item)) {
-        return { ...item, children: item.children!.filter((c) => can(c.requiredPermission)) };
-      }
-      return item;
-    }).filter((item) => {
-      if (isSubmenuParent(item)) return (item as NavItem & { children: NavItem[] }).children.length > 0;
-      return true;
-    }),
-  })).filter((g) => g.items.length > 0);
 
   const modulesEnabledFor = (item: NavItem): boolean => {
     if (!item.requiredModules?.length) return true;
@@ -81,31 +81,29 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
   };
 
   if (VITE_DEBUG_NAV) {
-    visibleGroups.forEach((group) => {
-      group.items.forEach((item) => {
-        if (isSubmenuParent(item)) {
-          item.children!.forEach((c) => {
-            const canResult = can(c.requiredPermission);
-            const modulesEnabledResult = modulesEnabledFor(c);
-            console.log('[VITE_DEBUG_NAV]', {
-              key: c.key,
-              requiredPermission: c.requiredPermission,
-              canResult,
-              requiredModules: c.requiredModules,
-              modulesEnabledResult,
+    visibleDomains.forEach((domain) => {
+      domain.sections.forEach((section) => {
+        section.items.forEach((item) => {
+          if (isSubmenuParent(item)) {
+            item.children!.forEach((c) => {
+              console.log('[VITE_DEBUG_NAV]', {
+                key: c.key,
+                requiredPermission: c.requiredPermission,
+                canResult: can(c.requiredPermission),
+                requiredModules: c.requiredModules,
+                modulesEnabledResult: modulesEnabledFor(c),
+              });
             });
-          });
-        } else {
-          const canResult = can(item.requiredPermission);
-          const modulesEnabledResult = modulesEnabledFor(item);
-          console.log('[VITE_DEBUG_NAV]', {
-            key: item.key,
-            requiredPermission: item.requiredPermission,
-            canResult,
-            requiredModules: item.requiredModules,
-            modulesEnabledResult,
-          });
-        }
+          } else {
+            console.log('[VITE_DEBUG_NAV]', {
+              key: item.key,
+              requiredPermission: item.requiredPermission,
+              canResult: can(item.requiredPermission),
+              requiredModules: item.requiredModules,
+              modulesEnabledResult: modulesEnabledFor(item),
+            });
+          }
+        });
       });
     });
   }
@@ -113,23 +111,25 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
   if (VITE_DEBUG_MODULES) {
     const tenantId = typeof window !== 'undefined' ? localStorage.getItem('farm_erp_tenant_id') ?? '' : '';
     const itemsWithModules: { key: string; requiredModules?: string[]; isEnabled: boolean }[] = [];
-    visibleGroups.forEach((group) => {
-      group.items.forEach((item) => {
-        if (isSubmenuParent(item)) {
-          item.children!.forEach((c) => {
-            itemsWithModules.push({
-              key: c.key,
-              requiredModules: c.requiredModules,
-              isEnabled: modulesEnabledFor(c),
+    visibleDomains.forEach((domain) => {
+      domain.sections.forEach((section) => {
+        section.items.forEach((item) => {
+          if (isSubmenuParent(item)) {
+            item.children!.forEach((c) => {
+              itemsWithModules.push({
+                key: c.key,
+                requiredModules: c.requiredModules,
+                isEnabled: modulesEnabledFor(c),
+              });
             });
-          });
-        } else {
-          itemsWithModules.push({
-            key: item.key,
-            requiredModules: item.requiredModules,
-            isEnabled: modulesEnabledFor(item),
-          });
-        }
+          } else {
+            itemsWithModules.push({
+              key: item.key,
+              requiredModules: item.requiredModules,
+              isEnabled: modulesEnabledFor(item),
+            });
+          }
+        });
       });
     });
     console.log('[VITE_DEBUG_MODULES] sidebar', { tenantId, navItems: itemsWithModules });
@@ -172,8 +172,8 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
   }, [tenantId]);
 
   useEffect(() => {
-    if (location.pathname.startsWith('/app/machinery') && !expandedSubmenus.machinery) {
-      setExpandedSubmenus((prev) => ({ ...prev, machinery: true }));
+    if (location.pathname.startsWith('/app/machinery')) {
+      setExpandedSubmenus((prev) => (prev.machinery ? prev : { ...prev, machinery: true }));
     }
   }, [location.pathname]);
 
@@ -185,52 +185,39 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
     });
   };
 
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
-    const active = new Set<string>();
-    active.add(term('navFarm'));
-    visibleGroups.forEach((group) => {
-      const hasActive = group.items.some((item) => {
-        if (isSubmenuParent(item)) {
-          return item.children!.some(
-            (c) => location.pathname === c.to || location.pathname.startsWith(c.to + '/')
-          );
-        }
-        return location.pathname === item.to || location.pathname.startsWith(item.to + '/');
-      });
-      if (hasActive) active.add(group.name);
-    });
-    return active;
+  const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => {
+    const initial = new Set<string>(['farm']);
+    return initial;
   });
 
   useEffect(() => {
-    visibleGroups.forEach((group) => {
-      const hasActive = group.items.some((item) => {
-        if (isSubmenuParent(item)) {
-          return item.children!.some(
-            (c) => location.pathname === c.to || location.pathname.startsWith(c.to + '/')
-          );
-        }
-        return location.pathname === item.to || location.pathname.startsWith(item.to + '/');
-      });
-      if (hasActive) {
-        setExpandedGroups((prev) => (prev.has(group.name) ? prev : new Set(prev).add(group.name)));
-      }
-    });
-  }, [location.pathname]);
-
-  const toggleGroup = (name: string) => {
-    setExpandedGroups((prev) => {
+    setExpandedDomains((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      visibleDomains.forEach((d) => {
+        if (domainHasActivePath(location.pathname, d)) {
+          next.add(d.domainKey);
+        }
+      });
+      if (stringSetsEqual(prev, next)) {
+        return prev;
+      }
+      return next;
+    });
+  }, [location.pathname, visibleDomains]);
+
+  const toggleDomain = (domainKey: string) => {
+    setExpandedDomains((prev) => {
+      const next = new Set(prev);
+      if (next.has(domainKey)) next.delete(domainKey);
+      else next.add(domainKey);
       return next;
     });
   };
 
-  const renderItem = (item: NavItem) => {
+  const renderLeafItem = (item: NavItem) => {
     const disabled = !modulesEnabledFor(item);
     const navTestId = `nav-${item.to.replace('/app/', '').replace(/\//g, '-')}`;
-    const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+    const isActive = isPathUnderRoute(location.pathname, item.to);
     const baseClass = `group flex items-center px-2 py-2 text-sm font-medium rounded-md`;
     const activeClass = isActive ? 'bg-[#E6ECEA] text-[#1F6F5C]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900';
     const disabledClass = disabled ? 'text-gray-400 cursor-not-allowed hover:bg-gray-50' : '';
@@ -273,34 +260,64 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
     );
   };
 
+  const renderItem = (item: NavItem) => {
+    if (isSubmenuParent(item)) {
+      const subExpanded = expandedSubmenus[item.submenuKey] ?? false;
+      const hasChildActive = isNavItemActive(location.pathname, item);
+      return (
+        <div key={item.submenuKey}>
+          <button
+            type="button"
+            onClick={() => toggleSubmenu(item.submenuKey)}
+            aria-expanded={subExpanded}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleSubmenu(item.submenuKey);
+              }
+            }}
+            className={`${
+              hasChildActive ? 'bg-[#E6ECEA] text-[#1F6F5C]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
+          >
+            <span>{item.label}</span>
+            <svg
+              className={`h-4 w-4 transition-transform ${subExpanded ? 'transform rotate-90' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          {subExpanded && (
+            <div className="ml-4 mt-1 space-y-1 pl-2 border-l border-gray-200">
+              {item.children!.map((child) => renderLeafItem(child))}
+            </div>
+          )}
+        </div>
+      );
+    }
+    return renderLeafItem(item);
+  };
+
   return (
     <nav className="mt-5 flex-1 px-2 space-y-1" aria-label="Main">
-      {visibleGroups.map((group) => {
-        const isExpanded = expandedGroups.has(group.name);
-        const hasActiveItem = group.items.some((item) => {
-          if (isSubmenuParent(item)) {
-            return item.children!.some(
-              (c) => location.pathname === c.to || location.pathname.startsWith(c.to + '/')
-            );
-          }
-          return location.pathname === item.to || location.pathname.startsWith(item.to + '/');
-        });
-
-        if (group.items.length === 1 && !isSubmenuParent(group.items[0])) {
-          const item = group.items[0];
-          return <div key={group.name}>{renderItem(item)}</div>;
-        }
+      {visibleDomains.map((domain) => {
+        const isExpanded = expandedDomains.has(domain.domainKey);
+        const hasActiveInDomain = domainHasActivePath(location.pathname, domain);
 
         return (
-          <div key={group.name}>
+          <div key={domain.domainKey}>
             <button
               type="button"
-              onClick={() => toggleGroup(group.name)}
+              onClick={() => toggleDomain(domain.domainKey)}
+              aria-expanded={isExpanded}
               className={`${
-                hasActiveItem ? 'bg-[#E6ECEA] text-[#1F6F5C]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
+                hasActiveInDomain ? 'bg-[#E6ECEA] text-[#1F6F5C]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              } w-full group flex items-center justify-between px-2 py-2 text-sm font-semibold rounded-md`}
             >
-              <span>{group.name}</span>
+              <span>{domain.name}</span>
               <svg
                 className={`h-4 w-4 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
                 fill="none"
@@ -311,49 +328,19 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
               </svg>
             </button>
             {isExpanded && (
-              <div className="ml-4 mt-1 space-y-1">
-                {group.items.map((item) => {
-                  if (isSubmenuParent(item)) {
-                    const subExpanded = expandedSubmenus[item.submenuKey] ?? false;
-                    const hasChildActive = item.children!.some(
-                      (c) => location.pathname === c.to || location.pathname.startsWith(c.to + '/')
-                    );
-                    return (
-                      <div key={item.submenuKey}>
-                        <button
-                          type="button"
-                          onClick={() => toggleSubmenu(item.submenuKey)}
-                          aria-expanded={subExpanded}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              toggleSubmenu(item.submenuKey);
-                            }
-                          }}
-                          className={`${
-                            hasChildActive ? 'bg-[#E6ECEA] text-[#1F6F5C]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                          } w-full group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md`}
-                        >
-                          <span>{item.label}</span>
-                          <svg
-                            className={`h-4 w-4 transition-transform ${subExpanded ? 'transform rotate-90' : ''}`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                        {subExpanded && (
-                          <div className="ml-4 mt-1 space-y-1 pl-2 border-l border-gray-200">
-                            {item.children!.map((child) => renderItem(child))}
-                          </div>
-                        )}
+              <div className="ml-4 mt-1 space-y-3">
+                {domain.sections.map((section, sIdx) => (
+                  <div key={section.sectionKey}>
+                    {section.sectionTitle ? (
+                      <div
+                        className={`text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 ${sIdx > 0 ? 'mt-1' : ''}`}
+                      >
+                        {section.sectionTitle}
                       </div>
-                    );
-                  }
-                  return renderItem(item);
-                })}
+                    ) : null}
+                    <div className="space-y-1">{section.items.map((item) => renderItem(item))}</div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

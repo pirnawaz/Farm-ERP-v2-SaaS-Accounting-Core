@@ -6,6 +6,7 @@ import { useCropCycles } from '../../hooks/useCropCycles';
 import { useParties } from '../../hooks/useParties';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { Modal } from '../../components/Modal';
@@ -94,6 +95,7 @@ export default function ChargesPage() {
       accessor: (row) => (
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/app/machinery/charges/${row.id}`);
@@ -107,116 +109,125 @@ export default function ChargesPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Machinery Charges</h1>
-        {canGenerate && (
-          <button
-            onClick={() => setShowGenerateModal(true)}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
-          >
-            Generate Charges
-          </button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Machinery Charges"
+        backTo="/app/machinery"
+        breadcrumbs={[
+          { label: 'Farm', to: '/app/dashboard' },
+          { label: 'Machinery', to: '/app/machinery' },
+          { label: 'Charges' },
+        ]}
+        right={
+          canGenerate ? (
+            <button
+              type="button"
+              onClick={() => setShowGenerateModal(true)}
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            >
+              Generate Charges
+            </button>
+          ) : undefined
+        }
+      />
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              <option value="DRAFT">Draft</option>
-              <option value="POSTED">Posted</option>
-              <option value="REVERSED">Reversed</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-            <select
-              value={filters.project_id}
-              onChange={(e) => handleFilterChange('project_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              {projects?.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Crop Cycle</label>
-            <select
-              value={filters.crop_cycle_id}
-              onChange={(e) => handleFilterChange('crop_cycle_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              {cropCycles?.map((cycle) => (
-                <option key={cycle.id} value={cycle.id}>
-                  {cycle.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Landlord Party</label>
-            <select
-              value={filters.landlord_party_id}
-              onChange={(e) => handleFilterChange('landlord_party_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              {parties?.filter((p) => p.party_types?.includes('LANDLORD')).map((party) => (
-                <option key={party.id} value={party.id}>
-                  {party.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date From</label>
-            <input
-              type="date"
-              value={filters.from}
-              onChange={(e) => handleFilterChange('from', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date To</label>
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(e) => handleFilterChange('to', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            />
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex flex-col gap-1 min-w-[10rem]">
+              <label className="text-sm font-medium text-gray-700">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">All</option>
+                <option value="DRAFT">Draft</option>
+                <option value="POSTED">Posted</option>
+                <option value="REVERSED">Reversed</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[12rem]">
+              <label className="text-sm font-medium text-gray-700">Project</label>
+              <select
+                value={filters.project_id}
+                onChange={(e) => handleFilterChange('project_id', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">All</option>
+                {projects?.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[12rem]">
+              <label className="text-sm font-medium text-gray-700">Crop Cycle</label>
+              <select
+                value={filters.crop_cycle_id}
+                onChange={(e) => handleFilterChange('crop_cycle_id', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">All</option>
+                {cropCycles?.map((cycle) => (
+                  <option key={cycle.id} value={cycle.id}>
+                    {cycle.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[12rem]">
+              <label className="text-sm font-medium text-gray-700">Landlord Party</label>
+              <select
+                value={filters.landlord_party_id}
+                onChange={(e) => handleFilterChange('landlord_party_id', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">All</option>
+                {parties?.filter((p) => p.party_types?.includes('LANDLORD')).map((party) => (
+                  <option key={party.id} value={party.id}>
+                    {party.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[10rem]">
+              <label className="text-sm font-medium text-gray-700">Date From</label>
+              <input
+                type="date"
+                value={filters.from}
+                onChange={(e) => handleFilterChange('from', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              />
+            </div>
+            <div className="flex flex-col gap-1 min-w-[10rem]">
+              <label className="text-sm font-medium text-gray-700">Date To</label>
+              <input
+                type="date"
+                value={filters.to}
+                onChange={(e) => handleFilterChange('to', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={(charges ?? []) as MachineryCharge[]}
-          columns={columns}
-          onRowClick={(row) => navigate(`/app/machinery/charges/${row.id}`)}
-        />
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner size="lg" />
+            </div>
+          ) : (
+            <DataTable
+              data={(charges ?? []) as MachineryCharge[]}
+              columns={columns}
+              onRowClick={(row) => navigate(`/app/machinery/charges/${row.id}`)}
+            />
+          )}
+        </div>
       </div>
 
       {showGenerateModal && (
@@ -266,8 +277,8 @@ function GenerateChargesModal({
 
   return (
     <Modal isOpen={true} title="Generate Charges" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <FormField label="Project" required>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField label="Project" required className="md:col-span-2">
           <select
             value={formData.project_id}
             onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
@@ -327,18 +338,18 @@ function GenerateChargesModal({
           />
         </FormField>
 
-        <div className="flex justify-end gap-2 mt-6">
+        <div className="md:col-span-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border rounded"
+            className="w-full sm:w-auto px-4 py-2 border rounded"
             disabled={isLoading}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a]"
             disabled={isLoading || !formData.project_id || !formData.from || !formData.to}
           >
             {isLoading ? 'Generating...' : 'Generate'}

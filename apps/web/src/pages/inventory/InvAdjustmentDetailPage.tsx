@@ -104,7 +104,7 @@ export default function InvAdjustmentDetailPage() {
   const total = (adj.lines || []).reduce((a, l) => a + lineTotal(l), 0);
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`${term('adjustmentSingular')} ${adj.doc_no}`}
         backTo={backTo}
@@ -143,6 +143,7 @@ export default function InvAdjustmentDetailPage() {
           </div>
           <div className="mb-4">
             <div className="flex justify-between mb-2"><h4 className="font-medium">Lines (qty_delta: + gain, - loss)</h4><button type="button" onClick={addLine} className="text-sm text-[#1F6F5C]">+ Add</button></div>
+            <div className="overflow-x-auto">
             <table className="min-w-full border">
               <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty delta</th><th className="px-3 py-2 text-left text-xs text-gray-500">Available</th><th className="w-10" /></tr></thead>
               <tbody>
@@ -156,6 +157,7 @@ export default function InvAdjustmentDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
@@ -165,6 +167,7 @@ export default function InvAdjustmentDetailPage() {
       ) : (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="font-medium mb-2">Lines</h3>
+          <div className="overflow-x-auto">
           <table className="min-w-full border">
             <thead className="bg-[#E6ECEA]"><tr><th className="px-3 py-2 text-left text-xs text-gray-500">Item</th><th className="px-3 py-2 text-left text-xs text-gray-500">Qty delta</th><th className="px-3 py-2 text-left text-xs text-gray-500">Total</th></tr></thead>
             <tbody>
@@ -173,6 +176,7 @@ export default function InvAdjustmentDetailPage() {
               ))}
             </tbody>
           </table>
+          </div>
           <p className="mt-2 font-medium">Total: <span className="tabular-nums">{formatMoney(total)}</span></p>
         </div>
       )}

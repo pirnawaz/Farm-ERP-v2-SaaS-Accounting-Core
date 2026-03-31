@@ -59,12 +59,43 @@ export default function WorkLogDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6">
+        <PageHeader
+          title="Work Log"
+          backTo={backTo}
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: '…' },
+          ]}
+        />
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
       </div>
     );
   }
-  if (!log) return <div>Work log not found.</div>;
+  if (!log) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Work Log"
+          backTo={backTo}
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: 'Not found' },
+          ]}
+        />
+        <p className="text-gray-600">Work log not found.</p>
+        <Link to="/app/machinery/work-logs" className="text-[#1F6F5C] font-medium hover:underline">
+          Back to Work Logs
+        </Link>
+      </div>
+    );
+  }
 
   const totalAmount = (log.lines ?? []).reduce(
     (s, l) => s + parseFloat(String(l.amount ?? 0)),
@@ -72,7 +103,7 @@ export default function WorkLogDetailPage() {
   );
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`Work Log ${log.work_log_no}`}
         backTo={backTo}
@@ -86,7 +117,7 @@ export default function WorkLogDetailPage() {
           canEdit && isDraft ? (
             <Link
               to={`/app/machinery/work-logs/${log.id}/edit`}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              className="inline-flex justify-center w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
             >
               Edit
             </Link>
@@ -94,7 +125,7 @@ export default function WorkLogDetailPage() {
         }
       />
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <dt className="text-sm text-gray-500">Work Log No</dt>
@@ -185,7 +216,7 @@ export default function WorkLogDetailPage() {
         </dl>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <h3 className="font-medium mb-2">Cost lines</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full border">
@@ -217,11 +248,11 @@ export default function WorkLogDetailPage() {
       </div>
 
       {isDraft && canPost && (
-        <div className="mb-6">
+        <div>
           <button
             type="button"
             onClick={() => setShowPostModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
           >
             Post
           </button>
@@ -229,14 +260,14 @@ export default function WorkLogDetailPage() {
       )}
 
       {isPosted && canPost && (
-        <div className="mb-6">
+        <div>
           <button
             type="button"
             onClick={() => {
               setShowReverseModal(true);
               setReverseReason('');
             }}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
             Reverse
           </button>
@@ -257,11 +288,11 @@ export default function WorkLogDetailPage() {
               className="w-full px-3 py-2 border rounded"
             />
           </FormField>
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={() => setShowPostModal(false)}
-              className="px-4 py-2 border rounded"
+              className="w-full sm:w-auto px-4 py-2 border rounded"
             >
               Cancel
             </button>
@@ -269,7 +300,7 @@ export default function WorkLogDetailPage() {
               type="button"
               onClick={handlePost}
               disabled={postM.isPending}
-              className="px-4 py-2 bg-green-600 text-white rounded"
+              className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded"
             >
               {postM.isPending ? 'Posting…' : 'Post'}
             </button>
@@ -303,14 +334,14 @@ export default function WorkLogDetailPage() {
               placeholder="Reason for reversal"
             />
           </FormField>
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={() => {
                 setShowReverseModal(false);
                 setReverseReason('');
               }}
-              className="px-4 py-2 border rounded"
+              className="w-full sm:w-auto px-4 py-2 border rounded"
             >
               Cancel
             </button>
@@ -318,7 +349,7 @@ export default function WorkLogDetailPage() {
               type="button"
               onClick={handleReverse}
               disabled={reverseM.isPending}
-              className="px-4 py-2 bg-red-600 text-white rounded"
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded"
             >
               {reverseM.isPending ? 'Reversing…' : 'Reverse'}
             </button>

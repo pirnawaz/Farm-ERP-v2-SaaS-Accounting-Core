@@ -15,6 +15,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../components/Term';
 import { term } from '../config/terminology';
 import { formatItemDisplayName } from '../utils/formatItemDisplay';
+import { DOCUMENT_LABELS, REPORT_LABELS } from '../config/presentation';
+import {
+  DocumentPrintShell,
+  DocumentMetaGrid,
+  DocumentLineItemsTable,
+  DocumentTotalsBlock,
+  DocumentNotesBlock,
+} from '../components/document';
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +32,7 @@ export default function SaleDetailPage() {
   const postMutation = usePostSale();
   const reverseMutation = useReverseSale();
   const { hasRole } = useRole();
-  const { formatMoney, formatDate, formatDateTime } = useFormatting();
+  const { formatMoney, formatDate, formatDateTime, formatNumber } = useFormatting();
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -97,92 +105,60 @@ export default function SaleDetailPage() {
 
   return (
     <div>
-      {/* Print Template - Invoice */}
-      <div className="print-document hidden">
-        <PrintHeader
-          title="Invoice"
-          subtitle={sale.buyer_party?.name}
+      {/* Print Template - Invoice (shared document framework) */}
+      <DocumentPrintShell>
+        <PrintHeader title={DOCUMENT_LABELS.invoice} subtitle={sale.buyer_party?.name} />
+
+        <DocumentMetaGrid
+          leftColumn={[
+            {
+              label: DOCUMENT_LABELS.invoiceNo,
+              value: sale.sale_no || (sale.id ? sale.id.substring(0, 8) : 'N/A'),
+            },
+            { label: DOCUMENT_LABELS.invoiceDate, value: formatDate(sale.posting_date) },
+            ...(sale.due_date
+              ? [{ label: DOCUMENT_LABELS.dueDate, value: formatDate(sale.due_date) }]
+              : []),
+          ]}
+          rightColumn={[
+            { label: DOCUMENT_LABELS.billTo, value: sale.buyer_party?.name || 'N/A' },
+            ...(sale.project
+              ? [{ label: `${REPORT_LABELS.project}:`, value: sale.project.name }]
+              : []),
+            ...(sale.crop_cycle
+              ? [{ label: `${REPORT_LABELS.cropCycle}:`, value: sale.crop_cycle.name }]
+              : []),
+          ]}
         />
-        
-        <div className="print-document-meta">
-          <div>
-            <dl>
-              <dt>Invoice No:</dt>
-              <dd>{sale.sale_no || (sale.id ? sale.id.substring(0, 8) : 'N/A')}</dd>
-              <dt>Date:</dt>
-              <dd>{formatDate(sale.posting_date)}</dd>
-              {sale.due_date && (
-                <>
-                  <dt>Due Date:</dt>
-                  <dd>{formatDate(sale.due_date)}</dd>
-                </>
-              )}
-            </dl>
-          </div>
-          <div>
-            <dl>
-              <dt>Bill To:</dt>
-              <dd>{sale.buyer_party?.name || 'N/A'}</dd>
-              {sale.project && (
-                <>
-                  <dt>Project:</dt>
-                  <dd>{sale.project.name}</dd>
-                </>
-              )}
-              {sale.crop_cycle && (
-                <>
-                  <dt>Crop Cycle:</dt>
-                  <dd>{sale.crop_cycle.name}</dd>
-                </>
-              )}
-            </dl>
-          </div>
-        </div>
 
         {sale.lines && sale.lines.length > 0 && (
-          <div className="print-line-items">
-            <table className="min-w-full">
-              <thead>
-                <tr>
-                  <th className="text-left">Item</th>
-                  <th className="text-left">Store</th>
-                  <th className="text-right">Quantity</th>
-                  <th className="text-right">Unit Price</th>
-                  <th className="text-right">Line Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sale.lines.map((line) => (
-                  <tr key={line.id}>
-                    <td>{formatItemDisplayName(line.item)}</td>
-                    <td>{line.store?.name || line.store_id || '-'}</td>
-                    <td className="text-right tabular-nums">{line.quantity}</td>
-                    <td className="text-right tabular-nums">{formatMoney(line.unit_price)}</td>
-                    <td className="text-right tabular-nums">{formatMoney(line.line_total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DocumentLineItemsTable
+            columns={[
+              { label: DOCUMENT_LABELS.item, align: 'left' },
+              { label: DOCUMENT_LABELS.store, align: 'left' },
+              { label: DOCUMENT_LABELS.quantity, align: 'right' },
+              { label: DOCUMENT_LABELS.unitPrice, align: 'right' },
+              { label: DOCUMENT_LABELS.lineTotal, align: 'right' },
+            ]}
+          >
+            {sale.lines.map((line) => (
+              <tr key={line.id}>
+                <td>{formatItemDisplayName(line.item)}</td>
+                <td>{line.store?.name || line.store_id || '—'}</td>
+                <td className="text-right tabular-nums">
+                  {formatNumber(Number.parseFloat(String(line.quantity)) || 0)}
+                </td>
+                <td className="text-right tabular-nums">{formatMoney(line.unit_price)}</td>
+                <td className="text-right tabular-nums">{formatMoney(line.line_total)}</td>
+              </tr>
+            ))}
+          </DocumentLineItemsTable>
         )}
 
-        <div className="print-totals">
-          <div className="flex justify-end">
-            <div className="w-64">
-              <div className="flex justify-between mb-2">
-                <span className="font-semibold">Total:</span>
-                <span className="font-semibold tabular-nums">{formatMoney(totalAmount)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <DocumentTotalsBlock label={`${REPORT_LABELS.total}:`} value={formatMoney(totalAmount)} />
 
-        {sale.notes && (
-          <div className="print-footer">
-            <p><strong>Notes:</strong> {sale.notes}</p>
-          </div>
-        )}
-      </div>
+        {sale.notes && <DocumentNotesBlock title={DOCUMENT_LABELS.notes}>{sale.notes}</DocumentNotesBlock>}
+      </DocumentPrintShell>
 
       <div className="no-print">
         <PageHeader

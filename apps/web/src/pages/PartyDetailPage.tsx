@@ -5,7 +5,11 @@ import { usePayments } from '../hooks/usePayments';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DataTable, type Column } from '../components/DataTable';
 import { useFormatting } from '../hooks/useFormatting';
+import { useTenantSettings } from '../hooks/useTenantSettings';
 import { exportToCSV } from '../utils/csvExport';
+import { exportAmountForSpreadsheet, exportDateIsoYmd } from '../utils/exportFormatting';
+import { metaReportingPeriodLabel } from '../utils/reportPresentation';
+import { DOCUMENT_LABELS } from '../config/presentation';
 import { PrintHeader } from '../components/print/PrintHeader';
 import type { Payment, PartyStatementLine, PartyStatementGroup, OpenSale } from '../types';
 
@@ -28,7 +32,8 @@ export default function PartyDetailPage() {
   const { data: payments, isLoading: paymentsLoading } = usePayments({ party_id: id });
   const [openSalesAsOf, setOpenSalesAsOf] = useState<string>(new Date().toISOString().split('T')[0]);
   const { data: openSales, isLoading: openSalesLoading } = usePartyOpenSales(id || '', openSalesAsOf);
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatMoney, formatDate, formatDateRange } = useFormatting();
+  const { settings } = useTenantSettings();
 
   const payableAmount = parseFloat(balances?.outstanding_total || '0');
   const receivableAmount = parseFloat(balances?.receivable_balance || '0');
@@ -309,26 +314,30 @@ export default function PartyDetailPage() {
         {statement && statement.line_items && statement.line_items.length > 0 && (
           <div className="print-document hidden">
             <PrintHeader
-              title="Account Statement"
+              title={DOCUMENT_LABELS.accountStatement}
               subtitle={party.name}
-              metaLeft={statementFrom && statementTo ? `From ${formatDate(statementFrom)} to ${formatDate(statementTo)}` : undefined}
+              metaLeft={
+                statementFrom && statementTo
+                  ? metaReportingPeriodLabel(formatDateRange(statementFrom, statementTo))
+                  : undefined
+              }
             />
             
             <div className="print-document-meta">
               <div>
                 <dl>
-                  <dt>Party:</dt>
+                  <dt>{DOCUMENT_LABELS.party}:</dt>
                   <dd>{party.name}</dd>
-                  <dt>Party Types:</dt>
+                  <dt>{DOCUMENT_LABELS.partyTypes}:</dt>
                   <dd>{party.party_types.join(', ')}</dd>
                 </dl>
               </div>
               <div>
                 {statement.summary && (
                   <dl>
-                    <dt>Closing Payable:</dt>
+                    <dt>{DOCUMENT_LABELS.closingPayable}:</dt>
                     <dd className="tabular-nums">{formatMoney(statement.summary.closing_balance_payable)}</dd>
-                    <dt>Closing Receivable:</dt>
+                    <dt>{DOCUMENT_LABELS.closingReceivable}:</dt>
                     <dd className="tabular-nums">{formatMoney(statement.summary.closing_balance_receivable)}</dd>
                   </dl>
                 )}
@@ -381,11 +390,11 @@ export default function PartyDetailPage() {
                   </div>
                   <div>
                     <div className="flex justify-between mb-1">
-                      <span className="font-semibold">Closing Payable:</span>
+                      <span className="font-semibold">{DOCUMENT_LABELS.closingPayable}:</span>
                       <span className="font-semibold tabular-nums text-red-600">{formatMoney(statement.summary.closing_balance_payable)}</span>
                     </div>
                     <div className="flex justify-between mb-1">
-                      <span className="font-semibold">Closing Receivable:</span>
+                      <span className="font-semibold">{DOCUMENT_LABELS.closingReceivable}:</span>
                       <span className="font-semibold tabular-nums text-green-600">{formatMoney(statement.summary.closing_balance_receivable)}</span>
                     </div>
                   </div>
@@ -427,11 +436,27 @@ export default function PartyDetailPage() {
                 </button>
                 <button
                   onClick={() => {
-                    exportToCSV(
-                      statement.line_items,
-                      `party-statement-${party.name}-${statementFrom || 'all'}-${statementTo || 'all'}.csv`,
-                      ['date', 'type', 'reference', 'description', 'amount', 'direction']
-                    );
+                    const mapped = statement.line_items.map((line) => ({
+                      date: exportDateIsoYmd(line.date),
+                      type: line.type,
+                      reference: line.reference,
+                      description: line.description,
+                      amount: exportAmountForSpreadsheet(line.amount),
+                      direction: line.direction,
+                    }));
+                    exportToCSV(mapped, 'export.csv', ['date', 'type', 'reference', 'description', 'amount', 'direction'], {
+                      reportName: 'PartyStatement',
+                      fromDate: statementFrom || undefined,
+                      toDate: statementTo || undefined,
+                      metadataRows: [
+                        ['export', 'Terrava Party Statement'],
+                        ['party_id', party.id],
+                        ['party_name', party.name],
+                        ['reporting_period_start', statementFrom || ''],
+                        ['reporting_period_end', statementTo || ''],
+                        ['base_currency', settings?.currency_code ?? 'PKR'],
+                      ],
+                    });
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                 >

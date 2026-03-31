@@ -48,7 +48,7 @@ export default function ActivityTypesPage() {
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`Crop Ops → ${term('activityType')}`}
         backTo="/app/crop-ops"
@@ -59,33 +59,35 @@ export default function ActivityTypesPage() {
           </button>
         }
       />
-      <p className="text-sm text-gray-500 mb-4">{term('activityType')} represent operations like ploughing, sowing, spraying.</p>
-      <div className="flex gap-4 mb-4 flex-wrap">
-        <select
-          value={String(isActiveFilter)}
-          onChange={(e) => setIsActiveFilter(e.target.value === '' ? '' : e.target.value === 'true')}
-          className="px-3 py-2 border rounded text-sm"
-        >
-          <option value="">All</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
-      </div>
-      <div className="bg-white rounded-lg shadow">
-        <DataTable data={types || []} columns={cols} emptyMessage={`No ${term('activityType').toLowerCase()}. Create one.`} />
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">{term('activityType')} represent operations like ploughing, sowing, spraying.</p>
+        <div className="flex flex-wrap gap-4 items-end">
+          <select
+            value={String(isActiveFilter)}
+            onChange={(e) => setIsActiveFilter(e.target.value === '' ? '' : e.target.value === 'true')}
+            className="px-3 py-2 border rounded text-sm"
+          >
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+        <div className="bg-white rounded-lg shadow">
+          <DataTable data={types || []} columns={cols} emptyMessage={`No ${term('activityType').toLowerCase()}. Create one.`} />
+        </div>
       </div>
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={`New ${term('activityTypeSingular')}`}>
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">e.g. Ploughing, Sowing, Fertilizer, Spraying…</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <p className="text-sm text-gray-500 md:col-span-2">e.g. Ploughing, Sowing, Fertilizer, Spraying…</p>
           <FormField label="Name" required>
             <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border rounded" />
           </FormField>
           <FormField label="Active">
             <label><input type="checkbox" checked={isActiveVal} onChange={(e) => setIsActiveVal(e.target.checked)} /> Active</label>
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">
+          <div className="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={() => setShowModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handleCreate} disabled={!name.trim() || createM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">
               Create
             </button>
           </div>

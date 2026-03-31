@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useJournalEntry, useReverseJournal } from '../../hooks/useJournalEntries';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -46,7 +46,7 @@ export default function JournalDetailPage() {
   const totalCredits = j.total_credits ?? j.lines?.reduce((s, l) => s + Number(l.credit_amount), 0) ?? 0;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`Journal ${j.journal_number}`}
         backTo="/app/accounting/journals"
@@ -60,7 +60,7 @@ export default function JournalDetailPage() {
             <button
               type="button"
               onClick={() => navigate(`/app/accounting/journals/${id}/edit`)}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
             >
               Edit
             </button>
@@ -69,7 +69,7 @@ export default function JournalDetailPage() {
               type="button"
               onClick={() => setShowReverseConfirm(true)}
               disabled={reverseM.isPending}
-              className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
             >
               Reverse
             </button>
@@ -158,13 +158,19 @@ export default function JournalDetailPage() {
 
         {j.posting_group_id && (
           <p className="text-sm text-gray-500">
-            Posting group: {j.posting_group_id}
+            Posting group:{' '}
+            <Link to={`/app/posting-groups/${j.posting_group_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
+              {j.posting_group_id}
+            </Link>
             {j.posting_group?.posting_date && ` (${formatDate(j.posting_group.posting_date)})`}
           </p>
         )}
         {j.reversal_posting_group_id && (
           <p className="text-sm text-gray-500">
-            Reversal posting group: {j.reversal_posting_group_id}
+            Reversal posting group:{' '}
+            <Link to={`/app/posting-groups/${j.reversal_posting_group_id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
+              {j.reversal_posting_group_id}
+            </Link>
           </p>
         )}
       </div>

@@ -74,6 +74,7 @@ export default function RateCardsPage() {
       header: 'Actions',
       accessor: (r) => (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             setEditingRateCard(r);
@@ -171,20 +172,30 @@ export default function RateCardsPage() {
     });
   };
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Rate Cards"
         backTo="/app/machinery"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Rate Cards' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Rate Card</button>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+          >
+            New Rate Card
+          </button>
         ) : undefined}
       />
-      <div className="bg-white rounded-lg shadow">
-        <DataTable data={rateCards || []} columns={cols} emptyMessage="No rate cards. Create one." />
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : (
+          <DataTable data={rateCards || []} columns={cols} emptyMessage="No rate cards. Create one." />
+        )}
       </div>
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingRateCard ? 'Edit Rate Card' : 'New Rate Card'}>
         <div className="space-y-4">
@@ -360,10 +371,13 @@ export default function RateCardsPage() {
             </label>
           </FormField>
 
-          <div className="flex gap-2 pt-4">
-            <button onClick={handleCloseModal} className="px-4 py-2 border rounded">Cancel</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+            <button type="button" onClick={handleCloseModal} className="w-full sm:w-auto px-4 py-2 border rounded">
+              Cancel
+            </button>
             {editingRateCard ? (
               <button
+                type="button"
                 onClick={handleUpdate}
                 disabled={
                   !form.effective_from || 
@@ -374,12 +388,13 @@ export default function RateCardsPage() {
                   (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || parseFloat(form.cost_plus_percent) <= 0)) ||
                   updateRC.isPending
                 }
-                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {updateRC.isPending ? 'Updating...' : 'Update'}
               </button>
             ) : (
               <button
+                type="button"
                 onClick={handleCreate}
                 disabled={
                   !form.effective_from || 
@@ -390,7 +405,7 @@ export default function RateCardsPage() {
                   (form.pricing_model === 'COST_PLUS' && (!form.cost_plus_percent || parseFloat(form.cost_plus_percent) <= 0)) ||
                   createRC.isPending
                 }
-                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {createRC.isPending ? 'Creating...' : 'Create'}
               </button>

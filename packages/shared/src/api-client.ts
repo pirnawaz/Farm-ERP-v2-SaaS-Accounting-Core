@@ -118,10 +118,31 @@ async function request<T>(
       
       // Try to parse as JSON, fallback to status text (prefer message for 5xx to show backend detail)
       try {
-        const error = JSON.parse(text)
+        const error = JSON.parse(text) as {
+          message?: string
+          error?: string
+          errors?: Record<string, string[]>
+        }
+        if (error.errors && typeof error.errors === 'object') {
+          const parts: string[] = []
+          for (const key of Object.keys(error.errors)) {
+            const msgs = error.errors[key]
+            if (Array.isArray(msgs)) {
+              for (const m of msgs) {
+                parts.push(`${key}: ${m}`)
+              }
+            }
+          }
+          if (parts.length > 0) {
+            throw new Error(parts.join(' '))
+          }
+        }
         const msg = error.message || error.error || `HTTP ${response.status}: ${response.statusText}`
         throw new Error(msg)
       } catch (parseError) {
+        if (!(parseError instanceof SyntaxError)) {
+          throw parseError
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}${text ? ` - ${text.substring(0, 100)}` : ''}`)
       }
     }

@@ -118,8 +118,9 @@ export default function MaintenanceJobsPage() {
     {
       header: 'Actions',
       accessor: (row) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/app/machinery/maintenance-jobs/${row.id}`);
@@ -131,6 +132,7 @@ export default function MaintenanceJobsPage() {
           {row.status === 'DRAFT' && canCreate && (
             <>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/app/machinery/maintenance-jobs/${row.id}/edit`);
@@ -141,6 +143,7 @@ export default function MaintenanceJobsPage() {
               </button>
               {canPost && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setPostingJobId(row.id);
@@ -151,6 +154,7 @@ export default function MaintenanceJobsPage() {
                 </button>
               )}
               <button
+                type="button"
                 onClick={(e) => handleDelete(row.id, e)}
                 className="text-red-600 hover:text-red-800"
                 disabled={deleteMutation.isPending}
@@ -161,6 +165,7 @@ export default function MaintenanceJobsPage() {
           )}
           {row.status === 'POSTED' && canPost && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setReversingJobId(row.id);
@@ -175,18 +180,11 @@ export default function MaintenanceJobsPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Maintenance Jobs"
+        backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
@@ -195,8 +193,9 @@ export default function MaintenanceJobsPage() {
         right={
           canCreate ? (
             <button
+              type="button"
               onClick={() => navigate('/app/machinery/maintenance-jobs/new')}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
               New Maintenance Job
             </button>
@@ -204,79 +203,87 @@ export default function MaintenanceJobsPage() {
         }
       />
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              <option value="DRAFT">Draft</option>
-              <option value="POSTED">Posted</option>
-              <option value="REVERSED">Reversed</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Machine</label>
-            <select
-              value={filters.machine_id}
-              onChange={(e) => handleFilterChange('machine_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              {machines?.map((machine) => (
-                <option key={machine.id} value={machine.id}>
-                  {machine.code} - {machine.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Party</label>
-            <select
-              value={filters.vendor_party_id}
-              onChange={(e) => handleFilterChange('vendor_party_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              {parties?.filter((p) => p.party_types?.includes('VENDOR')).map((party) => (
-                <option key={party.id} value={party.id}>
-                  {party.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date From</label>
-            <input
-              type="date"
-              value={filters.from}
-              onChange={(e) => handleFilterChange('from', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date To</label>
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(e) => handleFilterChange('to', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            />
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex flex-col gap-1 min-w-[10rem]">
+              <label className="text-sm font-medium text-gray-700">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">All</option>
+                <option value="DRAFT">Draft</option>
+                <option value="POSTED">Posted</option>
+                <option value="REVERSED">Reversed</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[12rem]">
+              <label className="text-sm font-medium text-gray-700">Machine</label>
+              <select
+                value={filters.machine_id}
+                onChange={(e) => handleFilterChange('machine_id', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">All</option>
+                {machines?.map((machine) => (
+                  <option key={machine.id} value={machine.id}>
+                    {machine.code} - {machine.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[12rem]">
+              <label className="text-sm font-medium text-gray-700">Vendor Party</label>
+              <select
+                value={filters.vendor_party_id}
+                onChange={(e) => handleFilterChange('vendor_party_id', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              >
+                <option value="">All</option>
+                {parties?.filter((p) => p.party_types?.includes('VENDOR')).map((party) => (
+                  <option key={party.id} value={party.id}>
+                    {party.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[10rem]">
+              <label className="text-sm font-medium text-gray-700">Date From</label>
+              <input
+                type="date"
+                value={filters.from}
+                onChange={(e) => handleFilterChange('from', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              />
+            </div>
+            <div className="flex flex-col gap-1 min-w-[10rem]">
+              <label className="text-sm font-medium text-gray-700">Date To</label>
+              <input
+                type="date"
+                value={filters.to}
+                onChange={(e) => handleFilterChange('to', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={(jobs ?? []) as MachineMaintenanceJob[]}
-          columns={columns}
-          onRowClick={(row) => navigate(`/app/machinery/maintenance-jobs/${row.id}`)}
-        />
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner size="lg" />
+            </div>
+          ) : (
+            <DataTable
+              data={(jobs ?? []) as MachineMaintenanceJob[]}
+              columns={columns}
+              onRowClick={(row) => navigate(`/app/machinery/maintenance-jobs/${row.id}`)}
+            />
+          )}
+        </div>
       </div>
 
       {/* Post Modal */}
@@ -292,17 +299,19 @@ export default function MaintenanceJobsPage() {
                 required
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
+                type="button"
                 onClick={() => setPostingJobId(null)}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={postMutation.isPending}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handlePost}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 disabled={postMutation.isPending}
               >
                 {postMutation.isPending ? 'Posting...' : 'Post'}
@@ -335,17 +344,19 @@ export default function MaintenanceJobsPage() {
                 placeholder="Optional reason for reversal"
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
+                type="button"
                 onClick={() => { setReversingJobId(null); setReverseReason(''); }}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={reverseMutation.isPending}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleReverse}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                 disabled={reverseMutation.isPending}
               >
                 {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}

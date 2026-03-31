@@ -105,7 +105,7 @@ export default function MaintenanceJobFormPage() {
   };
 
   return (
-    <div>
+    <div className="space-y-6 pb-8">
       <PageHeader
         title={isEdit ? 'Edit Maintenance Job' : 'New Maintenance Job'}
         backTo="/app/machinery/maintenance-jobs"
@@ -255,15 +255,16 @@ export default function MaintenanceJobFormPage() {
         </div>
 
         {!isEdit || isDraft ? (
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={() => navigate('/app/machinery/maintenance-jobs')}
-              className="px-4 py-2 border rounded"
+              className="w-full sm:w-auto px-4 py-2 border rounded"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={
                 (isEdit ? updateM.isPending : createM.isPending) ||
@@ -272,7 +273,7 @@ export default function MaintenanceJobFormPage() {
                 totalAmount <= 0 ||
                 !canEdit
               }
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {isEdit ? (updateM.isPending ? 'Saving...' : 'Save') : createM.isPending ? 'Creating...' : 'Create'}
             </button>

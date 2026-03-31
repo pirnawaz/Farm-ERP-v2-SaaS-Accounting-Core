@@ -64,17 +64,39 @@ export default function MachineryServiceDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6">
+        <PageHeader
+          title="Machinery Service"
+          backTo="/app/machinery/services"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Services', to: '/app/machinery/services' },
+            { label: '…' },
+          ]}
+        />
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
       </div>
     );
   }
 
   if (!service) {
     return (
-      <div className="p-6">
-        <p>Service not found.</p>
-        <button onClick={() => navigate('/app/machinery/services')} className="mt-4 text-[#1F6F5C] hover:underline">
+      <div className="space-y-6">
+        <PageHeader
+          title="Machinery Service"
+          backTo="/app/machinery/services"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Services', to: '/app/machinery/services' },
+            { label: 'Not found' },
+          ]}
+        />
+        <p className="text-gray-600">Service not found.</p>
+        <button type="button" onClick={() => navigate('/app/machinery/services')} className="text-[#1F6F5C] font-medium hover:underline">
           Back to Services
         </button>
       </div>
@@ -82,7 +104,7 @@ export default function MachineryServiceDetailPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Machinery Service"
         backTo="/app/machinery/services"
@@ -93,11 +115,12 @@ export default function MachineryServiceDetailPage() {
           { label: service.id.slice(0, 8) + '…' },
         ]}
         right={
-          <>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
             {isDraft && canEdit && (
               <button
+                type="button"
                 onClick={() => navigate(`/app/machinery/services/${id}/edit`)}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 mr-2"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Edit
               </button>
@@ -107,7 +130,7 @@ export default function MachineryServiceDetailPage() {
                 type="button"
                 data-testid="post-btn"
                 onClick={() => setShowPostModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
                 Post
               </button>
@@ -117,16 +140,16 @@ export default function MachineryServiceDetailPage() {
                 type="button"
                 data-testid="create-correction-btn"
                 onClick={() => setShowReverseModal(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
               >
                 Reverse
               </button>
             )}
-          </>
+          </div>
         }
       />
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
@@ -171,7 +194,7 @@ export default function MachineryServiceDetailPage() {
             <dt className="text-sm font-medium text-gray-500">Rate card</dt>
             <dd className="text-sm text-gray-900">
               {service.rate_card
-                ? `${service.rate_card.effective_from} @ ${formatMoney(service.rate_card.base_rate)}/${service.rate_card.rate_unit}`
+                ? `${formatDate(service.rate_card.effective_from)} @ ${formatMoney(service.rate_card.base_rate)}/${service.rate_card.rate_unit}`
                 : service.rate_card_id ?? '—'}
             </dd>
           </div>
@@ -263,11 +286,11 @@ export default function MachineryServiceDetailPage() {
                 required
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
                 type="button"
                 onClick={() => setShowPostModal(false)}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={postMutation.isPending}
               >
                 Cancel
@@ -276,7 +299,7 @@ export default function MachineryServiceDetailPage() {
                 type="button"
                 data-testid="confirm-post"
                 onClick={handlePost}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 disabled={postMutation.isPending}
               >
                 {postMutation.isPending ? 'Posting...' : 'Post'}
@@ -319,20 +342,22 @@ export default function MachineryServiceDetailPage() {
                 placeholder="Optional reason for reversal"
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
+                type="button"
                 onClick={() => {
                   setShowReverseModal(false);
                   setReverseReason('');
                 }}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={reverseMutation.isPending}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleReverse}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                 disabled={reverseMutation.isPending}
               >
                 {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}

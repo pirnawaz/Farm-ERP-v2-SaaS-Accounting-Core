@@ -39,36 +39,40 @@ export default function InvAdjustmentsPage() {
     },
   ];
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={term('adjustment')}
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('adjustment') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => navigate('/app/inventory/adjustments/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('adjustmentSingular')}</button>
+          <button type="button" onClick={() => navigate('/app/inventory/adjustments/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('adjustmentSingular')}</button>
         ) : undefined}
       />
-      <div className="flex gap-4 mb-4">
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All statuses</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="POSTED">POSTED</option>
-          <option value="REVERSED">REVERSED</option>
-        </select>
-        <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All stores</option>
-          {stores?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select value={reason} onChange={(e) => setReason(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All reasons</option>
-          {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
-      </div>
-      <div className="bg-white rounded-lg shadow">
-        <DataTable data={(adjustments ?? []) as InvAdjustment[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage={`No ${term('adjustment')}. Create one.`} />
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All statuses</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="POSTED">POSTED</option>
+            <option value="REVERSED">REVERSED</option>
+          </select>
+          <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All stores</option>
+            {stores?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={reason} onChange={(e) => setReason(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All reasons</option>
+            {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="bg-white rounded-lg shadow">
+          {isLoading ? (
+            <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
+          ) : (
+            <DataTable data={(adjustments ?? []) as InvAdjustment[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage={`No ${term('adjustment')}. Create one.`} />
+          )}
+        </div>
       </div>
     </div>
   );

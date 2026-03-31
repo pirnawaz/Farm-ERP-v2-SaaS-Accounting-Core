@@ -111,12 +111,12 @@ export default function SeasonSetupWizardPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-8">
+    <div className="max-w-5xl mx-auto pb-8 space-y-6">
       <PageHeader
         title={term('seasonSetup')}
         backTo="/app/crop-cycles"
         breadcrumbs={[
-          { label: term('navFarm'), to: '/app/farm-pulse' },
+          { label: 'Farm', to: '/app/dashboard' },
           { label: 'Crop Cycles', to: '/app/crop-cycles' },
           { label: term('seasonSetup') },
         ]}
@@ -175,7 +175,7 @@ export default function SeasonSetupWizardPage() {
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Start date</label>
                     <input

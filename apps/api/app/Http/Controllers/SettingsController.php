@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Services\TenantContext;
+use App\Support\TenantLocalisation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Validator;
 
 class SettingsController extends Controller
 {
@@ -17,7 +17,7 @@ class SettingsController extends Controller
     public function show(Request $request): JsonResponse
     {
         $tenant = TenantContext::getTenant($request);
-        
+
         if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);
         }
@@ -36,31 +36,47 @@ class SettingsController extends Controller
     public function update(Request $request): JsonResponse
     {
         $tenant = TenantContext::getTenant($request);
-        
+
         if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);
         }
 
-        // Validate input
-        $validated = $request->validate([
-            'currency_code' => ['required', 'string', 'size:3', 'regex:/^[A-Z]{3}$/'],
-            'locale' => ['required', 'string', 'max:10', 'regex:/^[a-z]{2}(-[A-Z]{2})?$/'],
+        $data = $request->validate([
+            'currency_code' => ['required', 'string', 'regex:/^[A-Za-z]{3}$/'],
+            'locale' => ['required', 'string', 'max:32'],
             'timezone' => ['required', 'string', 'max:64'],
         ]);
 
-        // Validate timezone using PHP DateTimeZone
-        $validTimezones = \DateTimeZone::listIdentifiers();
-        if (!in_array($validated['timezone'], $validTimezones)) {
-            throw ValidationException::withMessages([
-                'timezone' => ['The selected timezone is invalid.'],
-            ]);
+        $currency = strtoupper($data['currency_code']);
+        $localeNorm = TenantLocalisation::normalizeLocale($data['locale']);
+        $timezone = trim($data['timezone']);
+
+        $currentCurrency = strtoupper((string) ($tenant->currency_code ?? ''));
+        $tenantLocaleNorm = TenantLocalisation::normalizeLocale((string) ($tenant->locale ?? ''));
+        $currentTimezone = (string) ($tenant->timezone ?? '');
+
+        $errors = [];
+
+        if (!TenantLocalisation::isAllowedCurrency($currency) && $currency !== $currentCurrency) {
+            $errors['currency_code'] = ['The selected currency is not supported.'];
         }
 
-        // Update tenant settings
+        if (!TenantLocalisation::isAllowedLocale($localeNorm) && $localeNorm !== $tenantLocaleNorm) {
+            $errors['locale'] = ['The selected locale is not supported.'];
+        }
+
+        if (!TenantLocalisation::isAllowedTimezone($timezone) && $timezone !== $currentTimezone) {
+            $errors['timezone'] = ['The selected timezone is not supported.'];
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
         $tenant->update([
-            'currency_code' => strtoupper($validated['currency_code']),
-            'locale' => $validated['locale'],
-            'timezone' => $validated['timezone'],
+            'currency_code' => $currency,
+            'locale' => $localeNorm,
+            'timezone' => $timezone,
         ]);
 
         return response()->json([

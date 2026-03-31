@@ -28,24 +28,26 @@ export default function StockOnHandPage() {
   ];
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader title={term('stockOnHand')} backTo="/app/inventory" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('stockOnHand') }]} />
-      <div className="flex flex-wrap gap-4 mb-4">
-        <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All stores</option>
-          {stores?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select value={itemId} onChange={(e) => setItemId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All items</option>
-          {items?.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-        </select>
-      </div>
-      <div className="bg-white rounded-lg shadow">
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All stores</option>
+            {stores?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={itemId} onChange={(e) => setItemId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All items</option>
+            {items?.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+        </div>
+        <div className="bg-white rounded-lg shadow">
         {isLoading ? (
           <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
         ) : (
           <DataTable data={balances || []} columns={cols} emptyMessage={`No ${term('stockOnHand').toLowerCase()}. Record ${term('grn')} to receive stock.`} />
         )}
+        </div>
       </div>
     </div>
   );

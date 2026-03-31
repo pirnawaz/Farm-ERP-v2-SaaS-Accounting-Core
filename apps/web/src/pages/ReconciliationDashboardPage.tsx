@@ -8,6 +8,7 @@ import {
   type CropCycle,
 } from '@farm-erp/shared';
 import { exportToCSV } from '../utils/csvExport';
+import { REPORT_LABELS } from '../config/presentation';
 import { useFormatting } from '../hooks/useFormatting';
 import { PrintableReport } from '../components/print/PrintableReport';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -20,7 +21,7 @@ const defaultFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split
 const defaultTo = new Date().toISOString().split('T')[0];
 
 function ReconciliationDashboardPage() {
-  const { formatDate } = useFormatting();
+  const { formatDateTime, formatDateRange } = useFormatting();
   const [searchParams] = useSearchParams();
   const { data: parties = [] } = useParties();
   const [activeTab, setActiveTab] = useState<TabKey>('project');
@@ -342,7 +343,7 @@ function ReconciliationDashboardPage() {
         </div>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {lastRunAt && !loading && (
-          <p className="text-gray-500 text-sm">Last run: {formatDate(lastRunAt)}</p>
+          <p className="text-gray-500 text-sm">Last run: {formatDateTime(lastRunAt)}</p>
         )}
       </div>
 
@@ -355,7 +356,9 @@ function ReconciliationDashboardPage() {
       {!loading && result && (
         <>
           <div className="no-print">
-            <p className="text-gray-600 text-sm mb-2">Generated at: {formatDate(result.generated_at)}</p>
+            <p className="text-gray-600 text-sm mb-2">
+              {REPORT_LABELS.generatedAt}: {formatDateTime(result.generated_at)}
+            </p>
             <div className="space-y-4">
               {result.checks.map((check) => (
                 <CheckCard
@@ -370,10 +373,12 @@ function ReconciliationDashboardPage() {
           <PrintableReport
             title="Reconcile Accounts"
             subtitle={scopeLabel}
-            metaLeft={`From: ${filters.from} To: ${filters.to}`}
-            metaRight={`Generated: ${result.generated_at}`}
+            metaLeft={`${REPORT_LABELS.reportingPeriod}: ${formatDateRange(filters.from, filters.to)}`}
+            metaRight={`${REPORT_LABELS.generatedAt}: ${formatDateTime(result.generated_at)}`}
           >
-            <p className="text-sm text-gray-600 mb-2">Generated at: {result.generated_at}</p>
+            <p className="text-sm text-gray-600 mb-2">
+              {REPORT_LABELS.generatedAt}: {formatDateTime(result.generated_at)}
+            </p>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">

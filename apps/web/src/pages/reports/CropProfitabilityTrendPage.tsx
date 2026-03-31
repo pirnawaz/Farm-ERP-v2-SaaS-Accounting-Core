@@ -93,6 +93,7 @@ export default function CropProfitabilityTrendPage() {
     <div className="space-y-6">
       <PageHeader
         title="Crop Profitability Trend"
+        backTo="/app/reports"
         breadcrumbs={[
           { label: 'Profit & Reports', to: '/app/reports' },
           { label: 'Crop Profitability Trend' },

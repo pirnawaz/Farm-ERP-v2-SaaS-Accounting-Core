@@ -30,7 +30,7 @@ export default function InvUomsPage() {
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Units of Measure"
         backTo="/app/inventory"
@@ -43,7 +43,7 @@ export default function InvUomsPage() {
         <DataTable data={uoms || []} columns={cols} emptyMessage="No UoMs. Create one (e.g. KG, BAG, L) so you can add items." />
       </div>
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New UoM">
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Code" required>
             <input
               value={form.code}
@@ -60,12 +60,13 @@ export default function InvUomsPage() {
               placeholder="e.g. Kilogram, Bag, Liter"
             />
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowModal(false)} className="px-4 py-2 border rounded">Cancel</button>
+          <div className="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={() => setShowModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
             <button
+              type="button"
               onClick={handleCreate}
               disabled={!form.code.trim() || !form.name.trim() || createM.isPending}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createM.isPending ? 'Creating...' : 'Create'}
             </button>

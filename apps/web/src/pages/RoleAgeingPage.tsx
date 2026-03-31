@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '@farm-erp/shared';
 import { reportsApi } from '../api/reports';
 import { exportToCSV } from '../utils/csvExport';
+import { exportAmountForSpreadsheet } from '../utils/exportFormatting';
+import { metaAsOfLabel } from '../utils/reportPresentation';
 import { useFormatting } from '../hooks/useFormatting';
+import { useTenantSettings } from '../hooks/useTenantSettings';
+import { EMPTY_COPY, REPORT_LABELS } from '../config/presentation';
 import { PrintableReport } from '../components/print/PrintableReport';
 import type { RoleAgeingResponse, RoleAgeingRow, Project, CropCycle } from '../types';
 
 function RoleAgeingPage() {
   const { formatMoney, formatDate } = useFormatting();
+  const { settings } = useTenantSettings();
   const [data, setData] = useState<RoleAgeingResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [cropCycles, setCropCycles] = useState<CropCycle[]>([]);
@@ -63,15 +68,33 @@ function RoleAgeingPage() {
 
   const handleExport = () => {
     if (!data?.rows?.length) return;
-    exportToCSV(
-      data.rows,
-      '',
-      ['role', 'label', 'bucket_0_30', 'bucket_31_60', 'bucket_61_90', 'bucket_90_plus', 'total_balance'],
-      {
-        reportName: 'RoleAgeing',
-        asOfDate: filters.as_of,
-      }
-    );
+    const mapped = data.rows.map((row) => ({
+      role: row.role,
+      label: row.label,
+      bucket_0_30: exportAmountForSpreadsheet(row.bucket_0_30),
+      bucket_31_60: exportAmountForSpreadsheet(row.bucket_31_60),
+      bucket_61_90: exportAmountForSpreadsheet(row.bucket_61_90),
+      bucket_90_plus: exportAmountForSpreadsheet(row.bucket_90_plus),
+      total_balance: exportAmountForSpreadsheet(row.total_balance),
+    }));
+    const headers = [
+      'role',
+      'label',
+      'bucket_0_30',
+      'bucket_31_60',
+      'bucket_61_90',
+      'bucket_90_plus',
+      'total_balance',
+    ];
+    exportToCSV(mapped, '', headers, {
+      reportName: 'RoleAgeing',
+      asOfDate: filters.as_of,
+      metadataRows: [
+        ['export', 'Terrava Party Ageing'],
+        ['as_of', filters.as_of],
+        ['base_currency', settings?.currency_code ?? 'PKR'],
+      ],
+    });
   };
 
   const rows = data?.rows ?? [];
@@ -183,7 +206,7 @@ function RoleAgeingPage() {
                   {rows.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                        No role balances as of this date
+                        {EMPTY_COPY.noDataForPeriod}
                       </td>
                     </tr>
                   ) : (
@@ -241,7 +264,7 @@ function RoleAgeingPage() {
 
           <PrintableReport
             title="Party Ageing"
-            metaLeft={`As of ${formatDate(filters.as_of)}`}
+            metaLeft={metaAsOfLabel(formatDate(filters.as_of))}
           >
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
@@ -267,36 +290,44 @@ function RoleAgeingPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {rows.map((row: RoleAgeingRow) => (
-                  <tr key={row.role}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{row.label}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      {row.bucket_0_30}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      {row.bucket_31_60}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      {row.bucket_61_90}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      {row.bucket_90_plus}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                      {row.total_balance}
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                      {EMPTY_COPY.noDataForPeriod}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  rows.map((row: RoleAgeingRow) => (
+                    <tr key={row.role}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{row.label}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                        {formatMoney(row.bucket_0_30)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                        {formatMoney(row.bucket_31_60)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                        {formatMoney(row.bucket_61_90)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right tabular-nums">
+                        {formatMoney(row.bucket_90_plus)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium tabular-nums">
+                        {formatMoney(row.total_balance)}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
               {totals && rows.length > 0 && (
                 <tfoot className="bg-[#E6ECEA] font-medium">
                   <tr>
-                    <td className="px-6 py-3 text-sm">Totals</td>
-                    <td className="px-6 py-3 text-right text-sm">{totals.bucket_0_30}</td>
-                    <td className="px-6 py-3 text-right text-sm">{totals.bucket_31_60}</td>
-                    <td className="px-6 py-3 text-right text-sm">{totals.bucket_61_90}</td>
-                    <td className="px-6 py-3 text-right text-sm">{totals.bucket_90_plus}</td>
-                    <td className="px-6 py-3 text-right text-sm">{totals.total_balance}</td>
+                    <td className="px-6 py-3 text-sm">{REPORT_LABELS.total}</td>
+                    <td className="px-6 py-3 text-right text-sm tabular-nums">{formatMoney(totals.bucket_0_30)}</td>
+                    <td className="px-6 py-3 text-right text-sm tabular-nums">{formatMoney(totals.bucket_31_60)}</td>
+                    <td className="px-6 py-3 text-right text-sm tabular-nums">{formatMoney(totals.bucket_61_90)}</td>
+                    <td className="px-6 py-3 text-right text-sm tabular-nums">{formatMoney(totals.bucket_90_plus)}</td>
+                    <td className="px-6 py-3 text-right text-sm tabular-nums">{formatMoney(totals.total_balance)}</td>
                   </tr>
                 </tfoot>
               )}

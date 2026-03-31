@@ -20,19 +20,20 @@ export default function PayablesOutstandingPage() {
     navigate(`/app/payments/new?${params.toString()}`);
   };
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Wages Payable Outstanding"
         backTo="/app/labour"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Labour', to: '/app/labour' }, { label: 'Payables' }]}
       />
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {!rows || rows.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
+        ) : !rows || rows.length === 0 ? (
           <div className="text-center py-8 text-gray-500">No worker balances. Post work logs to accrue wages payable.</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-[#E6ECEA]">
               <tr>
@@ -49,6 +50,7 @@ export default function PayablesOutstandingPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {r.party_id ? (
                       <button
+                        type="button"
                         onClick={() => handlePay(r)}
                         className="text-[#1F6F5C] hover:text-[#1a5a4a]"
                       >
@@ -62,6 +64,7 @@ export default function PayablesOutstandingPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

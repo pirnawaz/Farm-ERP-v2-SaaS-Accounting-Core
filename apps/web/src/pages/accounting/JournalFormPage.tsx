@@ -142,7 +142,7 @@ function JournalFormPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={isNew ? 'New journal' : 'Edit journal'}
         backTo="/app/accounting/journals"
@@ -175,12 +175,12 @@ function JournalFormPage() {
         </div>
 
         <div>
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
             <h3 className="font-medium text-gray-900">Lines</h3>
             <button
               type="button"
               onClick={addLine}
-              className="text-sm text-[#1F6F5C] hover:underline"
+              className="text-sm text-[#1F6F5C] hover:underline sm:self-auto self-start"
             >
               + Add line
             </button>
@@ -258,8 +258,8 @@ function JournalFormPage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-4 pt-4 border-t">
-          <div className="flex items-center gap-6 tabular-nums text-sm">
+        <div className="pt-4 border-t">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 tabular-nums text-sm justify-end">
             <span>Total debits: {formatMoney(totalDebits)}</span>
             <span>Total credits: {formatMoney(totalCredits)}</span>
             <span className={difference !== 0 ? 'text-amber-600 font-medium' : ''}>
@@ -268,11 +268,11 @@ function JournalFormPage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
           <button
             type="button"
             onClick={() => navigate('/app/accounting/journals')}
-            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+            className="w-full sm:w-auto px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -280,7 +280,7 @@ function JournalFormPage() {
             type="button"
             onClick={handleSaveDraft}
             disabled={createM.isPending || updateM.isPending || buildPayload().lines.length < 2}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
           >
             {isNew ? 'Save draft' : 'Update draft'}
           </button>
@@ -293,7 +293,7 @@ function JournalFormPage() {
               createM.isPending ||
               postM.isPending
             }
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
           >
             {isNew ? 'Save and post' : 'Post'}
           </button>

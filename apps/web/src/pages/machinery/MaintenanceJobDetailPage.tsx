@@ -90,18 +90,47 @@ export default function MaintenanceJobDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6">
+        <PageHeader
+          title="Maintenance Job"
+          backTo="/app/machinery/maintenance-jobs"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Maintenance', to: '/app/machinery/maintenance-jobs' },
+            { label: '…' },
+          ]}
+        />
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
       </div>
     );
   }
 
   if (!job) {
-    return <div>Maintenance job not found</div>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Maintenance Job"
+          backTo="/app/machinery/maintenance-jobs"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Maintenance', to: '/app/machinery/maintenance-jobs' },
+            { label: 'Not found' },
+          ]}
+        />
+        <p className="text-gray-600">Maintenance job not found.</p>
+        <Link to="/app/machinery/maintenance-jobs" className="text-[#1F6F5C] font-medium hover:underline">
+          Back to Maintenance Jobs
+        </Link>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={`Maintenance Job ${job.job_no}`}
         backTo="/app/machinery/maintenance-jobs"
@@ -114,7 +143,7 @@ export default function MaintenanceJobDetailPage() {
       />
 
       {/* Header Info */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Job No</dt>
@@ -194,7 +223,7 @@ export default function MaintenanceJobDetailPage() {
       </div>
 
       {/* Lines Table */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Job Lines</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -238,21 +267,23 @@ export default function MaintenanceJobDetailPage() {
       </div>
 
       {/* Actions */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Actions</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-col-reverse sm:flex-row flex-wrap gap-3">
           {isDraft && canEdit && (
             <>
               <button
+                type="button"
                 onClick={() => navigate(`/app/machinery/maintenance-jobs/${id}/edit`)}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
               >
                 Edit
               </button>
               {canPost && (
                 <button
+                  type="button"
                   onClick={() => setShowPostModal(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 >
                   Post Job
                 </button>
@@ -261,8 +292,9 @@ export default function MaintenanceJobDetailPage() {
           )}
           {isPosted && canPost && (
             <button
+              type="button"
               onClick={() => setShowReverseModal(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
               Reverse Job
             </button>
@@ -283,17 +315,19 @@ export default function MaintenanceJobDetailPage() {
                 required
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
+                type="button"
                 onClick={() => setShowPostModal(false)}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={postMutation.isPending}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handlePost}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 disabled={postMutation.isPending}
               >
                 {postMutation.isPending ? 'Posting...' : 'Post'}
@@ -326,17 +360,19 @@ export default function MaintenanceJobDetailPage() {
                 placeholder="Optional reason for reversal"
               />
             </FormField>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
+                type="button"
                 onClick={() => setShowReverseModal(false)}
-                className="px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded"
                 disabled={reverseMutation.isPending}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleReverse}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                 disabled={reverseMutation.isPending}
               >
                 {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}

@@ -112,7 +112,7 @@ export default function AccountingPeriodsPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Accounting periods"
         backTo="/app/governance"
@@ -124,7 +124,7 @@ export default function AccountingPeriodsPage() {
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New period
           </button>
@@ -171,11 +171,11 @@ export default function AccountingPeriodsPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
             <button
               type="button"
               onClick={() => setShowCreateModal(false)}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="w-full sm:w-auto px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -183,7 +183,7 @@ export default function AccountingPeriodsPage() {
               type="button"
               onClick={handleCreate}
               disabled={!createForm.period_start || !createForm.period_end || createM.isPending}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {createM.isPending ? 'Creating…' : 'Create'}
             </button>
@@ -211,9 +211,9 @@ export default function AccountingPeriodsPage() {
                 placeholder="e.g. Month-end close"
               />
             </FormField>
-            <div className="flex justify-end gap-3 mt-4">
-              <button type="button" onClick={() => { setCloseTarget(null); setCloseNotes(''); }} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
-              <button type="button" onClick={handleClose} disabled={closeM.isPending} className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50">Close period</button>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-4">
+              <button type="button" onClick={() => { setCloseTarget(null); setCloseNotes(''); }} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={handleClose} disabled={closeM.isPending} className="w-full sm:w-auto px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50">Close period</button>
             </div>
           </div>
         )}
@@ -239,9 +239,9 @@ export default function AccountingPeriodsPage() {
                 placeholder="e.g. Correction required"
               />
             </FormField>
-            <div className="flex justify-end gap-3 mt-4">
-              <button type="button" onClick={() => { setReopenTarget(null); setReopenNotes(''); }} className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
-              <button type="button" onClick={handleReopen} disabled={reopenM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50">Reopen</button>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-4">
+              <button type="button" onClick={() => { setReopenTarget(null); setReopenNotes(''); }} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={handleReopen} disabled={reopenM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50">Reopen</button>
             </div>
           </div>
         )}

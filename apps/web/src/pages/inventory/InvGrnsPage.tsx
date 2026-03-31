@@ -31,37 +31,41 @@ export default function InvGrnsPage() {
     ) },
   ];
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={term('grn')}
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('grn') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => navigate('/app/inventory/grns/new')} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('grnSingular')}</button>
+          <button type="button" onClick={() => navigate('/app/inventory/grns/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('grnSingular')}</button>
         ) : undefined}
       />
-      <div className="flex gap-4 mb-4">
-        <select value={status} onChange={e => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All statuses</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="POSTED">POSTED</option>
-          <option value="REVERSED">REVERSED</option>
-        </select>
-        <select value={storeId} onChange={e => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-          <option value="">All stores</option>
-          {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-      </div>
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={(grns ?? []) as InvGrn[]}
-          columns={cols}
-          onRowClick={(r) => navigate(`/app/inventory/grns/${r.id}`, { state: { from: location.pathname + location.search } })}
-          emptyMessage={`No ${term('grn')}. Create one.`}
-        />
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <select value={status} onChange={e => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All statuses</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="POSTED">POSTED</option>
+            <option value="REVERSED">REVERSED</option>
+          </select>
+          <select value={storeId} onChange={e => setStoreId(e.target.value)} className="px-3 py-2 border rounded text-sm">
+            <option value="">All stores</option>
+            {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div className="bg-white rounded-lg shadow">
+          {isLoading ? (
+            <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
+          ) : (
+            <DataTable
+              data={(grns ?? []) as InvGrn[]}
+              columns={cols}
+              onRowClick={(r) => navigate(`/app/inventory/grns/${r.id}`, { state: { from: location.pathname + location.search } })}
+              emptyMessage={`No ${term('grn')}. Create one.`}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

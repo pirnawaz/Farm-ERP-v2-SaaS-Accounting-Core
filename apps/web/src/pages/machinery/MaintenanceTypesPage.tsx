@@ -28,6 +28,7 @@ export default function MaintenanceTypesPage() {
       header: 'Actions',
       accessor: (r) => (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             setEditingType(r);
@@ -70,20 +71,30 @@ export default function MaintenanceTypesPage() {
     setForm({ name: '', is_active: true });
   };
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Maintenance Setup"
         backTo="/app/machinery"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Maintenance Setup' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Maintenance Type</button>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+          >
+            New Maintenance Type
+          </button>
         ) : undefined}
       />
-      <div className="bg-white rounded-lg shadow">
-        <DataTable data={maintenanceTypes || []} columns={cols} emptyMessage="No maintenance types. Create one." />
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : (
+          <DataTable data={maintenanceTypes || []} columns={cols} emptyMessage="No maintenance types. Create one." />
+        )}
       </div>
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingType ? 'Edit Maintenance Type' : 'New Maintenance Type'}>
         <div className="space-y-4">
@@ -108,21 +119,25 @@ export default function MaintenanceTypesPage() {
               <span>Active</span>
             </label>
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={handleCloseModal} className="px-4 py-2 border rounded">Cancel</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+            <button type="button" onClick={handleCloseModal} className="w-full sm:w-auto px-4 py-2 border rounded">
+              Cancel
+            </button>
             {editingType ? (
               <button
+                type="button"
                 onClick={handleUpdate}
                 disabled={!form.name.trim() || updateM.isPending}
-                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {updateM.isPending ? 'Updating...' : 'Update'}
               </button>
             ) : (
               <button
+                type="button"
                 onClick={handleCreate}
                 disabled={!form.name.trim() || createM.isPending}
-                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {createM.isPending ? 'Creating...' : 'Create'}
               </button>

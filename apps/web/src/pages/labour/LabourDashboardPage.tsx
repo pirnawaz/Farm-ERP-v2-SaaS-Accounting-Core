@@ -22,9 +22,9 @@ export default function LabourDashboardPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Labour</h1>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900">Labour</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Link to="/app/labour/workers" className="p-4 bg-white rounded-lg shadow border border-gray-200 hover:border-[#1F6F5C]/30">
           <span className="font-medium text-gray-900">Workers</span>
           <p className="text-sm text-gray-500">{workerCount} workers</p>

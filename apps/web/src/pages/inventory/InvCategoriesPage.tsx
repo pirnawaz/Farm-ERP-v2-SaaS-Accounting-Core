@@ -62,7 +62,7 @@ export default function InvCategoriesPage() {
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={term('inventoryCategory')}
         tooltip="Group farm inputs (e.g. seeds, fertilizer, fuel) for inventory and reporting."
@@ -76,8 +76,8 @@ export default function InvCategoriesPage() {
         <DataTable data={categories || []} columns={cols} emptyMessage="No categories. Create one." />
       </div>
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingCategory ? 'Edit Category' : 'New Category'}>
-        <div className="space-y-4">
-          <FormField label="Name" required>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Name" required className="md:col-span-2">
             <input
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -85,21 +85,23 @@ export default function InvCategoriesPage() {
               placeholder="Enter category name"
             />
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={handleCloseModal} className="px-4 py-2 border rounded">Cancel</button>
+          <div className="md:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-gray-100">
+            <button type="button" onClick={handleCloseModal} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
             {editingCategory ? (
               <button
+                type="button"
                 onClick={handleUpdate}
                 disabled={!form.name.trim() || updateM.isPending}
-                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {updateM.isPending ? 'Updating...' : 'Update'}
               </button>
             ) : (
               <button
+                type="button"
                 onClick={handleCreate}
                 disabled={!form.name.trim() || createM.isPending}
-                className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
               >
                 {createM.isPending ? 'Creating...' : 'Create'}
               </button>

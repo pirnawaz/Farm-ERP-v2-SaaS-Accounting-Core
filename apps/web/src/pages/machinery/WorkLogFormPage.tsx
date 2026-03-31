@@ -127,20 +127,60 @@ export default function WorkLogFormPage() {
 
   if (isEdit && loadingLog) {
     return (
-      <div className="flex justify-center py-12">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6">
+        <PageHeader
+          title="Edit Work Log"
+          backTo="/app/machinery/work-logs"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: '…' },
+          ]}
+        />
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
       </div>
     );
   }
   if (isEdit && id && !workLog) {
-    return <div>Work log not found.</div>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Work Log"
+          backTo="/app/machinery/work-logs"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: 'Not found' },
+          ]}
+        />
+        <p className="text-gray-600">Work log not found.</p>
+      </div>
+    );
   }
   if (isEdit && workLog && workLog.status !== 'DRAFT') {
-    return <div>Only DRAFT work logs can be edited.</div>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title={`Work Log ${workLog.work_log_no}`}
+          backTo={`/app/machinery/work-logs/${id}`}
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery', to: '/app/machinery' },
+            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: workLog.work_log_no },
+          ]}
+        />
+        <p className="text-gray-600">Only DRAFT work logs can be edited.</p>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="space-y-6 pb-8">
       <PageHeader
         title={isEdit ? `Edit Work Log ${workLog?.work_log_no ?? ''}` : 'New Work Log'}
         backTo={isEdit ? `/app/machinery/work-logs/${id}` : '/app/machinery/work-logs'}
@@ -341,11 +381,11 @@ export default function WorkLogFormPage() {
           </p>
         </div>
 
-        <div className="flex gap-2 pt-4">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
           <button
             type="button"
             onClick={() => navigate(isEdit ? `/app/machinery/work-logs/${id}` : '/app/machinery/work-logs')}
-            className="px-4 py-2 border rounded"
+            className="w-full sm:w-auto px-4 py-2 border rounded"
           >
             Cancel
           </button>
@@ -353,7 +393,7 @@ export default function WorkLogFormPage() {
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit || createM.isPending || updateM.isPending}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
           >
             {isEdit ? (updateM.isPending ? 'Saving…' : 'Save') : createM.isPending ? 'Creating…' : 'Create'}
           </button>

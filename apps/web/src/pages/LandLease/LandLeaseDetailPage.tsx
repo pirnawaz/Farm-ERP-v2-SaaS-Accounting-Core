@@ -13,6 +13,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { useRole } from '../../hooks/useRole';
+import { useFormatting } from '../../hooks/useFormatting';
 import toast from 'react-hot-toast';
 import type {
   LandLeaseAccrual,
@@ -39,6 +40,7 @@ export default function LandLeaseDetailPage() {
   const postAccrualMutation = usePostLandLeaseAccrual();
   const reverseAccrualMutation = useReverseLandLeaseAccrual();
   const { hasRole } = useRole();
+  const { formatDate, formatMoney } = useFormatting();
   const canManage = hasRole(['tenant_admin']);
 
   const [showAccrualModal, setShowAccrualModal] = useState(false);
@@ -301,17 +303,17 @@ export default function LandLeaseDetailPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Start date</dt>
-            <dd className="text-sm text-gray-900">{lease.start_date}</dd>
+            <dd className="text-sm text-gray-900">{formatDate(lease.start_date)}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">End date</dt>
             <dd className="text-sm text-gray-900">
-              {lease.end_date ?? '—'}
+              {lease.end_date ? formatDate(lease.end_date) : '—'}
             </dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Rent amount</dt>
-            <dd className="text-sm text-gray-900">{lease.rent_amount}</dd>
+            <dd className="text-sm text-gray-900">{formatMoney(lease.rent_amount)}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Frequency</dt>

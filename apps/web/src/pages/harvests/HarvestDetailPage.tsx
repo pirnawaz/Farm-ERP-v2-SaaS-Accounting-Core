@@ -141,18 +141,19 @@ export default function HarvestDetailPage() {
   if (!harvest) return <div>Harvest not found.</div>;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title={harvest.harvest_no || `Harvest ${harvest.id.slice(0, 8)}`}
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
+          { label: 'Crop Ops', to: '/app/crop-ops' },
           { label: 'Harvests', to: '/app/harvests' },
           { label: harvest.harvest_no || 'Detail' },
         ]}
       />
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Harvest No</dt><dd className="font-medium">{harvest.harvest_no || '—'}</dd></div>
           <div><dt className="text-sm text-gray-500">Harvest Date</dt><dd>{formatDate(harvest.harvest_date)}</dd></div>
@@ -176,8 +177,9 @@ export default function HarvestDetailPage() {
         </dl>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <h3 className="font-medium mb-4">Lines</h3>
+        <div className="overflow-x-auto">
         <table className="min-w-full border">
           <thead className="bg-[#E6ECEA]">
             <tr>
@@ -206,11 +208,12 @@ export default function HarvestDetailPage() {
             ))}
           </tbody>
         </table>
+        </div>
         <p className="mt-2 font-medium">Total Quantity: {totalQty.toFixed(3)}</p>
       </div>
 
       {isDraft && canEdit && (
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
           <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Harvest No">
@@ -237,7 +240,7 @@ export default function HarvestDetailPage() {
             <div className="flex justify-between mb-2">
               <h4 className="font-medium">Add Line</h4>
             </div>
-            <div className="flex gap-2 items-start border p-2 rounded">
+            <div className="flex flex-wrap gap-2 items-start border p-2 rounded">
               <select
                 value={lines[lines.length - 1]?.inventory_item_id || ''}
                 onChange={(e) => updateLine(lines.length - 1, { inventory_item_id: e.target.value })}
@@ -269,21 +272,21 @@ export default function HarvestDetailPage() {
                 className="w-20 px-2 py-1 border rounded text-sm"
                 placeholder="UOM"
               />
-              <button onClick={handleAddLine} className="text-[#1F6F5C] hover:underline text-sm">Add</button>
+              <button type="button" onClick={handleAddLine} className="text-[#1F6F5C] hover:underline text-sm">Add</button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">
+          <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap gap-2">
+            <button type="button" onClick={handleSave} disabled={updateM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded">
               Save
             </button>
-            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
+            {canPost && <button type="button" onClick={() => setShowPostModal(true)} className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
           </div>
         </div>
       )}
 
       {isPosted && canPost && (
-        <div className="mb-6">
-          <button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
+        <div>
+          <button type="button" onClick={() => setShowReverseModal(true)} className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
         </div>
       )}
 
@@ -292,9 +295,9 @@ export default function HarvestDetailPage() {
           <FormField label="Posting Date" required>
             <input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" />
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowPostModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+            <button type="button" onClick={() => setShowPostModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handlePost} disabled={postM.isPending} className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>
           </div>
         </div>
       </Modal>
@@ -313,9 +316,9 @@ export default function HarvestDetailPage() {
               placeholder="Reason for reversal"
             />
           </FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowReverseModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleReverse} disabled={reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+            <button type="button" onClick={() => setShowReverseModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
+            <button type="button" onClick={handleReverse} disabled={reverseM.isPending} className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
           </div>
         </div>
       </Modal>

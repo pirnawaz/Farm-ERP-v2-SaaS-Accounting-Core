@@ -207,9 +207,9 @@ class E2ESeedService
             'id' => (string) Str::uuid(),
             'name' => $tenantName,
             'status' => 'active',
-            'currency_code' => 'GBP',
-            'locale' => 'en-GB',
-            'timezone' => 'Europe/London',
+            'currency_code' => 'PKR',
+            'locale' => 'en-PK',
+            'timezone' => 'Asia/Karachi',
         ]);
         Farm::firstOrCreate(
             ['tenant_id' => $tenant->id],
