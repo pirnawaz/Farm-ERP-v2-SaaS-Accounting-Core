@@ -100,6 +100,16 @@ export interface TrialBalanceRow {
   net: string
 }
 
+export interface TrialBalanceResponse {
+  as_of: string
+  rows: TrialBalanceRow[]
+  totals: {
+    total_debit: string
+    total_credit: string
+  }
+  balanced: boolean
+}
+
 export interface GeneralLedgerLine {
   posting_date: string
   posting_group_id: string

@@ -89,7 +89,7 @@ const configs: Record<UserRole, DashboardConfig> = {
       { label: term('newActivity'), to: '/app/crop-ops/activities/new', requiredModule: 'crop_ops' },
       { label: 'New Work Log', to: '/app/labour/work-logs/new', requiredModule: 'labour' },
       { label: `New ${term('grnSingular')}`, to: '/app/inventory/grns/new', requiredModule: 'inventory' },
-      { label: 'View Projects', to: '/app/projects', requiredModule: 'projects_crop_cycles' },
+      { label: `View ${term('fieldCycles')}`, to: '/app/projects', requiredModule: 'projects_crop_cycles' },
     ],
   },
   platform_admin: {
@@ -100,7 +100,7 @@ const configs: Record<UserRole, DashboardConfig> = {
     ],
     secondaryWidgets: [],
     quickActions: [
-      { label: 'View Projects', to: '/app/projects', requiredModule: 'projects_crop_cycles' },
+      { label: `View ${term('fieldCycles')}`, to: '/app/projects', requiredModule: 'projects_crop_cycles' },
       { label: 'Reports', to: '/app/reports', requiredModule: 'reports' },
     ],
   },
@@ -113,7 +113,7 @@ export function getDashboardConfig(role: UserRole | null): DashboardConfig {
       primaryWidgets: ['open_crop_cycles', 'draft_transactions', 'projects_count'],
       secondaryWidgets: [],
       quickActions: [
-        { label: 'View Projects', to: '/app/projects', requiredModule: 'projects_crop_cycles' },
+        { label: `View ${term('fieldCycles')}`, to: '/app/projects', requiredModule: 'projects_crop_cycles' },
       ],
     };
   }

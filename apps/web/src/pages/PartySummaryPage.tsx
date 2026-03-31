@@ -6,14 +6,20 @@ import { exportToCSV } from '../utils/csvExport';
 import { exportAmountForSpreadsheet } from '../utils/exportFormatting';
 import { metaReportingPeriodLabel } from '../utils/reportPresentation';
 import { useFormatting } from '../hooks/useFormatting';
+import { useLocalisation } from '../hooks/useLocalisation';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { EMPTY_COPY } from '../config/presentation';
 import { PrintableReport } from '../components/print/PrintableReport';
 import type { PartySummaryResponse, PartySummaryRow, Project, CropCycle } from '../types';
+import { term } from '../config/terminology';
+import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock';
+import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata';
+import { ReportErrorState, ReportLoadingState } from '../components/report';
 
 function PartySummaryPage() {
   const { formatMoney, formatDateRange } = useFormatting();
   const { settings } = useTenantSettings();
+  const { currency_code, locale, timezone } = useLocalisation();
   const navigate = useNavigate();
   const [data, setData] = useState<PartySummaryResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -86,12 +92,13 @@ function PartySummaryPage() {
       reportName: 'RoleSummary',
       fromDate: filters.from,
       toDate: filters.to,
-      metadataRows: [
-        ['export', 'Terrava Party Summary'],
-        ['reporting_period_start', filters.from],
-        ['reporting_period_end', filters.to],
-        ['base_currency', settings?.currency_code ?? 'PKR'],
-      ],
+      metadataRows: terravaBaseExportMetadataRows({
+        reportExportName: 'Terrava Party Summary',
+        baseCurrency: currency_code || settings?.currency_code || 'PKR',
+        period: { mode: 'range', from: filters.from, to: filters.to },
+        locale,
+        timezone,
+      }),
     });
   };
 
@@ -164,13 +171,13 @@ function PartySummaryPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
             <select
               value={filters.project_id}
               onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
               className="w-full border border-gray-300 rounded px-3 py-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{`All ${term('fieldCycles')}`}</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -199,12 +206,12 @@ function PartySummaryPage() {
         </p>
       </div>
 
-      {loading && <div className="text-center py-8">Loading...</div>}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
+      <div className="no-print">
+        <ReportMetadataBlock reportingPeriodRange={formatDateRange(filters.from, filters.to)} />
+      </div>
+
+      {loading && <ReportLoadingState label="Loading role summary..." className="no-print" />}
+      {error && <ReportErrorState error={error} className="no-print" />}
 
       {!loading && !error && (
         <>
@@ -234,7 +241,7 @@ function PartySummaryPage() {
                   {rows.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                        {EMPTY_COPY.noDataForPeriod}
+                        No activity found for this period.
                       </td>
                     </tr>
                   ) : (

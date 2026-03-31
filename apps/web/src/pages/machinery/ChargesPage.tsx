@@ -12,6 +12,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import type { MachineryCharge } from '../../types';
+import { term } from '../../config/terminology';
 
 export default function ChargesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -73,7 +74,7 @@ export default function ChargesPage() {
   const columns: Column<MachineryCharge>[] = [
     { header: 'Charge No', accessor: 'charge_no' },
     {
-      header: 'Project',
+      header: term('fieldCycle'),
       accessor: (row) => row.project?.name || 'N/A',
     },
     {
@@ -150,7 +151,7 @@ export default function ChargesPage() {
               </select>
             </div>
             <div className="flex flex-col gap-1 min-w-[12rem]">
-              <label className="text-sm font-medium text-gray-700">Project</label>
+              <label className="text-sm font-medium text-gray-700">{term('fieldCycle')}</label>
               <select
                 value={filters.project_id}
                 onChange={(e) => handleFilterChange('project_id', e.target.value)}

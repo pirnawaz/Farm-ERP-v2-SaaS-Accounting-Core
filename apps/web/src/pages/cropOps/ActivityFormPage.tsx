@@ -356,7 +356,7 @@ export default function ActivityFormPage() {
                 ))}
               </select>
             </FormField>
-            <FormField label="Project" required error={errors.project_id}>
+            <FormField label={term('fieldCycle')} required error={errors.project_id}>
               <select
                 value={project_id}
                 onChange={(e) => setProjectId(e.target.value)}

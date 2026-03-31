@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { DailyBookEntry, Project, apiClient } from '@farm-erp/shared'
 import { useTenantSettings } from '../hooks/useTenantSettings'
+import { term } from '../config/terminology'
 
 /**
  * LEGACY / ORPHANED UI: Not registered in `App.tsx`; unreachable in the normal app.
@@ -112,7 +113,7 @@ function DailyBookEntryFormPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Project *
+            {term('fieldCycle')} *
           </label>
           <select
             required
@@ -121,7 +122,7 @@ function DailyBookEntryFormPage() {
             onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
             className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
-            <option value="">Select a project</option>
+            <option value="">{`Select a ${term('fieldCycle').toLowerCase()}`}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}

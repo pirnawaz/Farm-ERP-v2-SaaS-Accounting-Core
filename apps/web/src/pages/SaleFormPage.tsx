@@ -496,7 +496,7 @@ export default function SaleFormPage() {
 
           <section className="space-y-4">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Optional</h2>
-          <FormField label="Project (Optional)">
+          <FormField label={`${term('fieldCycle')} (Optional)`}>
             <select
               value={formData.project_id}
               onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}

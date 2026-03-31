@@ -400,7 +400,7 @@ export default function FarmPulsePage() {
             </div>
           ) : fieldRows.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-              No project data for this period.
+              No {term('fieldCycle').toLowerCase()} data for this period.
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
@@ -408,7 +408,7 @@ export default function FarmPulsePage() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">Field / Project</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">{term('fieldCycle')}</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Cost so far</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Revenue so far</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Margin</th>
@@ -438,7 +438,7 @@ export default function FarmPulsePage() {
                   to="/app/reports/project-pl"
                   className="text-sm text-[#1F6F5C] hover:underline"
                 >
-                  View Project P&L →
+                  View {term('fieldCycle')} P&amp;L →
                 </Link>
               </div>
             </div>

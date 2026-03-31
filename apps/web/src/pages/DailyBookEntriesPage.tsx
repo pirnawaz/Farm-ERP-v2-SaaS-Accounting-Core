@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { DailyBookEntry, Project, apiClient } from '@farm-erp/shared'
 import { PostModal } from '../components/PostModal'
 import { useFormatting } from '../hooks/useFormatting'
+import { term } from '../config/terminology'
 
 /**
  * LEGACY / ORPHANED UI: Not registered in `App.tsx`, so unreachable via the normal `/app/...` router.
@@ -115,14 +116,14 @@ function DailyBookEntriesPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Project
+              {term('fieldCycle')}
             </label>
             <select
               value={filters.project_id}
               onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
               className="w-full border border-gray-300 rounded px-3 py-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{`All ${term('fieldCycles')}`}</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

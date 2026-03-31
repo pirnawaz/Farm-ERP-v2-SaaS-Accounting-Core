@@ -5,7 +5,7 @@
 
 import { test, expect } from '@playwright/test';
 import { fillByLabel } from '../helpers/form';
-import { todayISO, addDaysISO } from '../helpers/dates';
+import { todayISO } from '../helpers/dates';
 import { getProfile } from '../helpers/profile';
 import { waitForModulesReady } from '../helpers/readiness';
 
@@ -22,20 +22,14 @@ test.describe('@all Reports module', () => {
     await expect(page.getByTestId('report-heading-trial-balance')).toBeVisible();
   });
 
-  test('@all trial balance filters by date range', async ({ page }) => {
+  test('@all trial balance filters by as-of date', async ({ page }) => {
     const today = todayISO();
-    const monthAgo = addDaysISO(today, -30);
     await page.goto('/app/reports/trial-balance', { waitUntil: 'domcontentloaded' });
     await waitForModulesReady(page);
 
-    const fromInput = page.locator('input[type="date"]').first();
-    const toInput = page.locator('input[type="date"]').nth(1);
-
-    if (await fromInput.count() > 0) {
-      await fromInput.fill(monthAgo);
-    }
-    if (await toInput.count() > 0) {
-      await toInput.fill(today);
+    const asOfInput = page.locator('input[type="date"]').first();
+    if (await asOfInput.count() > 0) {
+      await asOfInput.fill(today);
     }
 
     // Apply or auto-refresh

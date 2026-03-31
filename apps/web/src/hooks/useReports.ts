@@ -5,8 +5,8 @@ import { reportsApi } from '../api/reports';
 import { getApiErrorMessage } from '../utils/api';
 import type { GeneralLedgerResponse, TrialBalanceRow, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy, ProductionUnitSummaryResponse, LivestockUnitStatusResponse } from '../types';
 
-export function useTrialBalance(params: { from: string; to: string }) {
-  return useQuery<TrialBalanceRow[], Error>({
+export function useTrialBalance(params: { as_of: string; project_id?: string; crop_cycle_id?: string; currency_code?: string }) {
+  return useQuery<{ as_of: string; rows: TrialBalanceRow[]; totals: { total_debit: string; total_credit: string }; balanced: boolean }, Error>({
     queryKey: ['reports', 'trial-balance', params],
     queryFn: () => reportsApi.trialBalance(params),
     staleTime: 2 * 60 * 1000, // 2 minutes - date-filtered reports

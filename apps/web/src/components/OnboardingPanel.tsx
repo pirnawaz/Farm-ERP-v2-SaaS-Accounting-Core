@@ -47,8 +47,8 @@ export function OnboardingPanel({ onboardingState }: OnboardingPanelProps) {
 
   if (!steps.hasProjects) {
     incompleteSteps.push({
-      text: 'Create your first Project or Crop Cycle',
-      buttonLabel: 'Add Project',
+      text: `Create your first ${term('fieldCycle')} (from a land allocation) or start a Crop Cycle.`,
+      buttonLabel: `Add ${term('fieldCycle')}`,
       action: () => navigate('/app/projects'),
       primary: true,
     });

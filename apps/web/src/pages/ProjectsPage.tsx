@@ -11,6 +11,7 @@ import { useRole } from '../hooks/useRole';
 import { EmptyState } from '../components/EmptyState';
 import toast from 'react-hot-toast';
 import type { Project, CreateProjectFromAllocationPayload } from '../types';
+import { term } from '../config/terminology';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -40,14 +41,14 @@ export default function ProjectsPage() {
       });
       await queryClient.refetchQueries({ queryKey: ['projects', undefined] });
       if (isFirstProject) {
-        toast.success('Your first project has been created. You can now track costs and activities.');
+        toast.success(`Your first ${term('fieldCycle').toLowerCase()} has been created. You can now track costs and activities.`);
       } else {
-        toast.success('Project created successfully');
+        toast.success(`${term('fieldCycle')} created successfully`);
       }
       setShowCreateModal(false);
       setFormData({ land_allocation_id: '', name: '' });
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create project');
+      toast.error(error.message || `Failed to create ${term('fieldCycle').toLowerCase()}`);
     }
   };
 
@@ -55,19 +56,19 @@ export default function ProjectsPage() {
     if (!projectToClose) return;
     try {
       await closeProjectMutation.mutateAsync(projectToClose.id);
-      toast.success('Project closed');
+      toast.success(`${term('fieldCycle')} closed`);
       setProjectToClose(null);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message ?? error.message ?? 'Failed to close project');
+      toast.error(error?.response?.data?.message ?? error.message ?? `Failed to close ${term('fieldCycle').toLowerCase()}`);
     }
   };
 
   const handleReopen = async (project: Project) => {
     try {
       await reopenProjectMutation.mutateAsync(project.id);
-      toast.success('Project reopened');
+      toast.success(`${term('fieldCycle')} reopened`);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message ?? error.message ?? 'Failed to reopen project');
+      toast.error(error?.response?.data?.message ?? error.message ?? `Failed to reopen ${term('fieldCycle').toLowerCase()}`);
     }
   };
 
@@ -149,13 +150,13 @@ export default function ProjectsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{term('fieldCycles')}</h1>
         {canCreate && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
-            New Project from Allocation
+            New {term('fieldCycle')} from Allocation
           </button>
         )}
       </div>
@@ -169,12 +170,12 @@ export default function ProjectsPage() {
           />
         ) : (
           <EmptyState
-            title="No projects yet"
-            description="Projects help track crops, fields, and costs."
+            title={`No ${term('fieldCycles').toLowerCase()} yet`}
+            description={`${term('fieldCycles')} help track crop cycles, land allocation, and costs.`}
             action={
               canCreate
                 ? {
-                    label: 'Create Project',
+                    label: `Create ${term('fieldCycle')}`,
                     onClick: () => setShowCreateModal(true),
                   }
                 : undefined
@@ -186,7 +187,7 @@ export default function ProjectsPage() {
       <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        title="Create Project from Allocation"
+        title={`Create ${term('fieldCycle')} from Allocation`}
       >
         <div className="space-y-4">
           <FormField label="Allocation" required>
@@ -203,7 +204,7 @@ export default function ProjectsPage() {
               ))}
             </select>
           </FormField>
-          <FormField label="Project Name" required>
+          <FormField label={`${term('fieldCycle')} Name`} required>
             <input
               type="text"
               value={formData.name}
@@ -232,7 +233,7 @@ export default function ProjectsPage() {
       <Modal
         isOpen={!!projectToClose}
         onClose={() => setProjectToClose(null)}
-        title="Close Project"
+        title={`Close ${term('fieldCycle')}`}
       >
         <p className="text-gray-600 mb-4">
           Closing prevents new work/harvest entries and rule changes.
@@ -252,7 +253,7 @@ export default function ProjectsPage() {
             disabled={closeProjectMutation.isPending}
             className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {closeProjectMutation.isPending ? 'Closing...' : 'Close Project'}
+            {closeProjectMutation.isPending ? 'Closing...' : `Close ${term('fieldCycle')}`}
           </button>
         </div>
       </Modal>

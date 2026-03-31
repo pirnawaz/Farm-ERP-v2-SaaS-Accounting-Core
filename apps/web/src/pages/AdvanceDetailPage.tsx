@@ -129,7 +129,7 @@ export default function AdvanceDetailPage() {
           </div>
           {advance.project && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Project</dt>
+              <dt className="text-sm font-medium text-gray-500">{term('fieldCycle')}</dt>
               <dd className="text-sm text-gray-900">{advance.project.name}</dd>
             </div>
           )}

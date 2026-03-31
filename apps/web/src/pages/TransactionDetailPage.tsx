@@ -123,7 +123,7 @@ export default function TransactionDetailPage() {
           </div>
           {transaction.project && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Project</dt>
+              <dt className="text-sm font-medium text-gray-500">{term('fieldCycle')}</dt>
               <dd className="text-sm text-gray-900">
                 <Link to={`/app/projects/${transaction.project.id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a]">
                   {transaction.project.name}

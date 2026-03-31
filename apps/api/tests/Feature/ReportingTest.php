@@ -93,23 +93,24 @@ class ReportingTest extends TestCase
 
         $response = $this->withHeader('X-Tenant-Id', $this->tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/reports/trial-balance?from=2024-01-15&to=2024-01-15');
+            ->getJson('/api/reports/trial-balance?as_of=2024-01-15');
 
         $response->assertStatus(200);
         $data = $response->json();
-        $this->assertNotEmpty($data);
+        $this->assertArrayHasKey('rows', $data);
+        $this->assertNotEmpty($data['rows']);
 
-        $expRow = collect($data)->firstWhere('account_code', 'EXP_SHARED');
+        $expRow = collect($data['rows'])->firstWhere('account_code', 'EXP_SHARED');
         $this->assertNotNull($expRow);
         $this->assertEquals('100.00', $expRow['total_debit']);
 
         $response2 = $this->withHeader('X-Tenant-Id', $this->tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/reports/trial-balance?from=2024-01-10&to=2024-01-14');
+            ->getJson('/api/reports/trial-balance?as_of=2024-01-14');
 
         $response2->assertStatus(200);
         $data2 = $response2->json();
-        $expRow2 = collect($data2)->firstWhere('account_code', 'EXP_SHARED');
+        $expRow2 = collect($data2['rows'] ?? [])->firstWhere('account_code', 'EXP_SHARED');
         $this->assertNull($expRow2);
     }
 
@@ -137,12 +138,13 @@ class ReportingTest extends TestCase
 
         $response = $this->withHeader('X-Tenant-Id', $this->tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/reports/trial-balance?from=2024-01-15&to=2024-01-15');
+            ->getJson('/api/reports/trial-balance?as_of=2024-01-15');
 
         $response->assertStatus(200);
         $data = $response->json();
-        $expRow = collect($data)->firstWhere('account_code', 'EXP_SHARED');
-        $cashRow = collect($data)->firstWhere('account_code', 'CASH');
+        $rows = $data['rows'] ?? [];
+        $expRow = collect($rows)->firstWhere('account_code', 'EXP_SHARED');
+        $cashRow = collect($rows)->firstWhere('account_code', 'CASH');
         $this->assertNotNull($expRow);
         $this->assertEquals('100.00', $expRow['total_debit']);
         $this->assertNotNull($cashRow);
@@ -158,16 +160,19 @@ class ReportingTest extends TestCase
 
         $response2 = $this->withHeader('X-Tenant-Id', $this->tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/reports/trial-balance?from=2024-01-15&to=2024-01-20');
+            ->getJson('/api/reports/trial-balance?as_of=2024-01-20');
 
         $response2->assertStatus(200);
         $data2 = $response2->json();
-        $expRow2 = collect($data2)->firstWhere('account_code', 'EXP_SHARED');
-        $cashRow2 = collect($data2)->firstWhere('account_code', 'CASH');
-        $this->assertNotNull($expRow2);
-        $this->assertEquals('0.00', $expRow2['net']);
-        $this->assertNotNull($cashRow2);
-        $this->assertEquals('0.00', $cashRow2['net']);
+        $rows2 = $data2['rows'] ?? [];
+        $expRow2 = collect($rows2)->firstWhere('account_code', 'EXP_SHARED');
+        $cashRow2 = collect($rows2)->firstWhere('account_code', 'CASH');
+        // Trial balance excludes reversal pairs (original + reversal), so touched accounts drop out.
+        $this->assertNull($expRow2);
+        $this->assertNull($cashRow2);
+        $this->assertTrue((bool) ($data2['balanced'] ?? false));
+        $this->assertEqualsWithDelta(0.0, (float) ($data2['totals']['total_debit'] ?? 0), 0.01);
+        $this->assertEqualsWithDelta(0.0, (float) ($data2['totals']['total_credit'] ?? 0), 0.01);
     }
 
     public function test_tenant_isolation_in_reports(): void
@@ -233,21 +238,21 @@ class ReportingTest extends TestCase
 
         $response = $this->withHeader('X-Tenant-Id', $this->tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/reports/trial-balance?from=2024-01-15&to=2024-01-15');
+            ->getJson('/api/reports/trial-balance?as_of=2024-01-15');
 
         $response->assertStatus(200);
         $data = $response->json();
-        $expRow = collect($data)->firstWhere('account_code', 'EXP_SHARED');
+        $expRow = collect($data['rows'] ?? [])->firstWhere('account_code', 'EXP_SHARED');
         $this->assertNotNull($expRow);
         $this->assertEquals('100.00', $expRow['total_debit']);
 
         $response2 = $this->withHeader('X-Tenant-Id', $this->tenant2->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->getJson('/api/reports/trial-balance?from=2024-01-15&to=2024-01-15');
+            ->getJson('/api/reports/trial-balance?as_of=2024-01-15');
 
         $response2->assertStatus(200);
         $data2 = $response2->json();
-        $expRow2 = collect($data2)->firstWhere('account_code', 'EXP_SHARED');
+        $expRow2 = collect($data2['rows'] ?? [])->firstWhere('account_code', 'EXP_SHARED');
         $this->assertNotNull($expRow2);
         $this->assertEquals('200.00', $expRow2['total_debit']);
     }

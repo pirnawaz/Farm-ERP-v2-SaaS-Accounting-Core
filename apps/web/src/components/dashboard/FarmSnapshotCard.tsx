@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { DashboardFarm, DashboardScope } from '@farm-erp/shared';
 import { useFormatting } from '../../hooks/useFormatting';
+import { term } from '../../config/terminology';
 
 interface FarmSnapshotCardProps {
   farm: DashboardFarm;
@@ -24,7 +25,7 @@ export function FarmSnapshotCard({ farm, scope }: FarmSnapshotCardProps) {
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500">Active projects</dt>
+          <dt className="text-gray-500">Active {term('fieldCycles').toLowerCase()}</dt>
           <dd className="font-semibold text-gray-900 tabular-nums">
             <Link to="/app/projects" className="text-[#1F6F5C] hover:underline">
               {formatNumber(farm.open_projects_count)}

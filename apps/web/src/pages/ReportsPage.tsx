@@ -21,8 +21,7 @@ export default function ReportsPage() {
   const { formatMoney, formatDate, formatDateRange, formatNumber } = useFormatting();
   const [activeTab, setActiveTab] = useState<Tab>('trial-balance');
   const [trialBalanceParams, setTrialBalanceParams] = useState({
-    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+    as_of: new Date().toISOString().split('T')[0],
   });
   const [generalLedgerParams, setGeneralLedgerParams] = useState({
     from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -68,8 +67,8 @@ export default function ReportsPage() {
   );
 
   const tbMeta = getReportMetadataBlockPeriodProps(
-    'range',
-    { mode: 'range', from: trialBalanceParams.from, to: trialBalanceParams.to },
+    'asOf',
+    { mode: 'asOf', asOf: trialBalanceParams.as_of },
     { formatDate, formatDateRange },
   );
   const glMeta = getReportMetadataBlockPeriodProps(
@@ -88,9 +87,10 @@ export default function ReportsPage() {
       return <LoadingSpinner size="lg" />;
     }
 
-    const totalDebit = trialBalance?.reduce((sum, row) => sum + parseFloat(row.total_debit || '0'), 0) || 0;
-    const totalCredit = trialBalance?.reduce((sum, row) => sum + parseFloat(row.total_credit || '0'), 0) || 0;
-    const totalNet = trialBalance?.reduce((sum, row) => sum + parseFloat(row.net || '0'), 0) || 0;
+    const rows = trialBalance?.rows ?? [];
+    const totalDebit = rows.reduce((sum, row) => sum + parseFloat(row.total_debit || '0'), 0) || 0;
+    const totalCredit = rows.reduce((sum, row) => sum + parseFloat(row.total_credit || '0'), 0) || 0;
+    const totalNet = rows.reduce((sum, row) => sum + parseFloat(row.net || '0'), 0) || 0;
 
     return (
       <div>
@@ -101,30 +101,21 @@ export default function ReportsPage() {
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">As of</label>
               <input
                 type="date"
-                value={trialBalanceParams.from}
-                onChange={(e) => setTrialBalanceParams({ ...trialBalanceParams, from: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-              <input
-                type="date"
-                value={trialBalanceParams.to}
-                onChange={(e) => setTrialBalanceParams({ ...trialBalanceParams, to: e.target.value })}
+                value={trialBalanceParams.as_of}
+                onChange={(e) => setTrialBalanceParams({ ...trialBalanceParams, as_of: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
           </div>
         </div>
         <div className="bg-white rounded-lg shadow">
-          {trialBalance && trialBalance.length > 0 ? (
+          {rows.length > 0 ? (
             <>
               <DataTable<WithId<TrialBalanceRow>>
-                data={trialBalance.map((r, i) => ({ ...r, id: r.account_id || String(i) }))}
+                data={rows.map((r, i) => ({ ...r, id: r.account_id || String(i) }))}
                 columns={trialBalanceColumns}
               />
               <div className="p-4 bg-gray-50 border-t">
@@ -181,13 +172,13 @@ export default function ReportsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
               <select
                 value={generalLedgerParams.project_id}
                 onChange={(e) => setGeneralLedgerParams({ ...generalLedgerParams, project_id: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
-                <option value="">All Projects</option>
+                <option value="">{`All ${term('fieldCycles')}`}</option>
                 {projects?.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -252,13 +243,13 @@ export default function ReportsPage() {
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
               <select
                 value={projectStatementParams.project_id}
                 onChange={(e) => setProjectStatementParams({ ...projectStatementParams, project_id: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
-                <option value="">Select Project</option>
+                <option value="">{`Select ${term('fieldCycle')}`}</option>
                 {projects?.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -343,7 +334,10 @@ export default function ReportsPage() {
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow">
-            <EmptyState title={EMPTY_COPY.noRecords} description="Select a project to view its statement." />
+            <EmptyState
+              title={EMPTY_COPY.noRecords}
+              description={`Select a ${term('fieldCycle').toLowerCase()} to view its statement.`}
+            />
           </div>
         )}
       </div>
@@ -394,7 +388,7 @@ export default function ReportsPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Project Statement
+            {REPORT_HUB_METADATA['project-statement'].reportTitle}
           </button>
         </nav>
       </div>

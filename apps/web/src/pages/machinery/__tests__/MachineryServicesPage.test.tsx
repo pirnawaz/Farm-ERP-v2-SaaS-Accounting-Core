@@ -8,6 +8,7 @@ vi.mock('../../../hooks/useMachinery', () => ({
   useMachineryServicesQuery: vi.fn(),
   usePostMachineryService: vi.fn(),
   useReverseMachineryService: vi.fn(),
+  useMachinesQuery: vi.fn(),
 }));
 vi.mock('../../../hooks/useProjects', () => ({
   useProjects: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('../../../hooks/useFormatting', () => ({
   }),
 }));
 
-import { useMachineryServicesQuery, usePostMachineryService, useReverseMachineryService } from '../../../hooks/useMachinery';
+import { useMachineryServicesQuery, usePostMachineryService, useReverseMachineryService, useMachinesQuery } from '../../../hooks/useMachinery';
 import { useProjects } from '../../../hooks/useProjects';
 import { useRole } from '../../../hooks/useRole';
 
@@ -34,6 +35,7 @@ describe('MachineryServicesPage', () => {
       isLoading: false,
     });
     (useProjects as ReturnType<typeof vi.fn>).mockReturnValue({ data: [] });
+    (useMachinesQuery as ReturnType<typeof vi.fn>).mockReturnValue({ data: [] });
     (useRole as ReturnType<typeof vi.fn>).mockReturnValue({
       hasRole: () => true,
     });

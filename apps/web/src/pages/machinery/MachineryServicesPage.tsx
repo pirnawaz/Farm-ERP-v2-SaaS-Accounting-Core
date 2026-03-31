@@ -15,6 +15,7 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import type { MachineryService } from '../../types';
+import { term } from '../../config/terminology';
 
 export default function MachineryServicesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -96,7 +97,7 @@ export default function MachineryServicesPage() {
         row.posting_date ? formatDate(row.posting_date) : (row.created_at ? formatDate(row.created_at) : '—'),
     },
     {
-      header: 'Project',
+      header: term('fieldCycle'),
       accessor: (row) => row.project?.name ?? row.project_id ?? '—',
     },
     {

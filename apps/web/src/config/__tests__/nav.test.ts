@@ -33,12 +33,8 @@ describe('getNavDomains', () => {
     const domains = getNavDomains(term, false, false);
     const ops = domains.find((d) => d.domainKey === 'operations');
     const machSection = ops?.sections.find((s) => s.sectionKey === 'ops-machinery');
-    expect(machSection?.items).toHaveLength(1);
-    const m = machSection?.items[0];
-    expect(m && isSubmenuParent(m)).toBe(true);
-    if (m && isSubmenuParent(m)) {
-      expect(m.children.some((c) => c.key === 'machinery-rate-cards')).toBe(true);
-    }
+    // Machinery is currently a flat section (not a submenu parent).
+    expect(machSection?.items.some((i) => i.key === 'machinery-rate-cards')).toBe(true);
   });
 
   it('does not change canonical route paths', () => {
@@ -57,7 +53,9 @@ describe('getNavDomains', () => {
     });
     const paths = new Set(allItems.map((i) => i.to));
     expect(paths.has('/app/transactions')).toBe(true);
-    expect(paths.has('/app/governance')).toBe(true);
+    // Governance is not a canonical route path; specific pages live under internal/admin routes.
+    expect(paths.has('/app/internal/farm-integrity')).toBe(true);
+    expect(paths.has('/app/admin/audit-logs')).toBe(true);
     expect(paths.has('/app/settings/localisation')).toBe(true);
   });
 });
@@ -96,8 +94,8 @@ describe('navMatch', () => {
   it('isNavItemActive for submenu parent follows children', () => {
     const domains = getNavDomains(term, false, false);
     const ops = domains.find((d) => d.domainKey === 'operations')!;
-    const mach = ops.sections.find((s) => s.sectionKey === 'ops-machinery')!.items[0];
-    expect(isNavItemActive('/app/machinery/rate-cards', mach)).toBe(true);
-    expect(isNavItemActive('/app/sales', mach)).toBe(false);
+    const rateCards = ops.sections.find((s) => s.sectionKey === 'ops-machinery')!.items.find((i) => i.key === 'machinery-rate-cards')!;
+    expect(isNavItemActive('/app/machinery/rate-cards', rateCards)).toBe(true);
+    expect(isNavItemActive('/app/sales', rateCards)).toBe(false);
   });
 });

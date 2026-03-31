@@ -14,6 +14,7 @@ import { PrintableReport } from '../components/print/PrintableReport';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { useParties } from '../hooks/useParties';
+import { term } from '../config/terminology';
 
 type TabKey = 'project' | 'crop-cycle' | 'supplier-ap';
 
@@ -146,7 +147,7 @@ function ReconciliationDashboardPage() {
       let data: ReconciliationResponse;
       if (activeTab === 'project') {
         if (!filters.project_id) {
-          setError('Please select a project.');
+          setError(`Please select a ${term('fieldCycle').toLowerCase()}.`);
           setLoading(false);
           return;
         }
@@ -222,7 +223,7 @@ function ReconciliationDashboardPage() {
 
   const scopeLabel =
     activeTab === 'project'
-      ? projects.find((p) => p.id === filters.project_id)?.name ?? 'Project'
+      ? projects.find((p) => p.id === filters.project_id)?.name ?? term('fieldCycle')
       : activeTab === 'crop-cycle'
         ? cropCycles.find((c) => c.id === filters.crop_cycle_id)?.name ?? 'Crop Cycle'
         : parties.find((p) => p.id === filters.party_id)?.name ?? 'Supplier AP';
@@ -260,7 +261,7 @@ function ReconciliationDashboardPage() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              {tab === 'project' ? 'Project' : tab === 'crop-cycle' ? 'Crop Cycle' : 'Supplier AP'}
+              {tab === 'project' ? term('fieldCycle') : tab === 'crop-cycle' ? 'Crop Cycle' : 'Supplier AP'}
             </button>
           ))}
         </nav>
@@ -270,13 +271,13 @@ function ReconciliationDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {activeTab === 'project' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
               <select
                 value={filters.project_id}
                 onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
                 className="w-full border border-gray-300 rounded px-3 py-2"
               >
-                <option value="">Select Project</option>
+                <option value="">{`Select ${term('fieldCycle')}`}</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}

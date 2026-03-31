@@ -107,13 +107,14 @@ test.describe('@core Core reports oracle', () => {
     const { totalDebits, totalCredits, perAccountNet } = aggregateLedgerEntries(ledgerEntries);
     expect(Math.abs(totalDebits - totalCredits)).toBeLessThan(0.01);
 
-    // Fetch trial balance for same date range
+    // Fetch trial balance as-of the same date
     const tbRes = await request.get(
-      `${API_BASE_URL}/api/reports/trial-balance?from=${today}&to=${today}`,
+      `${API_BASE_URL}/api/reports/trial-balance?as_of=${today}`,
       { headers }
     );
     expect(tbRes.ok()).toBeTruthy();
-    const trialBalance = (await tbRes.json()) as TrialBalanceRowLike[];
+    const trialBalanceResp = (await tbRes.json()) as { rows?: TrialBalanceRowLike[] };
+    const trialBalance = trialBalanceResp.rows ?? [];
 
     // Report must balance
     assertTrialBalanceBalanced(trialBalance);

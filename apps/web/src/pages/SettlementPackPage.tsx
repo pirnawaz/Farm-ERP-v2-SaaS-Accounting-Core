@@ -8,6 +8,7 @@ import {
 import { settlementPackApi } from '../api/settlementPack';
 import { PageHeader } from '../components/PageHeader';
 import { useFormatting } from '../hooks/useFormatting';
+import { term } from '../config/terminology';
 
 export default function SettlementPackPage() {
   const { id } = useParams<{ id: string }>();
@@ -97,7 +98,7 @@ export default function SettlementPackPage() {
       />
       {pack.project?.name && (
         <p className="text-sm text-gray-500 -mt-4">
-          Project: {pack.project.name}
+          {term('fieldCycle')}: {pack.project.name}
         </p>
       )}
 

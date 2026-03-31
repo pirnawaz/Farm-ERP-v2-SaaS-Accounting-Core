@@ -222,13 +222,13 @@ export const apiClient = {
 
   // Phase 6: Reporting methods
   getTrialBalance: (params: {
-    from: string
-    to: string
+    as_of: string
     project_id?: string
+    crop_cycle_id?: string
     currency_code?: string
   }) => {
     const query = buildQueryString(params)
-    return request<import('./types').TrialBalanceRow[]>(`/api/reports/trial-balance${query}`)
+    return request<import('./types').TrialBalanceResponse>(`/api/reports/trial-balance${query}`)
   },
 
   getGeneralLedger: (params: {

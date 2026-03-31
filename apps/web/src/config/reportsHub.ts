@@ -11,7 +11,7 @@ export const REPORT_HUB_METADATA: Record<ReportsHubTab, ReportPageMetadata> = {
   'trial-balance': {
     pageTitle: 'Trial balance (preview)',
     reportTitle: 'Trial balance',
-    periodMode: 'range',
+    periodMode: 'asOf',
     scopeType: 'tenantWide',
     reportKind: 'trial_balance',
     exportAvailable: true,
@@ -29,8 +29,8 @@ export const REPORT_HUB_METADATA: Record<ReportsHubTab, ReportPageMetadata> = {
     emptyStateKey: 'noDataForPeriod',
   },
   'project-statement': {
-    pageTitle: 'Project statement (preview)',
-    reportTitle: 'Project statement',
+    pageTitle: 'Field Cycle statement (preview)',
+    reportTitle: 'Field Cycle statement',
     periodMode: 'asOf',
     scopeType: 'project',
     reportKind: 'project_statement',

@@ -16,8 +16,11 @@ import {
   ReportTableCell,
   ReportEmptyState,
   ReportMetadataBlock,
+  ReportErrorState,
+  ReportLoadingState,
 } from '../components/report';
 import { EMPTY_COPY } from '../config/presentation';
+import { term } from '../config/terminology';
 
 function AccountBalancesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -119,7 +122,7 @@ function AccountBalancesPage() {
       <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">As Of Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">As of</label>
             <input
               type="date"
               value={filters.as_of}
@@ -128,13 +131,13 @@ function AccountBalancesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
             <select
               value={filters.project_id}
               onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
               className="w-full border border-gray-300 rounded px-3 py-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{`All ${term('fieldCycles')}`}</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -149,8 +152,8 @@ function AccountBalancesPage() {
         <ReportMetadataBlock asOfDate={formatDate(filters.as_of)} />
       </div>
 
-      {loading && <div className="text-center py-8">Loading...</div>}
-      {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>}
+      {loading && <ReportLoadingState label="Loading account balances..." className="no-print" />}
+      {error && <ReportErrorState error={error} className="no-print" />}
 
       {!loading && !error && (
         <>
@@ -169,7 +172,7 @@ function AccountBalancesPage() {
               </ReportTableHead>
               <ReportTableBody>
                 {data.length === 0 ? (
-                  <ReportEmptyState colSpan={7} message={EMPTY_COPY.noDataForPeriod} />
+                  <ReportEmptyState colSpan={7} message="No balances found for this date." />
                 ) : (
                   data.map((row) => (
                     <ReportTableRow key={`${row.account_id}-${row.currency_code}`}>
@@ -208,7 +211,7 @@ function AccountBalancesPage() {
               </ReportTableHead>
               <ReportTableBody>
                 {data.length === 0 ? (
-                  <ReportEmptyState colSpan={7} message={EMPTY_COPY.noDataForPeriod} />
+                  <ReportEmptyState colSpan={7} message="No balances found for this date." />
                 ) : (
                   data.map((row) => (
                     <ReportTableRow key={`print-${row.account_id}-${row.currency_code}`}>

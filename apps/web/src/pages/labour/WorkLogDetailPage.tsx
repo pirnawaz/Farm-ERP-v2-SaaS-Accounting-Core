@@ -130,7 +130,7 @@ export default function WorkLogDetailPage() {
           <div><dt className="text-sm text-gray-500">Worker</dt><dd>{log.worker?.name || log.worker_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Work Date</dt><dd>{formatDate(log.work_date)}</dd></div>
           <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{log.crop_cycle?.name || log.crop_cycle_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Project</dt><dd>{log.project?.name || log.project_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">{term('fieldCycle')}</dt><dd>{log.project?.name || log.project_id}</dd></div>
           {log.machine && (
             <div><dt className="text-sm text-gray-500">Machine</dt><dd>{log.machine.code} - {log.machine.name}</dd></div>
           )}
@@ -169,7 +169,7 @@ export default function WorkLogDetailPage() {
                 {cropCycles?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </FormField>
-            <FormField label="Project">
+            <FormField label={term('fieldCycle')}>
               <select value={project_id} onChange={(e) => setProjectId(e.target.value)} className="w-full px-3 py-2 border rounded">
                 <option value="">Select</option>
                 {(projects || [])?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

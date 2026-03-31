@@ -88,7 +88,7 @@ function ProjectsCountWidget() {
   const projectsCount = projects?.length || 0;
 
   if (isLoading) return <LoadingSpinner />;
-  return <StatCard title="Projects" value={projectsCount} link="/app/projects" />;
+  return <StatCard title={term('fieldCycles')} value={projectsCount} link="/app/projects" />;
 }
 
 function CashBalanceWidget() {

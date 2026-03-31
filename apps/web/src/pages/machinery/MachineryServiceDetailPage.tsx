@@ -14,6 +14,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../../components/Term';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import { term } from '../../config/terminology';
 
 export default function MachineryServiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -181,7 +182,7 @@ export default function MachineryServiceDetailPage() {
             </div>
           )}
           <div>
-            <dt className="text-sm font-medium text-gray-500">Project</dt>
+            <dt className="text-sm font-medium text-gray-500">{term('fieldCycle')}</dt>
             <dd className="text-sm text-gray-900">{service.project?.name ?? service.project_id ?? '—'}</dd>
           </div>
           <div>

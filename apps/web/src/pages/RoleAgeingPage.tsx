@@ -5,14 +5,19 @@ import { exportToCSV } from '../utils/csvExport';
 import { exportAmountForSpreadsheet } from '../utils/exportFormatting';
 import { metaAsOfLabel } from '../utils/reportPresentation';
 import { useFormatting } from '../hooks/useFormatting';
+import { useLocalisation } from '../hooks/useLocalisation';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { EMPTY_COPY, REPORT_LABELS } from '../config/presentation';
 import { PrintableReport } from '../components/print/PrintableReport';
 import type { RoleAgeingResponse, RoleAgeingRow, Project, CropCycle } from '../types';
+import { term } from '../config/terminology';
+import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata';
+import { ReportErrorState, ReportLoadingState } from '../components/report';
 
 function RoleAgeingPage() {
   const { formatMoney, formatDate } = useFormatting();
   const { settings } = useTenantSettings();
+  const { currency_code, locale, timezone } = useLocalisation();
   const [data, setData] = useState<RoleAgeingResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [cropCycles, setCropCycles] = useState<CropCycle[]>([]);
@@ -89,11 +94,13 @@ function RoleAgeingPage() {
     exportToCSV(mapped, '', headers, {
       reportName: 'RoleAgeing',
       asOfDate: filters.as_of,
-      metadataRows: [
-        ['export', 'Terrava Party Ageing'],
-        ['as_of', filters.as_of],
-        ['base_currency', settings?.currency_code ?? 'PKR'],
-      ],
+      metadataRows: terravaBaseExportMetadataRows({
+        reportExportName: 'Terrava Party Ageing',
+        baseCurrency: currency_code || settings?.currency_code || 'PKR',
+        period: { mode: 'asOf', asOf: filters.as_of },
+        locale,
+        timezone,
+      }),
     });
   };
 
@@ -124,7 +131,7 @@ function RoleAgeingPage() {
       <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">As Of Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">As of</label>
             <input
               type="date"
               value={filters.as_of}
@@ -133,13 +140,13 @@ function RoleAgeingPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
             <select
               value={filters.project_id}
               onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
               className="w-full border border-gray-300 rounded px-3 py-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{`All ${term('fieldCycles')}`}</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -168,12 +175,8 @@ function RoleAgeingPage() {
         </p>
       </div>
 
-      {loading && <div className="text-center py-8">Loading...</div>}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
+      {loading && <ReportLoadingState label="Loading party ageing..." className="no-print" />}
+      {error && <ReportErrorState error={error} className="no-print" />}
 
       {!loading && !error && (
         <>
@@ -206,7 +209,7 @@ function RoleAgeingPage() {
                   {rows.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                        {EMPTY_COPY.noDataForPeriod}
+                        No balances found for this date.
                       </td>
                     </tr>
                   ) : (

@@ -47,7 +47,7 @@ export default function TransactionsPage() {
     { header: 'Amount', accessor: 'amount' },
     { header: 'Classification', accessor: 'classification' },
     {
-      header: 'Project',
+      header: term('fieldCycle'),
       accessor: (row) => row.project?.name || 'N/A',
     },
     {
@@ -127,7 +127,7 @@ export default function TransactionsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
             <select
               value={filters.project_id}
               onChange={(e) => handleFilterChange('project_id', e.target.value)}

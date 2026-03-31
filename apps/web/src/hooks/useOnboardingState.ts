@@ -19,10 +19,8 @@ export function useOnboardingState(): OnboardingState {
   const { data: postedTransactions, isLoading: loadingPostedTransactions } = useOperationalTransactions({ status: 'POSTED' });
   
   // Get trial balance for current year to check if reports have data
-  const currentYear = new Date().getFullYear();
   const trialBalanceParams = {
-    from: new Date(currentYear, 0, 1).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+    as_of: new Date().toISOString().split('T')[0],
   };
   const { data: trialBalance, isLoading: loadingTrialBalance } = useTrialBalance(trialBalanceParams);
 
@@ -35,8 +33,9 @@ export function useOnboardingState(): OnboardingState {
   const hasTransactions = postedTransactions && postedTransactions.length > 0;
   
   // Check if trial balance has meaningful data (has rows and not all zeros)
-  const hasReports = trialBalance && trialBalance.length > 0 && 
-    trialBalance.some(row => {
+  const rows = trialBalance?.rows ?? [];
+  const hasReports = rows.length > 0 && 
+    rows.some(row => {
       const debit = parseFloat(row.total_debit || '0');
       const credit = parseFloat(row.total_credit || '0');
       const net = parseFloat(row.net || '0');

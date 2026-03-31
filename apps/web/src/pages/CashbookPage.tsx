@@ -4,11 +4,14 @@ import { exportToCSV } from '../utils/csvExport';
 import { exportAmountForSpreadsheet, exportDateIsoYmd } from '../utils/exportFormatting';
 import { metaReportingPeriodLabel } from '../utils/reportPresentation';
 import { useFormatting } from '../hooks/useFormatting';
+import { useLocalisation } from '../hooks/useLocalisation';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { EMPTY_COPY } from '../config/presentation';
-import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DataTable, type Column } from '../components/DataTable';
 import { PrintableReport } from '../components/print/PrintableReport';
+import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock';
+import { ReportErrorState, ReportLoadingState } from '../components/report';
+import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata';
 
 interface CashbookRow {
   date: string;
@@ -23,6 +26,7 @@ interface CashbookRow {
 export default function CashbookPage() {
   const { formatMoney, formatDate, formatDateRange, formatNumber } = useFormatting();
   const { settings } = useTenantSettings();
+  const { currency_code, locale, timezone } = useLocalisation();
   const [data, setData] = useState<CashbookRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,12 +69,13 @@ export default function CashbookPage() {
       reportName: 'Cashbook',
       fromDate: filters.from,
       toDate: filters.to,
-      metadataRows: [
-        ['export', 'Terrava Cashbook'],
-        ['reporting_period_start', filters.from],
-        ['reporting_period_end', filters.to],
-        ['base_currency', settings?.currency_code ?? 'PKR'],
-      ],
+      metadataRows: terravaBaseExportMetadataRows({
+        reportExportName: 'Terrava Cashbook',
+        baseCurrency: currency_code || settings?.currency_code || 'PKR',
+        period: { mode: 'range', from: filters.from, to: filters.to },
+        locale,
+        timezone,
+      }),
     });
   };
 
@@ -152,16 +157,14 @@ export default function CashbookPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
+      <div className="no-print">
+        <ReportMetadataBlock reportingPeriodRange={formatDateRange(filters.from, filters.to)} />
+      </div>
+
+      {error && <ReportErrorState error={error} className="no-print" />}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <LoadingSpinner size="lg" />
-        </div>
+        <ReportLoadingState label="Loading cashbook..." className="no-print" />
       ) : (
         <>
           {/* Screen view */}
@@ -170,6 +173,11 @@ export default function CashbookPage() {
               data={data.map((r, i) => ({ ...r, id: r.source_id || String(i) }))} 
               columns={columns} 
             />
+            {data.length === 0 && (
+              <div className="p-6 text-center text-sm text-gray-600">
+                No activity found for this period.
+              </div>
+            )}
             {data.length > 0 && (
               <div className="p-4 bg-gray-50 border-t totals-row">
                 <div className="grid grid-cols-4 gap-4 text-sm font-medium">

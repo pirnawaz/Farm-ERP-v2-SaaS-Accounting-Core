@@ -4,6 +4,7 @@ import { MoneySnapshotCard } from './MoneySnapshotCard';
 import { FarmSnapshotCard } from './FarmSnapshotCard';
 import { GovernanceStatusCard } from './GovernanceStatusCard';
 import { AttentionList } from './AttentionList';
+import { term } from '../../config/terminology';
 
 interface OwnerLayoutProps {
   data: DashboardSummary;
@@ -19,7 +20,7 @@ export function OwnerLayout({ data }: OwnerLayoutProps) {
       {data.profit.best_project && (
         <div className="grid grid-cols-1">
           <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Best project</h3>
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Best {term('fieldCycle').toLowerCase()}</h3>
             <p className="font-semibold text-gray-900">
               {data.profit.best_project.name} — profit this period in scope
             </p>

@@ -4,13 +4,19 @@ import { exportToCSV } from '../utils/csvExport'
 import { exportAmountForSpreadsheet } from '../utils/exportFormatting'
 import { metaReportingPeriodLabel } from '../utils/reportPresentation'
 import { useFormatting } from '../hooks/useFormatting'
+import { useLocalisation } from '../hooks/useLocalisation'
 import { useTenantSettings } from '../hooks/useTenantSettings'
 import { EMPTY_COPY, REPORT_LABELS } from '../config/presentation'
 import { PrintableReport } from '../components/print/PrintableReport'
+import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock'
+import { ReportErrorState, ReportLoadingState } from '../components/report'
+import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata'
+import { term } from '../config/terminology'
 
 function ProjectPLPage() {
   const { formatMoney, formatDateRange } = useFormatting()
   const { settings } = useTenantSettings()
+  const { currency_code, locale, timezone } = useLocalisation()
   const [data, setData] = useState<ProjectPLRow[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,12 +77,13 @@ function ProjectPLPage() {
       reportName: 'ProjectPL',
       fromDate: filters.from,
       toDate: filters.to,
-      metadataRows: [
-        ['export', 'Terrava Project P&L'],
-        ['reporting_period_start', filters.from],
-        ['reporting_period_end', filters.to],
-        ['base_currency', settings?.currency_code ?? 'PKR'],
-      ],
+      metadataRows: terravaBaseExportMetadataRows({
+        reportExportName: 'Terrava Field Cycle P&L',
+        baseCurrency: currency_code || settings?.currency_code || 'PKR',
+        period: { mode: 'range', from: filters.from, to: filters.to },
+        locale,
+        timezone,
+      }),
     })
   }
 
@@ -93,7 +100,7 @@ function ProjectPLPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center no-print">
-        <h2 className="text-2xl font-bold">Project P&L</h2>
+        <h2 className="text-2xl font-bold">{term('fieldCycle')} P&amp;L</h2>
         <div className="flex gap-2">
           <button
             onClick={() => window.print()}
@@ -137,14 +144,14 @@ function ProjectPLPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Project
+              {term('fieldCycle')}
             </label>
             <select
               value={filters.project_id}
               onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
               className="w-full border border-gray-300 rounded px-3 py-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{`All ${term('fieldCycles')}`}</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -155,8 +162,12 @@ function ProjectPLPage() {
         </div>
       </div>
 
-      {loading && <div className="text-center py-8">Loading...</div>}
-      {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>}
+      <div className="no-print">
+        <ReportMetadataBlock reportingPeriodRange={formatDateRange(filters.from, filters.to)} />
+      </div>
+
+      {loading && <ReportLoadingState label={`Loading ${term('fieldCycle').toLowerCase()} P&L...`} className="no-print" />}
+      {error && <ReportErrorState error={error} className="no-print" />}
 
       {!loading && !error && (
         <>
@@ -167,7 +178,7 @@ function ProjectPLPage() {
                 <thead className="bg-[#E6ECEA]">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Project
+                      {term('fieldCycle')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Currency
@@ -187,7 +198,7 @@ function ProjectPLPage() {
                   {data.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                        {EMPTY_COPY.noDataForPeriod}
+                        No activity found for this period.
                       </td>
                     </tr>
                   ) : (
@@ -239,14 +250,14 @@ function ProjectPLPage() {
 
           {/* Print view */}
           <PrintableReport
-            title="Project P&L"
+            title={`${term('fieldCycle')} P&L`}
             metaLeft={metaReportingPeriodLabel(formatDateRange(filters.from, filters.to))}
           >
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Project
+                    {term('fieldCycle')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Currency

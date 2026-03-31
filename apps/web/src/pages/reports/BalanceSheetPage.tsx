@@ -3,6 +3,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useBalanceSheet } from '../../hooks/useReports';
 import { term } from '../../config/terminology';
+import { ReportErrorState, ReportLoadingState } from '../../components/report';
 
 const defaultAsOf = () => new Date().toISOString().split('T')[0];
 
@@ -17,6 +18,70 @@ export default function BalanceSheetPage() {
     ...(compareEnabled && compareAsOf ? { compare_as_of: compareAsOf } : {}),
   };
   const { data, isLoading, error } = useBalanceSheet(params);
+
+  const normalized = (() => {
+    if (!data) return null;
+
+    // Backward-compatible adapter: support both legacy web shape and current backend/controller shape.
+    const isLegacy = typeof (data as any).assets === 'object' && (data as any).assets != null;
+    const backend = data as any;
+
+    const sectionFromLegacy = (k: 'assets' | 'liabilities' | 'equity') => {
+      const s = (data as any)[k] ?? {};
+      const lines = Array.isArray(s.lines) ? s.lines : [];
+      const total = typeof s.total === 'number' ? s.total : 0;
+      return {
+        lines: lines.map((l: any) => ({
+          account_id: l.account_id ?? null,
+          code: l.code ?? null,
+          name: l.name ?? '—',
+          amount: typeof l.amount === 'number' ? l.amount : 0,
+        })),
+        total,
+      };
+    };
+
+    const sectionFromBackend = (k: 'assets' | 'liabilities' | 'equity') => {
+      const rawLines = backend?.sections?.[k];
+      const lines = Array.isArray(rawLines) ? rawLines : [];
+      const totals = backend?.totals ?? {};
+      const total =
+        k === 'assets'
+          ? (typeof totals.assets_total === 'number' ? totals.assets_total : 0)
+          : k === 'liabilities'
+            ? (typeof totals.liabilities_total === 'number' ? totals.liabilities_total : 0)
+            : (typeof totals.equity_total === 'number' ? totals.equity_total : 0);
+      return {
+        lines: lines.map((l: any) => ({
+          account_id: l.account_id ?? null,
+          code: l.account_code ?? l.code ?? null,
+          name: l.account_name ?? l.name ?? '—',
+          amount: typeof l.net === 'number' ? l.net : (typeof l.amount === 'number' ? l.amount : 0),
+        })),
+        total,
+      };
+    };
+
+    const sections = {
+      assets: isLegacy ? sectionFromLegacy('assets') : sectionFromBackend('assets'),
+      liabilities: isLegacy ? sectionFromLegacy('liabilities') : sectionFromBackend('liabilities'),
+      equity: isLegacy ? sectionFromLegacy('equity') : sectionFromBackend('equity'),
+    };
+
+    const equationDiff =
+      typeof (data as any).checks?.equation_diff === 'number'
+        ? (data as any).checks.equation_diff
+        : typeof backend?.totals?.assets_total === 'number' && typeof backend?.totals?.liabilities_plus_equity_total === 'number'
+          ? backend.totals.assets_total - backend.totals.liabilities_plus_equity_total
+          : null;
+
+    return {
+      as_of: (data as any).as_of ?? backend?.meta?.as_of ?? asOf,
+      sections,
+      equationDiff,
+      compare: (data as any).compare,
+    };
+  })();
 
   return (
     <div className="space-y-6">
@@ -62,33 +127,37 @@ export default function BalanceSheetPage() {
         </div>
       </div>
 
-      {isLoading && (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">Loading…</div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error.message}
-        </div>
-      )}
+      {isLoading && <ReportLoadingState label="Loading balance sheet..." />}
+      {error && <ReportErrorState error={error} />}
 
-      {data && !isLoading && (
+      {normalized && !isLoading && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-500">As of</div>
-              <div className="font-medium">{data.as_of}</div>
+              <div className="font-medium">{normalized.as_of}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm text-gray-500">Equation check</div>
-              <div className={`font-medium tabular-nums ${Math.abs(data.checks.equation_diff) <= 0.01 ? 'text-green-700' : 'text-amber-700'}`}>
-                Assets − (Liabilities + Equity) = {formatMoney(data.checks.equation_diff)}
-                {Math.abs(data.checks.equation_diff) <= 0.01 && ' ✓'}
-              </div>
+              {typeof normalized.equationDiff === 'number' ? (
+                <div
+                  className={`font-medium tabular-nums ${
+                    Math.abs(normalized.equationDiff) <= 0.01 ? 'text-green-700' : 'text-amber-700'
+                  }`}
+                >
+                  Assets − (Liabilities + Equity) = {formatMoney(normalized.equationDiff)}
+                  {Math.abs(normalized.equationDiff) <= 0.01 && ' ✓'}
+                </div>
+              ) : (
+                <div className="font-medium text-gray-500">
+                  Equation check unavailable
+                </div>
+              )}
             </div>
           </div>
 
           {(['assets', 'liabilities', 'equity'] as const).map((key) => {
-            const section = data[key];
+            const section = normalized.sections[key];
             return (
               <div key={key} className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="px-4 py-3 bg-[#E6ECEA] font-medium text-gray-800 capitalize">{key}</div>
@@ -102,14 +171,14 @@ export default function BalanceSheetPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {section.lines.length === 0 ? (
+                      {(section.lines ?? []).length === 0 ? (
                         <tr>
                           <td colSpan={3} className="px-4 py-3 text-center text-gray-500 text-sm">
                             No lines
                           </td>
                         </tr>
                       ) : (
-                        section.lines.map((line, idx) => (
+                        (section.lines ?? []).map((line, idx) => (
                           <tr key={line.account_id ?? idx}>
                             <td className="px-4 py-2 text-sm text-gray-900">{line.code ?? '—'}</td>
                             <td className="px-4 py-2 text-sm text-gray-700">{line.name}</td>
@@ -121,7 +190,7 @@ export default function BalanceSheetPage() {
                     <tfoot className="bg-gray-50 font-medium">
                       <tr>
                         <td colSpan={2} className="px-4 py-2 text-sm text-gray-700">Total {key}</td>
-                        <td className="px-4 py-2 text-sm text-right tabular-nums">{formatMoney(section.total)}</td>
+                        <td className="px-4 py-2 text-sm text-right tabular-nums">{formatMoney(section.total ?? 0)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -130,13 +199,13 @@ export default function BalanceSheetPage() {
             );
           })}
 
-          {data.compare && (
+          {normalized.compare && (
             <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm font-medium text-gray-700 mb-2">Compare as of: {data.compare.as_of}</div>
+              <div className="text-sm font-medium text-gray-700 mb-2">Compare as of: {normalized.compare.as_of}</div>
               <div className="grid grid-cols-3 gap-4 text-sm">
-                <span className="text-gray-600">Assets: {formatMoney(data.compare.total_assets)}</span>
-                <span className="text-gray-600">Liabilities: {formatMoney(data.compare.total_liabilities)}</span>
-                <span className="text-gray-600">Equity: {formatMoney(data.compare.total_equity)}</span>
+                <span className="text-gray-600">Assets: {formatMoney(normalized.compare.total_assets)}</span>
+                <span className="text-gray-600">Liabilities: {formatMoney(normalized.compare.total_liabilities)}</span>
+                <span className="text-gray-600">Equity: {formatMoney(normalized.compare.total_equity)}</span>
               </div>
             </div>
           )}

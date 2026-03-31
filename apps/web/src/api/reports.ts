@@ -3,11 +3,15 @@ import type { LandlordStatementResponse } from '@farm-erp/shared';
 import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy, ProductionUnitSummaryResponse, LivestockUnitStatusResponse } from '../types';
 
 export const reportsApi = {
-  trialBalance: (params: { from: string; to: string }) => {
+  trialBalance: (params: { as_of: string; project_id?: string; crop_cycle_id?: string; currency_code?: string }) => {
     const query = new URLSearchParams();
-    query.append('from', params.from);
-    query.append('to', params.to);
-    return apiClient.get<TrialBalanceRow[]>(`/api/reports/trial-balance?${query.toString()}`);
+    query.append('as_of', params.as_of);
+    if (params.project_id) query.append('project_id', params.project_id);
+    if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
+    if (params.currency_code) query.append('currency_code', params.currency_code);
+    return apiClient.get<{ as_of: string; rows: TrialBalanceRow[]; totals: { total_debit: string; total_credit: string }; balanced: boolean }>(
+      `/api/reports/trial-balance?${query.toString()}`
+    );
   },
   generalLedger: (params: { 
     from: string; 

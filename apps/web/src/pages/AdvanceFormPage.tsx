@@ -8,6 +8,7 @@ import { FormField } from '../components/FormField';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useRole } from '../hooks/useRole';
 import type { CreateAdvancePayload, AdvanceType, AdvanceDirection, AdvanceMethod } from '../types';
+import { term } from '../config/terminology';
 
 export default function AdvanceFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -208,7 +209,7 @@ export default function AdvanceFormPage() {
             </select>
           </FormField>
 
-          <FormField label="Project (Optional)">
+          <FormField label={`${term('fieldCycle')} (Optional)`}>
             <select
               value={formData.project_id}
               onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}

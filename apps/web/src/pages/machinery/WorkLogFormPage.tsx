@@ -13,6 +13,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLogCostCode, MachineWorkLogPoolScope } from '../../types';
+import { term } from '../../config/terminology';
 
 const BENEFICIARY_OPTIONS: { value: MachineWorkLogPoolScope; label: string }[] = [
   { value: 'LANDLORD_ONLY', label: 'My farm' },
@@ -208,14 +209,14 @@ export default function WorkLogFormPage() {
               ))}
             </select>
           </FormField>
-          <FormField label="Project" required>
+          <FormField label={term('fieldCycle')} required>
             <select
               value={project_id}
               onChange={(e) => setProjectId(e.target.value)}
               className="w-full px-3 py-2 border rounded"
               disabled={isEdit}
             >
-              <option value="">Select project</option>
+              <option value="">{`Select ${term('fieldCycle').toLowerCase()}`}</option>
               {projects?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -223,7 +224,7 @@ export default function WorkLogFormPage() {
               ))}
             </select>
           </FormField>
-          <FormField label="Crop cycle (from project)">
+          <FormField label={`Crop cycle (from ${term('fieldCycle').toLowerCase()})`}>
             <span className="text-gray-700">
               {selectedProject?.crop_cycle?.name ?? '—'}
             </span>

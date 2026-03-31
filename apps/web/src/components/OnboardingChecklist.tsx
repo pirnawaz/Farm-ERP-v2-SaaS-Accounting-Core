@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 import { useOnboardingQuery, useOnboardingUpdateMutation } from '../hooks/useOnboarding';
 import type { OnboardingStepId } from '@farm-erp/shared';
+import { term } from '../config/terminology';
 
 const STEP_CONFIG: { id: OnboardingStepId; label: string; path: string; required: boolean }[] = [
   { id: 'farm_profile', label: 'Farm Profile', path: '/app/admin/farm', required: true },
   { id: 'add_land_parcel', label: 'Add Land Parcel', path: '/app/land', required: true },
   { id: 'create_crop_cycle', label: 'Create Crop Cycle', path: '/app/crop-cycles', required: true },
-  { id: 'create_first_project', label: 'Create First Project', path: '/app/projects', required: true },
+  { id: 'create_first_project', label: `Create First ${term('fieldCycle')}`, path: '/app/projects', required: true },
   { id: 'add_first_party', label: 'Add First Party', path: '/app/parties', required: false },
   { id: 'post_first_transaction', label: 'Post First Transaction', path: '/app/transactions', required: false },
 ];

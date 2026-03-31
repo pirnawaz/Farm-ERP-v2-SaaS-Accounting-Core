@@ -7,6 +7,7 @@ import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
 import toast from 'react-hot-toast';
 import type { UpdateProjectRulePayload } from '../types';
+import { term } from '../config/terminology';
 
 export default function ProjectRulesPage() {
   const { id } = useParams<{ id: string }>();
@@ -75,9 +76,9 @@ export default function ProjectRulesPage() {
         kamdari_pct: parseFloat(String(formData.kamdari_pct || 0)),
       };
       await updateMutation.mutateAsync({ projectId: id, payload });
-      toast.success('Project rules updated successfully');
+      toast.success(`${term('fieldCycle')} rules updated successfully`);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to update project rules');
+      toast.error(error.message || `Failed to update ${term('fieldCycle').toLowerCase()} rules`);
     }
   };
 
@@ -90,7 +91,7 @@ export default function ProjectRulesPage() {
   }
 
   if (!rule) {
-    return <div>Project rules not found</div>;
+    return <div>{term('fieldCycle')} rules not found</div>;
   }
 
   const landlordPct = parseFloat(String(formData.profit_split_landlord_pct || 0));
@@ -101,9 +102,9 @@ export default function ProjectRulesPage() {
     <div>
       <div className="mb-6">
         <Link to={`/app/projects/${id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
-          ← Back to Project
+          ← Back to {term('fieldCycle')}
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">Project Rules</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mt-2">{term('fieldCycle')} Rules</h1>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">

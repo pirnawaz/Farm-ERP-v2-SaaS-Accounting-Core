@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { TrialBalanceRow, Project, apiClient } from '@farm-erp/shared'
+import { TrialBalanceRow, TrialBalanceResponse, Project, apiClient } from '@farm-erp/shared'
 import { exportToCSV } from '../utils/csvExport'
 import { exportAmountForSpreadsheet } from '../utils/exportFormatting'
 import { useFormatting } from '../hooks/useFormatting'
@@ -7,11 +7,12 @@ import { useLocalisation } from '../hooks/useLocalisation'
 import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata'
 import { PrintableReport } from '../components/print/PrintableReport'
 import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock'
+import { ReportErrorState, ReportLoadingState } from '../components/report'
 import { EMPTY_COPY, REPORT_LABELS } from '../config/presentation'
 import { term } from '../config/terminology'
 
 function TrialBalancePage() {
-  const { formatMoney, formatDateRange } = useFormatting()
+  const { formatMoney, formatDate } = useFormatting()
   const { currency_code, locale, timezone } = useLocalisation()
   const [data, setData] = useState<TrialBalanceRow[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -19,8 +20,7 @@ function TrialBalancePage() {
   const [error, setError] = useState<string | null>(null)
   
   const [filters, setFilters] = useState({
-    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Start of year
-    to: new Date().toISOString().split('T')[0], // Today
+    as_of: new Date().toISOString().split('T')[0], // Today
     project_id: '',
     currency_code: '',
   })
@@ -39,19 +39,18 @@ function TrialBalancePage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!filters.from || !filters.to) return
+      if (!filters.as_of) return
       
       try {
         setLoading(true)
         setError(null)
         
         const result = await apiClient.getTrialBalance({
-          from: filters.from,
-          to: filters.to,
+          as_of: filters.as_of,
           project_id: filters.project_id || undefined,
           currency_code: filters.currency_code || undefined,
-        })
-        setData(result)
+        }) as TrialBalanceResponse
+        setData(result.rows ?? [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch trial balance')
       } finally {
@@ -75,12 +74,11 @@ function TrialBalancePage() {
     const headers = ['account_code', 'account_name', 'account_type', 'currency_code', 'total_debit', 'total_credit', 'net']
     exportToCSV(rows, '', headers, {
       reportName: 'TrialBalance',
-      fromDate: filters.from,
-      toDate: filters.to,
+      asOfDate: filters.as_of,
       metadataRows: terravaBaseExportMetadataRows({
         reportExportName: 'Terrava Trial Balance',
         baseCurrency: currency_code,
-        period: { mode: 'range', from: filters.from, to: filters.to },
+        period: { mode: 'asOf', asOf: filters.as_of },
         locale,
         timezone,
       }),
@@ -112,36 +110,25 @@ function TrialBalancePage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              From Date
+              As of
             </label>
             <input
               type="date"
-              value={filters.from}
-              onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+              value={filters.as_of}
+              onChange={(e) => setFilters({ ...filters, as_of: e.target.value })}
               className="w-full border border-gray-300 rounded px-3 py-2"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              To Date
-            </label>
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Project
+              {term('fieldCycle')}
             </label>
             <select
               value={filters.project_id}
               onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
               className="w-full border border-gray-300 rounded px-3 py-2"
             >
-              <option value="">All Projects</option>
+              <option value="">{`All ${term('fieldCycles')}`}</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -166,11 +153,11 @@ function TrialBalancePage() {
       </div>
 
       <div className="no-print">
-        <ReportMetadataBlock reportingPeriodRange={formatDateRange(filters.from, filters.to)} />
+        <ReportMetadataBlock asOfDate={formatDate(filters.as_of)} />
       </div>
 
-      {loading && <div className="text-center py-8">Loading...</div>}
-      {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>}
+      {loading && <ReportLoadingState label="Loading trial balance..." className="no-print" />}
+      {error && <ReportErrorState error={error} className="no-print" />}
 
       {!loading && !error && (
         <>
@@ -207,7 +194,7 @@ function TrialBalancePage() {
                   {data.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                        {EMPTY_COPY.noDataForPeriod}
+                        No balances found for this date.
                       </td>
                     </tr>
                   ) : (
@@ -263,7 +250,7 @@ function TrialBalancePage() {
           {/* Print view */}
           <PrintableReport
             title={term('trialBalance')}
-            metaLeft={`${REPORT_LABELS.reportingPeriod}: ${formatDateRange(filters.from, filters.to)}`}
+            metaLeft={`${REPORT_LABELS.asOf}: ${formatDate(filters.as_of)}`}
           >
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
@@ -295,7 +282,7 @@ function TrialBalancePage() {
                 {data.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                      {EMPTY_COPY.noDataForPeriod}
+                      No balances found for this date.
                     </td>
                   </tr>
                 ) : (

@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { LabWorkLog } from '../../types';
+import { term } from '../../config/terminology';
 
 export default function WorkLogsPage() {
   const [status, setStatus] = useState('');
@@ -36,7 +37,7 @@ export default function WorkLogsPage() {
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'Worker', accessor: (r) => r.worker?.name || r.worker_id },
     { header: 'Work Date', accessor: (r) => formatDate(r.work_date) },
-    { header: 'Project', accessor: (r) => r.project?.name || r.project_id },
+    { header: term('fieldCycle'), accessor: (r) => r.project?.name || r.project_id },
     { header: 'Units', accessor: 'units' },
     { header: 'Rate', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.rate)}</span> },
     { header: 'Amount', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.amount)}</span> },
@@ -77,7 +78,7 @@ export default function WorkLogsPage() {
             {cropCycles?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="px-3 py-2 border rounded text-sm">
-            <option value="">All projects</option>
+            <option value="">{`All ${term('fieldCycles').toLowerCase()}`}</option>
             {projects?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border rounded text-sm" placeholder="From" />

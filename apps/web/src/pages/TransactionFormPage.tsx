@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useRole } from '../hooks/useRole';
 import toast from 'react-hot-toast';
 import type { CreateOperationalTransactionPayload, TransactionType, TransactionClassification } from '../types';
+import { term } from '../config/terminology';
 
 export default function TransactionFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -172,7 +173,7 @@ export default function TransactionFormPage() {
               disabled={!canEdit || isEdit}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
-              <option value="PROJECT">Project</option>
+              <option value="PROJECT">{term('fieldCycle')}</option>
               <option value="FARM_OVERHEAD">Farm Overhead</option>
             </select>
           </FormField>
@@ -198,7 +199,7 @@ export default function TransactionFormPage() {
             </FormField>
           ) : (
             <>
-              <FormField label="Project" required error={errors.project_id}>
+              <FormField label={term('fieldCycle')} required error={errors.project_id}>
                 <select
                   value={formData.project_id}
                   onChange={(e) => {
@@ -213,7 +214,7 @@ export default function TransactionFormPage() {
                   disabled={!canEdit}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
                 >
-                  <option value="">Select project</option>
+                  <option value="">{`Select ${term('fieldCycle').toLowerCase()}`}</option>
                   {projects?.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}

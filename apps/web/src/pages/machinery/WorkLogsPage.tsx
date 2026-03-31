@@ -16,6 +16,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLog } from '../../types';
+import { term } from '../../config/terminology';
 
 export default function WorkLogsPage() {
   const [searchParams] = useSearchParams();
@@ -57,7 +58,7 @@ export default function WorkLogsPage() {
     { header: 'Work Log No', accessor: 'work_log_no' },
     { header: 'Machine', accessor: (r) => r.machine?.name ?? r.machine_id },
     { header: 'Work Date', accessor: (r) => (r.work_date ? formatDate(r.work_date) : '—') },
-    { header: 'Project', accessor: (r) => r.project?.name ?? r.project_id },
+    { header: term('fieldCycle'), accessor: (r) => r.project?.name ?? r.project_id },
     { header: 'Usage', accessor: (r) => (r.usage_qty != null ? String(r.usage_qty) : '—') },
     {
       header: 'Total',

@@ -17,6 +17,9 @@ export type TermKey =
   | 'arAgeing'
   | 'profitAndLoss'
   | 'balanceSheet'
+  // Project-like record (UI only; domain entity remains Project)
+  | 'fieldCycle'
+  | 'fieldCycles'
   | 'confirmPost'
   | 'confirmReverse'
   // Inventory (farm-first)
@@ -83,6 +86,8 @@ export const TERMS: Record<TermKey, { farm: string; accounting: string }> = {
   arAgeing: { farm: 'Overdue Customers', accounting: 'AR Ageing' },
   profitAndLoss: { farm: 'Farm Profit', accounting: 'Profit & Loss' },
   balanceSheet: { farm: 'Farm Position', accounting: 'Balance Sheet' },
+  fieldCycle: { farm: 'Field Cycle', accounting: 'Project' },
+  fieldCycles: { farm: 'Field Cycles', accounting: 'Projects' },
   confirmPost: { farm: 'Confirm Post to Accounts', accounting: 'Confirm Post' },
   confirmReverse: { farm: 'Confirm Reverse Posting', accounting: 'Confirm Reverse' },
   grn: { farm: 'Supplies Received', accounting: 'GRNs' },
@@ -116,7 +121,8 @@ export const TERMS: Record<TermKey, { farm: string; accounting: string }> = {
   navDomainFinance: { farm: 'Finance', accounting: 'Finance' },
   navDomainGovernance: { farm: 'Governance', accounting: 'Governance' },
   navDomainSettings: { farm: 'Settings', accounting: 'Settings' },
-  navFields: { farm: 'Fields', accounting: 'Projects' },
+  // `/app/projects` is a field-season record, not a physical land unit.
+  navFields: { farm: 'Field Cycles', accounting: 'Projects' },
   navWork: { farm: 'Work', accounting: 'Crop Ops' },
   navPayReceive: { farm: 'Pay & Receive', accounting: 'Payments' },
   todayOnFarm: { farm: 'Today on the farm', accounting: 'Today' },

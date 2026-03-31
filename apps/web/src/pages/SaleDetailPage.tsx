@@ -206,7 +206,7 @@ export default function SaleDetailPage() {
           </div>
           {sale.project && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Project</dt>
+              <dt className="text-sm font-medium text-gray-500">{term('fieldCycle')}</dt>
               <dd className="text-sm text-gray-900">{sale.project.name}</dd>
             </div>
           )}

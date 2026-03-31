@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@farm-erp/shared';
-import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DataTable, type Column } from '../components/DataTable';
 import { useFormatting } from '../hooks/useFormatting';
 import type { ARAgeingReport } from '../types';
 import { term } from '../config/terminology';
+import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock';
+import { ReportEmptyStateCard, ReportErrorState, ReportLoadingState } from '../components/report';
 
 export default function ARAgeingPage() {
   const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const { formatMoney, formatDate } = useFormatting();
 
-  const { data: report, isLoading } = useQuery<ARAgeingReport>({
+  const { data: report, isLoading, error } = useQuery<ARAgeingReport>({
     queryKey: ['ar-ageing', asOfDate],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -32,14 +33,6 @@ export default function ARAgeingPage() {
     { header: '90+ Days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_90_plus)}</span> },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
   return (
     <div>
       <div className="mb-6">
@@ -51,7 +44,7 @@ export default function ARAgeingPage() {
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="flex items-center space-x-4 mb-4">
-          <label className="text-sm font-medium text-gray-700">As Of Date:</label>
+          <label className="text-sm font-medium text-gray-700">As of</label>
           <input
             type="date"
             value={asOfDate}
@@ -61,7 +54,14 @@ export default function ARAgeingPage() {
         </div>
       </div>
 
-      {report && (
+      <div className="no-print mb-6">
+        <ReportMetadataBlock asOfDate={formatDate(asOfDate)} />
+      </div>
+
+      {isLoading && <ReportLoadingState label={`Loading ${term('arAgeing').toLowerCase()}...`} className="no-print" />}
+      {error && <ReportErrorState error={error} className="no-print" />}
+
+      {!isLoading && !error && report && (
         <div className="bg-white rounded-lg shadow">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">
@@ -99,7 +99,7 @@ export default function ARAgeingPage() {
                 </div>
               </>
             ) : (
-              <p className="text-gray-500">No outstanding receivables as of {formatDate(report.as_of)}</p>
+              <ReportEmptyStateCard message={`No outstanding receivables found for this date.`} className="shadow-none p-0 bg-transparent" />
             )}
           </div>
         </div>

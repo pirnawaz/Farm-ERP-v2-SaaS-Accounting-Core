@@ -1764,12 +1764,28 @@ export interface BalanceSheetCompare {
 }
 
 export interface BalanceSheetResponse {
-  as_of: string;
-  assets: BalanceSheetSection;
-  liabilities: BalanceSheetSection;
-  equity: BalanceSheetSection;
-  checks: { equation_diff: number };
+  /**
+   * Legacy web shape (kept optional for backward compatibility).
+   */
+  as_of?: string;
+  assets?: BalanceSheetSection;
+  liabilities?: BalanceSheetSection;
+  equity?: BalanceSheetSection;
+  checks?: { equation_diff?: number };
   compare?: BalanceSheetCompare;
+
+  /**
+   * Current backend/controller shape (ReportController::balanceSheet + BalanceSheetService).
+   */
+  meta?: { tenant_id: string; as_of: string; filters: Record<string, unknown> };
+  sections?: { assets?: unknown[]; liabilities?: unknown[]; equity?: unknown[] };
+  totals?: {
+    assets_total: number;
+    liabilities_total: number;
+    equity_total: number;
+    liabilities_plus_equity_total: number;
+    balanced: boolean;
+  };
 }
 
 // Crop Profitability report

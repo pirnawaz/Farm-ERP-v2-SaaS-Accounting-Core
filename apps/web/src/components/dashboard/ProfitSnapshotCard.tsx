@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { DashboardProfit } from '@farm-erp/shared';
+import { term } from '../../config/terminology';
 
 interface ProfitSnapshotCardProps {
   profit: DashboardProfit;
@@ -25,7 +26,7 @@ export function ProfitSnapshotCard({ profit }: ProfitSnapshotCardProps) {
         </div>
         {profit.best_project && (
           <div className="mt-3 pt-3 border-t border-gray-100">
-            <dt className="text-gray-500 text-xs">Best project</dt>
+            <dt className="text-gray-500 text-xs">Best {term('fieldCycle').toLowerCase()}</dt>
             <dd className="font-semibold text-gray-900">
               <Link to={`/app/projects/${profit.best_project.project_id}`} className="text-[#1F6F5C] hover:underline">
                 {profit.best_project.name}

@@ -257,20 +257,20 @@ export default function HarvestFormPage() {
               {cropCycles?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Project *" error={errors.project_id}>
+          <FormField label={`${term('fieldCycle')} *`} error={errors.project_id}>
             <select
               value={project_id}
               onChange={(e) => setProjectId(e.target.value)}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C] disabled:bg-gray-50"
               disabled={!crop_cycle_id}
             >
-              <option value="">Select project</option>
+              <option value="">{`Select ${term('fieldCycle').toLowerCase()}`}</option>
               {(projectsForCrop ?? []).map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
             {crop_cycle_id && !(projectsForCrop?.length) && (
-              <p className="text-sm text-gray-500 mt-1">No projects in this crop cycle. Create one first.</p>
+              <p className="text-sm text-gray-500 mt-1">No {term('fieldCycles').toLowerCase()} in this crop cycle. Create one first.</p>
             )}
           </FormField>
           <FormField label="Production Unit (optional)">
