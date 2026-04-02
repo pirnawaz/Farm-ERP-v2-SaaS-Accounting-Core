@@ -14,7 +14,7 @@ import { getModuleLabel } from '../config/moduleKeys';
 import { CAPABILITIES, can as canPermission } from '../config/permissions';
 import { useRole } from '../hooks/useRole';
 import { useModules } from '../contexts/ModulesContext';
-import { useTenantAddonModulesQuery } from '../hooks/useModules';
+import { useOrchardLivestockAddonsEnabled } from '../hooks/useModules';
 
 const VITE_DEBUG_NAV = import.meta.env.VITE_DEBUG_NAV === 'true' || import.meta.env.VITE_DEBUG_NAV === '1';
 const VITE_DEBUG_MODULES = import.meta.env.VITE_DEBUG_MODULES === 'true' || import.meta.env.VITE_DEBUG_MODULES === '1';
@@ -46,11 +46,7 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
   const navigate = useNavigate();
   const { can, userRole } = useRole();
   const { isModuleEnabled, loading: modulesLoading } = useModules();
-  const { data: addonData, status: addonStatus } = useTenantAddonModulesQuery();
-  const envOrchards = import.meta.env.VITE_ENABLE_ORCHARDS === 'true';
-  const envLivestock = import.meta.env.VITE_ENABLE_LIVESTOCK === 'true';
-  const showOrchards = envOrchards || (addonStatus === 'success' && addonData?.modules?.orchards === true);
-  const showLivestock = envLivestock || (addonStatus === 'success' && addonData?.modules?.livestock === true);
+  const { showOrchards, showLivestock } = useOrchardLivestockAddonsEnabled();
 
   const navDomains = useMemo(() => getNavDomains(term, showOrchards, showLivestock), [showOrchards, showLivestock]);
   const rolePrunedDomains = useMemo(() => pruneDomainsForRole(navDomains, userRole), [navDomains, userRole]);

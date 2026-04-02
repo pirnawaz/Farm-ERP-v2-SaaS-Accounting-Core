@@ -1,6 +1,23 @@
 import { apiClient } from '@farm-erp/shared';
 import type { LandlordStatementResponse } from '@farm-erp/shared';
-import type { TrialBalanceRow, GeneralLedgerResponse, ProjectStatement, PartyLedgerResponse, PartySummaryResponse, RoleAgeingResponse, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy, ProductionUnitSummaryResponse, LivestockUnitStatusResponse } from '../types';
+import type {
+  TrialBalanceRow,
+  GeneralLedgerResponse,
+  ProjectStatement,
+  PartyLedgerResponse,
+  PartySummaryResponse,
+  RoleAgeingResponse,
+  ProfitLossResponse,
+  BalanceSheetResponse,
+  CropProfitabilityResponse,
+  CropProfitabilityGroupBy,
+  CropProfitabilityTrendResponse,
+  CropProfitabilityTrendGroupBy,
+  ProductionUnitSummaryResponse,
+  LivestockUnitStatusResponse,
+  ProductionUnitsProfitabilityResponse,
+  ProductionUnitCategoryFilter,
+} from '../types';
 
 export const reportsApi = {
   trialBalance: (params: { as_of: string; project_id?: string; crop_cycle_id?: string; currency_code?: string }) => {
@@ -164,5 +181,13 @@ export const reportsApi = {
     query.append('production_unit_id', params.production_unit_id);
     query.append('as_of', params.as_of);
     return apiClient.get<LivestockUnitStatusResponse>(`/api/reports/livestock-unit-status?${query.toString()}`);
+  },
+
+  productionUnitsProfitability: (params: { from: string; to: string; category?: ProductionUnitCategoryFilter }) => {
+    const query = new URLSearchParams();
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.category) query.append('category', params.category);
+    return apiClient.get<ProductionUnitsProfitabilityResponse>(`/api/reports/production-units-profitability?${query.toString()}`);
   },
 };

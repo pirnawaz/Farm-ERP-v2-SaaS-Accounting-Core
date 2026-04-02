@@ -5,6 +5,7 @@ import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import { PageHeader } from '../components/PageHeader';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageContainer } from '../components/PageContainer';
 import type { OperationalTransaction } from '../types';
 
 export default function ReviewQueuePage() {
@@ -17,12 +18,12 @@ export default function ReviewQueuePage() {
   const canAccess = hasRole('tenant_admin') || hasRole('accountant');
   if (!canAccess) {
     return (
-      <div className="max-w-2xl mx-auto p-4">
+      <PageContainer className="p-4">
         <p className="text-gray-600">You don’t have access to the review queue.</p>
         <Link to="/app/dashboard" className="text-[#1F6F5C] hover:underline mt-2 inline-block">
           Back to dashboard
         </Link>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -56,7 +57,7 @@ export default function ReviewQueuePage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Review Queue"
         backTo="/app/farm-pulse"
@@ -130,6 +131,6 @@ export default function ReviewQueuePage() {
           </div>
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

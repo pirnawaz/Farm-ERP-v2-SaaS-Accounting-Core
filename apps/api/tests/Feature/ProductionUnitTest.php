@@ -261,4 +261,59 @@ class ProductionUnitTest extends TestCase
         $this->assertSame('ORCHARD', $data[0]['category']);
         $this->assertSame('Phalsa', $data[0]['orchard_crop']);
     }
+
+    public function test_orchard_fields_require_orchard_category(): void
+    {
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->postJson('/api/production-units', [
+                'name' => 'Bad Orchard Unit',
+                'type' => 'LONG_CYCLE',
+                'start_date' => '2020-01-01',
+                // category intentionally omitted
+                'orchard_crop' => 'Mango',
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_livestock_fields_require_livestock_category(): void
+    {
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->postJson('/api/production-units', [
+                'name' => 'Bad Livestock Unit',
+                'type' => 'LONG_CYCLE',
+                'start_date' => '2024-01-01',
+                // category intentionally omitted
+                'livestock_type' => 'GOAT',
+                'herd_start_count' => 10,
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_orchard_category_requires_long_cycle_type_on_create(): void
+    {
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->postJson('/api/production-units', [
+                'name' => 'Orchard Wrong Type',
+                'type' => 'SEASONAL',
+                'start_date' => '2020-01-01',
+                'category' => 'ORCHARD',
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_livestock_category_requires_long_cycle_type_on_create(): void
+    {
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->postJson('/api/production-units', [
+                'name' => 'Livestock Wrong Type',
+                'type' => 'SEASONAL',
+                'start_date' => '2024-01-01',
+                'category' => 'LIVESTOCK',
+            ]);
+
+        $response->assertStatus(422);
+    }
 }

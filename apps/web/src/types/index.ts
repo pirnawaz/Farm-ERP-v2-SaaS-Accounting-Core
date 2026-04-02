@@ -319,6 +319,26 @@ export interface LivestockUnitStatusResponse {
   last_30_days_by_type: Record<string, number>;
 }
 
+// Production unit profitability (cross-cycle operational analytics)
+export type ProductionUnitCategoryFilter = 'ORCHARD' | 'LIVESTOCK' | 'OTHER';
+
+export interface ProductionUnitProfitabilityRow {
+  production_unit_id: string;
+  production_unit_name: string;
+  production_unit_category: string | null;
+  cost: string;
+  revenue: string;
+  margin: string;
+}
+
+export interface ProductionUnitsProfitabilityResponse {
+  from: string;
+  to: string;
+  category: ProductionUnitCategoryFilter | null;
+  rows: ProductionUnitProfitabilityRow[];
+  totals: { cost: string; revenue: string; margin: string };
+}
+
 // Land Allocation
 // Rotation warning (crop rotation on same parcel)
 export interface RotationWarning {

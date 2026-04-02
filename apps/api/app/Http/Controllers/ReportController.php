@@ -2749,7 +2749,7 @@ class ReportController extends Controller
         $includeUnassigned = filter_var($request->input('include_unassigned'), FILTER_VALIDATE_BOOLEAN);
         $productionUnitId = $request->input('production_unit_id');
         if ($productionUnitId && !\App\Models\ProductionUnit::where('id', $productionUnitId)->where('tenant_id', $tenantId)->exists()) {
-            return response()->json(['errors' => ['production_unit_id' => ['Production unit not found or access denied.']]], 422);
+            return response()->json(['errors' => ['production_unit_id' => ['Unit not found or access denied.']]], 422);
         }
 
         $cycleRows = $this->buildCycleFinancials($tenantId, $from, $to, $includeUnassigned, $productionUnitId);
@@ -2818,7 +2818,7 @@ class ReportController extends Controller
 
         $productionUnitId = $request->input('production_unit_id');
         if (!\App\Models\ProductionUnit::where('id', $productionUnitId)->where('tenant_id', $tenantId)->exists()) {
-            return response()->json(['errors' => ['production_unit_id' => ['Production unit not found or access denied.']]], 422);
+            return response()->json(['errors' => ['production_unit_id' => ['Unit not found or access denied.']]], 422);
         }
 
         $from = $request->input('from');
@@ -2845,6 +2845,117 @@ class ReportController extends Controller
     }
 
     /**
+     * GET /api/reports/production-units-profitability
+     * Operational analytics: unit-level profitability over a date range (cross-cycle).
+     *
+     * This is NOT an accounting boundary. It summarizes posting groups that originate from
+     * operational records tagged with a production_unit_id (orchards, livestock, long-cycle units).
+     *
+     * Optional category filter:
+     * - ORCHARD | LIVESTOCK | OTHER
+     */
+    public function productionUnitsProfitability(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'category' => ['nullable', 'string', 'in:ORCHARD,LIVESTOCK,OTHER'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $category = $request->input('category');
+
+        $base = fn (string $table) => DB::table($table)
+            ->select('posting_group_id', 'production_unit_id')
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('posting_group_id')
+            ->whereNotNull('production_unit_id');
+
+        $taggedPostingGroups = $base('crop_activities')
+            ->unionAll($base('lab_work_logs'))
+            ->unionAll($base('inv_issues'))
+            ->unionAll($base('harvests'))
+            ->unionAll($base('sales'));
+
+        $distinctTagged = DB::query()
+            ->fromSub($taggedPostingGroups, 't')
+            ->select('t.posting_group_id', 't.production_unit_id')
+            ->distinct();
+
+        $query = DB::query()
+            ->fromSub($distinctTagged, 'm')
+            ->join('posting_groups', 'posting_groups.id', '=', 'm.posting_group_id')
+            ->join('ledger_entries as le', 'le.posting_group_id', '=', 'posting_groups.id')
+            ->join('accounts as a', 'a.id', '=', 'le.account_id')
+            ->join('production_units as pu', 'pu.id', '=', 'm.production_unit_id')
+            ->whereBetween('posting_groups.posting_date', [$from, $to])
+            ->selectRaw("
+                m.production_unit_id as production_unit_id,
+                pu.name as production_unit_name,
+                pu.category as production_unit_category,
+                SUM(CASE WHEN a.type = 'expense' THEN (le.debit_amount - le.credit_amount) ELSE 0 END) as cost,
+                SUM(CASE WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount) ELSE 0 END) as revenue
+            ")
+            ->groupBy('m.production_unit_id', 'pu.name', 'pu.category');
+
+        ReportingQuery::applyTenant($query, $tenantId);
+        ReportingQuery::applyExcludeReversals($query);
+
+        if ($category === \App\Models\ProductionUnit::CATEGORY_ORCHARD) {
+            $query->where('pu.category', \App\Models\ProductionUnit::CATEGORY_ORCHARD);
+        } elseif ($category === \App\Models\ProductionUnit::CATEGORY_LIVESTOCK) {
+            $query->where('pu.category', \App\Models\ProductionUnit::CATEGORY_LIVESTOCK);
+        } elseif ($category === 'OTHER') {
+            $query->where(function ($q) {
+                $q->whereNull('pu.category')
+                    ->orWhereNotIn('pu.category', [
+                        \App\Models\ProductionUnit::CATEGORY_ORCHARD,
+                        \App\Models\ProductionUnit::CATEGORY_LIVESTOCK,
+                    ]);
+            });
+        }
+
+        $rows = $query
+            ->get()
+            ->map(function ($r) {
+                $cost = (float) ($r->cost ?? 0);
+                $revenue = (float) ($r->revenue ?? 0);
+                $margin = $revenue - $cost;
+                return [
+                    'production_unit_id' => $r->production_unit_id,
+                    'production_unit_name' => $r->production_unit_name,
+                    'production_unit_category' => $r->production_unit_category,
+                    'cost' => number_format($cost, 2, '.', ''),
+                    'revenue' => number_format($revenue, 2, '.', ''),
+                    'margin' => number_format($margin, 2, '.', ''),
+                ];
+            })
+            ->sortBy(fn ($r) => strtolower((string) ($r['production_unit_name'] ?? '')))
+            ->values()
+            ->all();
+
+        $totals = [
+            'cost' => number_format(array_sum(array_map(fn ($r) => (float) $r['cost'], $rows)), 2, '.', ''),
+            'revenue' => number_format(array_sum(array_map(fn ($r) => (float) $r['revenue'], $rows)), 2, '.', ''),
+            'margin' => number_format(array_sum(array_map(fn ($r) => (float) $r['margin'], $rows)), 2, '.', ''),
+        ];
+
+        return response()->json([
+            'from' => $from,
+            'to' => $to,
+            'category' => $category,
+            'rows' => $rows,
+            'totals' => $totals,
+        ]);
+    }
+
+    /**
      * GET /api/reports/livestock-unit-status
      * Headcount as of date and optional last 30 days event summary.
      */
@@ -2867,7 +2978,7 @@ class ReportController extends Controller
             ->where('tenant_id', $tenantId)
             ->first();
         if (!$unit || $unit->category !== \App\Models\ProductionUnit::CATEGORY_LIVESTOCK) {
-            return response()->json(['errors' => ['production_unit_id' => ['Production unit not found or is not a livestock unit.']]], 422);
+            return response()->json(['errors' => ['production_unit_id' => ['Unit not found or is not a livestock unit.']]], 422);
         }
 
         $herdStart = (int) ($unit->herd_start_count ?? 0);

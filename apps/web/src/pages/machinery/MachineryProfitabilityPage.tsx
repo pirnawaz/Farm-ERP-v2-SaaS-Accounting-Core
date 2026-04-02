@@ -8,6 +8,8 @@ import { Modal } from '../../components/Modal';
 import type { MachineryProfitabilityRow, MachineryChargesByMachineRow, MachineryCostsByMachineRow } from '../../types';
 import { machineryApi } from '../../api/machinery';
 import { useQuery } from '@tanstack/react-query';
+import { ReportEmptyStateCard } from '../../components/report/ReportStates';
+import { EMPTY_COPY } from '../../config/presentation';
 
 export default function MachineryProfitabilityPage() {
   const { formatMoney } = useFormatting();
@@ -253,7 +255,7 @@ export default function MachineryProfitabilityPage() {
               )}
             </>
           ) : (
-            <p className="text-gray-500">No data found for the selected date range</p>
+            <ReportEmptyStateCard message={EMPTY_COPY.noDataForPeriod} className="shadow-none border border-gray-100" />
           )}
         </div>
       </div>

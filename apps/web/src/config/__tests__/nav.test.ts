@@ -58,6 +58,22 @@ describe('getNavDomains', () => {
     expect(paths.has('/app/admin/audit-logs')).toBe(true);
     expect(paths.has('/app/settings/localisation')).toBe(true);
   });
+
+  it('omits Orchard & Livestock performance report when addons disabled', () => {
+    const domains = getNavDomains(term, false, false);
+    const fin = domains.find((d) => d.domainKey === 'finance')!;
+    const analysis = fin.sections.find((s) => s.sectionKey === 'fin-analysis')!;
+    const keys = analysis.items.map((i) => i.key);
+    expect(keys).not.toContain('production-units-profitability');
+  });
+
+  it('includes Orchard & Livestock performance report when any addon enabled', () => {
+    const domains = getNavDomains(term, true, false);
+    const fin = domains.find((d) => d.domainKey === 'finance')!;
+    const analysis = fin.sections.find((s) => s.sectionKey === 'fin-analysis')!;
+    const keys = analysis.items.map((i) => i.key);
+    expect(keys).toContain('production-units-profitability');
+  });
 });
 
 describe('filterDomainsByPermission', () => {

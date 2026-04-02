@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateSaleRequest extends FormRequest
 {
@@ -13,11 +14,19 @@ class UpdateSaleRequest extends FormRequest
 
     public function rules(): array
     {
+        $tenantId = $this->header('X-Tenant-Id');
+
         return [
             'buyer_party_id' => ['sometimes', 'required', 'uuid', 'exists:parties,id'],
             'project_id' => ['nullable', 'uuid', 'exists:projects,id'],
             'crop_cycle_id' => ['nullable', 'uuid', 'exists:crop_cycles,id'],
-            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
+            'production_unit_id' => [
+                'nullable',
+                'uuid',
+                $tenantId
+                    ? Rule::exists('production_units', 'id')->where('tenant_id', $tenantId)
+                    : 'exists:production_units,id',
+            ],
             'amount' => ['sometimes', 'required', 'numeric', 'min:0.01'],
             'posting_date' => ['sometimes', 'required', 'date', 'date_format:Y-m-d'],
             'sale_no' => ['nullable', 'string', 'max:255'],

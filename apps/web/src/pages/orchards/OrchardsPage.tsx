@@ -5,6 +5,8 @@ import { PageHeader } from '../../components/PageHeader';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { Badge } from '../../components/Badge';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import toast from 'react-hot-toast';
 import type { ProductionUnit, CreateProductionUnitPayload } from '../../types';
 
@@ -27,6 +29,7 @@ const initialOrchardForm: OrchardFormState = {
 };
 
 export default function OrchardsPage() {
+  const { showOrchards } = useOrchardLivestockAddonsEnabled();
   const { data: orchardUnits, isLoading } = useProductionUnits({ category: 'ORCHARD' });
   const createMutation = useCreateProductionUnit();
   const [showNewModal, setShowNewModal] = useState(false);
@@ -62,6 +65,24 @@ export default function OrchardsPage() {
 
   const orchards = orchardUnits ?? [];
 
+  if (!showOrchards) {
+    return (
+      <div className="space-y-6" data-testid="orchards-page">
+        <PageHeader
+          title="Orchards"
+          backTo="/app/dashboard"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Orchards' },
+          ]}
+        />
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          Orchards module is not enabled for this tenant.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" data-testid="orchards-page">
       <PageHeader
@@ -82,7 +103,9 @@ export default function OrchardsPage() {
           </button>
         }
       />
-      <p className="text-gray-600">Orchard production units: track costs, revenue and activities by orchard.</p>
+      <p className="text-gray-600">
+        Orchards are long-lived operational units. Track costs and revenue by tagging work, harvests and sales to an orchard (optional for seasonal crops).
+      </p>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -113,13 +136,9 @@ export default function OrchardsPage() {
                 )}
               </div>
               <div className="mt-1">
-                <span
-                  className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    unit.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                  }`}
-                >
+                <Badge variant={unit.status === 'ACTIVE' ? 'success' : 'neutral'}>
                   {unit.status}
-                </span>
+                </Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link

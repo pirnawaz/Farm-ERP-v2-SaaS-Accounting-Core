@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { term } from '../../config/terminology';
+import { Badge } from '../../components/Badge';
 import type { CropActivity } from '../../types';
 
 export default function ActivitiesPage() {
@@ -53,14 +54,9 @@ export default function ActivitiesPage() {
     {
       header: 'Status',
       accessor: (r) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            r.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-            r.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-          }`}
-        >
+        <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
           {r.status}
-        </span>
+        </Badge>
       ),
     },
   ];

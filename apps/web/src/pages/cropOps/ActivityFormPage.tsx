@@ -7,10 +7,13 @@ import { useProjects } from '../../hooks/useProjects';
 import { useLandParcels } from '../../hooks/useLandParcels';
 import { useWorkers } from '../../hooks/useLabour';
 import { useInventoryStores, useInventoryItems, useStockOnHand } from '../../hooks/useInventory';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import { useTenant } from '../../hooks/useTenant';
 import { useFormAutosave } from '../../hooks/useFormAutosave';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { PageContainer } from '../../components/PageContainer';
+import { FormCard } from '../../components/FormLayout';
 import { useFormatting } from '../../hooks/useFormatting';
 import {
   generateDocNo,
@@ -53,6 +56,7 @@ export default function ActivityFormPage() {
   const { data: items } = useInventoryItems(true);
   const { data: stock } = useStockOnHand({});
   const { formatMoney } = useFormatting();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
 
   const [doc_no, setDocNo] = useState('');
   const [activity_type_id, setActivityTypeId] = useState('');
@@ -89,6 +93,10 @@ export default function ActivityFormPage() {
   }, [crop_cycle_id]);
   useEffect(() => {
     if (!productionUnits?.length) return;
+    if (!hasOrchardLivestockModule) {
+      setProductionUnitId('');
+      return;
+    }
     const fromUrl = searchParams.get('production_unit_id');
     if (fromUrl && productionUnits.some((u) => u.id === fromUrl)) {
       setProductionUnitId(fromUrl);
@@ -96,10 +104,11 @@ export default function ActivityFormPage() {
     }
     const stored = getStored<string>(formStorageKeys.last_production_unit_id);
     if (stored && productionUnits.some((u) => u.id === stored) && !production_unit_id) setProductionUnitId(stored);
-  }, [productionUnits, searchParams]);
+  }, [productionUnits, searchParams, hasOrchardLivestockModule]);
   useEffect(() => {
+    if (!hasOrchardLivestockModule) return;
     if (production_unit_id) setStored(formStorageKeys.last_production_unit_id, production_unit_id);
-  }, [production_unit_id]);
+  }, [production_unit_id, hasOrchardLivestockModule]);
   useEffect(() => {
     if (land_parcel_id) setStored(formStorageKeys.last_land_parcel_id, land_parcel_id);
   }, [land_parcel_id]);
@@ -253,7 +262,7 @@ export default function ActivityFormPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <PageContainer width="form" className="space-y-6">
       <PageHeader
         title={term('newActivity')}
         backTo="/app/crop-ops/activities"
@@ -278,7 +287,7 @@ export default function ActivityFormPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6">
+      <FormCard>
         {hasLast && (
           <div className="flex justify-end">
             <button
@@ -369,18 +378,23 @@ export default function ActivityFormPage() {
                 ))}
               </select>
             </FormField>
-            <FormField label="Production Unit (optional)">
-              <select
-                value={production_unit_id}
-                onChange={(e) => setProductionUnitId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
-              >
-                <option value="">None</option>
-                {(productionUnits ?? []).map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-            </FormField>
+            {hasOrchardLivestockModule ? (
+              <FormField label="Orchard / Livestock / Long-cycle unit (optional)">
+                <select
+                  value={production_unit_id}
+                  onChange={(e) => setProductionUnitId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
+                >
+                  <option value="">None</option>
+                  {(productionUnits ?? []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional. Use this when you want to attribute work to an Orchard or Livestock unit. Seasonal workflows usually leave this blank.
+                </p>
+              </FormField>
+            ) : null}
           </div>
         </section>
 
@@ -535,7 +549,7 @@ export default function ActivityFormPage() {
             {createM.isPending ? 'Creating...' : 'Create'}
           </button>
         </div>
-      </div>
-    </div>
+      </FormCard>
+    </PageContainer>
   );
 }

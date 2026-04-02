@@ -5,6 +5,8 @@ import { PageHeader } from '../../components/PageHeader';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { Badge } from '../../components/Badge';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import toast from 'react-hot-toast';
 import type { ProductionUnit, CreateProductionUnitPayload } from '../../types';
 
@@ -22,6 +24,7 @@ const initialLivestockForm: LivestockFormState = {
 };
 
 export default function LivestockPage() {
+  const { showLivestock } = useOrchardLivestockAddonsEnabled();
   const { data: livestockUnits, isLoading } = useProductionUnits({ category: 'LIVESTOCK' });
   const createMutation = useCreateProductionUnit();
   const [showNewModal, setShowNewModal] = useState(false);
@@ -55,6 +58,24 @@ export default function LivestockPage() {
 
   const units = livestockUnits ?? [];
 
+  if (!showLivestock) {
+    return (
+      <div className="space-y-6" data-testid="livestock-page">
+        <PageHeader
+          title="Livestock"
+          backTo="/app/dashboard"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Livestock' },
+          ]}
+        />
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          Livestock module is not enabled for this tenant.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" data-testid="livestock-page">
       <PageHeader
@@ -75,7 +96,9 @@ export default function LivestockPage() {
           </button>
         }
       />
-      <p className="text-gray-600">Livestock production units: track herd events, costs and revenue.</p>
+      <p className="text-gray-600">
+        Livestock units are long-lived operational units. Track herd events here, and optionally tag expenses, issues and sales to a livestock unit.
+      </p>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -100,13 +123,9 @@ export default function LivestockPage() {
                 )}
               </div>
               <div className="mt-1">
-                <span
-                  className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    unit.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                  }`}
-                >
+                <Badge variant={unit.status === 'ACTIVE' ? 'success' : 'neutral'}>
                   {unit.status}
-                </span>
+                </Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link to={`/app/livestock/${unit.id}`} className="text-sm text-[#1F6F5C] font-medium hover:underline">

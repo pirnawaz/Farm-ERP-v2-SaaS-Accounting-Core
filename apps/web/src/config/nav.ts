@@ -105,7 +105,6 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'fields',
     'land',
     'crop-cycles',
-    'production-units',
     'allocations',
     'land-leases',
     'orchards',
@@ -272,6 +271,7 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
   const USERS = CAPABILITIES.TENANT_USERS_MANAGE;
   const ROLES = CAPABILITIES.TENANT_ROLES_ASSIGN;
   const MODULES = CAPABILITIES.TENANT_MODULES_MANAGE;
+  const hasOrchardLivestockAddons = showOrchards || showLivestock;
 
   const machineryItems: NavItem[] = [
     { key: 'machinery-machines', label: 'Machines', to: '/app/machinery/machines', requiredPermission: VIEW, requiredModules: ['machinery'] },
@@ -287,11 +287,11 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
     { key: 'fields', label: term('navFields'), to: '/app/projects', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
     { key: 'land', label: 'Land Parcels', to: '/app/land', requiredPermission: VIEW, requiredModules: ['land'] },
     { key: 'crop-cycles', label: 'Crop Cycles', to: '/app/crop-cycles', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
-    { key: 'production-units', label: 'Production Units', to: '/app/production-units', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
     { key: 'allocations', label: 'Land Allocation', to: '/app/allocations', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
     { key: 'land-leases', label: 'Land Leases (Maqada)', to: '/app/land-leases', requiredPermission: MODULES, requiredModules: ['land_leases'] },
     ...(showOrchards ? [{ key: 'orchards', label: 'Orchards', to: '/app/orchards', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] } as NavItem] : []),
     ...(showLivestock ? [{ key: 'livestock', label: 'Livestock', to: '/app/livestock', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] } as NavItem] : []),
+    { key: 'production-units', label: 'Production Units (Advanced)', to: '/app/production-units', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
   ];
 
   const workAndHarvest: NavItem[] = [
@@ -360,7 +360,20 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
         {
           sectionKey: 'fin-analysis',
           sectionTitle: 'Analysis',
-          items: financeSectionItems(term, VIEW).analysis,
+          items: [
+            ...financeSectionItems(term, VIEW).analysis,
+            ...(hasOrchardLivestockAddons
+              ? [
+                  {
+                    key: 'production-units-profitability',
+                    label: 'Orchard & Livestock performance',
+                    to: '/app/reports/production-units-profitability',
+                    requiredPermission: VIEW,
+                    requiredModules: ['projects_crop_cycles'],
+                  } as NavItem,
+                ]
+              : []),
+          ],
         },
         {
           sectionKey: 'fin-receivables',

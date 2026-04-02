@@ -1,23 +1,47 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useProductionUnit } from '../../hooks/useProductionUnits';
 import { useProductionUnitSummary } from '../../hooks/useReports';
 import { useQuery } from '@tanstack/react-query';
 import { harvestsApi } from '../../api/harvests';
 import { salesApi } from '../../api/sales';
 import { PageHeader } from '../../components/PageHeader';
+import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { KpiCard, KpiGrid } from '../../components/KpiCard';
 import { useFormatting } from '../../hooks/useFormatting';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import type { Harvest, Sale } from '../../types';
 
 const currentYear = new Date().getFullYear();
 
 export default function OrchardDetailPage() {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
+  const { showOrchards } = useOrchardLivestockAddonsEnabled();
   const yearParam = searchParams.get('year');
   const [year, setYear] = useState(() => (yearParam ? parseInt(yearParam, 10) : currentYear));
   const { formatMoney } = useFormatting();
+
+  if (!showOrchards) {
+    return (
+      <div className="space-y-6" data-testid="orchard-detail-page">
+        <PageHeader
+          title="Orchard"
+          backTo="/app/dashboard"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Orchards', to: '/app/orchards' },
+            { label: 'Orchard' },
+          ]}
+        />
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          Orchards module is not enabled for this tenant.
+        </div>
+      </div>
+    );
+  }
 
   const { data: unit, isLoading: unitLoading } = useProductionUnit(id || '');
   const from = `${year}-01-01`;
@@ -55,11 +79,12 @@ export default function OrchardDetailPage() {
 
   if (!unit) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <p className="text-gray-600">Orchard unit not found.</p>
-        <Link to="/app/orchards" className="text-[#1F6F5C] font-medium hover:underline mt-2 inline-block">
-          Back to Orchards
-        </Link>
+      <div>
+        <EmptyState
+          title="Orchard not found"
+          description="This orchard may have been deleted, or you may not have access."
+          action={{ label: 'Back to Orchards', onClick: () => navigate('/app/orchards') }}
+        />
       </div>
     );
   }
@@ -109,20 +134,11 @@ export default function OrchardDetailPage() {
             <LoadingSpinner />
           </div>
         ) : summary ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm font-medium text-gray-500">Cost</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{formatMoney(parseFloat(summary.cost))}</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm font-medium text-gray-500">Revenue</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{formatMoney(parseFloat(summary.revenue))}</p>
-            </div>
-            <div className="rounded-xl border-2 border-[#1F6F5C]/20 bg-[#1F6F5C]/5 p-4">
-              <p className="text-sm font-medium text-gray-600">Margin</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{formatMoney(parseFloat(summary.margin))}</p>
-            </div>
-          </div>
+          <KpiGrid>
+            <KpiCard label="Cost" value={formatMoney(parseFloat(summary.cost))} />
+            <KpiCard label="Revenue" value={formatMoney(parseFloat(summary.revenue))} />
+            <KpiCard label="Margin" value={formatMoney(parseFloat(summary.margin))} tone="good" emphasized />
+          </KpiGrid>
         ) : (
           <p className="text-sm text-gray-500">No data for this period.</p>
         )}

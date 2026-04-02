@@ -11,8 +11,10 @@ import { useAlerts } from '../hooks/useAlerts';
 import { PageHeader } from '../components/PageHeader';
 import { QuickActions } from '../components/QuickActions';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { EmptyState } from '../components/EmptyState';
 import { useFormatting } from '../hooks/useFormatting';
 import { term } from '../config/terminology';
+import { PageContainer } from '../components/PageContainer';
 
 type TodayItem = {
   id: string;
@@ -174,7 +176,7 @@ export default function TodayPage() {
     issuesLoading;
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Today"
         backTo="/app/dashboard"
@@ -184,7 +186,7 @@ export default function TodayPage() {
         ]}
       />
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {!alertsLoading && alertsCount > 0 && (
           <Link
             to="/app/alerts"
@@ -218,7 +220,10 @@ export default function TodayPage() {
               <LoadingSpinner />
             </div>
           ) : items.length === 0 ? (
-            <p className="text-gray-500 text-sm py-6">No records for today yet.</p>
+            <EmptyState
+              title="No records yet"
+              description="Nothing has been recorded for today."
+            />
           ) : (
             <ul className="space-y-2">
               {items.map((it) => (
@@ -250,6 +255,6 @@ export default function TodayPage() {
           )}
         </section>
       </div>
-    </div>
+    </PageContainer>
   );
 }

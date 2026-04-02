@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { DailyBookEntry, Project, apiClient } from '@farm-erp/shared'
 import { useTenantSettings } from '../hooks/useTenantSettings'
 import { term } from '../config/terminology'
+import { PageContainer } from '../components/PageContainer'
+import { FormCard } from '../components/FormLayout'
 
 /**
  * LEGACY / ORPHANED UI: Not registered in `App.tsx`; unreachable in the normal app.
@@ -91,7 +93,8 @@ function DailyBookEntryFormPage() {
   const isReadOnly = isEdit && entryStatus === 'POSTED'
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <PageContainer width="form" className="space-y-6 py-6">
+      <FormCard>
       <h2 className="text-2xl font-bold mb-6">
         {isEdit ? (isReadOnly ? 'View Entry (Posted)' : 'Edit Entry') : 'New Entry'}
       </h2>
@@ -227,7 +230,8 @@ function DailyBookEntryFormPage() {
           )}
         </div>
       </form>
-    </div>
+      </FormCard>
+    </PageContainer>
   )
 }
 

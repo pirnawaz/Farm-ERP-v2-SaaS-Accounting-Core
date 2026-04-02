@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@farm-erp/shared';
@@ -11,6 +11,7 @@ import { usePayablesOutstanding } from '../hooks/useLabour';
 import { useOperationalTransactions } from '../hooks/useOperationalTransactions';
 import { useAlerts } from '../hooks/useAlerts';
 import { useModules } from '../contexts/ModulesContext';
+import { useOrchardLivestockAddonsEnabled } from '../hooks/useModules';
 import { useRole } from '../hooks/useRole';
 import { PageHeader } from '../components/PageHeader';
 import { QuickActions } from '../components/QuickActions';
@@ -20,6 +21,8 @@ import { getActiveCropCycleId } from '../utils/formDefaults';
 import { computeNetPositionSigned } from '../utils/netPosition';
 import { getMoneyColorClass } from '../utils/moneyStyles';
 import { term } from '../config/terminology';
+import { PageContainer } from '../components/PageContainer';
+import { KpiCard, KpiGrid } from '../components/KpiCard';
 
 /** Normalize a date string to Y-m-d for API (from/to). */
 function toYmd(dateStr: string): string {
@@ -63,6 +66,7 @@ function HeroCard({
 export default function FarmPulsePage() {
   const { formatMoney, formatDateRange } = useFormatting();
   const { isModuleEnabled } = useModules();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
   const { hasRole } = useRole();
   const asOf = useMemo(() => new Date().toISOString().split('T')[0], []);
   const today = asOf;
@@ -80,6 +84,17 @@ export default function FarmPulsePage() {
   const [viewBy, setViewBy] = useState<'crop_cycle' | 'production_unit'>('crop_cycle');
   const [selectedProductionUnitId, setSelectedProductionUnitId] = useState<string>('');
 
+  useEffect(() => {
+    if (!hasOrchardLivestockModule) {
+      setViewBy('crop_cycle');
+      setSelectedProductionUnitId('');
+    }
+  }, [hasOrchardLivestockModule]);
+
+  /** Crop cycle vs unit snapshot; unit branch only when Orchards/Livestock addons are licensed. */
+  const effectiveViewBy: 'crop_cycle' | 'production_unit' =
+    hasOrchardLivestockModule && viewBy === 'production_unit' ? 'production_unit' : 'crop_cycle';
+
   const activeCycleId = useMemo(() => getActiveCropCycleId(cropCycles), [cropCycles]);
   const activeCycle = useMemo(
     () => cropCycles?.find((c) => c.id === activeCycleId),
@@ -92,20 +107,20 @@ export default function FarmPulsePage() {
 
   const cycleStart = useMemo(() => {
     const raw =
-      viewBy === 'production_unit' && selectedUnit
+      effectiveViewBy === 'production_unit' && selectedUnit
         ? selectedUnit.start_date
         : activeCycle?.start_date ?? today;
     return toYmd(raw ?? today);
-  }, [viewBy, selectedUnit, activeCycle, today]);
+  }, [effectiveViewBy, selectedUnit, activeCycle, today]);
   const cycleEnd = useMemo(() => {
     const todayYmd = toYmd(today);
-    if (viewBy === 'production_unit' && selectedUnit) {
+    if (effectiveViewBy === 'production_unit' && selectedUnit) {
       const end = selectedUnit.end_date ? toYmd(selectedUnit.end_date) : null;
       return end && end < todayYmd ? end : todayYmd;
     }
     const end = activeCycle?.end_date ? toYmd(activeCycle.end_date) : null;
     return end && end < todayYmd ? end : todayYmd;
-  }, [viewBy, selectedUnit, activeCycle, today]);
+  }, [effectiveViewBy, selectedUnit, activeCycle, today]);
 
   const { data: accountBalances, isLoading: balancesLoading } = useQuery({
     queryKey: ['reports', 'account-balances', { as_of: asOf }],
@@ -158,7 +173,7 @@ export default function FarmPulsePage() {
     {
       from: cycleStart,
       to: cycleEnd,
-      ...(viewBy === 'production_unit' && selectedProductionUnitId
+      ...(effectiveViewBy === 'production_unit' && selectedProductionUnitId
         ? { production_unit_id: selectedProductionUnitId }
         : {}),
     },
@@ -167,7 +182,7 @@ export default function FarmPulsePage() {
         !!cycleStart &&
         !!cycleEnd &&
         isModuleEnabled('reports') &&
-        (viewBy !== 'production_unit' || !!selectedProductionUnitId),
+        (effectiveViewBy !== 'production_unit' || !!selectedProductionUnitId),
     }
   );
 
@@ -216,16 +231,38 @@ export default function FarmPulsePage() {
   const showCashSection = isModuleEnabled('reports');
   const showSeason =
     isModuleEnabled('reports') &&
-    (viewBy === 'crop_cycle' ? activeCycle : viewBy === 'production_unit' && selectedUnit);
+    (effectiveViewBy === 'crop_cycle' ? activeCycle : effectiveViewBy === 'production_unit' && selectedUnit);
   const showFieldStatus =
     isModuleEnabled('reports') &&
     isModuleEnabled('projects_crop_cycles') &&
-    (viewBy === 'crop_cycle' || !selectedProductionUnitId);
+    (effectiveViewBy === 'crop_cycle' || !selectedProductionUnitId);
 
-  const hasActiveSeason = isModuleEnabled('projects_crop_cycles') && (viewBy === 'crop_cycle' ? activeCycle : viewBy === 'production_unit' && selectedUnit);
+  /** Crop-cycle view needs a global active cycle; unit view only needs the unit picker (handled by showSeason). */
+  const hasActiveSeason =
+    isModuleEnabled('projects_crop_cycles') &&
+    (effectiveViewBy === 'crop_cycle' ? !!activeCycle : true);
+
+  /** Unit snapshot: profitability API filters by unit; empty rows = no posting-group linkage. */
+  const unitSnapshotHasNoLinkedActivity =
+    hasOrchardLivestockModule &&
+    effectiveViewBy === 'production_unit' &&
+    !!selectedProductionUnitId &&
+    !profitabilityLoading &&
+    !!profitability &&
+    profitability.rows.length === 0;
+
+  const seasonSnapshotTitle = useMemo(() => {
+    if (effectiveViewBy === 'production_unit' && selectedUnit) {
+      return `${selectedUnit.name} (${formatDateRange(selectedUnit.start_date, cycleEnd)})`;
+    }
+    if (effectiveViewBy === 'crop_cycle' && activeCycle) {
+      return `${activeCycle.name} (${formatDateRange(activeCycle.start_date, cycleEnd)})`;
+    }
+    return '';
+  }, [effectiveViewBy, selectedUnit, activeCycle, cycleEnd, formatDateRange]);
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Farm Pulse"
         backTo="/app/dashboard"
@@ -265,8 +302,8 @@ export default function FarmPulsePage() {
           </div>
         </section>
 
-        {/* View by: Crop Cycle | Production Unit */}
-        {isModuleEnabled('projects_crop_cycles') && (
+        {/* View by: Crop Cycle | Orchard/Livestock unit (addons licensed) */}
+        {isModuleEnabled('projects_crop_cycles') && hasOrchardLivestockModule && (
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium text-gray-700">View by:</span>
             <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
@@ -282,7 +319,7 @@ export default function FarmPulsePage() {
                 onClick={() => setViewBy('production_unit')}
                 className={`px-3 py-1.5 text-sm rounded-md ${viewBy === 'production_unit' ? 'bg-white shadow text-[#1F6F5C] font-medium' : 'text-gray-600 hover:text-gray-900'}`}
               >
-                Production Unit
+                Orchard / Livestock
               </button>
             </div>
             {viewBy === 'production_unit' && (() => {
@@ -316,7 +353,7 @@ export default function FarmPulsePage() {
                     </optgroup>
                   )}
                   {otherUnits.length > 0 && (
-                    <optgroup label={orchardUnits.length > 0 || livestockUnits.length > 0 ? 'Other units' : 'Production units'}>
+                    <optgroup label="Other long-lived units (advanced)">
                       {otherUnits.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.name}
@@ -346,34 +383,57 @@ export default function FarmPulsePage() {
               </Link>
             </div>
           ) : !showSeason ? (
-            <p className="text-sm text-gray-500">Select a production unit above, or switch to Crop Cycle view.</p>
+            <p className="text-sm text-gray-500">
+              {hasOrchardLivestockModule && viewBy === 'production_unit'
+                ? 'Select an orchard/livestock unit above, or switch to Crop Cycle view.'
+                : 'Reports module is required for the season snapshot.'}
+            </p>
           ) : profitabilityLoading ? (
             <div className="flex justify-center py-6">
               <LoadingSpinner />
             </div>
+          ) : unitSnapshotHasNoLinkedActivity ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              <p className="font-medium text-gray-700">No linked season activity for this unit</p>
+              <p className="mt-1 text-gray-500">
+                Post costs, harvests, or sales with this orchard/livestock unit tagged so season totals appear here.
+              </p>
+            </div>
           ) : profitability?.totals ? (
             <Link
-              to={`/app/reports/crop-profitability?from=${cycleStart}&to=${cycleEnd}`}
+              to={
+                effectiveViewBy === 'production_unit' && selectedProductionUnitId
+                  ? `/app/reports/crop-profitability?from=${cycleStart}&to=${cycleEnd}&production_unit_id=${encodeURIComponent(selectedProductionUnitId)}`
+                  : `/app/reports/crop-profitability?from=${cycleStart}&to=${cycleEnd}`
+              }
               className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 hover:border-[#1F6F5C]/30"
             >
-              <p className="font-medium text-gray-900">
-                {activeCycle?.name} ({formatDateRange(activeCycle?.start_date, cycleEnd)})
+              <p className="font-medium text-gray-900">{seasonSnapshotTitle}</p>
+              <KpiGrid className="gap-3 text-sm">
+                <KpiCard
+                  label="Cost so far"
+                  value={formatMoney(parseFloat(profitability.totals.cost))}
+                  padding="none"
+                  className="border-0 bg-transparent"
+                />
+                <KpiCard
+                  label="Revenue so far"
+                  value={formatMoney(parseFloat(profitability.totals.revenue))}
+                  padding="none"
+                  className="border-0 bg-transparent"
+                />
+                <KpiCard
+                  label="Margin so far"
+                  value={formatMoney(parseFloat(profitability.totals.margin))}
+                  padding="none"
+                  className="border-0 bg-transparent"
+                />
+              </KpiGrid>
+              <p className="text-xs text-gray-400">
+                {effectiveViewBy === 'production_unit'
+                  ? 'From posted activity for this unit'
+                  : 'From posted season activity'}
               </p>
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500">Cost so far</p>
-                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.cost))}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Revenue so far</p>
-                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.revenue))}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Margin so far</p>
-                  <p className="font-semibold tabular-nums">{formatMoney(parseFloat(profitability.totals.margin))}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">From posted season activity</p>
               <span className="text-sm text-[#1F6F5C] hover:underline">View crop profitability →</span>
             </Link>
           ) : (
@@ -390,8 +450,8 @@ export default function FarmPulsePage() {
           </h2>
           {!showFieldStatus ? (
             <p className="text-sm text-gray-500">
-              {viewBy === 'production_unit' && selectedProductionUnitId
-                ? 'Unit reporting: Field status by unit coming soon. Tag activities and harvests with a production unit to use Unit Snapshot above.'
+              {hasOrchardLivestockModule && effectiveViewBy === 'production_unit' && selectedProductionUnitId
+                ? 'Unit reporting: Field status by unit coming soon. Tag activities and harvests with an orchard/livestock unit to use Unit Snapshot above.'
                 : 'Reports and crop cycles required.'}
             </p>
           ) : projectPLLoading ? (
@@ -588,6 +648,6 @@ export default function FarmPulsePage() {
           <QuickActions />
         </section>
       </div>
-    </div>
+    </PageContainer>
   );
 }

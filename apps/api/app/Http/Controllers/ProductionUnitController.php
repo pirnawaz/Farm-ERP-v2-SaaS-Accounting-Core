@@ -6,10 +6,45 @@ use App\Models\ProductionUnit;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 
 class ProductionUnitController extends Controller
 {
+    private function effectiveCategory(?string $current, array $validated): ?string
+    {
+        if (array_key_exists('category', $validated)) {
+            $v = $validated['category'];
+            if ($v === '' || $v === null) return null;
+            return (string) $v;
+        }
+        return $current;
+    }
+
+    private function validateCategorySemantics(array $validated, ?string $currentCategory = null): void
+    {
+        $category = $this->effectiveCategory($currentCategory, $validated);
+
+        $orchardKeys = ['orchard_crop', 'planting_year', 'area_acres', 'tree_count'];
+        $livestockKeys = ['livestock_type', 'herd_start_count'];
+
+        $hasAnyOrchardField = Arr::hasAny($validated, $orchardKeys);
+        $hasAnyLivestockField = Arr::hasAny($validated, $livestockKeys);
+
+        if ($hasAnyOrchardField && $category !== ProductionUnit::CATEGORY_ORCHARD) {
+            abort(422, 'Orchard fields require category ORCHARD.');
+        }
+        if ($hasAnyLivestockField && $category !== ProductionUnit::CATEGORY_LIVESTOCK) {
+            abort(422, 'Livestock fields require category LIVESTOCK.');
+        }
+
+        if ($category === ProductionUnit::CATEGORY_ORCHARD || $category === ProductionUnit::CATEGORY_LIVESTOCK) {
+            if (array_key_exists('type', $validated) && $validated['type'] !== ProductionUnit::TYPE_LONG_CYCLE) {
+                abort(422, 'Category ' . $category . ' requires type LONG_CYCLE.');
+            }
+        }
+    }
+
     public function index(Request $request): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
@@ -56,6 +91,8 @@ class ProductionUnitController extends Controller
             'livestock_type' => ['nullable', 'string', 'max:64'],
             'herd_start_count' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        $this->validateCategorySemantics($validated, null);
 
         $data = [
             'tenant_id' => $tenantId,
@@ -113,6 +150,8 @@ class ProductionUnitController extends Controller
             'livestock_type' => ['nullable', 'string', 'max:64'],
             'herd_start_count' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        $this->validateCategorySemantics($validated, $unit->category);
 
         $allowedKeys = ['name', 'type', 'start_date', 'end_date', 'status', 'notes', 'category', 'orchard_crop', 'planting_year', 'area_acres', 'tree_count', 'livestock_type', 'herd_start_count'];
         $data = array_intersect_key($validated, array_flip($allowedKeys));

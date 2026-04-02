@@ -495,6 +495,7 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:proj
     Route::get('reports/crop-costs', [ReportController::class, 'cropCosts']);
     Route::get('reports/crop-profitability', [ReportController::class, 'cropProfitability']);
     Route::get('reports/crop-profitability-trend', [ReportController::class, 'cropProfitabilityTrend']);
+    Route::get('reports/production-units-profitability', [ReportController::class, 'productionUnitsProfitability']);
     Route::get('reports/production-unit-summary', [ReportController::class, 'productionUnitSummary']);
     Route::get('reports/livestock-unit-status', [ReportController::class, 'livestockUnitStatus']);
 });

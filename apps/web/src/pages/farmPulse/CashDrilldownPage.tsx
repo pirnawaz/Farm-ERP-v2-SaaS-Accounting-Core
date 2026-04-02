@@ -7,6 +7,7 @@ import { usePayments } from '../../hooks/usePayments';
 import { useSales } from '../../hooks/useSales';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageContainer } from '../../components/PageContainer';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { Payment, Sale } from '../../types';
 
@@ -64,15 +65,15 @@ export default function CashDrilldownPage() {
   const isLoading = balancesLoading;
   if (isLoading) {
     return (
-      <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+      <PageContainer className="pb-24 sm:pb-6">
         <PageHeader title="Cash in hand" backTo="/app/farm-pulse" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Farm Pulse', to: '/app/farm-pulse' }, { label: 'Cash' }]} />
         <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader title="Cash in hand" backTo="/app/farm-pulse" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Farm Pulse', to: '/app/farm-pulse' }, { label: 'Cash' }]} />
       <p className="text-sm text-gray-500 mb-4">From account balances (as of today).</p>
 
@@ -124,6 +125,6 @@ export default function CashDrilldownPage() {
         <Link to="/app/payments/new" className="inline-flex items-center rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a]">Record payment</Link>
         <Link to="/app/reports/account-balances" className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">View all account balances</Link>
       </div>
-    </div>
+    </PageContainer>
   );
 }

@@ -6,6 +6,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useCropCycles } from '../hooks/useCropCycles';
 import { useProductionUnits } from '../hooks/useProductionUnits';
 import { useInventoryStores, useInventoryItems } from '../hooks/useInventory';
+import { useOrchardLivestockAddonsEnabled } from '../hooks/useModules';
 import { useTenant } from '../hooks/useTenant';
 import { useFormAutosave } from '../hooks/useFormAutosave';
 import { FormField } from '../components/FormField';
@@ -16,6 +17,8 @@ import { saleSchema } from '../validation/saleSchema';
 import { getLastSubmit, setLastSubmit } from '../utils/formDefaults';
 import toast from 'react-hot-toast';
 import { term } from '../config/terminology';
+import { PageContainer } from '../components/PageContainer';
+import { FormCard } from '../components/FormLayout';
 import type { CreateSalePayload, SaleLine } from '../types';
 
 type SaleLineFormRow = Omit<SaleLine, 'id' | 'sale_id' | 'line_total'>;
@@ -37,13 +40,14 @@ export default function SaleFormPage() {
   const { data: projects } = useProjects();
   const { data: cropCycles } = useCropCycles();
   const { data: productionUnits } = useProductionUnits();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
   const { data: stores } = useInventoryStores();
   const { data: items } = useInventoryItems(true);
   const { hasRole } = useRole();
   
   // Get query params for prefill
   const prefilledBuyerPartyId = searchParams.get('buyerPartyId');
-  const prefilledProductionUnitId = searchParams.get('production_unit_id') || '';
+  const prefilledProductionUnitId = hasOrchardLivestockModule ? (searchParams.get('production_unit_id') || '') : '';
 
   const [formData, setFormData] = useState<CreateSalePayload>({
     buyer_party_id: prefilledBuyerPartyId || '',
@@ -259,7 +263,7 @@ export default function SaleFormPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <PageContainer width="form" className="space-y-6 pb-8">
       <PageHeader
         title={isEdit ? 'Edit Sale' : 'New Sale'}
         backTo="/app/sales"
@@ -278,7 +282,7 @@ export default function SaleFormPage() {
           <button type="button" onClick={discard} className="font-medium text-gray-600 hover:underline">Discard</button>
         </div>
       )}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6">
+      <FormCard>
         {hasLast && (
           <div className="flex justify-end">
             <button type="button" onClick={handleUseLast} className="text-sm font-medium text-[#1F6F5C] hover:underline">
@@ -527,19 +531,24 @@ export default function SaleFormPage() {
               ))}
             </select>
           </FormField>
-          <FormField label="Production Unit (Optional)">
-            <select
-              value={formData.production_unit_id ?? ''}
-              onChange={(e) => setFormData({ ...formData, production_unit_id: e.target.value })}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
-            >
-              <option value="">None</option>
-              {productionUnits?.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </FormField>
+          {hasOrchardLivestockModule ? (
+            <FormField label="Orchard / Livestock / Long-cycle unit (optional)">
+              <select
+                value={formData.production_unit_id ?? ''}
+                onChange={(e) => setFormData({ ...formData, production_unit_id: e.target.value })}
+                disabled={!canEdit}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
+              >
+                <option value="">None</option>
+                {productionUnits?.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Optional. Use this when the sale belongs to an Orchard or Livestock unit. Seasonal sales usually leave this blank.
+              </p>
+            </FormField>
+          ) : null}
 
           <FormField label="Notes">
             <textarea
@@ -569,7 +578,7 @@ export default function SaleFormPage() {
               </button>
             </div>
           )}
-      </div>
-    </div>
+      </FormCard>
+    </PageContainer>
   );
 }

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@farm-erp/shared';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageContainer } from '../../components/PageContainer';
 import { useRole } from '../../hooks';
 import { term } from '../../config/terminology';
 
@@ -45,7 +46,7 @@ export default function FarmIntegrityPage() {
   });
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Farm Integrity"
         backTo="/app/dashboard"
@@ -70,7 +71,7 @@ export default function FarmIntegrityPage() {
       ) : data ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <IntegrityCard
-            title={`${term('activities')} missing production unit`}
+            title={`${term('activities')} missing orchard/livestock unit`}
             count={data.activities_missing_production_unit}
             link="/app/crop-ops/activities"
             linkLabel={`View ${term('activities').toLowerCase()}`}
@@ -94,10 +95,10 @@ export default function FarmIntegrityPage() {
             linkLabel="View stock on hand"
           />
           <IntegrityCard
-            title="Production units, no activity (last 30 days)"
+            title="Long-lived units, no activity (last 30 days)"
             count={data.production_units_no_activity_last_30_days}
             link="/app/production-units"
-            linkLabel="View production units"
+            linkLabel="View production units (advanced)"
           />
           <IntegrityCard
             title="Livestock units, negative headcount"
@@ -107,6 +108,6 @@ export default function FarmIntegrityPage() {
           />
         </div>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

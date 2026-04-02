@@ -17,6 +17,7 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLog } from '../../types';
 import { term } from '../../config/terminology';
+import { Badge } from '../../components/Badge';
 
 export default function WorkLogsPage() {
   const [searchParams] = useSearchParams();
@@ -70,17 +71,9 @@ export default function WorkLogsPage() {
     {
       header: 'Status',
       accessor: (r) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            r.status === 'DRAFT'
-              ? 'bg-yellow-100 text-yellow-800'
-              : r.status === 'POSTED'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-gray-100 text-gray-800'
-          }`}
-        >
+        <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
           {r.status}
-        </span>
+        </Badge>
       ),
     },
     {

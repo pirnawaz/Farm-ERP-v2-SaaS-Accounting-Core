@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Project;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateCropActivityRequest extends FormRequest
 {
@@ -14,6 +15,8 @@ class UpdateCropActivityRequest extends FormRequest
 
     public function rules(): array
     {
+        $tenantId = $this->header('X-Tenant-Id');
+
         return [
             'doc_no' => ['sometimes', 'string', 'max:100'],
             'activity_type_id' => ['sometimes', 'uuid', 'exists:crop_activity_types,id'],
@@ -33,7 +36,13 @@ class UpdateCropActivityRequest extends FormRequest
                     }
                 },
             ],
-            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
+            'production_unit_id' => [
+                'nullable',
+                'uuid',
+                $tenantId
+                    ? Rule::exists('production_units', 'id')->where('tenant_id', $tenantId)
+                    : 'exists:production_units,id',
+            ],
             'land_parcel_id' => ['nullable', 'uuid', 'exists:land_parcels,id'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'inputs' => ['sometimes', 'array'],

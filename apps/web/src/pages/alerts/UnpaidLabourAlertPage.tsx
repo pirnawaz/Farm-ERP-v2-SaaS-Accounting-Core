@@ -2,6 +2,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { usePayablesOutstanding } from '../../hooks/useLabour';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageContainer } from '../../components/PageContainer';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { PayablesOutstandingRow } from '../../types';
 
@@ -24,7 +25,7 @@ export default function UnpaidLabourAlertPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+      <PageContainer className="pb-24 sm:pb-6">
         <PageHeader
           title="Unpaid labour"
           backTo="/app/alerts"
@@ -37,12 +38,12 @@ export default function UnpaidLabourAlertPage() {
         <div className="flex justify-center py-12">
           <LoadingSpinner />
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Unpaid labour"
         backTo="/app/alerts"
@@ -103,6 +104,6 @@ export default function UnpaidLabourAlertPage() {
           Work logs
         </Link>
       </div>
-    </div>
+    </PageContainer>
   );
 }

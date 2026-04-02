@@ -36,7 +36,7 @@ export default function ProductionUnitsPage() {
         end_date: formData.end_date?.trim() || undefined,
         notes: formData.notes?.trim() || undefined,
       });
-      toast.success('Production unit created');
+      toast.success('Long-lived unit created');
       setShowCreateModal(false);
       setFormData(initialFormData);
     } catch (error: unknown) {
@@ -64,31 +64,38 @@ export default function ProductionUnitsPage() {
   return (
     <div data-testid="production-units-page">
       <PageHeader
-        title="Production Units"
+        title="Production Units (Advanced)"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Production Units' },
+          { label: 'Production Units (Advanced)' },
         ]}
       />
       <div className="flex justify-between items-center mb-6">
-        <p className="text-gray-600">Track long-duration crops (e.g. Sugarcane) across multiple crop cycles.</p>
+        <p className="text-gray-600">
+          Optional long-lived units used to track continuity across seasons (e.g. orchards, livestock, long-cycle crops). Most seasonal work uses
+          Crop Cycle + Field Cycle only.
+        </p>
         <button
           data-testid="new-production-unit"
           onClick={() => setShowCreateModal(true)}
           className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
         >
-          New Production Unit
+          New Production Unit (Advanced)
         </button>
       </div>
 
       <div className="bg-white rounded-lg shadow">
-        <DataTable columns={columns} data={units ?? []} emptyMessage="No production units yet. Create one to get started." />
+        <DataTable
+          columns={columns}
+          data={units ?? []}
+          emptyMessage="No production units yet. Create one only if you need a long-lived unit (orchard, livestock, or long-cycle crop)."
+        />
       </div>
 
       <Modal
         isOpen={showCreateModal}
         onClose={() => { setShowCreateModal(false); setFormData(initialFormData); }}
-        title="New Production Unit"
+        title="New Production Unit (Advanced)"
       >
         <div className="space-y-4">
           <FormField label="Name" required>
@@ -96,7 +103,7 @@ export default function ProductionUnitsPage() {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-              placeholder="e.g. Sugarcane Plant 2025"
+              placeholder="e.g. Orchard Block A (2025) or Herd B"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
             />
           </FormField>
@@ -133,6 +140,9 @@ export default function ProductionUnitsPage() {
               rows={2}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Tip: For orchards and livestock, use the dedicated modules. This page is for advanced setup and long-cycle crops.
+            </p>
           </FormField>
         </div>
         <div className="mt-6 flex justify-end gap-2">

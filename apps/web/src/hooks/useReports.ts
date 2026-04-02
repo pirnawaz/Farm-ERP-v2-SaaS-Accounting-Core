@@ -3,7 +3,20 @@ import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { reportsApi } from '../api/reports';
 import { getApiErrorMessage } from '../utils/api';
-import type { GeneralLedgerResponse, TrialBalanceRow, ProfitLossResponse, BalanceSheetResponse, CropProfitabilityResponse, CropProfitabilityGroupBy, CropProfitabilityTrendResponse, CropProfitabilityTrendGroupBy, ProductionUnitSummaryResponse, LivestockUnitStatusResponse } from '../types';
+import type {
+  GeneralLedgerResponse,
+  TrialBalanceRow,
+  ProfitLossResponse,
+  BalanceSheetResponse,
+  CropProfitabilityResponse,
+  CropProfitabilityGroupBy,
+  CropProfitabilityTrendResponse,
+  CropProfitabilityTrendGroupBy,
+  ProductionUnitSummaryResponse,
+  LivestockUnitStatusResponse,
+  ProductionUnitsProfitabilityResponse,
+  ProductionUnitCategoryFilter,
+} from '../types';
 
 export function useTrialBalance(params: { as_of: string; project_id?: string; crop_cycle_id?: string; currency_code?: string }) {
   return useQuery<{ as_of: string; rows: TrialBalanceRow[]; totals: { total_debit: string; total_credit: string }; balanced: boolean }, Error>({
@@ -133,6 +146,20 @@ export function useLivestockUnitStatus(
   return useQuery<LivestockUnitStatusResponse, Error>({
     queryKey: ['reports', 'livestock-unit-status', params],
     queryFn: () => reportsApi.getLivestockUnitStatus(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useProductionUnitsProfitability(
+  params: { from: string; to: string; category?: ProductionUnitCategoryFilter },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.from && !!params.to;
+  return useQuery<ProductionUnitsProfitabilityResponse, Error>({
+    queryKey: ['reports', 'production-units-profitability', params],
+    queryFn: () => reportsApi.productionUnitsProfitability(params),
     enabled,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

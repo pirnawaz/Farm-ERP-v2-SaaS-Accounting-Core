@@ -3,12 +3,13 @@ import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useBalanceSheet } from '../../hooks/useReports';
 import { term } from '../../config/terminology';
-import { ReportErrorState, ReportLoadingState } from '../../components/report';
+import { EMPTY_COPY } from '../../config/presentation';
+import { ReportErrorState, ReportKindBadge, ReportLoadingState, ReportMetadataBlock, ReportFilterCard, ReportPage, ReportSectionCard, ReportEmptyState } from '../../components/report';
 
 const defaultAsOf = () => new Date().toISOString().split('T')[0];
 
 export default function BalanceSheetPage() {
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDate } = useFormatting();
   const [asOf, setAsOf] = useState(defaultAsOf());
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [compareAsOf, setCompareAsOf] = useState('');
@@ -84,14 +85,17 @@ export default function BalanceSheetPage() {
   })();
 
   return (
-    <div className="space-y-6">
+    <ReportPage>
       <PageHeader
         title={term('balanceSheet')}
         backTo="/app/reports"
         breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: term('balanceSheet') }]}
+        right={<ReportKindBadge kind="accounting" />}
       />
 
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
+      <ReportMetadataBlock asOfDate={formatDate(asOf)} />
+
+      <ReportFilterCard>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">As of date</label>
@@ -125,7 +129,7 @@ export default function BalanceSheetPage() {
             </div>
           )}
         </div>
-      </div>
+      </ReportFilterCard>
 
       {isLoading && <ReportLoadingState label="Loading balance sheet..." />}
       {error && <ReportErrorState error={error} />}
@@ -159,7 +163,7 @@ export default function BalanceSheetPage() {
           {(['assets', 'liabilities', 'equity'] as const).map((key) => {
             const section = normalized.sections[key];
             return (
-              <div key={key} className="bg-white rounded-lg shadow overflow-hidden">
+              <ReportSectionCard key={key}>
                 <div className="px-4 py-3 bg-[#E6ECEA] font-medium text-gray-800 capitalize">{key}</div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
@@ -172,11 +176,7 @@ export default function BalanceSheetPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {(section.lines ?? []).length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-3 text-center text-gray-500 text-sm">
-                            No lines
-                          </td>
-                        </tr>
+                        <ReportEmptyState colSpan={3} message={EMPTY_COPY.noRecords} />
                       ) : (
                         (section.lines ?? []).map((line, idx) => (
                           <tr key={line.account_id ?? idx}>
@@ -195,7 +195,7 @@ export default function BalanceSheetPage() {
                     </tfoot>
                   </table>
                 </div>
-              </div>
+              </ReportSectionCard>
             );
           })}
 
@@ -211,6 +211,6 @@ export default function BalanceSheetPage() {
           )}
         </>
       )}
-    </div>
+    </ReportPage>
   );
 }

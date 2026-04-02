@@ -11,3 +11,4 @@ export {
 } from './ReportTable';
 export { ReportMetadataBlock } from './ReportMetadataBlock';
 export { ReportLoadingState, ReportErrorState, ReportEmptyStateCard } from './ReportStates';
+export { ReportPage, ReportFilterCard, ReportSectionCard, ReportKindBadge } from './ReportLayout';

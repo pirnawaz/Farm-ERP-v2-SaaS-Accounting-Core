@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useProductionUnit } from '../../hooks/useProductionUnits';
 import { useProductionUnitSummary, useLivestockUnitStatus } from '../../hooks/useReports';
 import { useLivestockEvents, useCreateLivestockEvent, useUpdateLivestockEvent, useDeleteLivestockEvent } from '../../hooks/useLivestockEvents';
@@ -7,7 +7,10 @@ import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
+import { EmptyState } from '../../components/EmptyState';
+import { KpiCard, KpiGrid } from '../../components/KpiCard';
 import { useFormatting } from '../../hooks/useFormatting';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import toast from 'react-hot-toast';
 import type { LivestockEvent, LivestockEventType } from '../../types';
 
@@ -143,10 +146,31 @@ function EventModal({
 }
 
 export default function LivestockDetailPage() {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { showLivestock } = useOrchardLivestockAddonsEnabled();
   const { formatMoney } = useFormatting();
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<LivestockEvent | null>(null);
+
+  if (!showLivestock) {
+    return (
+      <div className="space-y-6" data-testid="livestock-detail-page">
+        <PageHeader
+          title="Livestock"
+          backTo="/app/dashboard"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Livestock', to: '/app/livestock' },
+            { label: 'Unit' },
+          ]}
+        />
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          Livestock module is not enabled for this tenant.
+        </div>
+      </div>
+    );
+  }
 
   const { data: unit, isLoading: unitLoading } = useProductionUnit(id || '');
   const { data: status, isLoading: statusLoading } = useLivestockUnitStatus(
@@ -172,11 +196,12 @@ export default function LivestockDetailPage() {
 
   if (!unit) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <p className="text-gray-600">Livestock unit not found.</p>
-        <Link to="/app/livestock" className="text-[#1F6F5C] font-medium hover:underline mt-2 inline-block">
-          Back to Livestock
-        </Link>
+      <div>
+        <EmptyState
+          title="Livestock unit not found"
+          description="This unit may have been deleted, or you may not have access."
+          action={{ label: 'Back to Livestock', onClick: () => navigate('/app/livestock') }}
+        />
       </div>
     );
   }
@@ -227,20 +252,11 @@ export default function LivestockDetailPage() {
             <LoadingSpinner />
           </div>
         ) : summary ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm font-medium text-gray-500">Cost</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{formatMoney(parseFloat(summary.cost))}</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm font-medium text-gray-500">Revenue</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{formatMoney(parseFloat(summary.revenue))}</p>
-            </div>
-            <div className="rounded-xl border-2 border-[#1F6F5C]/20 bg-[#1F6F5C]/5 p-4">
-              <p className="text-sm font-medium text-gray-600">Margin</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900 tabular-nums">{formatMoney(parseFloat(summary.margin))}</p>
-            </div>
-          </div>
+          <KpiGrid>
+            <KpiCard label="Cost" value={formatMoney(parseFloat(summary.cost))} />
+            <KpiCard label="Revenue" value={formatMoney(parseFloat(summary.revenue))} />
+            <KpiCard label="Margin" value={formatMoney(parseFloat(summary.margin))} tone="good" emphasized />
+          </KpiGrid>
         ) : (
           <p className="text-sm text-gray-500">No data for this period.</p>
         )}

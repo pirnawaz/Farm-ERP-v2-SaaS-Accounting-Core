@@ -3,10 +3,22 @@ import { ReactNode, useCallback } from 'react';
 /** Use for rows that get a synthetic id via .map(r => ({ ...r, id: ... })) */
 export type WithId<T> = T & { id: string };
 
+type Align = 'left' | 'right' | 'center';
+
 export interface Column<T> {
   header: string;
   accessor: keyof T | ((row: T) => ReactNode);
   sortable?: boolean;
+  /** Optional alignment for body cells (defaults to left; numeric defaults to right). */
+  align?: Align;
+  /** Tabular numerals + right alignment for amounts/counts. */
+  numeric?: boolean;
+  /** Optional alignment for header cell (defaults to body alignment). */
+  headerAlign?: Align;
+  /** Optional additional class for the header cell. */
+  headerClassName?: string;
+  /** Optional additional class for each body cell in this column. */
+  cellClassName?: string;
 }
 
 interface DataTableProps<T> {
@@ -42,7 +54,7 @@ export function DataTable<T extends { id: string }>({
 
   if (data.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">{emptyMessage}</div>
+      <div className="text-center py-12 px-4 text-sm text-gray-600">{emptyMessage}</div>
     );
   }
 
@@ -51,16 +63,24 @@ export function DataTable<T extends { id: string }>({
       <table className="min-w-full divide-y divide-gray-200" role="table" aria-label="Data table">
         <thead className="bg-[#E6ECEA]">
           <tr>
-            {columns.map((column, idx) => (
-              <th
-                key={idx}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                scope="col"
-                aria-label={column.header}
-              >
-                {column.header}
-              </th>
-            ))}
+            {columns.map((column, idx) => {
+              const align: Align =
+                column.headerAlign ??
+                column.align ??
+                (column.numeric ? 'right' : 'left');
+              const alignClass =
+                align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
+              return (
+                <th
+                  key={idx}
+                  className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${alignClass} ${column.headerClassName ?? ''}`}
+                  scope="col"
+                  aria-label={column.header}
+                >
+                  {column.header}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -74,11 +94,20 @@ export function DataTable<T extends { id: string }>({
               aria-label={onRowClick ? 'Click to view details' : undefined}
               className={onRowClick ? 'cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]' : ''}
             >
-              {columns.map((column, idx) => (
-                <td key={idx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {renderCell(row, column)}
-                </td>
-              ))}
+              {columns.map((column, idx) => {
+                const align: Align =
+                  column.align ?? (column.numeric ? 'right' : 'left');
+                const alignClass =
+                  align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
+                return (
+                  <td
+                    key={idx}
+                    className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${alignClass} ${column.numeric ? 'tabular-nums' : ''} ${column.cellClassName ?? ''}`}
+                  >
+                    {renderCell(row, column)}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

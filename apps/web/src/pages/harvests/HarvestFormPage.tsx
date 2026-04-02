@@ -5,10 +5,13 @@ import { useCropCycles } from '../../hooks/useCropCycles';
 import { useProductionUnits } from '../../hooks/useProductionUnits';
 import { useProjects } from '../../hooks/useProjects';
 import { useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import { useTenant } from '../../hooks/useTenant';
 import { useFormAutosave } from '../../hooks/useFormAutosave';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { PageContainer } from '../../components/PageContainer';
+import { FormCard } from '../../components/FormLayout';
 import { harvestSchema } from '../../validation/harvestSchema';
 import { getActiveCropCycleId, getStored, setStored, formStorageKeys, getLastSubmit, setLastSubmit } from '../../utils/formDefaults';
 import toast from 'react-hot-toast';
@@ -34,6 +37,7 @@ export default function HarvestFormPage() {
   const addLineM = useAddHarvestLine();
   const { data: cropCycles } = useCropCycles();
   const { data: productionUnits } = useProductionUnits();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
   const [crop_cycle_id, setCropCycleId] = useState('');
   const { data: projectsForCrop } = useProjects(crop_cycle_id || undefined);
   const { data: stores } = useInventoryStores();
@@ -42,6 +46,11 @@ export default function HarvestFormPage() {
   const [harvest_no, setHarvestNo] = useState('');
   const [project_id, setProjectId] = useState('');
   const [production_unit_id, setProductionUnitId] = useState('');
+  useEffect(() => {
+    if (!hasOrchardLivestockModule) {
+      setProductionUnitId('');
+    }
+  }, [hasOrchardLivestockModule]);
   const [harvest_date, setHarvestDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<HarvestLineForm[]>([{ inventory_item_id: '', store_id: '', quantity: '', uom: '', notes: '' }]);
@@ -67,6 +76,7 @@ export default function HarvestFormPage() {
   }, [project_id]);
   useEffect(() => {
     if (!productionUnits?.length) return;
+    if (!hasOrchardLivestockModule) return;
     const fromUrl = searchParams.get('production_unit_id');
     if (fromUrl && productionUnits.some((u) => u.id === fromUrl)) {
       setProductionUnitId(fromUrl);
@@ -74,10 +84,11 @@ export default function HarvestFormPage() {
     }
     const stored = getStored<string>(formStorageKeys.last_production_unit_id);
     if (stored && productionUnits.some((u) => u.id === stored) && !production_unit_id) setProductionUnitId(stored);
-  }, [productionUnits, searchParams]);
+  }, [productionUnits, searchParams, hasOrchardLivestockModule]);
   useEffect(() => {
+    if (!hasOrchardLivestockModule) return;
     if (production_unit_id) setStored(formStorageKeys.last_production_unit_id, production_unit_id);
-  }, [production_unit_id]);
+  }, [production_unit_id, hasOrchardLivestockModule]);
 
   const addLine = () => setLines((l) => [...l, { inventory_item_id: '', store_id: '', quantity: '', uom: '', notes: '' }]);
   const removeLine = (i: number) => setLines((l) => l.filter((_, idx) => idx !== i));
@@ -194,7 +205,7 @@ export default function HarvestFormPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-8">
+    <PageContainer width="form" className="space-y-6 pb-8">
       <PageHeader
         title="New Harvest"
         backTo="/app/harvests"
@@ -213,7 +224,7 @@ export default function HarvestFormPage() {
           <button type="button" onClick={discard} className="font-medium text-gray-600 hover:underline">Discard</button>
         </div>
       )}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6">
+      <FormCard>
         {hasLast && (
           <div className="flex justify-end">
             <button type="button" onClick={handleUseLast} className="text-sm font-medium text-[#1F6F5C] hover:underline">
@@ -273,18 +284,23 @@ export default function HarvestFormPage() {
               <p className="text-sm text-gray-500 mt-1">No {term('fieldCycles').toLowerCase()} in this crop cycle. Create one first.</p>
             )}
           </FormField>
-          <FormField label="Production Unit (optional)">
-            <select
-              value={production_unit_id}
-              onChange={(e) => setProductionUnitId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
-            >
-              <option value="">None</option>
-              {(productionUnits ?? []).map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </FormField>
+          {hasOrchardLivestockModule ? (
+            <FormField label="Orchard / Livestock / Long-cycle unit (optional)">
+              <select
+                value={production_unit_id}
+                onChange={(e) => setProductionUnitId(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
+              >
+                <option value="">None</option>
+                {(productionUnits ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Optional. Use this to attribute the harvest to an Orchard unit. Seasonal harvests usually leave this blank.
+              </p>
+            </FormField>
+          ) : null}
         </section>
 
         <section className="space-y-4">
@@ -375,7 +391,7 @@ export default function HarvestFormPage() {
             {createM.isPending || addLineM.isPending ? 'Creating...' : 'Create Harvest'}
           </button>
         </div>
-      </div>
-    </div>
+      </FormCard>
+    </PageContainer>
   );
 }

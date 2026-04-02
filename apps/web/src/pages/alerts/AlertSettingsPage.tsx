@@ -1,4 +1,5 @@
 import { PageHeader } from '../../components/PageHeader';
+import { PageContainer } from '../../components/PageContainer';
 import { useAlertPreferences } from '../../hooks/useAlertPreferences';
 import type { AlertType } from '../../types/alerts';
 import type { OverdueBucket } from '../../types/alertPreferences';
@@ -28,7 +29,7 @@ export default function AlertSettingsPage() {
   } = useAlertPreferences();
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Alert settings"
         backTo="/app/alerts"
@@ -126,6 +127,6 @@ export default function AlertSettingsPage() {
           </button>
         </section>
       </div>
-    </div>
+    </PageContainer>
   );
 }

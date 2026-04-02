@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreInvIssueRequest extends FormRequest
 {
@@ -13,12 +14,20 @@ class StoreInvIssueRequest extends FormRequest
 
     public function rules(): array
     {
+        $tenantId = $this->header('X-Tenant-Id');
+
         return [
             'doc_no' => ['nullable', 'string', 'max:100'],
             'store_id' => ['required', 'uuid', 'exists:inv_stores,id'],
             'crop_cycle_id' => ['required', 'uuid', 'exists:crop_cycles,id'],
             'project_id' => ['required', 'uuid', 'exists:projects,id'],
-            'production_unit_id' => ['nullable', 'uuid', 'exists:production_units,id'],
+            'production_unit_id' => [
+                'nullable',
+                'uuid',
+                $tenantId
+                    ? Rule::exists('production_units', 'id')->where('tenant_id', $tenantId)
+                    : 'exists:production_units,id',
+            ],
             'activity_id' => ['nullable', 'uuid'],
             'machine_id' => ['nullable', 'uuid', 'exists:machines,id'],
             'doc_date' => ['required', 'date', 'date_format:Y-m-d'],

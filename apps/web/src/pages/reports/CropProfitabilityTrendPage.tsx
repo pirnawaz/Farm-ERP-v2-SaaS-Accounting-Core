@@ -2,6 +2,9 @@ import { useState, useMemo } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useCropProfitabilityTrend } from '../../hooks/useReports';
+import { EMPTY_COPY } from '../../config/presentation';
+import { ReportFilterCard, ReportKindBadge, ReportLoadingState, ReportMetadataBlock, ReportPage, ReportEmptyStateCard } from '../../components/report';
+import { FilterBar, FilterCheckboxField, FilterField, FilterGrid } from '../../components/FilterBar';
 import type {
   CropProfitabilityTrendGroupBy,
   CropProfitabilityTrendPoint,
@@ -24,7 +27,7 @@ function today(): string {
 const TOP_SERIES = 5;
 
 export default function CropProfitabilityTrendPage() {
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDateRange } = useFormatting();
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(today);
   const [groupBy, setGroupBy] = useState<CropProfitabilityTrendGroupBy>('category');
@@ -90,7 +93,7 @@ export default function CropProfitabilityTrendPage() {
   }, [topSeries]);
 
   return (
-    <div className="space-y-6">
+    <ReportPage>
       <PageHeader
         title="Crop Profitability Trend"
         backTo="/app/reports"
@@ -98,59 +101,44 @@ export default function CropProfitabilityTrendPage() {
           { label: 'Profit & Reports', to: '/app/reports' },
           { label: 'Crop Profitability Trend' },
         ]}
+        right={<ReportKindBadge kind="accounting" />}
       />
 
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className={`w-full border rounded px-3 py-2 focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C] ${
-                toBeforeFrom ? 'border-red-500 bg-red-50' : 'border-gray-300'
-              }`}
-            />
-            {toBeforeFrom && (
-              <p className="text-sm text-red-600 mt-1">To date must be on or after from date.</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Group by</label>
-            <select
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as CropProfitabilityTrendGroupBy)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
-            >
-              <option value="category">Category</option>
-              <option value="crop">Crop</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+      <ReportMetadataBlock reportingPeriodRange={formatDateRange(from, to)} />
+
+      <ReportFilterCard>
+        <FilterBar>
+          <FilterGrid>
+            <FilterField label="From">
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </FilterField>
+            <FilterField label="To">
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className={toBeforeFrom ? 'border-red-500 bg-red-50' : undefined}
+              />
+              {toBeforeFrom && (
+                <p className="text-sm text-red-600 mt-1">To date must be on or after from date.</p>
+              )}
+            </FilterField>
+            <FilterField label="Group by">
+              <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as CropProfitabilityTrendGroupBy)}>
+                <option value="category">Category</option>
+                <option value="crop">Crop</option>
+                <option value="all">All</option>
+              </select>
+            </FilterField>
+            <FilterCheckboxField
               id="trend-include-unassigned"
+              label="Include unassigned"
               checked={includeUnassigned}
-              onChange={(e) => setIncludeUnassigned(e.target.checked)}
-              className="rounded border-gray-300 text-[#1F6F5C] focus:ring-[#1F6F5C]"
+              onChange={setIncludeUnassigned}
             />
-            <label htmlFor="trend-include-unassigned" className="text-sm font-medium text-gray-700">
-              Include unassigned
-            </label>
-          </div>
-        </div>
-      </div>
+          </FilterGrid>
+        </FilterBar>
+      </ReportFilterCard>
 
       {!includeUnassigned && (
         <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg text-sm">
@@ -169,15 +157,11 @@ export default function CropProfitabilityTrendPage() {
       )}
 
       {isLoading || isFetching ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          Loading…
-        </div>
+        <ReportLoadingState />
       ) : data ? (
         <>
           {data.series.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-              No data for selected period.
-            </div>
+            <ReportEmptyStateCard message={EMPTY_COPY.noDataForPeriod} />
           ) : (
             <>
               {/* Trend chart: margin per acre by month for top series */}
@@ -343,6 +327,6 @@ export default function CropProfitabilityTrendPage() {
           )}
         </>
       ) : null}
-    </div>
+    </ReportPage>
   );
 }

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PageContainer } from '../components/PageContainer';
 import { useAlerts } from '../hooks/useAlerts';
 import type { Alert } from '../types/alerts';
 
@@ -45,7 +46,7 @@ export default function AlertsPage() {
   const { alerts, isLoading } = useAlerts();
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Alert Center"
         backTo="/app/dashboard"
@@ -55,7 +56,7 @@ export default function AlertsPage() {
         ]}
       />
 
-      <div className="mt-4 space-y-4">
+      <div className="mt-4 space-y-6">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
@@ -78,6 +79,6 @@ export default function AlertsPage() {
           Alert settings
         </Link>
       </div>
-    </div>
+    </PageContainer>
   );
 }

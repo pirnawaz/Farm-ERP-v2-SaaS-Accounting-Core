@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useOperationalTransaction, useDeleteOperationalTransaction, usePostOperationalTransaction, useOperationalTransactions } from '../hooks/useOperationalTransactions';
+import { Badge } from '../components/Badge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
@@ -99,14 +100,12 @@ export default function TransactionDetailPage() {
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
             <dd className="text-sm text-gray-900">
-              <span
+              <Badge
                 data-testid="status-badge"
-                className={`px-2 py-1 rounded text-xs ${
-                  transaction.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                }`}
+                variant={transaction.status === 'DRAFT' ? 'warning' : 'success'}
               >
                 {transaction.status}
-              </span>
+              </Badge>
             </dd>
           </div>
           <div>

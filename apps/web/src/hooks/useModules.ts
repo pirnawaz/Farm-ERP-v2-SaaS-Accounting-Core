@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UpdateTenantModulesPayload } from '@farm-erp/shared';
 import { modulesApi } from '../api/modules';
@@ -23,6 +24,26 @@ export function useTenantAddonModulesQuery() {
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
+}
+
+/**
+ * Orchards / Livestock addon flags (GET /api/tenant/addon-modules plus VITE_ENABLE_ORCHARDS / VITE_ENABLE_LIVESTOCK).
+ * Same rules as sidebar Land & Crops — use for licensing-aware UI (e.g. Farm Pulse unit view).
+ */
+export function useOrchardLivestockAddonsEnabled() {
+  const { data: addonData, status: addonStatus } = useTenantAddonModulesQuery();
+  return useMemo(() => {
+    const envOrchards = import.meta.env.VITE_ENABLE_ORCHARDS === 'true';
+    const envLivestock = import.meta.env.VITE_ENABLE_LIVESTOCK === 'true';
+    const showOrchards = envOrchards || (addonStatus === 'success' && addonData?.modules?.orchards === true);
+    const showLivestock = envLivestock || (addonStatus === 'success' && addonData?.modules?.livestock === true);
+    return {
+      showOrchards,
+      showLivestock,
+      /** True when at least one addon is available (or env override). */
+      hasOrchardLivestockModule: showOrchards || showLivestock,
+    };
+  }, [addonData, addonStatus]);
 }
 
 /** Update addon module enabled state (tenant_admin). Invalidates addon modules query so sidebar updates. */

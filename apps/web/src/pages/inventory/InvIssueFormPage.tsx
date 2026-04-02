@@ -9,10 +9,13 @@ import { useProjects } from '../../hooks/useProjects';
 import { useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { useMachinesQuery } from '../../hooks/useMachinery';
 import { useModules } from '../../contexts/ModulesContext';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import { useTenant } from '../../hooks/useTenant';
 import { useFormAutosave } from '../../hooks/useFormAutosave';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { PageContainer } from '../../components/PageContainer';
+import { FormCard } from '../../components/FormLayout';
 import { useRole } from '../../hooks/useRole';
 import { useParties } from '../../hooks/useParties';
 import { useProjectRule } from '../../hooks/useProjectRules';
@@ -80,9 +83,16 @@ export default function InvIssueFormPage() {
     enabled: !!crop_cycle_id && allocation_mode === 'SHARED',
   });
   const { isModuleEnabled } = useModules();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
   const machineryEnabled = isModuleEnabled('machinery');
   const { data: machines } = useMachinesQuery(undefined);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
+
+  useEffect(() => {
+    if (!hasOrchardLivestockModule) {
+      setProductionUnitId('');
+    }
+  }, [hasOrchardLivestockModule]);
 
   // Get hari parties (parties with HARI type)
   const hariParties = parties?.filter((p) => p.party_types?.includes('HARI')) || [];
@@ -155,6 +165,7 @@ export default function InvIssueFormPage() {
   }, [project_id]);
   useEffect(() => {
     if (!productionUnits?.length) return;
+    if (!hasOrchardLivestockModule) return;
     const fromUrl = searchParams.get('production_unit_id');
     if (fromUrl && productionUnits.some((u) => u.id === fromUrl)) {
       setProductionUnitId(fromUrl);
@@ -162,10 +173,11 @@ export default function InvIssueFormPage() {
     }
     const stored = getStored<string>(formStorageKeys.last_production_unit_id);
     if (stored && productionUnits.some((u) => u.id === stored) && !production_unit_id) setProductionUnitId(stored);
-  }, [productionUnits, searchParams]);
+  }, [productionUnits, searchParams, hasOrchardLivestockModule]);
   useEffect(() => {
+    if (!hasOrchardLivestockModule) return;
     if (production_unit_id) setStored(formStorageKeys.last_production_unit_id, production_unit_id);
-  }, [production_unit_id]);
+  }, [production_unit_id, hasOrchardLivestockModule]);
 
   const addLine = () => setLines((l) => [...l, { item_id: '', qty: '' }]);
   const removeLine = (i: number) => setLines((l) => l.filter((_, idx) => idx !== i));
@@ -328,7 +340,7 @@ export default function InvIssueFormPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <PageContainer width="form" className="space-y-6">
       <PageHeader
         title={`New ${term('issueSingular')}`}
         backTo="/app/inventory/issues"
@@ -348,7 +360,7 @@ export default function InvIssueFormPage() {
           <button type="button" onClick={discard} className="font-medium text-gray-600 hover:underline">Discard</button>
         </div>
       )}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6">
+      <FormCard>
         {hasLast && (
           <div className="flex justify-end">
             <button type="button" onClick={handleUseLast} className="text-sm font-medium text-[#1F6F5C] hover:underline">
@@ -383,19 +395,24 @@ export default function InvIssueFormPage() {
               {(projectsForCrop || [])?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Production Unit (optional)">
-            <select
-              value={production_unit_id}
-              onChange={(e) => setProductionUnitId(e.target.value)}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border rounded disabled:bg-gray-100"
-            >
-              <option value="">None</option>
-              {(productionUnits ?? []).map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </FormField>
+          {hasOrchardLivestockModule ? (
+            <FormField label="Orchard / Livestock / Long-cycle unit (optional)">
+              <select
+                value={production_unit_id}
+                onChange={(e) => setProductionUnitId(e.target.value)}
+                disabled={!canEdit}
+                className="w-full px-3 py-2 border rounded disabled:bg-gray-100"
+              >
+                <option value="">None</option>
+                {(productionUnits ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Optional. Use this when issuing inputs for an Orchard or Livestock unit. Seasonal issues usually leave this blank.
+              </p>
+            </FormField>
+          ) : null}
           <FormField label={`${term('activities')} (optional)`}>
             <select
               value={activity_id}
@@ -610,7 +627,7 @@ export default function InvIssueFormPage() {
             </button>
           </div>
         )}
-      </div>
-    </div>
+      </FormCard>
+    </PageContainer>
   );
 }

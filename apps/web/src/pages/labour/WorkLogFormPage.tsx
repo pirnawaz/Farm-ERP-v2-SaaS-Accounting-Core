@@ -7,10 +7,13 @@ import { useProductionUnits } from '../../hooks/useProductionUnits';
 import { useProjects } from '../../hooks/useProjects';
 import { useMachinesQuery } from '../../hooks/useMachinery';
 import { useModules } from '../../contexts/ModulesContext';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import { useTenant } from '../../hooks/useTenant';
 import { useFormAutosave } from '../../hooks/useFormAutosave';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { PageContainer } from '../../components/PageContainer';
+import { FormActions, FormCard, FormSection } from '../../components/FormLayout';
 import { useFormatting } from '../../hooks/useFormatting';
 import {
   generateDocNo,
@@ -53,6 +56,7 @@ export default function WorkLogFormPage() {
     crop_cycle_id && project_id ? { crop_cycle_id, project_id } : undefined
   );
   const { isModuleEnabled } = useModules();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
   const machineryEnabled = isModuleEnabled('machinery');
   const { data: machines } = useMachinesQuery(undefined);
   const { formatMoney } = useFormatting();
@@ -66,6 +70,12 @@ export default function WorkLogFormPage() {
   const [units, setUnits] = useState('');
   const [rate, setRate] = useState('');
   const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (!hasOrchardLivestockModule) {
+      setProductionUnitId('');
+    }
+  }, [hasOrchardLivestockModule]);
 
   // Defaults: active crop cycle, last project, last worker, last rate
   useEffect(() => {
@@ -221,7 +231,7 @@ export default function WorkLogFormPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-8">
+    <PageContainer width="form" className="space-y-6 pb-8">
       <PageHeader
         title="New Work Log"
         backTo="/app/labour/work-logs"
@@ -244,7 +254,7 @@ export default function WorkLogFormPage() {
           </button>
         </div>
       )}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6">
+      <FormCard>
         {hasLast && (
           <div className="flex justify-end">
             <button type="button" onClick={handleUseLast} className="text-sm font-medium text-[#1F6F5C] hover:underline">
@@ -253,8 +263,7 @@ export default function WorkLogFormPage() {
           </div>
         )}
         {/* Date */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Date</h2>
+        <FormSection title="Date">
           <FormField label="Work Date" required>
             <input
               type="date"
@@ -263,11 +272,10 @@ export default function WorkLogFormPage() {
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
             />
           </FormField>
-        </section>
+        </FormSection>
 
         {/* Work: cycle, project, activity, machine */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Work</h2>
+        <FormSection title="Work">
           <div className="space-y-4">
             <FormField label="Crop Cycle" required>
               <select
@@ -301,18 +309,23 @@ export default function WorkLogFormPage() {
                 ))}
               </select>
             </FormField>
-            <FormField label="Production Unit (optional)">
-              <select
-                value={production_unit_id}
-                onChange={(e) => setProductionUnitId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
-              >
-                <option value="">None</option>
-                {(productionUnits ?? []).map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-            </FormField>
+            {hasOrchardLivestockModule ? (
+              <FormField label="Orchard / Livestock / Long-cycle unit (optional)">
+                <select
+                  value={production_unit_id}
+                  onChange={(e) => setProductionUnitId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] focus:border-[#1F6F5C]"
+                >
+                  <option value="">None</option>
+                  {(productionUnits ?? []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional. Use this when logging work for an Orchard or Livestock unit. Seasonal work usually leaves this blank.
+                </p>
+              </FormField>
+            ) : null}
             <FormField label="Activity (optional)">
               <select
                 value={activity_id}
@@ -345,11 +358,10 @@ export default function WorkLogFormPage() {
               </FormField>
             )}
           </div>
-        </section>
+        </FormSection>
 
         {/* Labour */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Labour</h2>
+        <FormSection title="Labour">
           <div className="space-y-4">
             <FormField label="Worker" required>
               <select
@@ -398,7 +410,7 @@ export default function WorkLogFormPage() {
             </div>
             <p className="font-medium text-gray-700">Amount: <span className="tabular-nums">{formatMoney(amount)}</span></p>
           </div>
-        </section>
+        </FormSection>
 
         <FormField label="Doc No (optional)">
           <input
@@ -417,7 +429,7 @@ export default function WorkLogFormPage() {
           />
         </FormField>
 
-        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
+        <FormActions>
           <button
             type="button"
             onClick={() => navigate('/app/labour/work-logs')}
@@ -439,8 +451,8 @@ export default function WorkLogFormPage() {
           >
             {createM.isPending ? 'Creating...' : 'Create'}
           </button>
-        </div>
-      </div>
-    </div>
+        </FormActions>
+      </FormCard>
+    </PageContainer>
   );
 }

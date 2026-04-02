@@ -5,6 +5,7 @@ import { apiClient } from '@farm-erp/shared';
 import type { AccountBalanceRow } from '@farm-erp/shared';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageContainer } from '../../components/PageContainer';
 import { useFormatting } from '../../hooks/useFormatting';
 
 export default function PayablesPage() {
@@ -29,15 +30,15 @@ export default function PayablesPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+      <PageContainer className="pb-24 sm:pb-6">
         <PageHeader title="Bills to pay" backTo="/app/farm-pulse" breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Farm Pulse', to: '/app/farm-pulse' }, { label: 'Payables' }]} />
         <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Bills to pay"
         backTo="/app/farm-pulse"
@@ -76,6 +77,6 @@ export default function PayablesPage() {
           Record payment
         </Link>
       </div>
-    </div>
+    </PageContainer>
   );
 }

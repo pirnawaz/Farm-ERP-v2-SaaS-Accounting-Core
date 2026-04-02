@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { term } from '../../config/terminology';
+import { Badge } from '../../components/Badge';
 import type { InvAdjustment, InvAdjustmentReason } from '../../types';
 
 const REASONS: InvAdjustmentReason[] = ['LOSS', 'DAMAGE', 'COUNT_GAIN', 'COUNT_LOSS', 'OTHER'];
@@ -34,7 +35,9 @@ export default function InvAdjustmentsPage() {
     {
       header: 'Status',
       accessor: (r) => (
-        <span className={`px-2 py-1 rounded text-xs ${r.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : r.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{r.status}</span>
+        <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
+          {r.status}
+        </Badge>
       ),
     },
   ];

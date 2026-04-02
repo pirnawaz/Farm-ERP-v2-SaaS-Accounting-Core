@@ -24,7 +24,6 @@ const DENY_ALL_CROP_CYCLES_PREFIXES: readonly string[] = [
   '/app/accounting',
   '/app/posting-groups',
   '/app/crop-cycles/season-setup',
-  '/app/production-units',
 ];
 
 const INVENTORY_DASHBOARD_PATH = '/app/inventory';

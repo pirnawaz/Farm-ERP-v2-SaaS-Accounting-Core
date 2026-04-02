@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { usePayablesOutstanding } from '../../hooks/useLabour';
 import { PageHeader } from '../../components/PageHeader';
+import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { PayablesOutstandingRow } from '../../types';
@@ -31,7 +32,10 @@ export default function PayablesOutstandingPage() {
         {isLoading ? (
           <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
         ) : !rows || rows.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">No worker balances. Post work logs to accrue wages payable.</div>
+          <EmptyState
+            title="No balances yet"
+            description="Post work logs to accrue wages payable."
+          />
         ) : (
           <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">

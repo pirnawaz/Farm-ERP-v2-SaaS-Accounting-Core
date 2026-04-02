@@ -5,10 +5,12 @@ import { useParties } from '../../hooks/useParties';
 import { useInventoryStores, useInventoryItems } from '../../hooks/useInventory';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { PageContainer } from '../../components/PageContainer';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { generateDocNo, getStored, setStored, formStorageKeys } from '../../utils/formDefaults';
 import { term } from '../../config/terminology';
+import { FormActions, FormCard, FormSection } from '../../components/FormLayout';
 import type { CreateInvGrnPayload } from '../../types';
 
 type Line = { item_id: string; qty: string; unit_cost: string };
@@ -85,7 +87,7 @@ export default function InvGrnFormPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <PageContainer width="form" className="space-y-6">
       <PageHeader
         title={`New ${term('grnSingular')}`}
         backTo="/app/inventory/grns"
@@ -97,9 +99,8 @@ export default function InvGrnFormPage() {
         ]}
       />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-6">
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Header</h2>
+      <FormCard>
+        <FormSection title="Header">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Doc No">
               <input
@@ -146,11 +147,14 @@ export default function InvGrnFormPage() {
               </select>
             </FormField>
           </div>
-        </section>
+        </FormSection>
 
-        <section className="space-y-4">
+        <FormSection
+          title="Lines"
+          className="pt-2"
+        >
           <div className="flex justify-between items-center">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Lines</h2>
+            <div />
             {canEdit && (
               <button type="button" onClick={addLine} className="text-sm font-medium text-[#1F6F5C] hover:underline">
                 + Add line
@@ -214,10 +218,10 @@ export default function InvGrnFormPage() {
             ))}
           </div>
           <p className="font-medium text-gray-700">Total: <span className="tabular-nums">{formatMoney(total)}</span></p>
-        </section>
+        </FormSection>
 
         {canEdit && (
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
+          <FormActions>
             <button
               type="button"
               onClick={() => navigate('/app/inventory/grns')}
@@ -232,9 +236,9 @@ export default function InvGrnFormPage() {
             >
               {createM.isPending ? 'Creating...' : 'Create'}
             </button>
-          </div>
+          </FormActions>
         )}
-      </div>
-    </div>
+      </FormCard>
+    </PageContainer>
   );
 }

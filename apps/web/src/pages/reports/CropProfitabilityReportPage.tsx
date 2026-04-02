@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useCropProfitability } from '../../hooks/useReports';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 import type { CropProfitabilityRow, CropProfitabilityGroupBy } from '../../types';
+import { ReportLoadingState, ReportEmptyStateCard, ReportFilterCard, ReportKindBadge, ReportMetadataBlock, ReportPage } from '../../components/report';
+import { EMPTY_COPY } from '../../config/presentation';
 
 const n = (v?: string | null) => (v ? Number(v) : 0);
 const fmt = (v?: string | null) => v ?? '—';
@@ -57,17 +60,21 @@ function stableSort<T>(arr: T[], compare: (a: T, b: T) => number): T[] {
 }
 
 export default function CropProfitabilityReportPage() {
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDateRange } = useFormatting();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
   const [searchParams] = useSearchParams();
   const [from, setFrom] = useState(startOfCurrentMonth);
   const [to, setTo] = useState(today);
   const [groupBy, setGroupBy] = useState<CropProfitabilityGroupBy>('crop');
+  const [productionUnitId, setProductionUnitId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const fromParam = searchParams.get('from');
     const toParam = searchParams.get('to');
+    const unitParam = searchParams.get('production_unit_id');
     if (fromParam) setFrom(fromParam);
     if (toParam) setTo(toParam);
+    setProductionUnitId(unitParam && unitParam.trim() !== '' ? unitParam : undefined);
   }, [searchParams]);
   const [includeUnassigned, setIncludeUnassigned] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('margin_per_acre');
@@ -80,8 +87,9 @@ export default function CropProfitabilityReportPage() {
       to,
       group_by: groupBy,
       include_unassigned: includeUnassigned,
+      ...(productionUnitId ? { production_unit_id: productionUnitId } : {}),
     }),
-    [from, to, groupBy, includeUnassigned]
+    [from, to, groupBy, includeUnassigned, productionUnitId]
   );
   const { data, isLoading, isFetching } = useCropProfitability(params, {
     enabled: !toBeforeFrom && !!from && !!to,
@@ -148,14 +156,30 @@ export default function CropProfitabilityReportPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <ReportPage>
       <PageHeader
         title="Crop Profitability"
         backTo="/app/reports"
         breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: 'Crop Profitability' }]}
+        right={<ReportKindBadge kind="accounting" />}
       />
 
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
+      <ReportMetadataBlock reportingPeriodRange={formatDateRange(from, to)} />
+
+      <ReportFilterCard>
+        <p className="text-sm text-gray-600">
+          Accounting view by crop/cycle over a reporting period.
+          {hasOrchardLivestockModule ? (
+            <>
+              {' '}
+              For continuity across time by orchard/livestock unit, use{' '}
+              <Link className="text-[#1F6F5C] hover:underline font-medium" to="/app/reports/production-units-profitability">
+                Orchard &amp; Livestock performance
+              </Link>
+              .
+            </>
+          ) : null}
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
@@ -205,7 +229,7 @@ export default function CropProfitabilityReportPage() {
             </label>
           </div>
         </div>
-      </div>
+      </ReportFilterCard>
 
       {!includeUnassigned && (
         <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg text-sm">
@@ -224,13 +248,11 @@ export default function CropProfitabilityReportPage() {
       )}
 
       {isLoading || isFetching ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          Loading…
-        </div>
+        <ReportLoadingState />
       ) : data ? (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {rows.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No data for selected period.</div>
+            <ReportEmptyStateCard message={EMPTY_COPY.noDataForPeriod} className="shadow-none" />
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -347,6 +369,6 @@ export default function CropProfitabilityReportPage() {
           )}
         </div>
       ) : null}
-    </div>
+    </ReportPage>
   );
 }

@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { term } from '../../config/terminology';
+import { Badge } from '../../components/Badge';
 import type { InvIssue } from '../../types';
 
 export default function InvIssuesPage() {
@@ -24,12 +25,14 @@ export default function InvIssuesPage() {
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
     { header: 'Project', accessor: (r) => r.project?.name || r.project_id },
     { header: 'Doc Date', accessor: (r) => formatDate(r.doc_date) },
-    { header: 'Status', accessor: (r) => (
-      <span className={`px-2 py-1 rounded text-xs ${
-        r.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-        r.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-      }`}>{r.status}</span>
-    ) },
+    {
+      header: 'Status',
+      accessor: (r) => (
+        <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
+          {r.status}
+        </Badge>
+      ),
+    },
   ];
 
   return (

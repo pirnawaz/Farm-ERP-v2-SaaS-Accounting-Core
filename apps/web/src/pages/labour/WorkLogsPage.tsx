@@ -7,6 +7,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
+import { Badge } from '../../components/Badge';
 import type { LabWorkLog } from '../../types';
 import { term } from '../../config/terminology';
 
@@ -41,12 +42,14 @@ export default function WorkLogsPage() {
     { header: 'Units', accessor: 'units' },
     { header: 'Rate', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.rate)}</span> },
     { header: 'Amount', accessor: (r) => <span className="tabular-nums text-right block">{formatMoney(r.amount)}</span> },
-    { header: 'Status', accessor: (r) => (
-      <span className={`px-2 py-1 rounded text-xs ${
-        r.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-        r.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-      }`}>{r.status}</span>
-    ) },
+    {
+      header: 'Status',
+      accessor: (r) => (
+        <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
+          {r.status}
+        </Badge>
+      ),
+    },
   ];
 
   return (

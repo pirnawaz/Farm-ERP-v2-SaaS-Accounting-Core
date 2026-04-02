@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useSale, useDeleteSale, usePostSale, useReverseSale } from '../hooks/useSales';
+import { Badge } from '../components/Badge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
@@ -185,11 +186,7 @@ export default function SaleDetailPage() {
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
             <dd className="text-sm text-gray-900">
-              <span className={`px-2 py-1 rounded text-xs ${
-                sale.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-              }`}>
-                {sale.status}
-              </span>
+              <Badge variant={sale.status === 'DRAFT' ? 'warning' : 'success'}>{sale.status}</Badge>
             </dd>
           </div>
           <div>

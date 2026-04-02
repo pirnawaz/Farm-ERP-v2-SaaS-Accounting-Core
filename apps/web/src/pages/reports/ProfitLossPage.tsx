@@ -3,6 +3,8 @@ import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useProfitLoss } from '../../hooks/useReports';
 import { term } from '../../config/terminology';
+import { EMPTY_COPY } from '../../config/presentation';
+import { ReportErrorState, ReportKindBadge, ReportLoadingState, ReportMetadataBlock, ReportFilterCard, ReportPage, ReportSectionCard, ReportEmptyState } from '../../components/report';
 
 const defaultFrom = () => {
   const d = new Date();
@@ -12,7 +14,7 @@ const defaultFrom = () => {
 const defaultTo = () => new Date().toISOString().split('T')[0];
 
 export default function ProfitLossPage() {
-  const { formatMoney } = useFormatting();
+  const { formatMoney, formatDateRange } = useFormatting();
   const [from, setFrom] = useState(defaultFrom());
   const [to, setTo] = useState(defaultTo());
   const [compareEnabled, setCompareEnabled] = useState(false);
@@ -27,14 +29,17 @@ export default function ProfitLossPage() {
   const { data, isLoading, error } = useProfitLoss(params);
 
   return (
-    <div className="space-y-6">
+    <ReportPage>
       <PageHeader
         title={term('profitAndLoss')}
         backTo="/app/reports"
         breadcrumbs={[{ label: 'Profit & Reports', to: '/app/reports' }, { label: term('profitAndLoss') }]}
+        right={<ReportKindBadge kind="accounting" />}
       />
 
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
+      <ReportMetadataBlock reportingPeriodRange={formatDateRange(from, to)} />
+
+      <ReportFilterCard>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
@@ -88,16 +93,10 @@ export default function ProfitLossPage() {
             </>
           )}
         </div>
-      </div>
+      </ReportFilterCard>
 
-      {isLoading && (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">Loading…</div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error.message}
-        </div>
-      )}
+      {isLoading && <ReportLoadingState label="Loading profit & loss..." />}
+      {error && <ReportErrorState error={error} />}
 
       {data && !isLoading && (
         <>
@@ -115,7 +114,7 @@ export default function ProfitLossPage() {
           </div>
 
           {data.sections.map((section) => (
-            <div key={section.key} className="bg-white rounded-lg shadow overflow-hidden">
+            <ReportSectionCard key={section.key}>
               <div className="px-4 py-3 bg-[#E6ECEA] font-medium text-gray-800">{section.label}</div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -134,11 +133,7 @@ export default function ProfitLossPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {section.lines.length === 0 ? (
-                      <tr>
-                        <td colSpan={data.compare ? 5 : 3} className="px-4 py-3 text-center text-gray-500 text-sm">
-                          No lines
-                        </td>
-                      </tr>
+                      <ReportEmptyState colSpan={data.compare ? 5 : 3} message={EMPTY_COPY.noRecords} />
                     ) : (
                       section.lines.map((line, idx) => (
                         <tr key={line.account_id ?? idx}>
@@ -168,7 +163,7 @@ export default function ProfitLossPage() {
                   </tfoot>
                 </table>
               </div>
-            </div>
+            </ReportSectionCard>
           ))}
 
           {data.compare && (
@@ -182,6 +177,6 @@ export default function ProfitLossPage() {
           )}
         </>
       )}
-    </div>
+    </ReportPage>
   );
 }

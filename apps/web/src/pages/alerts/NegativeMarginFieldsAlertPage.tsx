@@ -8,6 +8,7 @@ import { useAlertPreferences } from '../../hooks/useAlertPreferences';
 import { getActiveCropCycleId } from '../../utils/formDefaults';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageContainer } from '../../components/PageContainer';
 import { useFormatting } from '../../hooks/useFormatting';
 
 export default function NegativeMarginFieldsAlertPage() {
@@ -66,7 +67,7 @@ export default function NegativeMarginFieldsAlertPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+      <PageContainer className="pb-24 sm:pb-6">
         <PageHeader
           title="Negative margin fields"
           backTo="/app/alerts"
@@ -79,12 +80,12 @@ export default function NegativeMarginFieldsAlertPage() {
         <div className="flex justify-center py-12">
           <LoadingSpinner />
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Negative margin fields"
         backTo="/app/alerts"
@@ -163,6 +164,6 @@ export default function NegativeMarginFieldsAlertPage() {
           Project P&L
         </Link>
       </div>
-    </div>
+    </PageContainer>
   );
 }

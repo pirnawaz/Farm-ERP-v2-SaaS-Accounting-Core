@@ -16,6 +16,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import type { MachineryService } from '../../types';
 import { term } from '../../config/terminology';
+import { Badge } from '../../components/Badge';
 
 export default function MachineryServicesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -118,17 +119,13 @@ export default function MachineryServicesPage() {
     {
       header: 'Status',
       accessor: (row) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            row.status === 'DRAFT'
-              ? 'bg-yellow-100 text-yellow-800'
-              : row.status === 'POSTED'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
-          }`}
+        <Badge
+          variant={
+            row.status === 'DRAFT' ? 'warning' : row.status === 'POSTED' ? 'success' : 'danger'
+          }
         >
           {row.status}
-        </span>
+        </Badge>
       ),
     },
     {

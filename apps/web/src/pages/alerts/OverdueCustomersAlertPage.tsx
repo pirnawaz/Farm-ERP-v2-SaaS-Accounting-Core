@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@farm-erp/shared';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageContainer } from '../../components/PageContainer';
 import { useFormatting } from '../../hooks/useFormatting';
 import { useAlertPreferences } from '../../hooks/useAlertPreferences';
 import { isOverdueInBucketOrWorse } from '../../utils/alertOverdueBucket';
@@ -38,7 +39,7 @@ export default function OverdueCustomersAlertPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+      <PageContainer className="pb-24 sm:pb-6">
         <PageHeader
           title="Overdue customers"
           backTo="/app/alerts"
@@ -51,12 +52,12 @@ export default function OverdueCustomersAlertPage() {
         <div className="flex justify-center py-12">
           <LoadingSpinner />
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 sm:pb-6">
+    <PageContainer className="pb-24 sm:pb-6">
       <PageHeader
         title="Overdue customers"
         backTo="/app/alerts"
@@ -124,6 +125,6 @@ export default function OverdueCustomersAlertPage() {
       >
         Full AR Ageing report
       </Link>
-    </div>
+    </PageContainer>
   );
 }
