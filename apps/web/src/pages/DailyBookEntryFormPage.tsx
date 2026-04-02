@@ -179,7 +179,7 @@ function DailyBookEntryFormPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Amount *
@@ -211,11 +211,11 @@ function DailyBookEntryFormPage() {
           </div>
         </div>
 
-        <div className="flex justify-end space-x-4 pt-4">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
           <button
             type="button"
             onClick={() => navigate('/daily-book-entries')}
-            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+            className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
           >
             {isReadOnly ? 'Back' : 'Cancel'}
           </button>
@@ -223,7 +223,7 @@ function DailyBookEntryFormPage() {
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
             </button>

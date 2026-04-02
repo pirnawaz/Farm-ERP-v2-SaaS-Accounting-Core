@@ -119,7 +119,7 @@ export default function ReportsPage() {
                 columns={trialBalanceColumns}
               />
               <div className="p-4 bg-gray-50 border-t">
-                <div className="grid grid-cols-3 gap-4 text-sm font-medium">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm font-medium">
                   <div>
                     Total Debit: <span className="tabular-nums">{formatMoney(totalDebit)}</span>
                   </div>
@@ -276,7 +276,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div>
                 <h3 className="font-medium text-gray-900 mb-2">Totals</h3>
-                <dl className="grid grid-cols-3 gap-4">
+                <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <dt className="text-sm text-gray-500">Revenue</dt>
                     <dd className="text-lg font-semibold tabular-nums">{formatMoney(projectStatement.totals.revenue)}</dd>
@@ -294,7 +294,7 @@ export default function ReportsPage() {
               {projectStatement.settlement && (
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Settlement</h3>
-                  <dl className="grid grid-cols-2 gap-4">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <dt className="text-sm text-gray-500">Pool Revenue</dt>
                       <dd className="text-sm font-semibold tabular-nums">{formatMoney(projectStatement.settlement.pool_revenue)}</dd>
@@ -356,7 +356,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex min-w-max gap-x-8 gap-y-2 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('trial-balance')}

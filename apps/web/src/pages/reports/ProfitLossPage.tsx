@@ -5,6 +5,7 @@ import { useProfitLoss } from '../../hooks/useReports';
 import { term } from '../../config/terminology';
 import { EMPTY_COPY } from '../../config/presentation';
 import { ReportErrorState, ReportKindBadge, ReportLoadingState, ReportMetadataBlock, ReportFilterCard, ReportPage, ReportSectionCard, ReportEmptyState } from '../../components/report';
+import { FilterBar, FilterCheckboxField, FilterField, FilterGrid } from '../../components/FilterBar';
 
 const defaultFrom = () => {
   const d = new Date();
@@ -40,59 +41,40 @@ export default function ProfitLossPage() {
       <ReportMetadataBlock reportingPeriodRange={formatDateRange(from, to)} />
 
       <ReportFilterCard>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+        <FilterBar>
+          <FilterGrid className="lg:grid-cols-4 xl:grid-cols-4">
+            <FilterField label="From">
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </FilterField>
+            <FilterField label="To">
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </FilterField>
+            <div className="sm:pt-7">
+              <FilterCheckboxField
+                id="compare-period"
+                label="Compare period"
                 checked={compareEnabled}
-                onChange={(e) => setCompareEnabled(e.target.checked)}
-                className="rounded border-gray-300"
+                onChange={(checked) => {
+                  setCompareEnabled(checked);
+                  if (!checked) {
+                    setCompareFrom('');
+                    setCompareTo('');
+                  }
+                }}
               />
-              <span className="text-sm text-gray-700">Compare period</span>
-            </label>
-          </div>
-          {compareEnabled && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Compare from</label>
-                <input
-                  type="date"
-                  value={compareFrom}
-                  onChange={(e) => setCompareFrom(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Compare to</label>
-                <input
-                  type="date"
-                  value={compareTo}
-                  onChange={(e) => setCompareTo(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                />
-              </div>
-            </>
-          )}
-        </div>
+            </div>
+            {compareEnabled && (
+              <>
+                <FilterField label="Compare from">
+                  <input type="date" value={compareFrom} onChange={(e) => setCompareFrom(e.target.value)} />
+                </FilterField>
+                <FilterField label="Compare to">
+                  <input type="date" value={compareTo} onChange={(e) => setCompareTo(e.target.value)} />
+                </FilterField>
+              </>
+            )}
+          </FilterGrid>
+        </FilterBar>
       </ReportFilterCard>
 
       {isLoading && <ReportLoadingState label="Loading profit & loss..." />}
@@ -169,7 +151,7 @@ export default function ProfitLossPage() {
           {data.compare && (
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm font-medium text-gray-700 mb-2">Compare period: {data.compare.from} to {data.compare.to}</div>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                 <span className="text-sm text-gray-600">Compare net profit: {formatMoney(data.compare.net_profit)}</span>
                 <span className="text-sm text-gray-600">Delta: {formatMoney(data.compare.delta)}</span>
               </div>

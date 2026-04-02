@@ -208,7 +208,7 @@ export default function PaymentDetailPage() {
               <dd className="text-sm text-gray-900">
                 <div className="space-y-2">
                   {payment.sale_allocations.map((alloc) => (
-                    <div key={alloc.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                    <div key={alloc.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 bg-gray-50 p-2 rounded">
                       <div>
                         <Link
                           to={`/app/sales/${alloc.sale_id}`}
@@ -220,7 +220,7 @@ export default function PaymentDetailPage() {
                           ({alloc.allocation_date})
                         </span>
                       </div>
-                      <span className="font-medium"><span className="tabular-nums">{formatMoney(alloc.amount)}</span></span>
+                      <span className="font-medium sm:text-right"><span className="tabular-nums">{formatMoney(alloc.amount)}</span></span>
                     </div>
                   ))}
                 </div>
@@ -231,25 +231,25 @@ export default function PaymentDetailPage() {
       </div>
 
       {(isDraft || canReverse) && (
-        <div className="bg-white rounded-lg shadow p-6 flex justify-end space-x-4">
+        <div className="bg-white rounded-lg shadow p-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
           {isDraft && (
             <>
               <Link
                 to={`/app/payments/${id}/edit`}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-center"
               >
                 Edit
               </Link>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
               >
                 Delete
               </button>
               {canPost && (
                 <button
                   onClick={() => setShowPostModal(true)}
-                  className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+                  className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
                 >
                   {term('postAction')}
                 </button>
@@ -259,7 +259,7 @@ export default function PaymentDetailPage() {
           {canReverse && (
             <button
               onClick={() => setShowReverseModal(true)}
-              className="px-4 py-2 border border-amber-600 text-amber-700 rounded-md hover:bg-amber-50"
+              className="w-full sm:w-auto px-4 py-2 border border-amber-600 text-amber-700 rounded-md hover:bg-amber-50"
             >
               {term('reverseAction')}
             </button>
@@ -301,17 +301,17 @@ export default function PaymentDetailPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
             />
           </FormField>
-          <div className="flex justify-end space-x-4 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <button
               onClick={() => setShowPostModal(false)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               onClick={handlePost}
               disabled={postMutation.isPending || (!payment.settlement_id && !cropCycleId)}
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
             >
               {postMutation.isPending ? term('postActionPending') : term('postAction')}
             </button>
@@ -341,17 +341,17 @@ export default function PaymentDetailPage() {
               placeholder="e.g. Duplicate entry, wrong amount"
             />
           </FormField>
-          <div className="flex justify-end space-x-4 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <button
               onClick={() => setShowReverseModal(false)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               onClick={handleReverse}
               disabled={reverseMutation.isPending}
-              className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
             >
               {reverseMutation.isPending ? term('reverseActionPending') : term('reverseAction')}
             </button>

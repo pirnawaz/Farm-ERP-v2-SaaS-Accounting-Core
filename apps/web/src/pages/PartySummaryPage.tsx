@@ -15,6 +15,8 @@ import { term } from '../config/terminology';
 import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock';
 import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata';
 import { ReportErrorState, ReportLoadingState } from '../components/report';
+import { PageContainer } from '../components/PageContainer';
+import { FilterBar, FilterField, FilterGrid } from '../components/FilterBar';
 
 function PartySummaryPage() {
   const { formatMoney, formatDateRange } = useFormatting();
@@ -117,20 +119,20 @@ function PartySummaryPage() {
   const totals = data?.totals;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center no-print">
+    <PageContainer className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
         <h2 className="text-2xl font-bold">Role Summary</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={() => window.print()}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
           >
             Print
           </button>
           <button
             onClick={handleExport}
             disabled={!data?.rows?.length}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
           >
             Export CSV
           </button>
@@ -138,69 +140,61 @@ function PartySummaryPage() {
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <input
-              type="date"
-              value={filters.from}
-              onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <select
-              value={filters.role}
-              onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">All</option>
-              <option value="HARI">Hari</option>
-              <option value="LANDLORD">Landlord</option>
-              <option value="KAMDAR">Kamdar</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{term('fieldCycle')}</label>
-            <select
-              value={filters.project_id}
-              onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">{`All ${term('fieldCycles')}`}</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Crop Cycle</label>
-            <select
-              value={filters.crop_cycle_id}
-              onChange={(e) => setFilters({ ...filters, crop_cycle_id: e.target.value })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">All Crop Cycles</option>
-              {cropCycles.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <FilterBar>
+          <FilterGrid>
+            <FilterField label="From Date">
+              <input
+                type="date"
+                value={filters.from}
+                onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+              />
+            </FilterField>
+            <FilterField label="To Date">
+              <input
+                type="date"
+                value={filters.to}
+                onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+              />
+            </FilterField>
+            <FilterField label="Role">
+              <select
+                value={filters.role}
+                onChange={(e) => setFilters({ ...filters, role: e.target.value })}
+              >
+                <option value="">All</option>
+                <option value="HARI">Hari</option>
+                <option value="LANDLORD">Landlord</option>
+                <option value="KAMDAR">Kamdar</option>
+              </select>
+            </FilterField>
+            <FilterField label={term('fieldCycle')}>
+              <select
+                value={filters.project_id}
+                onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
+              >
+                <option value="">{`All ${term('fieldCycles')}`}</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+            <FilterField label="Crop Cycle">
+              <select
+                value={filters.crop_cycle_id}
+                onChange={(e) => setFilters({ ...filters, crop_cycle_id: e.target.value })}
+              >
+                <option value="">All Crop Cycles</option>
+                {cropCycles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+          </FilterGrid>
+        </FilterBar>
         <p className="text-sm text-gray-600 mt-2">
           Shows balances summarized by role (Hari/Landlord/Kamdar). Use Party Ledger for detailed transactions.
         </p>
@@ -220,19 +214,19 @@ function PartySummaryPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-[#E6ECEA]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Party
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Role
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Opening
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Movement
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Closing
                     </th>
                   </tr>
@@ -240,7 +234,7 @@ function PartySummaryPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={5} className="px-3 sm:px-6 py-3 sm:py-4 text-center text-gray-500">
                         No activity found for this period.
                       </td>
                     </tr>
@@ -251,19 +245,19 @@ function PartySummaryPage() {
                         onClick={() => handleRowClick(row)}
                         className="cursor-pointer hover:bg-gray-50"
                       >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-normal break-words text-sm text-gray-900">
                           {row.party_name}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                           {row.role}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right tabular-nums">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-900 text-right tabular-nums">
                           {formatMoney(row.opening_balance)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right tabular-nums">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-900 text-right tabular-nums">
                           {formatMoney(row.period_movement)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right tabular-nums">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right tabular-nums">
                           {formatMoney(row.closing_balance)}
                         </td>
                       </tr>
@@ -273,16 +267,16 @@ function PartySummaryPage() {
                 {totals && rows.length > 0 && (
                   <tfoot className="bg-[#E6ECEA] font-medium">
                     <tr>
-                      <td className="px-6 py-3 text-sm text-gray-700" colSpan={2}>
+                      <td className="px-3 sm:px-6 py-3 text-sm text-gray-700" colSpan={2}>
                         Totals
                       </td>
-                      <td className="px-6 py-3 text-right text-sm tabular-nums">
+                      <td className="px-3 sm:px-6 py-3 text-right text-sm tabular-nums">
                         {formatMoney(totals.opening_balance)}
                       </td>
-                      <td className="px-6 py-3 text-right text-sm tabular-nums">
+                      <td className="px-3 sm:px-6 py-3 text-right text-sm tabular-nums">
                         {formatMoney(totals.period_movement)}
                       </td>
-                      <td className="px-6 py-3 text-right text-sm tabular-nums">
+                      <td className="px-3 sm:px-6 py-3 text-right text-sm tabular-nums">
                         {formatMoney(totals.closing_balance)}
                       </td>
                     </tr>
@@ -357,7 +351,7 @@ function PartySummaryPage() {
           </PrintableReport>
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

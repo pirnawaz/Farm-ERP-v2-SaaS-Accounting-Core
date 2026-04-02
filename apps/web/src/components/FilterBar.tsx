@@ -12,7 +12,8 @@ export function FilterGrid(props: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cx(
-        'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end',
+        // Mobile-first: 1 col on phones, 2 on small/tablet, 3 on desktop, expand to 5 only when space allows.
+        'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end',
         props.className
       )}
     >

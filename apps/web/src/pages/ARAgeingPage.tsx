@@ -7,6 +7,8 @@ import type { ARAgeingReport } from '../types';
 import { term } from '../config/terminology';
 import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock';
 import { ReportEmptyStateCard, ReportErrorState, ReportLoadingState } from '../components/report';
+import { PageContainer } from '../components/PageContainer';
+import { FilterBar, FilterField, FilterGrid } from '../components/FilterBar';
 
 export default function ARAgeingPage() {
   const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -34,27 +36,27 @@ export default function ARAgeingPage() {
   ];
 
   return (
-    <div>
-      <div className="mb-6">
+    <PageContainer className="space-y-6">
+      <div>
         <h1 className="text-2xl font-bold text-gray-900">{term('arAgeing')} Report</h1>
         <p className="text-sm text-gray-600 mt-1">
           Shows outstanding receivables grouped by ageing buckets
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="flex items-center space-x-4 mb-4">
-          <label className="text-sm font-medium text-gray-700">As of</label>
-          <input
-            type="date"
-            value={asOfDate}
-            onChange={(e) => setAsOfDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-          />
+      <div className="no-print">
+        <div className="bg-white rounded-lg shadow p-4">
+          <FilterBar>
+            <FilterGrid className="lg:grid-cols-2 xl:grid-cols-2">
+              <FilterField label="As of">
+                <input type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+              </FilterField>
+            </FilterGrid>
+          </FilterBar>
         </div>
       </div>
 
-      <div className="no-print mb-6">
+      <div className="no-print">
         <ReportMetadataBlock asOfDate={formatDate(asOfDate)} />
       </div>
 
@@ -74,7 +76,7 @@ export default function ARAgeingPage() {
                 
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <h3 className="text-md font-medium text-gray-900 mb-4">Totals</h3>
-                  <div className="grid grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
                     <div>
                       <div className="text-sm text-gray-500">Total Outstanding</div>
                       <div className="text-lg font-semibold"><span className="tabular-nums">{formatMoney(report.totals.total_outstanding)}</span></div>
@@ -104,6 +106,6 @@ export default function ARAgeingPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

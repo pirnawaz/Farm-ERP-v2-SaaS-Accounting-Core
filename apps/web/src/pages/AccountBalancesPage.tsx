@@ -98,13 +98,13 @@ function AccountBalancesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center no-print">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
         <h2 className="text-2xl font-bold">Account Balances</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => window.print()}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
           >
             Print
           </button>
@@ -112,7 +112,7 @@ function AccountBalancesPage() {
             type="button"
             onClick={handleExport}
             disabled={data.length === 0}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
           >
             Export CSV
           </button>
@@ -120,7 +120,7 @@ function AccountBalancesPage() {
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">As of</label>
             <input

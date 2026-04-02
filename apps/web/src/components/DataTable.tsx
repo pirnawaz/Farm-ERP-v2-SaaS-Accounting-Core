@@ -73,7 +73,7 @@ export function DataTable<T extends { id: string }>({
               return (
                 <th
                   key={idx}
-                  className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${alignClass} ${column.headerClassName ?? ''}`}
+                  className={`px-3 sm:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${alignClass} ${column.headerClassName ?? ''}`}
                   scope="col"
                   aria-label={column.header}
                 >
@@ -102,7 +102,7 @@ export function DataTable<T extends { id: string }>({
                 return (
                   <td
                     key={idx}
-                    className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${alignClass} ${column.numeric ? 'tabular-nums' : ''} ${column.cellClassName ?? ''}`}
+                    className={`px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-900 ${alignClass} ${column.numeric ? 'tabular-nums whitespace-nowrap' : 'whitespace-normal break-words'} ${column.cellClassName ?? ''}`}
                   >
                     {renderCell(row, column)}
                   </td>

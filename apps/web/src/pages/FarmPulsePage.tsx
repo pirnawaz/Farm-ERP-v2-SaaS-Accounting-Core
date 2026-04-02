@@ -517,7 +517,7 @@ export default function FarmPulsePage() {
               <LoadingSpinner />
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <HeroCard
                 title="Cash in hand"
                 value={cash != null ? formatMoney(cash) : '—'}
@@ -617,7 +617,7 @@ export default function FarmPulsePage() {
             </h2>
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
               {dailyReview ? (
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-gray-500">Records created today</p>
                     <p className="font-semibold tabular-nums text-gray-900">

@@ -263,9 +263,9 @@ export default function PaymentFormPage() {
 
               {!isEdit && formData.amount && parseFloat(String(formData.amount)) > 0 && formData.payment_date && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
                     <h4 className="text-sm font-medium text-gray-900">Payment Allocation</h4>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       <label className="flex items-center">
                         <input
                           type="radio"
@@ -315,14 +315,14 @@ export default function PaymentFormPage() {
                           <p className="text-xs text-gray-600 mb-2">Manual allocation:</p>
                           <div className="space-y-2 max-h-64 overflow-y-auto">
                             {allocationPreview.open_sales.map((sale: OpenSale) => (
-                              <div key={sale.sale_id} className="flex items-center space-x-4 bg-gray-50 p-2 rounded">
-                                <div className="flex-1 text-sm">
+                              <div key={sale.sale_id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 bg-gray-50 p-2 rounded">
+                                <div className="flex-1 min-w-0 text-sm">
                                   <div className="font-medium">{sale.sale_no || 'Sale'} ({formatDate(sale.posting_date)})</div>
                                   <div className="text-xs text-gray-500">
                                     Outstanding: <span className="tabular-nums">{formatMoney(sale.outstanding)}</span>
                                   </div>
                                 </div>
-                                <div className="w-32">
+                                <div className="w-full sm:w-32 shrink-0">
                                   <input
                                     type="number"
                                     step="0.01"
@@ -506,10 +506,10 @@ export default function PaymentFormPage() {
           </FormField>
 
           {canEdit && (
-            <div className="flex justify-end space-x-4 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 [&>a]:w-full sm:[&>a]:w-auto [&>button]:w-full sm:[&>button]:w-auto">
               <Link
                 to="/app/payments"
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="text-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </Link>

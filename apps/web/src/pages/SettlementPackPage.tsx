@@ -105,7 +105,7 @@ export default function SettlementPackPage() {
       {/* Summary totals */}
       <section className="bg-white rounded-lg shadow p-6" data-testid="settlement-pack-summary">
         <h3 className="text-lg font-semibold mb-4">Summary</h3>
-        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
             <dd className="mt-1 text-gray-900 font-medium">{pack.status}</dd>

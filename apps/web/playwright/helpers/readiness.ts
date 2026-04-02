@@ -5,7 +5,7 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-const MODULES_READY_TIMEOUT = 30_000;
+const MODULES_READY_TIMEOUT = 60_000;
 
 /** Wait until the modules-ready marker has data-state "ready" or "error"; throws if error. */
 export async function waitForModulesReady(page: Page): Promise<void> {

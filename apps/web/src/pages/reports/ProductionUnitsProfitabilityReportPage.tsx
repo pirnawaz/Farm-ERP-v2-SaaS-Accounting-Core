@@ -146,7 +146,7 @@ export default function ProductionUnitsProfitabilityReportPage() {
                 </table>
               </div>
               <div className="p-4 bg-gray-50 border-t">
-                <div className="grid grid-cols-3 gap-4 text-sm font-medium">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm font-medium">
                   <div>
                     Total revenue: <span className="tabular-nums">{formatMoney(data.totals.revenue)}</span>
                   </div>

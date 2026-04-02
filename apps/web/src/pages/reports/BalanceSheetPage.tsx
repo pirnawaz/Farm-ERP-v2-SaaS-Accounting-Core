@@ -5,6 +5,7 @@ import { useBalanceSheet } from '../../hooks/useReports';
 import { term } from '../../config/terminology';
 import { EMPTY_COPY } from '../../config/presentation';
 import { ReportErrorState, ReportKindBadge, ReportLoadingState, ReportMetadataBlock, ReportFilterCard, ReportPage, ReportSectionCard, ReportEmptyState } from '../../components/report';
+import { FilterBar, FilterField, FilterGrid, FilterCheckboxField } from '../../components/FilterBar';
 
 const defaultAsOf = () => new Date().toISOString().split('T')[0];
 
@@ -96,39 +97,29 @@ export default function BalanceSheetPage() {
       <ReportMetadataBlock asOfDate={formatDate(asOf)} />
 
       <ReportFilterCard>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">As of date</label>
-            <input
-              type="date"
-              value={asOf}
-              onChange={(e) => setAsOf(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+        <FilterBar>
+          <FilterGrid className="lg:grid-cols-4 xl:grid-cols-4">
+            <FilterField label="As of date">
+              <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+            </FilterField>
+            <div className="sm:pt-7">
+              <FilterCheckboxField
+                id="compare-asof"
+                label="Compare as-of"
                 checked={compareEnabled}
-                onChange={(e) => setCompareEnabled(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span className="text-sm text-gray-700">Compare as-of</span>
-            </label>
-          </div>
-          {compareEnabled && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Compare as of</label>
-              <input
-                type="date"
-                value={compareAsOf}
-                onChange={(e) => setCompareAsOf(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2"
+                onChange={(checked) => {
+                  setCompareEnabled(checked);
+                  if (!checked) setCompareAsOf('');
+                }}
               />
             </div>
-          )}
-        </div>
+            {compareEnabled && (
+              <FilterField label="Compare as of">
+                <input type="date" value={compareAsOf} onChange={(e) => setCompareAsOf(e.target.value)} />
+              </FilterField>
+            )}
+          </FilterGrid>
+        </FilterBar>
       </ReportFilterCard>
 
       {isLoading && <ReportLoadingState label="Loading balance sheet..." />}
@@ -202,7 +193,7 @@ export default function BalanceSheetPage() {
           {normalized.compare && (
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-sm font-medium text-gray-700 mb-2">Compare as of: {normalized.compare.as_of}</div>
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm">
                 <span className="text-gray-600">Assets: {formatMoney(normalized.compare.total_assets)}</span>
                 <span className="text-gray-600">Liabilities: {formatMoney(normalized.compare.total_liabilities)}</span>
                 <span className="text-gray-600">Equity: {formatMoney(normalized.compare.total_equity)}</span>

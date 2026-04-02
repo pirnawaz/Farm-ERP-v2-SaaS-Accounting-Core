@@ -325,7 +325,7 @@ export default function LandAllocationsPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <button
               onClick={() => {
                 setShowCreateModal(false);
@@ -402,7 +402,7 @@ export default function LandAllocationsPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
           </FormField>
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <button
               onClick={() => {
                 setEditingAllocation(null);
@@ -431,7 +431,7 @@ export default function LandAllocationsPage() {
         <p className="text-gray-600 mb-4">
           Are you sure you want to delete this allocation? This cannot be undone.
         </p>
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
           <button
             onClick={() => setAllocationToDelete(null)}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"

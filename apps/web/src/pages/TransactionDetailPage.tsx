@@ -168,16 +168,16 @@ export default function TransactionDetailPage() {
       )}
 
       {isDraft && (
-        <div className="flex space-x-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
           <Link
             to={`/app/transactions/${id}/edit`}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-center"
           >
             Edit
           </Link>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
           >
             Delete
           </button>
@@ -186,7 +186,7 @@ export default function TransactionDetailPage() {
               type="button"
               data-testid="post-btn"
               onClick={() => setShowPostModal(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
             >
               {term('postAction')}
             </button>
@@ -218,11 +218,11 @@ export default function TransactionDetailPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
             />
           </FormField>
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
             <button
               type="button"
               onClick={() => setShowPostModal(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -231,7 +231,7 @@ export default function TransactionDetailPage() {
               data-testid="confirm-post"
               onClick={handlePost}
               disabled={postMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {postMutation.isPending ? term('postActionPending') : term('postAction')}
             </button>

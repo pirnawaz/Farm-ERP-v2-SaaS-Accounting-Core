@@ -14,6 +14,8 @@ import { Term } from '../components/Term'
 import { term } from '../config/terminology'
 import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock'
 import { ReportErrorState, ReportLoadingState } from '../components/report'
+import { FilterBar, FilterField, FilterGrid } from '../components/FilterBar'
+import { PageContainer } from '../components/PageContainer'
 
 const defaultFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
 const defaultTo = new Date().toISOString().split('T')[0]
@@ -150,7 +152,7 @@ function GeneralLedgerPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-6">
       <div className="no-print">
         <PageHeader
           title={term('generalLedger')}
@@ -164,7 +166,7 @@ function GeneralLedgerPage() {
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+                className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
               >
                 Print
               </button>
@@ -172,7 +174,7 @@ function GeneralLedgerPage() {
                 type="button"
                 onClick={handleExport}
                 disabled={data.length === 0}
-                className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+                className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
               >
                 Export CSV
               </button>
@@ -181,66 +183,52 @@ function GeneralLedgerPage() {
         />
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              From Date
-            </label>
-            <input
-              type="date"
-              value={filters.from}
-              onChange={(e) => setFilters({ ...filters, from: e.target.value, page: 1 })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              To Date
-            </label>
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(e) => setFilters({ ...filters, to: e.target.value, page: 1 })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Account
-            </label>
-            <select
-              value={filters.account_id}
-              onChange={(e) => setFilters({ ...filters, account_id: e.target.value, page: 1 })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">All Accounts</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} - {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {term('fieldCycle')}
-            </label>
-            <select
-              value={filters.project_id}
-              onChange={(e) => setFilters({ ...filters, project_id: e.target.value, page: 1 })}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">{`All ${term('fieldCycles')}`}</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
+      <FilterBar className="no-print">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <FilterGrid className="lg:grid-cols-4 xl:grid-cols-4">
+            <FilterField label="From Date">
+              <input
+                type="date"
+                value={filters.from}
+                onChange={(e) => setFilters({ ...filters, from: e.target.value, page: 1 })}
+              />
+            </FilterField>
+            <FilterField label="To Date">
+              <input
+                type="date"
+                value={filters.to}
+                onChange={(e) => setFilters({ ...filters, to: e.target.value, page: 1 })}
+              />
+            </FilterField>
+            <FilterField label="Account">
+              <select
+                value={filters.account_id}
+                onChange={(e) => setFilters({ ...filters, account_id: e.target.value, page: 1 })}
+              >
+                <option value="">All Accounts</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.code} - {a.name}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+            <FilterField label={term('fieldCycle')}>
+              <select
+                value={filters.project_id}
+                onChange={(e) => setFilters({ ...filters, project_id: e.target.value, page: 1 })}
+              >
+                <option value="">{`All ${term('fieldCycles')}`}</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+          </FilterGrid>
         </div>
-      </div>
+      </FilterBar>
 
       <div className="no-print">
         <ReportMetadataBlock reportingPeriodRange={formatDateRange(filters.from, filters.to)} />
@@ -257,25 +245,25 @@ function GeneralLedgerPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-[#E6ECEA]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Account
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Description
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <Term k="postingGroup" showHint />
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Debit
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Credit
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Net
                     </th>
                   </tr>
@@ -283,23 +271,23 @@ function GeneralLedgerPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {data.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={7} className="px-3 sm:px-6 py-3 sm:py-4 text-center text-gray-500">
                         No activity found for this period.
                       </td>
                     </tr>
                   ) : (
                     data.map((row) => (
                       <tr key={row.ledger_entry_id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(row.posting_date)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-normal break-words text-sm text-gray-500">
                           <div>
                             <div className="font-medium">{row.account_code}</div>
                             <div className="text-xs text-gray-400">{row.account_name}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-normal break-words text-sm text-gray-500">
                           <div>
                             {row.reversal_of_posting_group_id && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mr-1">
@@ -309,7 +297,7 @@ function GeneralLedgerPage() {
                             <span>{row.source_type}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                           {row.posting_group_id ? (
                             <Link
                               to={`/app/posting-groups/${row.posting_group_id}`}
@@ -321,13 +309,13 @@ function GeneralLedgerPage() {
                             'N/A'
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                           <span className="tabular-nums">{formatMoney(row.debit)}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                           <span className="tabular-nums">{formatMoney(row.credit)}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                           <span className="tabular-nums">{formatMoney(row.net)}</span>
                         </td>
                       </tr>
@@ -424,7 +412,7 @@ function GeneralLedgerPage() {
                 {Math.min(pagination.page * pagination.per_page, pagination.total)} of{' '}
                 {pagination.total} results
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2 justify-end">
                 <button
                   onClick={() => setFilters({ ...filters, page: filters.page - 1 })}
                   disabled={filters.page <= 1}
@@ -444,7 +432,7 @@ function GeneralLedgerPage() {
           )}
         </>
       )}
-    </div>
+    </PageContainer>
   )
 }
 

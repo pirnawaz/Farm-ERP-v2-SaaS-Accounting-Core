@@ -173,7 +173,7 @@ export default function SaleDetailPage() {
           right={
             <button
               onClick={() => window.print()}
-              className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+              className="w-full sm:w-auto bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
             >
               Print Invoice
             </button>
@@ -316,17 +316,17 @@ export default function SaleDetailPage() {
 
       {isDraft && (
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-medium text-gray-900 mb-2">Actions</h2>
               <p className="text-sm text-gray-600">
                 This sale is in DRAFT status. {term('postAction')} to create accounting entries.
               </p>
             </div>
-            <div className="flex space-x-4">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full sm:w-auto">
               <Link
                 to={`/app/sales/${id}/edit`}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-center"
               >
                 Edit
               </Link>
@@ -339,7 +339,7 @@ export default function SaleDetailPage() {
               )}
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
               >
                 Delete
               </button>
@@ -350,14 +350,14 @@ export default function SaleDetailPage() {
 
       {isPosted && canPost && (
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-medium text-gray-900 mb-2">Actions</h2>
               <p className="text-sm text-gray-600">
                 This sale has been posted. You can reverse it to create offsetting accounting entries.
               </p>
             </div>
-            <div className="flex space-x-4">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full sm:w-auto">
               <ReverseButton
                 onClick={() => setShowReverseModal(true)}
                 isCycleClosed={isCycleClosed}
@@ -416,17 +416,17 @@ export default function SaleDetailPage() {
                 )}
               </p>
             </div>
-            <div className="flex justify-end space-x-4 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
               <button
                 onClick={() => setShowPostModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePost}
                 disabled={postMutation.isPending || isCycleClosed}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {postMutation.isPending ? term('postActionPending') : term('postAction')}
               </button>
@@ -488,20 +488,20 @@ export default function SaleDetailPage() {
                 </ul>
               </p>
             </div>
-            <div className="flex justify-end space-x-4 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
               <button
                 onClick={() => {
                   setShowReverseModal(false);
                   setReverseReason('');
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReverse}
                 disabled={reverseMutation.isPending || isCycleClosed}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {reverseMutation.isPending ? term('reverseActionPending') : term('reverseAction')}
               </button>

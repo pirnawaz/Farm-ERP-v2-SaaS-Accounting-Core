@@ -5,6 +5,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
+import { FilterBar, FilterField, FilterGrid } from '../../components/FilterBar';
 import type { JournalEntry, JournalEntryStatus } from '../../types';
 
 const defaultFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
@@ -72,49 +73,32 @@ export default function JournalsPage() {
       />
 
       <div className="space-y-4">
-        <div className="flex flex-wrap gap-4 items-end">
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-gray-600">From</span>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-gray-600">To</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-gray-600">Status</span>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as JournalEntryStatus | '')}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-            >
-              <option value="">All</option>
-              <option value="DRAFT">Draft</option>
-              <option value="POSTED">Posted</option>
-              <option value="REVERSED">Reversed</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-gray-600">Search</span>
-            <input
-              type="text"
-              placeholder="Number or memo"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] min-w-[180px]"
-            />
-          </label>
-        </div>
+        <FilterBar>
+          <FilterGrid className="lg:grid-cols-4 xl:grid-cols-4">
+            <FilterField label="From">
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </FilterField>
+            <FilterField label="To">
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </FilterField>
+            <FilterField label="Status">
+              <select value={status} onChange={(e) => setStatus(e.target.value as JournalEntryStatus | '')}>
+                <option value="">All</option>
+                <option value="DRAFT">Draft</option>
+                <option value="POSTED">Posted</option>
+                <option value="REVERSED">Reversed</option>
+              </select>
+            </FilterField>
+            <FilterField label="Search">
+              <input
+                type="text"
+                placeholder="Number or memo"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </FilterField>
+          </FilterGrid>
+        </FilterBar>
 
         <div className="bg-white rounded-lg shadow">
           {isLoading ? (

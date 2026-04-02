@@ -12,6 +12,8 @@ import { PrintableReport } from '../components/print/PrintableReport';
 import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock';
 import { ReportErrorState, ReportLoadingState } from '../components/report';
 import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata';
+import { PageContainer } from '../components/PageContainer';
+import { FilterBar, FilterField, FilterGrid } from '../components/FilterBar';
 
 interface CashbookRow {
   date: string;
@@ -110,52 +112,46 @@ export default function CashbookPage() {
   const netBalance = totalIn - totalOut;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center no-print">
+    <PageContainer className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
         <h2 className="text-2xl font-bold">Cashbook</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={() => window.print()}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
           >
             Print
           </button>
           <button
             onClick={handleExport}
             disabled={data.length === 0}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
           >
             Export CSV
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow space-y-4 no-print">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              From Date
-            </label>
-            <input
-              type="date"
-              value={filters.from}
-              onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              To Date
-            </label>
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
+      <FilterBar className="no-print">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <FilterGrid className="lg:grid-cols-2 xl:grid-cols-2">
+            <FilterField label="From Date">
+              <input
+                type="date"
+                value={filters.from}
+                onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+              />
+            </FilterField>
+            <FilterField label="To Date">
+              <input
+                type="date"
+                value={filters.to}
+                onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+              />
+            </FilterField>
+          </FilterGrid>
         </div>
-      </div>
+      </FilterBar>
 
       <div className="no-print">
         <ReportMetadataBlock reportingPeriodRange={formatDateRange(filters.from, filters.to)} />
@@ -180,7 +176,7 @@ export default function CashbookPage() {
             )}
             {data.length > 0 && (
               <div className="p-4 bg-gray-50 border-t totals-row">
-                <div className="grid grid-cols-4 gap-4 text-sm font-medium">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-sm font-medium">
                   <div>Total In: <span className="tabular-nums">{formatMoney(totalIn)}</span></div>
                   <div>Total Out: <span className="tabular-nums">{formatMoney(totalOut)}</span></div>
                   <div>Net Balance: <span className="tabular-nums">{formatMoney(netBalance)}</span></div>
@@ -250,6 +246,6 @@ export default function CashbookPage() {
           </PrintableReport>
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

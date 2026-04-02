@@ -44,7 +44,7 @@ export function ReportTableHeaderCell({
   const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
   return (
     <th
-      className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${alignClass} ${className}`}
+      className={`px-3 sm:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${alignClass} ${className}`}
     >
       {children}
     </th>
@@ -71,7 +71,7 @@ export function ReportTableCell({
   const weight = muted ? 'font-normal' : 'font-medium';
   return (
     <td
-      className={`px-6 py-4 whitespace-nowrap text-sm ${tone} ${weight} ${alignClass} ${numeric ? 'tabular-nums' : ''} ${className}`}
+      className={`px-3 sm:px-6 py-3 sm:py-4 text-sm ${tone} ${weight} ${alignClass} ${numeric ? 'tabular-nums whitespace-nowrap' : 'whitespace-normal break-words'} ${className}`}
     >
       {children}
     </td>
@@ -98,7 +98,7 @@ export function ReportTotalsRow({
       : 'bg-gray-50 font-semibold border-t border-gray-200';
   return (
     <tr className={rowClass}>
-      <td colSpan={labelColSpan} className="px-6 py-4 text-sm text-gray-900">
+      <td colSpan={labelColSpan} className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-900">
         {label}
       </td>
       {children}
@@ -115,7 +115,7 @@ export function ReportEmptyState({
 }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-6 py-4 text-center text-gray-500">
+      <td colSpan={colSpan} className="px-3 sm:px-6 py-3 sm:py-4 text-center text-gray-500">
         {message}
       </td>
     </tr>

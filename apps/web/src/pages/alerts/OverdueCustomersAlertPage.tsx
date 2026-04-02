@@ -73,7 +73,7 @@ export default function OverdueCustomersAlertPage() {
       </p>
 
       {report?.totals && (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
             <span className="text-gray-500">31–60</span>
             <p className="font-semibold tabular-nums">{formatMoney(report.totals.bucket_31_60)}</p>

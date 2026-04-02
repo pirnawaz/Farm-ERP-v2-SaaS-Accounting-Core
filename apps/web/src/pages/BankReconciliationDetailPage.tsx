@@ -378,31 +378,33 @@ export default function BankReconciliationDetailPage() {
                         )}
                       </td>
                       {isDraft && (
-                        <td className="px-4 py-2 text-sm space-x-2">
-                          {line.is_matched ? (
+                        <td className="px-4 py-2 text-sm">
+                          <div className="flex flex-wrap gap-x-2 gap-y-1">
+                            {line.is_matched ? (
+                              <button
+                                type="button"
+                                onClick={() => setUnmatchLineId(line.id)}
+                                className="text-amber-600 hover:text-amber-800"
+                              >
+                                Unmatch
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setMatchModalLine(line)}
+                                className="text-[#1F6F5C] hover:text-[#1a5a4a]"
+                              >
+                                Match to ledger
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => setUnmatchLineId(line.id)}
-                              className="text-amber-600 hover:text-amber-800"
+                              onClick={() => setVoidLineId(line.id)}
+                              className="text-red-600 hover:text-red-800"
                             >
-                              Unmatch
+                              Void
                             </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setMatchModalLine(line)}
-                              className="text-[#1F6F5C] hover:text-[#1a5a4a]"
-                            >
-                              Match to ledger
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setVoidLineId(line.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            Void
-                          </button>
+                          </div>
                         </td>
                       )}
                     </tr>

@@ -221,7 +221,7 @@ export default function MachineryProfitabilityPage() {
               {totals && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <h3 className="text-md font-medium text-gray-900 mb-4">Totals</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <div className="text-sm text-gray-500">Total Usage</div>
                       <div className="text-lg font-semibold tabular-nums">

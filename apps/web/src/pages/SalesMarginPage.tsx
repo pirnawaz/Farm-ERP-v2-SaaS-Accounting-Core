@@ -196,7 +196,7 @@ export default function SalesMarginPage() {
                 {totals && (
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <h3 className="text-md font-medium text-gray-900 mb-4">Totals</h3>
-                    <div className="grid grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                       <div>
                         <div className="text-sm text-gray-500">Qty Sold</div>
                         <div className="text-lg font-semibold">{totals.qty_sold.toFixed(3)}</div>

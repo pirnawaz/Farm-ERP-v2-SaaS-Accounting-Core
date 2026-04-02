@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { FilterBar, FilterField, FilterGrid } from '../../components/FilterBar';
 import type { LabWorker } from '../../types';
 
 export default function WorkersPage() {
@@ -71,20 +72,31 @@ export default function WorkersPage() {
         }
       />
       <div className="space-y-4">
-        <div className="flex flex-wrap gap-4 items-end">
-          <select value={String(isActive)} onChange={(e) => setIsActive(e.target.value === '' ? '' : e.target.value === 'true')} className="px-3 py-2 border rounded text-sm">
-            <option value="">All active</option>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
-          <select value={workerType} onChange={(e) => setWorkerType(e.target.value)} className="px-3 py-2 border rounded text-sm">
-            <option value="">All types</option>
-            <option value="HARI">HARI</option>
-            <option value="STAFF">STAFF</option>
-            <option value="CONTRACT">CONTRACT</option>
-          </select>
-          <input type="text" placeholder="Search name" value={q} onChange={(e) => setQ(e.target.value)} className="px-3 py-2 border rounded text-sm min-w-[12rem]" />
-        </div>
+        <FilterBar>
+          <FilterGrid className="lg:grid-cols-3 xl:grid-cols-3">
+            <FilterField label="Active">
+              <select
+                value={String(isActive)}
+                onChange={(e) => setIsActive(e.target.value === '' ? '' : e.target.value === 'true')}
+              >
+                <option value="">All</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </FilterField>
+            <FilterField label="Worker type">
+              <select value={workerType} onChange={(e) => setWorkerType(e.target.value)}>
+                <option value="">All types</option>
+                <option value="HARI">HARI</option>
+                <option value="STAFF">STAFF</option>
+                <option value="CONTRACT">CONTRACT</option>
+              </select>
+            </FilterField>
+            <FilterField label="Search">
+              <input type="text" placeholder="Search name" value={q} onChange={(e) => setQ(e.target.value)} />
+            </FilterField>
+          </FilterGrid>
+        </FilterBar>
         <div className="bg-white rounded-lg shadow">
           {isLoading ? (
             <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>

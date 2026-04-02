@@ -262,13 +262,13 @@ export default function ModuleTogglePage() {
             );
           })}
         </ul>
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-end gap-2">
           <button
             type="button"
             onClick={handleSave}
             disabled={updateMutation.isPending}
             data-testid="module-toggles-save"
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {updateMutation.isPending ? 'Saving...' : 'Save'}
           </button>

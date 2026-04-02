@@ -109,7 +109,7 @@ export default function ProjectRulesPage() {
 
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Landlord %" required error={errors.profit_split}>
               <input
                 type="number"
@@ -183,11 +183,11 @@ export default function ProjectRulesPage() {
           )}
 
           {canEdit && (
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
               <button
                 onClick={handleSubmit}
                 disabled={updateMutation.isPending || total !== 100}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateMutation.isPending ? 'Saving...' : 'Save Rules'}
               </button>

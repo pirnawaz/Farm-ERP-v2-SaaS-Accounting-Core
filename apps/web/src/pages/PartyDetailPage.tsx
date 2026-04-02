@@ -98,10 +98,10 @@ export default function PartyDetailPage() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">Quick Actions</h3>
           </div>
-          <div className="flex space-x-4">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
             <Link
               to={`/app/payments/new?direction=OUT&partyId=${party.id}`}
-              className={`px-4 py-2 rounded-md font-medium ${
+              className={`w-full sm:w-auto text-center px-4 py-2 rounded-md font-medium ${
                 payableAmount > 0
                   ? 'bg-[#1F6F5C] text-white hover:bg-[#1a5a4a]'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -111,7 +111,7 @@ export default function PartyDetailPage() {
             </Link>
             <Link
               to={`/app/payments/new?direction=IN&partyId=${party.id}`}
-              className={`px-4 py-2 rounded-md font-medium ${
+              className={`w-full sm:w-auto text-center px-4 py-2 rounded-md font-medium ${
                 receivableAmount > 0
                   ? 'bg-green-600 text-white hover:bg-green-700'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -122,7 +122,7 @@ export default function PartyDetailPage() {
             {isBuyer && (
               <Link
                 to={`/app/sales/new?buyerPartyId=${party.id}`}
-                className="px-4 py-2 rounded-md font-medium bg-[#1F6F5C] text-white hover:bg-[#1a5a4a]"
+                className="w-full sm:w-auto text-center px-4 py-2 rounded-md font-medium bg-[#1F6F5C] text-white hover:bg-[#1a5a4a]"
               >
                 Create Sale
               </Link>
@@ -130,7 +130,7 @@ export default function PartyDetailPage() {
             {isHariOrVendor && (
               <Link
                 to={`/app/advances/new?partyId=${party.id}&type=${party.party_types?.includes('HARI') ? 'HARI_ADVANCE' : 'VENDOR_ADVANCE'}&direction=OUT`}
-                className="px-4 py-2 rounded-md font-medium bg-purple-600 text-white hover:bg-purple-700"
+                className="w-full sm:w-auto text-center px-4 py-2 rounded-md font-medium bg-purple-600 text-white hover:bg-purple-700"
               >
                 Create Advance
               </Link>
@@ -247,15 +247,15 @@ export default function PartyDetailPage() {
           <div className="space-y-4">
             {statement.grouped_breakdown.map((group: PartyStatementGroup, idx: number) => (
               <div key={idx} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-2">
                   <h4 className="font-medium text-gray-900">
                     {group.crop_cycle_name || `Crop Cycle ${idx + 1}`}
                   </h4>
-                  <span className="text-sm font-medium text-gray-600">
+                  <span className="text-sm font-medium text-gray-600 sm:text-right">
                     Net: <span className="tabular-nums">{formatMoney(group.net_outstanding)}</span>
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Allocations:</span>
                     <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(group.total_allocations)}</span></span>
@@ -373,7 +373,7 @@ export default function PartyDetailPage() {
 
             {statement.summary && (
               <div className="print-totals">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <div className="flex justify-between mb-1">
                       <span>Total Allocations:</span>
@@ -405,32 +405,32 @@ export default function PartyDetailPage() {
         )}
 
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex space-x-4 mb-4 no-print">
-            <div>
+          <div className="flex flex-col sm:flex-row gap-4 mb-4 no-print">
+            <div className="w-full sm:min-w-0 sm:flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
               <input
                 type="date"
                 value={statementFrom}
                 onChange={(e) => setStatementFrom(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
-            <div>
+            <div className="w-full sm:min-w-0 sm:flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
               <input
                 type="date"
                 value={statementTo}
                 onChange={(e) => setStatementTo(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
           </div>
-          <div className="mb-4 flex justify-end gap-2 no-print">
+          <div className="mb-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 no-print">
             {statement && statement.line_items && statement.line_items.length > 0 && (
               <>
                 <button
                   onClick={() => window.print()}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
                 >
                   Print Statement
                 </button>
@@ -458,7 +458,7 @@ export default function PartyDetailPage() {
                       ],
                     });
                   }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                  className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
                 >
                   Export CSV
                 </button>
@@ -468,7 +468,7 @@ export default function PartyDetailPage() {
           {statement && statement.summary && (
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
               <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Total Allocations:</span>
                   <span className="ml-2 font-medium"><span className="tabular-nums">{formatMoney(statement.summary.total_allocations_increasing_balance)}</span></span>
@@ -585,18 +585,16 @@ export default function PartyDetailPage() {
     return (
       <div className="space-y-4">
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">Open Sales (Outstanding Receivables)</h3>
-            <div className="flex items-center space-x-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">As Of</label>
-                <input
-                  type="date"
-                  value={openSalesAsOf}
-                  onChange={(e) => setOpenSalesAsOf(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-                />
-              </div>
+            <div className="w-full sm:w-auto sm:min-w-[12rem]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">As Of</label>
+              <input
+                type="date"
+                value={openSalesAsOf}
+                onChange={(e) => setOpenSalesAsOf(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              />
             </div>
           </div>
           {openSales && openSales.length > 0 ? (
@@ -626,7 +624,7 @@ export default function PartyDetailPage() {
       </div>
 
       <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex min-w-max gap-x-8 gap-y-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${

@@ -43,7 +43,7 @@ export function PageHeader({ title, tooltip, backTo, breadcrumbs, right }: PageH
 
   return (
     <div className="mb-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0">
           <button
             type="button"
@@ -53,7 +53,7 @@ export function PageHeader({ title, tooltip, backTo, breadcrumbs, right }: PageH
             ← Back
           </button>
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav className="flex items-center gap-1 text-sm text-gray-500 mb-1">
+            <nav className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-500 mb-1">
               {breadcrumbs.map((b, i) => (
                 <span key={i} className="flex items-center gap-1">
                   {i > 0 && <span className="text-gray-400">/</span>}
@@ -68,9 +68,11 @@ export function PageHeader({ title, tooltip, backTo, breadcrumbs, right }: PageH
               ))}
             </nav>
           )}
-          <h1 className="text-2xl font-semibold text-gray-900" title={tooltip}>{title}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 break-words" title={tooltip}>
+            {title}
+          </h1>
         </div>
-        {right && <div className="flex-shrink-0">{right}</div>}
+        {right && <div className="w-full sm:w-auto sm:flex-shrink-0">{right}</div>}
       </div>
     </div>
   );

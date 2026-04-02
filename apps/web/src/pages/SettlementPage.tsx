@@ -476,7 +476,7 @@ export default function SettlementPage() {
             </div>
           )}
 
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <button
               onClick={() => {
                 setShowPostModal(false);

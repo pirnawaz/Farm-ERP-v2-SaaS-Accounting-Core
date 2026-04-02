@@ -56,7 +56,7 @@ export default function InvItemsPage() {
           {
             header: 'Actions',
             accessor: (row: InvItem) => (
-              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-wrap gap-x-3 gap-y-1" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={() => {
@@ -156,7 +156,7 @@ export default function InvItemsPage() {
         backTo="/app/inventory"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('inventoryItem') }]}
         right={canAct ? (
-          <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('inventoryItemSingular')}</button>
+          <button onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('inventoryItemSingular')}</button>
         ) : undefined}
       />
       <div className="bg-white rounded-lg shadow">

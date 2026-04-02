@@ -156,7 +156,7 @@ export default function PartiesPage() {
     {
       header: 'Actions',
       accessor: (row) => (
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to={`/app/parties/${row.id}`}
             className="text-[#1F6F5C] hover:text-[#1a5a4a]"
@@ -224,7 +224,7 @@ export default function PartiesPage() {
       />
 
       {/* Quick Filters */}
-      <div className="mb-4 flex space-x-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => setFilter('all')}
           className={`px-4 py-2 text-sm font-medium rounded-md ${
@@ -324,7 +324,7 @@ export default function PartiesPage() {
               ))}
             </div>
           </FormField>
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <button
               onClick={() => {
                 setShowCreateModal(false);
@@ -389,7 +389,7 @@ export default function PartiesPage() {
               ))}
             </div>
           </FormField>
-          <div className="flex justify-end space-x-3">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <button
               onClick={() => {
                 setEditingParty(null);

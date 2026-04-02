@@ -8,6 +8,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Modal } from '../components/Modal'
 import { FormField } from '../components/FormField'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { PageContainer } from '../components/PageContainer'
 
 const GL_LIST_PATH = '/app/reports/general-ledger'
 
@@ -103,7 +104,7 @@ function PostingGroupDetailPage() {
   const titleLabel = `${term('postingGroup')} · ${postingGroup.id.length > 12 ? `${postingGroup.id.slice(0, 8)}…` : postingGroup.id}`
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-6">
       <PageHeader
         title={titleLabel}
         backTo={GL_LIST_PATH}
@@ -124,7 +125,7 @@ function PostingGroupDetailPage() {
               type="button"
               data-testid="create-correction-btn"
               onClick={() => setShowReverseModal(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shrink-0"
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shrink-0"
             >
               {term('reverseAction')}
             </button>
@@ -185,19 +186,19 @@ function PostingGroupDetailPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Cost Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Currency
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Rule Version
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Rule Hash
                   </th>
                 </tr>
@@ -205,19 +206,19 @@ function PostingGroupDetailPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {postingGroup.allocation_rows.map((row) => (
                   <tr key={row.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-normal break-words text-sm text-gray-900">
                       {row.cost_type}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       <span className="tabular-nums">{formatMoney(row.amount)}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                       {row.currency_code}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                       {row.rule_version || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-500">
                       {row.rule_hash ? (
                         <details className="cursor-pointer">
                           <summary className="text-[#1F6F5C] hover:underline">
@@ -251,16 +252,16 @@ function PostingGroupDetailPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-[#E6ECEA]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Account
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Debit
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Credit
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Currency
                   </th>
                 </tr>
@@ -268,30 +269,30 @@ function PostingGroupDetailPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {postingGroup.ledger_entries.map((entry) => (
                   <tr key={entry.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-normal break-words text-sm text-gray-900">
                       {entry.account?.name || entry.account?.code || 'N/A'}
                       <span className="text-gray-500 ml-2">({entry.account?.code || 'N/A'})</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
                       {parseFloat(entry.debit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.debit)}</span> : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
                       {parseFloat(entry.credit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.credit)}</span> : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                       {entry.currency_code}
                     </td>
                   </tr>
                 ))}
                 <tr className="bg-gray-50 font-semibold">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">Total</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm">Total</td>
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right">
                     <span className="tabular-nums">{formatMoney(
                       postingGroup.ledger_entries
                         .reduce((sum, e) => sum + parseFloat(e.debit.toString()), 0)
                     )}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right">
                     <span className="tabular-nums">{formatMoney(
                       postingGroup.ledger_entries
                         .reduce((sum, e) => sum + parseFloat(e.credit.toString()), 0)
@@ -353,7 +354,7 @@ function PostingGroupDetailPage() {
           </div>
         </form>
       </Modal>
-    </div>
+    </PageContainer>
   )
 }
 

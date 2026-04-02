@@ -230,19 +230,19 @@ function ReconciliationDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center no-print">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between no-print">
         <h2 className="text-2xl font-bold">Reconcile Accounts</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={() => window.print()}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] text-sm font-medium"
           >
             Print
           </button>
           <button
             onClick={handleExport}
             disabled={!result?.checks?.length}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
           >
             Export CSV
           </button>
@@ -250,7 +250,7 @@ function ReconciliationDashboardPage() {
       </div>
 
       <div className="border-b border-gray-200 mb-6 no-print">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex min-w-max gap-x-8 gap-y-2 overflow-x-auto">
           {(['project', 'crop-cycle', 'supplier-ap'] as const).map((tab) => (
             <button
               key={tab}
@@ -337,7 +337,7 @@ function ReconciliationDashboardPage() {
           <button
             onClick={runChecks}
             disabled={loading}
-            className="bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+            className="w-full sm:w-auto bg-[#1F6F5C] text-white px-4 py-2 rounded hover:bg-[#1a5a4a] disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
           >
             {loading ? 'Running…' : 'Run Checks'}
           </button>

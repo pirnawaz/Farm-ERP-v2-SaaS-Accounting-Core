@@ -13,6 +13,7 @@ import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import type { MachineryCharge } from '../../types';
 import { term } from '../../config/terminology';
+import { FilterBar, FilterField, FilterGrid } from '../../components/FilterBar';
 
 export default function ChargesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -136,87 +137,65 @@ export default function ChargesPage() {
       <div className="space-y-4">
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="flex flex-col gap-1 min-w-[10rem]">
-              <label className="text-sm font-medium text-gray-700">Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-              >
-                <option value="">All</option>
-                <option value="DRAFT">Draft</option>
-                <option value="POSTED">Posted</option>
-                <option value="REVERSED">Reversed</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-[12rem]">
-              <label className="text-sm font-medium text-gray-700">{term('fieldCycle')}</label>
-              <select
-                value={filters.project_id}
-                onChange={(e) => handleFilterChange('project_id', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-              >
-                <option value="">All</option>
-                {projects?.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-[12rem]">
-              <label className="text-sm font-medium text-gray-700">Crop Cycle</label>
-              <select
-                value={filters.crop_cycle_id}
-                onChange={(e) => handleFilterChange('crop_cycle_id', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-              >
-                <option value="">All</option>
-                {cropCycles?.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-[12rem]">
-              <label className="text-sm font-medium text-gray-700">Landlord Party</label>
-              <select
-                value={filters.landlord_party_id}
-                onChange={(e) => handleFilterChange('landlord_party_id', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-              >
-                <option value="">All</option>
-                {parties?.filter((p) => p.party_types?.includes('LANDLORD')).map((party) => (
-                  <option key={party.id} value={party.id}>
-                    {party.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-[10rem]">
-              <label className="text-sm font-medium text-gray-700">Date From</label>
-              <input
-                type="date"
-                value={filters.from}
-                onChange={(e) => handleFilterChange('from', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-              />
-            </div>
-            <div className="flex flex-col gap-1 min-w-[10rem]">
-              <label className="text-sm font-medium text-gray-700">Date To</label>
-              <input
-                type="date"
-                value={filters.to}
-                onChange={(e) => handleFilterChange('to', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-              />
-            </div>
-          </div>
+          <FilterBar>
+            <FilterGrid className="lg:grid-cols-3 xl:grid-cols-5">
+              <FilterField label="Status">
+                <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
+                  <option value="">All</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="POSTED">Posted</option>
+                  <option value="REVERSED">Reversed</option>
+                </select>
+              </FilterField>
+              <FilterField label={term('fieldCycle')}>
+                <select value={filters.project_id} onChange={(e) => handleFilterChange('project_id', e.target.value)}>
+                  <option value="">All</option>
+                  {projects?.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Crop Cycle">
+                <select
+                  value={filters.crop_cycle_id}
+                  onChange={(e) => handleFilterChange('crop_cycle_id', e.target.value)}
+                >
+                  <option value="">All</option>
+                  {cropCycles?.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>
+                      {cycle.name}
+                    </option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Landlord Party">
+                <select
+                  value={filters.landlord_party_id}
+                  onChange={(e) => handleFilterChange('landlord_party_id', e.target.value)}
+                >
+                  <option value="">All</option>
+                  {parties
+                    ?.filter((p) => p.party_types?.includes('LANDLORD'))
+                    .map((party) => (
+                      <option key={party.id} value={party.id}>
+                        {party.name}
+                      </option>
+                    ))}
+                </select>
+              </FilterField>
+              <FilterField label="Date From">
+                <input type="date" value={filters.from} onChange={(e) => handleFilterChange('from', e.target.value)} />
+              </FilterField>
+              <FilterField label="Date To">
+                <input type="date" value={filters.to} onChange={(e) => handleFilterChange('to', e.target.value)} />
+              </FilterField>
+            </FilterGrid>
+          </FilterBar>
         </div>
 
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <div className="bg-white rounded-lg shadow">
           {isLoading ? (
             <div className="flex justify-center py-12">
               <LoadingSpinner size="lg" />
