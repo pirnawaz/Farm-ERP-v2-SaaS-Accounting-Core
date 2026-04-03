@@ -8,7 +8,7 @@ import { terravaBaseExportMetadataRows } from '../utils/reportPageMetadata'
 import { PrintableReport } from '../components/print/PrintableReport'
 import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock'
 import { ReportErrorState, ReportLoadingState } from '../components/report'
-import { EMPTY_COPY, REPORT_LABELS } from '../config/presentation'
+import { REPORT_LABELS } from '../config/presentation'
 import { term } from '../config/terminology'
 
 function TrialBalancePage() {

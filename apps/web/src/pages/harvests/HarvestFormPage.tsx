@@ -16,6 +16,7 @@ import { harvestSchema } from '../../validation/harvestSchema';
 import { getActiveCropCycleId, getStored, setStored, formStorageKeys, getLastSubmit, setLastSubmit } from '../../utils/formDefaults';
 import toast from 'react-hot-toast';
 import type { CreateHarvestPayload } from '../../types';
+import { term } from '../../config/terminology';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
 

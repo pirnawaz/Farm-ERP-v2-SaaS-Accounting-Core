@@ -7,6 +7,13 @@ import { EMPTY_COPY } from '../../config/presentation';
 import { ReportErrorState, ReportKindBadge, ReportLoadingState, ReportMetadataBlock, ReportFilterCard, ReportPage, ReportSectionCard, ReportEmptyState } from '../../components/report';
 import { FilterBar, FilterField, FilterGrid, FilterCheckboxField } from '../../components/FilterBar';
 
+type BalanceSheetLineRow = {
+  account_id: string | null;
+  code: string | null;
+  name: string;
+  amount: number;
+};
+
 const defaultAsOf = () => new Date().toISOString().split('T')[0];
 
 export default function BalanceSheetPage() {
@@ -169,7 +176,7 @@ export default function BalanceSheetPage() {
                       {(section.lines ?? []).length === 0 ? (
                         <ReportEmptyState colSpan={3} message={EMPTY_COPY.noRecords} />
                       ) : (
-                        (section.lines ?? []).map((line, idx) => (
+                        (section.lines ?? []).map((line: BalanceSheetLineRow, idx: number) => (
                           <tr key={line.account_id ?? idx}>
                             <td className="px-4 py-2 text-sm text-gray-900">{line.code ?? '—'}</td>
                             <td className="px-4 py-2 text-sm text-gray-700">{line.name}</td>

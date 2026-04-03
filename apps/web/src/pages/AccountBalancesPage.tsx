@@ -19,7 +19,6 @@ import {
   ReportErrorState,
   ReportLoadingState,
 } from '../components/report';
-import { EMPTY_COPY } from '../config/presentation';
 import { term } from '../config/terminology';
 
 function AccountBalancesPage() {
