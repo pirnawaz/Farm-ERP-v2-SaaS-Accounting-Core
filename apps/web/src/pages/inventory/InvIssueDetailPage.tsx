@@ -28,6 +28,7 @@ import type { UpdateInvIssuePayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 type Line = { item_id: string; qty: string };
 
@@ -196,6 +197,8 @@ export default function InvIssueDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={`${term('issueSingular')} ${issue.doc_no}`}
+        description="Stock removed from a store and allocated to crop work, field cycles, or machinery."
+        helper="Not goods received or a transfer—issues reduce on-hand stock when posted."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -209,17 +212,14 @@ export default function InvIssueDetailPage() {
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{issue.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Store</dt><dd>{issue.store?.name || issue.store_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{issue.crop_cycle?.name || issue.crop_cycle_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Project</dt><dd>{issue.project?.name || issue.project_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">Crop cycle</dt><dd>{issue.crop_cycle?.name || issue.crop_cycle_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">Field cycle</dt><dd>{issue.project?.name || issue.project_id}</dd></div>
           {issue.machine && (
             <div><dt className="text-sm text-gray-500">Machine</dt><dd>{issue.machine.code} - {issue.machine.name}</dd></div>
           )}
-          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(issue.doc_date)}</dd></div>
+          <div><dt className="text-sm text-gray-500">Doc date</dt><dd className="tabular-nums">{formatDate(issue.doc_date, { variant: 'medium' })}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
-            <dd><span className={`px-2 py-1 rounded text-xs ${
-              issue.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-              issue.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}>{issue.status}</span></dd>
+            <dd><PostingStatusBadge status={issue.status} /></dd>
           </div>
           {issue.posting_group_id && (
             <div className="md:col-span-2">
@@ -227,7 +227,7 @@ export default function InvIssueDetailPage() {
               <dd><Link to={`/app/posting-groups/${issue.posting_group_id}`} className="text-[#1F6F5C]">{issue.posting_group_id}</Link></dd>
             </div>
           )}
-          {issue.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(issue.posting_date)}</dd></div>}
+          {issue.posting_date && <div><dt className="text-sm text-gray-500">Posting date</dt><dd className="tabular-nums">{formatDate(issue.posting_date, { variant: 'medium' })}</dd></div>}
           {issue.allocation_mode && (
             <div><dt className="text-sm text-gray-500">Cost Ownership</dt><dd className="font-medium">{issue.allocation_mode}</dd></div>
           )}
@@ -248,7 +248,7 @@ export default function InvIssueDetailPage() {
 
       {isDraft && canEdit ? (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit draft</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Doc Date"><input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>

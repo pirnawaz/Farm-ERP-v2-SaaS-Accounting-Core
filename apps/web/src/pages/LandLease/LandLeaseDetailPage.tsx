@@ -258,10 +258,15 @@ export default function LandLeaseDetailPage() {
         >
           ← Back to Land Leases
         </Link>
-        <div className="flex justify-between items-start mt-2">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Lease: {projectName} / {parcelName}
-          </h1>
+        <div className="flex justify-between items-start mt-2 gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Land lease (Maqada): {projectName} / {parcelName}
+            </h1>
+            <p className="mt-1 text-base text-gray-700 max-w-2xl">
+              Review agreement terms and accrual periods; posting follows your normal accounts workflow.
+            </p>
+          </div>
           {canManage && (
             <div className="flex flex-wrap gap-2">
               <Link
@@ -290,7 +295,7 @@ export default function LandLeaseDetailPage() {
         </h2>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <dt className="text-sm font-medium text-gray-500">Project</dt>
+            <dt className="text-sm font-medium text-gray-500">Field cycle</dt>
             <dd className="text-sm text-gray-900">{projectName}</dd>
           </div>
           <div>

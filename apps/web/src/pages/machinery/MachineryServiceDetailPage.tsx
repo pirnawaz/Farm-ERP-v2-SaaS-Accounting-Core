@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../../components/Term';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 import { term } from '../../config/terminology';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 export default function MachineryServiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -98,7 +99,7 @@ export default function MachineryServiceDetailPage() {
         />
         <p className="text-gray-600">Service not found.</p>
         <button type="button" onClick={() => navigate('/app/machinery/services')} className="text-[#1F6F5C] font-medium hover:underline">
-          Back to Service History
+          Back to service history
         </button>
       </div>
     );
@@ -108,6 +109,8 @@ export default function MachineryServiceDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title="Service record"
+        description="Historical servicing entry for a machine, with field cycle context and allocation."
+        helper="Distinct from machine usage logs—service history records servicing work and amounts."
         backTo="/app/machinery/services"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -154,19 +157,8 @@ export default function MachineryServiceDetailPage() {
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
-            <dd className="text-sm text-gray-900">
-              <span
-                data-testid="status-badge"
-                className={`px-2 py-1 rounded text-xs ${
-                  service.status === 'DRAFT'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : service.status === 'POSTED'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {service.status}
-              </span>
+            <dd className="text-sm text-gray-900" data-testid="status-badge">
+              <PostingStatusBadge status={service.status} />
             </dd>
           </div>
           <div>
@@ -178,7 +170,7 @@ export default function MachineryServiceDetailPage() {
           {service.posting_date && (
             <div>
               <dt className="text-sm font-medium text-gray-500">Posting Date</dt>
-              <dd className="text-sm text-gray-900">{formatDate(service.posting_date)}</dd>
+              <dd className="text-sm text-gray-900 tabular-nums">{formatDate(service.posting_date, { variant: 'medium' })}</dd>
             </div>
           )}
           <div>

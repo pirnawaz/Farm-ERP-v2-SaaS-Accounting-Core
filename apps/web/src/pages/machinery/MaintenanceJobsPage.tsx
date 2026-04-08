@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useMaintenanceJobsQuery,
@@ -94,6 +94,25 @@ export default function MaintenanceJobsPage() {
     setSearchParams(new URLSearchParams());
   };
 
+  const hasFilters = !!(
+    filters.status ||
+    filters.machine_id ||
+    filters.from ||
+    filters.to ||
+    filters.vendor_party_id
+  );
+
+  const jobList = (jobs ?? []) as MachineMaintenanceJob[];
+
+  const summaryLine = useMemo(() => {
+    const n = jobList.length;
+    const label = n === 1 ? 'maintenance job' : 'maintenance jobs';
+    const base = hasFilters ? `${n} ${label} (filtered)` : `${n} ${label}`;
+    if (n === 0) return base;
+    const draftCount = jobList.filter((j) => j.status === 'DRAFT').length;
+    return draftCount ? `${base} · ${draftCount} draft` : base;
+  }, [jobList, hasFilters]);
+
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this maintenance job?')) {
@@ -106,7 +125,12 @@ export default function MaintenanceJobsPage() {
   };
 
   const columns: Column<MachineMaintenanceJob>[] = [
-    { header: 'Date', accessor: (row) => formatDate(row.job_date) },
+    {
+      header: 'Date',
+      accessor: (row) => (
+        <span className="tabular-nums text-gray-900">{formatDate(row.job_date, { variant: 'medium' })}</span>
+      ),
+    },
     {
       header: 'Machine',
       accessor: (row) => row.machine?.name || row.machine?.code || '—',
@@ -145,7 +169,7 @@ export default function MaintenanceJobsPage() {
               e.stopPropagation();
               navigate(`/app/machinery/maintenance-jobs/${row.id}`);
             }}
-            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
+            className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View
           </button>
@@ -157,7 +181,7 @@ export default function MaintenanceJobsPage() {
                   e.stopPropagation();
                   navigate(`/app/machinery/maintenance-jobs/${row.id}/edit`);
                 }}
-                className="text-blue-600 hover:text-blue-800"
+                className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
               >
                 Edit
               </button>
@@ -201,10 +225,12 @@ export default function MaintenanceJobsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="Maintenance Jobs"
         tooltip="Track maintenance work and repairs for your machines."
+        description="Track maintenance work and repairs for your machines."
+        helper="Use maintenance jobs to record servicing, repairs, and vendor work against machines."
         backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -216,19 +242,27 @@ export default function MaintenanceJobsPage() {
             <button
               type="button"
               onClick={() => navigate('/app/machinery/maintenance-jobs/new')}
-              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
-              New Maintenance Job
+              New maintenance job
             </button>
           ) : undefined
         }
       />
-      <p className="text-sm text-gray-600">Track maintenance work and repairs for your machines.</p>
 
-      <div className="space-y-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-          <div className="flex flex-wrap gap-4 items-end">
+      <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasFilters}
+            className="text-sm font-medium text-[#1F6F5C] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            Clear filters
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-4 items-end">
             <div className="flex flex-col gap-1 min-w-[10rem]">
               <label className="text-sm font-medium text-gray-700">Status</label>
               <select
@@ -290,44 +324,46 @@ export default function MaintenanceJobsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
               />
             </div>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
-            >
-              Clear filters
-            </button>
-          </div>
-
-          <div className="mt-4 text-sm text-gray-600">
-            <span className="font-medium text-gray-900 tabular-nums">{(jobs ?? []).length}</span>{' '}
-            {(jobs ?? []).length === 1 ? 'maintenance job' : 'maintenance jobs'}
-            {filters.status || filters.machine_id || filters.from || filters.to || filters.vendor_party_id ? (
-              <span className="text-gray-500"> (filtered)</span>
-            ) : null}
-            {(() => {
-              const list = (jobs ?? []) as MachineMaintenanceJob[];
-              const draftCount = list.filter((j) => j.status === 'DRAFT').length;
-              return draftCount ? <span className="text-gray-500"> · {draftCount} draft</span> : null;
-            })()}
-          </div>
         </div>
+      </section>
 
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : (
-            <DataTable
-              data={(jobs ?? []) as MachineMaintenanceJob[]}
-              columns={columns}
-              onRowClick={(row) => navigate(`/app/machinery/maintenance-jobs/${row.id}`)}
-              emptyMessage="No maintenance jobs yet. Create one to track repairs or servicing."
-            />
-          )}
-        </div>
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : jobList.length === 0 && !hasFilters ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No maintenance jobs yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Create a job to track repairs, servicing, or vendor maintenance against your machines.
+          </p>
+        </div>
+      ) : jobList.length === 0 && hasFilters ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No maintenance jobs match your filters.</h3>
+          <p className="mt-2 text-sm text-gray-600">Try adjusting filters or clear them to see all jobs.</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-6 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
+          <DataTable
+            data={jobList}
+            columns={columns}
+            onRowClick={(row) => navigate(`/app/machinery/maintenance-jobs/${row.id}`)}
+            emptyMessage=""
+          />
+        </div>
+      )}
 
       {/* Post Modal */}
       {postingJobId && (

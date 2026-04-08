@@ -20,6 +20,7 @@ import type { UpdateInvTransferPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 type Line = { item_id: string; qty: string };
 
@@ -106,6 +107,8 @@ export default function InvTransferDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={`${term('transferSingular')} ${transfer.doc_no}`}
+        description="Move stock between your stores without a supplier receipt or crop issue."
+        helper="Transfers reallocate quantity from one store to another when posted—not a goods received or stock used."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -120,20 +123,20 @@ export default function InvTransferDetailPage() {
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{transfer.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">From Store</dt><dd className="font-medium">{transfer.from_store?.name || transfer.from_store_id}</dd></div>
           <div><dt className="text-sm text-gray-500">To Store</dt><dd className="font-medium">{transfer.to_store?.name || transfer.to_store_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(transfer.doc_date)}</dd></div>
+          <div><dt className="text-sm text-gray-500">Doc date</dt><dd className="tabular-nums">{formatDate(transfer.doc_date, { variant: 'medium' })}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
-            <dd><span className={`px-2 py-1 rounded text-xs ${transfer.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : transfer.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{transfer.status}</span></dd>
+            <dd><PostingStatusBadge status={transfer.status} /></dd>
           </div>
           {transfer.posting_group_id && (
             <div className="md:col-span-2"><dt className="text-sm text-gray-500"><Term k="postingGroup" showHint /></dt><dd><Link to={`/app/posting-groups/${transfer.posting_group_id}`} className="text-[#1F6F5C]">{transfer.posting_group_id}</Link></dd></div>
           )}
-          {transfer.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(transfer.posting_date)}</dd></div>}
+          {transfer.posting_date && <div><dt className="text-sm text-gray-500">Posting date</dt><dd className="tabular-nums">{formatDate(transfer.posting_date, { variant: 'medium' })}</dd></div>}
         </dl>
       </div>
 
       {isDraft && canEdit ? (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit draft</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Doc Date"><input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>

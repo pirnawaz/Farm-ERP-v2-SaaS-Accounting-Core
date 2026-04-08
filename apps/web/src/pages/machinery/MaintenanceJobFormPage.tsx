@@ -107,7 +107,9 @@ export default function MaintenanceJobFormPage() {
   return (
     <div className="space-y-6 pb-8">
       <PageHeader
-        title={isEdit ? 'Edit Maintenance Job' : 'New Maintenance Job'}
+        title={isEdit ? 'Edit maintenance job' : 'New maintenance job'}
+        description="Record maintenance or repair against a machine with cost lines and optional vendor."
+        helper="Separate from service history—jobs are your workflow for maintenance work through posting."
         backTo="/app/machinery/maintenance-jobs"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -275,12 +277,12 @@ export default function MaintenanceJobFormPage() {
               }
               className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
             >
-              {isEdit ? (updateM.isPending ? 'Saving...' : 'Save') : createM.isPending ? 'Creating...' : 'Create'}
+              {isEdit ? (updateM.isPending ? 'Saving…' : 'Save') : createM.isPending ? 'Saving…' : 'Save'}
             </button>
           </div>
         ) : (
           <div className="pt-4 text-sm text-gray-600">
-            This maintenance job cannot be edited because it is not in DRAFT status.
+            This maintenance job cannot be edited because it is not in draft status.
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   useRateCardsQuery,
   useCreateRateCard,
@@ -70,8 +70,9 @@ export default function RateCardsPage() {
     { 
       header: 'Effective',
       accessor: (r) => (
-        <span className="tabular-nums">
-          {formatDate(r.effective_from)}{r.effective_to ? ` → ${formatDate(r.effective_to)}` : ' → open'}
+        <span className="tabular-nums text-gray-900">
+          {formatDate(r.effective_from, { variant: 'medium' })}
+          {r.effective_to ? ` → ${formatDate(r.effective_to, { variant: 'medium' })}` : ' → Open'}
         </span>
       ),
     },
@@ -109,7 +110,7 @@ export default function RateCardsPage() {
             });
             setShowModal(true);
           }}
-          className="px-3 py-1 text-sm text-[#1F6F5C] hover:text-[#1a5a4a]"
+          className="px-3 py-1 text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           Edit
         </button>
@@ -185,40 +186,50 @@ export default function RateCardsPage() {
     });
   };
 
+  const list = rateCards ?? [];
+  const summaryLine = useMemo(() => {
+    const n = list.length;
+    return n === 1 ? '1 rate card' : `${n} rate cards`;
+  }, [list.length]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="Rate Cards"
         tooltip="Set machine usage rates and pricing rules."
+        description="Set machine usage rates and pricing rules."
+        helper="Rate cards define how machine work is priced for usage and charge generation."
         backTo="/app/machinery"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery Overview', to: '/app/machinery' }, { label: 'Rate Cards' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
           >
-            New Rate Card
+            New rate card
           </button>
         ) : undefined}
       />
-      <div className="space-y-1">
-        <p className="text-sm text-gray-600">Set machine usage rates and pricing rules.</p>
-        <p className="text-xs text-gray-500">Use rate cards to define how machinery work is priced.</p>
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
-      <div className="text-sm text-gray-600">
-        <span className="font-medium text-gray-900 tabular-nums">{(rateCards ?? []).length}</span>{' '}
-        {(rateCards ?? []).length === 1 ? 'rate card' : 'rate cards'}
-      </div>
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : (
-          <DataTable data={rateCards || []} columns={cols} emptyMessage="No rate cards yet. Create one to set usage rates." />
-        )}
-      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : list.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No rate cards yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Create a rate card to set how machinery work is priced before usage and charges.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
+          <DataTable data={list} columns={cols} emptyMessage="" />
+        </div>
+      )}
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingRateCard ? 'Edit Rate Card' : 'New Rate Card'}>
         <div className="space-y-4">
           <FormField label="Applies To Mode" required>

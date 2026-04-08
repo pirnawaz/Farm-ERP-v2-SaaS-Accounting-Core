@@ -77,9 +77,11 @@ export default function LivestockPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="livestock-page">
+    <div className="space-y-6 max-w-7xl" data-testid="livestock-page">
       <PageHeader
         title="Livestock"
+        description="Long-lived herd or flock units for events, costs, and sales tagging."
+        helper="Use livestock units when you want operations tied to a specific herd over time."
         backTo="/app/dashboard"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -90,23 +92,31 @@ export default function LivestockPage() {
             type="button"
             data-testid="new-livestock-unit"
             onClick={() => setShowNewModal(true)}
-            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
-            New Livestock Unit
+            New livestock unit
           </button>
         }
       />
-      <p className="text-gray-600">
-        Livestock units are long-lived operational units. Track herd events here, and optionally tag expenses, issues and sales to a livestock unit.
-      </p>
+
+      {!isLoading ? (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+          <span className="font-medium text-gray-900">
+            {units.length === 1 ? '1 livestock unit' : `${units.length} livestock units`}
+          </span>
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="flex justify-center py-12">
           <LoadingSpinner size="lg" />
         </div>
       ) : units.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center text-gray-600">
-          No livestock units yet. Create one to get started.
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No livestock units yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Create a unit to track herd events and tag feed, medicine, and sales where it helps.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -124,7 +134,7 @@ export default function LivestockPage() {
               </div>
               <div className="mt-1">
                 <Badge variant={unit.status === 'ACTIVE' ? 'success' : 'neutral'}>
-                  {unit.status}
+                  {unit.status === 'ACTIVE' ? 'Active' : 'Closed'}
                 </Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">

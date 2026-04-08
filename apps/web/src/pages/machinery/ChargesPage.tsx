@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useChargesQuery, useGenerateCharges } from '../../hooks/useMachinery';
 import { useProjects } from '../../hooks/useProjects';
@@ -12,7 +12,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import type { MachineryCharge } from '../../types';
-import { FilterBar, FilterField, FilterGrid } from '../../components/FilterBar';
+import { Badge } from '../../components/Badge';
 
 export default function ChargesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -66,6 +66,23 @@ export default function ChargesPage() {
     setSearchParams(new URLSearchParams());
   };
 
+  const hasFilters = !!(
+    filters.status ||
+    filters.project_id ||
+    filters.crop_cycle_id ||
+    filters.from ||
+    filters.to ||
+    filters.landlord_party_id
+  );
+
+  const chargeList = (charges ?? []) as MachineryCharge[];
+
+  const summaryLine = useMemo(() => {
+    const n = chargeList.length;
+    const label = n === 1 ? 'machinery charge' : 'machinery charges';
+    return hasFilters ? `${n} ${label} (filtered)` : `${n} ${label}`;
+  }, [chargeList.length, hasFilters]);
+
   const handleGenerate = async (payload: any) => {
     try {
       const result = await generateMutation.mutateAsync(payload);
@@ -85,14 +102,19 @@ export default function ChargesPage() {
   };
 
   const columns: Column<MachineryCharge>[] = [
-    { header: 'Date', accessor: (row) => formatDate(row.charge_date) },
+    {
+      header: 'Date',
+      accessor: (row) => (
+        <span className="tabular-nums text-gray-900">{formatDate(row.charge_date, { variant: 'medium' })}</span>
+      ),
+    },
     {
       header: 'Field cycle',
-      accessor: (row) => row.project?.name || 'N/A',
+      accessor: (row) => row.project?.name || '—',
     },
     {
       header: 'Crop cycle',
-      accessor: (row) => row.crop_cycle?.name || 'N/A',
+      accessor: (row) => row.crop_cycle?.name || '—',
     },
     {
       header: 'Beneficiary',
@@ -100,9 +122,16 @@ export default function ChargesPage() {
     },
     {
       header: 'Amount',
-      accessor: (row) => <span className="tabular-nums">{formatMoney(row.total_amount)}</span>,
+      accessor: (row) => <span className="tabular-nums text-gray-900">{formatMoney(row.total_amount)}</span>,
     },
-    { header: 'Status', accessor: (row) => (row.status === 'DRAFT' ? 'Draft' : row.status === 'POSTED' ? 'Posted' : 'Reversed') },
+    {
+      header: 'Status',
+      accessor: (row) => (
+        <Badge variant={row.status === 'DRAFT' ? 'warning' : row.status === 'POSTED' ? 'success' : 'neutral'}>
+          {row.status === 'DRAFT' ? 'Draft' : row.status === 'POSTED' ? 'Posted' : 'Reversed'}
+        </Badge>
+      ),
+    },
     { header: 'Reference', accessor: (row) => <span className="tabular-nums">{row.charge_no || '—'}</span> },
     {
       header: 'Actions',
@@ -114,7 +143,7 @@ export default function ChargesPage() {
               e.stopPropagation();
               navigate(`/app/machinery/charges/${row.id}`);
             }}
-            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
+            className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View
           </button>
@@ -124,10 +153,12 @@ export default function ChargesPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="Machinery Charges"
         tooltip="Track costs associated with machine usage and operations."
+        description="Track costs associated with machine usage and operations."
+        helper="Charges allocate machinery usage to field and crop cycles; use this list to review amounts and status."
         backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -139,107 +170,145 @@ export default function ChargesPage() {
             <button
               type="button"
               onClick={() => setShowGenerateModal(true)}
-              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
-              Generate Charges
+              Generate charges
             </button>
           ) : undefined
         }
       />
 
-      <div className="space-y-4">
-        <p className="text-sm text-gray-600">Track costs associated with machine usage and operations.</p>
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-          <FilterBar>
-            <FilterGrid className="lg:grid-cols-3 xl:grid-cols-5">
-              <FilterField label="Status">
-                <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
-                  <option value="">All</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="POSTED">Posted</option>
-                  <option value="REVERSED">Reversed</option>
-                </select>
-              </FilterField>
-              <FilterField label="Field cycle">
-                <select value={filters.project_id} onChange={(e) => handleFilterChange('project_id', e.target.value)}>
-                  <option value="">All</option>
-                  {projects?.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              </FilterField>
-              <FilterField label="Crop Cycle">
-                <select
-                  value={filters.crop_cycle_id}
-                  onChange={(e) => handleFilterChange('crop_cycle_id', e.target.value)}
-                >
-                  <option value="">All</option>
-                  {cropCycles?.map((cycle) => (
-                    <option key={cycle.id} value={cycle.id}>
-                      {cycle.name}
-                    </option>
-                  ))}
-                </select>
-              </FilterField>
-              <FilterField label="Landlord">
-                <select
-                  value={filters.landlord_party_id}
-                  onChange={(e) => handleFilterChange('landlord_party_id', e.target.value)}
-                >
-                  <option value="">All</option>
-                  {parties
-                    ?.filter((p) => p.party_types?.includes('LANDLORD'))
-                    .map((party) => (
-                      <option key={party.id} value={party.id}>
-                        {party.name}
-                      </option>
-                    ))}
-                </select>
-              </FilterField>
-              <FilterField label="From">
-                <input type="date" value={filters.from} onChange={(e) => handleFilterChange('from', e.target.value)} />
-              </FilterField>
-              <FilterField label="To">
-                <input type="date" value={filters.to} onChange={(e) => handleFilterChange('to', e.target.value)} />
-              </FilterField>
-            </FilterGrid>
-          </FilterBar>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900 tabular-nums">{(charges ?? []).length}</span>{' '}
-              {(charges ?? []).length === 1 ? 'machinery charge' : 'machinery charges'}
-              {(filters.status || filters.project_id || filters.crop_cycle_id || filters.from || filters.to || filters.landlord_party_id) ? (
-                <span className="text-gray-500"> (filtered)</span>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+      <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasFilters}
+            className="text-sm font-medium text-[#1F6F5C] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            Clear filters
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
-              Clear filters
-            </button>
+              <option value="">All</option>
+              <option value="DRAFT">Draft</option>
+              <option value="POSTED">Posted</option>
+              <option value="REVERSED">Reversed</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Field cycle</label>
+            <select
+              value={filters.project_id}
+              onChange={(e) => handleFilterChange('project_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {projects?.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Crop cycle</label>
+            <select
+              value={filters.crop_cycle_id}
+              onChange={(e) => handleFilterChange('crop_cycle_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {cropCycles?.map((cycle) => (
+                <option key={cycle.id} value={cycle.id}>
+                  {cycle.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Landlord</label>
+            <select
+              value={filters.landlord_party_id}
+              onChange={(e) => handleFilterChange('landlord_party_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {parties
+                ?.filter((p) => p.party_types?.includes('LANDLORD'))
+                .map((party) => (
+                  <option key={party.id} value={party.id}>
+                    {party.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">From</label>
+            <input
+              type="date"
+              value={filters.from}
+              onChange={(e) => handleFilterChange('from', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
+          </div>
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">To</label>
+            <input
+              type="date"
+              value={filters.to}
+              onChange={(e) => handleFilterChange('to', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
           </div>
         </div>
+      </section>
 
-        <div className="bg-white rounded-lg shadow">
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : (
-            <DataTable
-              data={(charges ?? []) as MachineryCharge[]}
-              columns={columns}
-              onRowClick={(row) => navigate(`/app/machinery/charges/${row.id}`)}
-              emptyMessage="No machinery charges yet. Generate charges to record machinery-related costs."
-            />
-          )}
-        </div>
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : chargeList.length === 0 && !hasFilters ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No machinery charges yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Generate charges from machine usage to record machinery-related costs against cycles.
+          </p>
+        </div>
+      ) : chargeList.length === 0 && hasFilters ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No machinery charges match your filters.</h3>
+          <p className="mt-2 text-sm text-gray-600">Try adjusting filters or clear them to see all charges.</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-6 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
+          <DataTable
+            data={chargeList}
+            columns={columns}
+            onRowClick={(row) => navigate(`/app/machinery/charges/${row.id}`)}
+            emptyMessage=""
+          />
+        </div>
+      )}
 
       {showGenerateModal && (
         <GenerateChargesModal

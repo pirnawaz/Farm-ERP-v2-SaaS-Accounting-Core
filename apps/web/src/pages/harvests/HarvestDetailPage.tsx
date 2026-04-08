@@ -21,6 +21,7 @@ import type { UpdateHarvestPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
 
@@ -144,10 +145,12 @@ export default function HarvestDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={harvest.harvest_no || `Harvest ${harvest.id.slice(0, 8)}`}
+        description="Quantities harvested against crop and field cycles, with optional store lines."
+        helper="Review lines and status before posting—posting records the harvest in your operations history."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Crop Ops', to: '/app/crop-ops' },
+          { label: 'Crop Ops Overview', to: '/app/crop-ops' },
           { label: 'Harvests', to: '/app/harvests' },
           { label: harvest.harvest_no || 'Detail' },
         ]}
@@ -155,16 +158,13 @@ export default function HarvestDetailPage() {
 
       <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><dt className="text-sm text-gray-500">Harvest No</dt><dd className="font-medium">{harvest.harvest_no || '—'}</dd></div>
-          <div><dt className="text-sm text-gray-500">Harvest Date</dt><dd>{formatDate(harvest.harvest_date)}</dd></div>
-          <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{harvest.crop_cycle?.name || harvest.crop_cycle_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Project</dt><dd>{harvest.project?.name ?? '—'}</dd></div>
-          <div><dt className="text-sm text-gray-500">Land Parcel</dt><dd>{harvest.land_parcel?.name || harvest.land_parcel_id || '—'}</dd></div>
+          <div><dt className="text-sm text-gray-500">Harvest no.</dt><dd className="font-medium">{harvest.harvest_no || '—'}</dd></div>
+          <div><dt className="text-sm text-gray-500">Harvest date</dt><dd className="tabular-nums">{formatDate(harvest.harvest_date, { variant: 'medium' })}</dd></div>
+          <div><dt className="text-sm text-gray-500">Crop cycle</dt><dd>{harvest.crop_cycle?.name || harvest.crop_cycle_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">Field cycle</dt><dd>{harvest.project?.name ?? '—'}</dd></div>
+          <div><dt className="text-sm text-gray-500">Land parcel</dt><dd>{harvest.land_parcel?.name || harvest.land_parcel_id || '—'}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
-            <dd><span className={`px-2 py-1 rounded text-xs ${
-              harvest.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-              harvest.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}>{harvest.status}</span></dd>
+            <dd><PostingStatusBadge status={harvest.status} /></dd>
           </div>
           {harvest.posting_group_id && (
             <div className="md:col-span-2">
@@ -214,7 +214,7 @@ export default function HarvestDetailPage() {
 
       {isDraft && canEdit && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit draft</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Harvest No">
               <input value={harvest_no} onChange={(e) => setHarvestNo(e.target.value)} className="w-full px-3 py-2 border rounded" />

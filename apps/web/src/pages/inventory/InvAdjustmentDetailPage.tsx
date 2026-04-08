@@ -20,6 +20,7 @@ import type { UpdateInvAdjustmentPayload, InvAdjustmentReason } from '../../type
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 const REASONS: InvAdjustmentReason[] = ['LOSS', 'DAMAGE', 'COUNT_GAIN', 'COUNT_LOSS', 'OTHER'];
 
@@ -107,6 +108,8 @@ export default function InvAdjustmentDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={`${term('adjustmentSingular')} ${adj.doc_no}`}
+        description="Correct on-hand quantity for loss, damage, or stock counts in one store."
+        helper="Adjustments change stock without a receipt, issue, or transfer—use the reason to explain the change."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -121,19 +124,19 @@ export default function InvAdjustmentDetailPage() {
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{adj.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Store</dt><dd className="font-medium">{adj.store?.name || adj.store_id}</dd></div>
           <div><dt className="text-sm text-gray-500">Reason</dt><dd>{adj.reason}</dd></div>
-          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(adj.doc_date)}</dd></div>
+          <div><dt className="text-sm text-gray-500">Doc date</dt><dd className="tabular-nums">{formatDate(adj.doc_date, { variant: 'medium' })}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
-            <dd><span className={`px-2 py-1 rounded text-xs ${adj.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' : adj.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{adj.status}</span></dd>
+            <dd><PostingStatusBadge status={adj.status} /></dd>
           </div>
           {adj.notes && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Notes</dt><dd>{adj.notes}</dd></div>}
           {adj.posting_group_id && <div className="md:col-span-2"><dt className="text-sm text-gray-500"><Term k="postingGroup" showHint /></dt><dd><Link to={`/app/posting-groups/${adj.posting_group_id}`} className="text-[#1F6F5C]">{adj.posting_group_id}</Link></dd></div>}
-          {adj.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(adj.posting_date)}</dd></div>}
+          {adj.posting_date && <div><dt className="text-sm text-gray-500">Posting date</dt><dd className="tabular-nums">{formatDate(adj.posting_date, { variant: 'medium' })}</dd></div>}
         </dl>
       </div>
 
       {isDraft && canEdit ? (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit draft</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Doc Date"><input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>

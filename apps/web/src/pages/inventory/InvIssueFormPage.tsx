@@ -342,13 +342,15 @@ export default function InvIssueFormPage() {
   return (
     <PageContainer width="form" className="space-y-6">
       <PageHeader
-        title="Record Stock Used"
+        title="Record stock used"
+        description="Remove stock from a store and tie it to crop cycles, field work, or machinery."
+        helper="This is an issue (consumption), not a receipt or a transfer between stores."
         backTo="/app/inventory/issues"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('issue'), to: '/app/inventory/issues' },
-          { label: 'Record Stock Used' },
+          { label: 'Record stock used' },
         ]}
       />
 
@@ -627,7 +629,7 @@ export default function InvIssueFormPage() {
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
             <button type="button" onClick={() => navigate('/app/inventory/issues')} className="w-full sm:w-auto px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
             <button onClick={handleSubmit} disabled={createM.isPending} className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50">
-              {createM.isPending ? 'Creating...' : 'Create'}
+              {createM.isPending ? 'Saving…' : 'Save'}
             </button>
           </div>
         )}

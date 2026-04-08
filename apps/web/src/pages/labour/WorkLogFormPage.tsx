@@ -233,11 +233,13 @@ export default function WorkLogFormPage() {
   return (
     <PageContainer width="form" className="space-y-6 pb-8">
       <PageHeader
-        title="New Work Log"
+        title="New work log"
+        description="Record paid labour time for a worker against crop and field cycles."
+        helper="This drives payables—operational field work without labour pay is under Crop Ops field work logs."
         backTo="/app/labour/work-logs"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Labour', to: '/app/labour' },
+          { label: 'Labour Overview', to: '/app/labour' },
           { label: 'Work Logs', to: '/app/labour/work-logs' },
           { label: 'New' },
         ]}
@@ -453,7 +455,7 @@ export default function WorkLogFormPage() {
             }
             className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
           >
-            {createM.isPending ? 'Creating...' : 'Create'}
+            {createM.isPending ? 'Saving…' : 'Save'}
           </button>
         </FormActions>
       </FormCard>

@@ -208,11 +208,13 @@ export default function HarvestFormPage() {
   return (
     <PageContainer width="form" className="space-y-6 pb-8">
       <PageHeader
-        title="New Harvest"
+        title="New harvest"
+        description="Record harvest quantities against crop and field cycles."
+        helper="Use inventory lines when stock should move into a store; posting finalizes the harvest record."
         backTo="/app/harvests"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Crop Ops', to: '/app/crop-ops' },
+          { label: 'Crop Ops Overview', to: '/app/crop-ops' },
           { label: 'Harvests', to: '/app/harvests' },
           { label: 'New' },
         ]}
@@ -393,7 +395,7 @@ export default function HarvestFormPage() {
             disabled={createM.isPending || addLineM.isPending}
             className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
           >
-            {createM.isPending || addLineM.isPending ? 'Creating...' : 'Create Harvest'}
+            {createM.isPending || addLineM.isPending ? 'Saving…' : 'Save'}
           </button>
         </div>
       </FormCard>

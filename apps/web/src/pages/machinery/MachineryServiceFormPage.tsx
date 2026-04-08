@@ -123,7 +123,7 @@ export default function MachineryServiceFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title={isEdit ? 'Edit Service' : 'New Service'}
+          title={isEdit ? 'Edit service' : 'New service'}
           backTo="/app/machinery/services"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -143,7 +143,7 @@ export default function MachineryServiceFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Edit Service"
+          title="Edit service"
           backTo={`/app/machinery/services/${id}`}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -152,7 +152,7 @@ export default function MachineryServiceFormPage() {
             { label: 'Edit' },
           ]}
         />
-        <p className="text-red-600">Only draft services can be edited.</p>
+        <p className="text-red-600">Only draft service records can be edited.</p>
         <button
           type="button"
           onClick={() => navigate(`/app/machinery/services/${id}`)}
@@ -167,7 +167,9 @@ export default function MachineryServiceFormPage() {
   return (
     <div className="space-y-6 pb-8">
       <PageHeader
-        title={isEdit ? 'Edit Service' : 'New Service'}
+        title={isEdit ? 'Edit service' : 'New service'}
+        description="Log machine servicing with field cycle context, quantity, and who benefits."
+        helper="Not the same as a machine usage log—use this for service/repair history."
         backTo="/app/machinery/services"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -353,7 +355,7 @@ export default function MachineryServiceFormPage() {
             disabled={createM.isPending || updateM.isPending}
             className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] disabled:opacity-50"
           >
-            {isEdit ? (updateM.isPending ? 'Saving...' : 'Save') : createM.isPending ? 'Creating...' : 'Create'}
+            {isEdit ? (updateM.isPending ? 'Saving…' : 'Save') : createM.isPending ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>

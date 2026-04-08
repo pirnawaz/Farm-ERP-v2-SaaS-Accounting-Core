@@ -11,6 +11,7 @@ import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 export default function WorkLogDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -61,7 +62,7 @@ export default function WorkLogDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Usage entry"
+          title="Machine usage"
           backTo={backTo}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -80,7 +81,7 @@ export default function WorkLogDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Usage entry"
+          title="Machine usage"
           backTo={backTo}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -89,9 +90,9 @@ export default function WorkLogDetailPage() {
             { label: 'Not found' },
           ]}
         />
-        <p className="text-gray-600">Usage entry not found.</p>
+        <p className="text-gray-600">Machine usage record not found.</p>
         <Link to="/app/machinery/work-logs" className="text-[#1F6F5C] font-medium hover:underline">
-          Back to Machine Usage
+          Back to machine usage
         </Link>
       </div>
     );
@@ -105,7 +106,9 @@ export default function WorkLogDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Usage entry ${log.work_log_no}`}
+        title={`Machine usage ${log.work_log_no}`}
+        description="Machine hours or usage linked to a field cycle, with cost lines for fuel, operator, or maintenance."
+        helper="This is usage and costing—not a maintenance job or service history record."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -128,15 +131,15 @@ export default function WorkLogDetailPage() {
       <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <dt className="text-sm text-gray-500">Work Log No</dt>
-            <dd className="font-medium">{log.work_log_no}</dd>
+            <dt className="text-sm text-gray-500">Usage no.</dt>
+            <dd className="font-medium tabular-nums">{log.work_log_no}</dd>
           </div>
           <div>
             <dt className="text-sm text-gray-500">Machine</dt>
             <dd>{log.machine?.name ?? log.machine_id}</dd>
           </div>
           <div>
-            <dt className="text-sm text-gray-500">Project</dt>
+            <dt className="text-sm text-gray-500">Field cycle</dt>
             <dd>{log.project?.name ?? log.project_id}</dd>
           </div>
           <div>
@@ -145,7 +148,7 @@ export default function WorkLogDetailPage() {
           </div>
           <div>
             <dt className="text-sm text-gray-500">Work date</dt>
-            <dd>{log.work_date ? formatDate(log.work_date) : '—'}</dd>
+            <dd className="tabular-nums">{log.work_date ? formatDate(log.work_date, { variant: 'medium' }) : '—'}</dd>
           </div>
           <div>
             <dt className="text-sm text-gray-500">Meter start / end</dt>
@@ -162,23 +165,13 @@ export default function WorkLogDetailPage() {
           <div>
             <dt className="text-sm text-gray-500">Status</dt>
             <dd>
-              <span
-                className={`px-2 py-1 rounded text-xs ${
-                  log.status === 'DRAFT'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : log.status === 'POSTED'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {log.status}
-              </span>
+              <PostingStatusBadge status={log.status} />
             </dd>
           </div>
           {log.posting_date && (
             <div>
               <dt className="text-sm text-gray-500">Posting date</dt>
-              <dd>{formatDate(log.posting_date)}</dd>
+              <dd className="tabular-nums">{formatDate(log.posting_date, { variant: 'medium' })}</dd>
             </div>
           )}
           {log.posting_group_id && (
@@ -217,7 +210,7 @@ export default function WorkLogDetailPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="font-medium mb-2">Cost lines</h3>
+        <h3 className="text-sm font-semibold text-gray-900 mb-2">Cost lines</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full border">
             <thead className="bg-[#E6ECEA]">

@@ -265,6 +265,8 @@ export default function ActivityFormPage() {
     <PageContainer width="form" className="space-y-6">
       <PageHeader
         title={term('newActivity')}
+        description="Record operational field work for crop cycles—materials, activity, and optional on-farm labour lines."
+        helper="For worker pay and payables, use Labour work logs instead."
         backTo="/app/crop-ops/activities"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -273,9 +275,6 @@ export default function ActivityFormPage() {
           { label: term('newActivity') },
         ]}
       />
-      <p className="-mt-2 mb-2 text-sm text-gray-500 max-w-2xl">
-        Record operational field work for crop operations. This is separate from Labour Work Logs (people and pay).
-      </p>
 
       {hasDraft && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex flex-wrap items-center gap-2">
@@ -553,7 +552,7 @@ export default function ActivityFormPage() {
             disabled={createM.isPending}
             className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
           >
-            {createM.isPending ? 'Creating...' : 'Create'}
+            {createM.isPending ? 'Saving…' : 'Save'}
           </button>
         </div>
       </FormCard>

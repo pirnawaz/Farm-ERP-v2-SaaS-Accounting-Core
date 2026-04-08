@@ -93,18 +93,26 @@ export default function LandParcelDetailPage() {
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <Link to="/app/land" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block">
-            ← Back to Land Parcels
+          <Link to="/app/land" className="text-[#1F6F5C] hover:text-[#1a5a4a] mb-2 inline-block text-sm">
+            ← Back
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-2">{parcel.name}</h1>
+          <nav className="text-sm text-gray-500 mb-1 flex flex-wrap gap-x-1">
+            <Link to="/app/dashboard" className="text-[#1F6F5C] hover:underline">Farm</Link>
+            <span className="text-gray-400">/</span>
+            <Link to="/app/land" className="text-[#1F6F5C] hover:underline">Land Parcels</Link>
+          </nav>
+          <h1 className="text-2xl font-semibold text-gray-900 mt-1">{parcel.name}</h1>
+          <p className="mt-1 text-base text-gray-700 max-w-2xl">
+            Review acreage, allocations to crop cycles, and remaining acres for this parcel.
+          </p>
         </div>
         {canEdit && (
           <button
             type="button"
             onClick={() => setShowEditModal(true)}
-            className="self-start sm:self-center px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            className="self-start sm:self-center px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C] text-sm font-medium"
           >
-            Edit Parcel
+            Edit parcel
           </button>
         )}
       </div>

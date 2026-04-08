@@ -43,7 +43,7 @@ export default function MaintenanceTypesPage() {
             setForm({ name: r.name, is_active: r.is_active });
             setShowModal(true);
           }}
-          className="px-3 py-1 text-sm text-[#1F6F5C] hover:text-[#1a5a4a]"
+          className="px-3 py-1 text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           Edit
         </button>
@@ -79,42 +79,50 @@ export default function MaintenanceTypesPage() {
     setForm({ name: '', is_active: true });
   };
 
-  const totalCount = useMemo(() => (maintenanceTypes ?? []).length, [maintenanceTypes]);
+  const rows = maintenanceTypes ?? [];
+  const totalCount = rows.length;
+  const summaryLine = useMemo(() => {
+    return totalCount === 1 ? '1 maintenance type' : `${totalCount} maintenance types`;
+  }, [totalCount]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="Maintenance Setup"
         tooltip="Define maintenance types and configurations for your machines."
+        description="Define maintenance types and configurations for your machines."
+        helper="Maintenance types classify jobs so servicing and repairs stay consistent across machines."
         backTo="/app/machinery"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery Overview', to: '/app/machinery' }, { label: 'Maintenance Setup' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
           >
             Add maintenance type
           </button>
         ) : undefined}
       />
-      <div className="space-y-1">
-        <p className="text-sm text-gray-600">Define maintenance types and configurations for your machines.</p>
-        <p className="text-xs text-gray-500">Use maintenance types to organise maintenance jobs.</p>
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
-      <div className="text-sm text-gray-600">
-        <span className="font-medium text-gray-900 tabular-nums">{totalCount}</span>{' '}
-        {totalCount === 1 ? 'maintenance type' : 'maintenance types'}
-      </div>
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : (
-          <DataTable data={maintenanceTypes || []} columns={cols} emptyMessage="No maintenance types yet. Add one to organise maintenance jobs." />
-        )}
-      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : totalCount === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No maintenance types yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Add types such as oil change or belt replacement so maintenance jobs are easy to classify.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
+          <DataTable data={rows} columns={cols} emptyMessage="" />
+        </div>
+      )}
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingType ? 'Edit Maintenance Type' : 'New Maintenance Type'}>
         <div className="space-y-4">
           {!editingType && (

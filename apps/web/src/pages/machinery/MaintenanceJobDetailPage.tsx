@@ -13,6 +13,7 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../../components/Term';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 export default function MaintenanceJobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -92,7 +93,7 @@ export default function MaintenanceJobDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Maintenance Job"
+          title="Maintenance job"
           backTo="/app/machinery/maintenance-jobs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -112,7 +113,7 @@ export default function MaintenanceJobDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Maintenance Job"
+          title="Maintenance job"
           backTo="/app/machinery/maintenance-jobs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -123,7 +124,7 @@ export default function MaintenanceJobDetailPage() {
         />
         <p className="text-gray-600">Maintenance job not found.</p>
         <Link to="/app/machinery/maintenance-jobs" className="text-[#1F6F5C] font-medium hover:underline">
-          Back to Maintenance Jobs
+          Back to maintenance jobs
         </Link>
       </div>
     );
@@ -132,7 +133,9 @@ export default function MaintenanceJobDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Maintenance Job ${job.job_no}`}
+        title={`Maintenance job ${job.job_no}`}
+        description="Tracked maintenance or repair for a machine, with optional vendor and cost lines."
+        helper="Different from service history entries—jobs follow your maintenance workflow through posting."
         backTo="/app/machinery/maintenance-jobs"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -152,17 +155,7 @@ export default function MaintenanceJobDetailPage() {
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
             <dd className="text-sm text-gray-900">
-              <span
-                className={`px-2 py-1 rounded text-xs ${
-                  job.status === 'DRAFT'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : job.status === 'POSTED'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {job.status}
-              </span>
+              <PostingStatusBadge status={job.status} />
             </dd>
           </div>
           <div>
@@ -171,11 +164,11 @@ export default function MaintenanceJobDetailPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Maintenance Type</dt>
-            <dd className="text-sm text-gray-900">{job.maintenance_type?.name || 'N/A'}</dd>
+            <dd className="text-sm text-gray-900">{job.maintenance_type?.name || '—'}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Vendor</dt>
-            <dd className="text-sm text-gray-900">{job.vendor_party?.name || 'N/A'}</dd>
+            <dd className="text-sm text-gray-900">{job.vendor_party?.name || '—'}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Job Date</dt>

@@ -84,9 +84,11 @@ export default function OrchardsPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="orchards-page">
+    <div className="space-y-6 max-w-7xl" data-testid="orchards-page">
       <PageHeader
         title="Orchards"
+        description="Long-lived orchard blocks you can tag for work, harvests, and sales."
+        helper="Optional for seasonal crops—use orchard units when you want costs and revenue tracked per block."
         backTo="/app/dashboard"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -97,23 +99,31 @@ export default function OrchardsPage() {
             type="button"
             data-testid="new-orchard-unit"
             onClick={() => setShowNewModal(true)}
-            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
-            New Orchard Unit
+            New orchard unit
           </button>
         }
       />
-      <p className="text-gray-600">
-        Orchards are long-lived operational units. Track costs and revenue by tagging work, harvests and sales to an orchard (optional for seasonal crops).
-      </p>
+
+      {!isLoading ? (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+          <span className="font-medium text-gray-900">
+            {orchards.length === 1 ? '1 orchard unit' : `${orchards.length} orchard units`}
+          </span>
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="flex justify-center py-12">
           <LoadingSpinner size="lg" />
         </div>
       ) : orchards.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center text-gray-600">
-          No orchard units yet. Create one to get started.
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No orchard units yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Create an orchard unit to tag harvests, labour, and sales to a long-lived block.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -137,7 +147,7 @@ export default function OrchardsPage() {
               </div>
               <div className="mt-1">
                 <Badge variant={unit.status === 'ACTIVE' ? 'success' : 'neutral'}>
-                  {unit.status}
+                  {unit.status === 'ACTIVE' ? 'Active' : 'Closed'}
                 </Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">

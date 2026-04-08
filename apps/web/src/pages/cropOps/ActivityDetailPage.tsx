@@ -23,6 +23,7 @@ import type { UpdateCropActivityPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 type InputLine = { store_id: string; item_id: string; qty: string };
 type LabourLine = { worker_id: string; rate_basis: string; units: string; rate: string };
@@ -157,6 +158,8 @@ export default function ActivityDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={activity.doc_no}
+        description="Operational field work for crop cycles—inputs, activity type, and optional labour lines."
+        helper="Worker pay and payables are tracked in Labour work logs, not here."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -165,24 +168,17 @@ export default function ActivityDetailPage() {
           { label: activity.doc_no },
         ]}
       />
-      <p className="-mt-2 mb-6 text-sm text-gray-500 max-w-2xl">
-        Field work log — operational crop activity on the farm. Worker pay and labour time are tracked under Labour (Labour
-        Work Logs), not here.
-      </p>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{activity.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Type</dt><dd>{activity.type?.name || activity.activity_type_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Work date</dt><dd>{formatDate(activity.activity_date)}</dd></div>
-          <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{activity.crop_cycle?.name || activity.crop_cycle_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Project</dt><dd>{activity.project?.name || activity.project_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Land Parcel</dt><dd>{activity.land_parcel?.name || activity.land_parcel_id || '—'}</dd></div>
+          <div><dt className="text-sm text-gray-500">Work date</dt><dd className="tabular-nums">{formatDate(activity.activity_date, { variant: 'medium' })}</dd></div>
+          <div><dt className="text-sm text-gray-500">Crop cycle</dt><dd>{activity.crop_cycle?.name || activity.crop_cycle_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">Field cycle</dt><dd>{activity.project?.name || activity.project_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">Land parcel</dt><dd>{activity.land_parcel?.name || activity.land_parcel_id || '—'}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
-            <dd><span className={`px-2 py-1 rounded text-xs ${
-              activity.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-              activity.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}>{activity.status}</span></dd>
+            <dd><PostingStatusBadge status={activity.status} /></dd>
           </div>
           {activity.posting_group_id && (
             <div className="md:col-span-2">
@@ -190,7 +186,7 @@ export default function ActivityDetailPage() {
               <dd><Link to={`/app/posting-groups/${activity.posting_group_id}`} className="text-[#1F6F5C]">{activity.posting_group_id}</Link></dd>
             </div>
           )}
-          {activity.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(activity.posting_date)}</dd></div>}
+          {activity.posting_date && <div><dt className="text-sm text-gray-500">Posting date</dt><dd className="tabular-nums">{formatDate(activity.posting_date, { variant: 'medium' })}</dd></div>}
           {(isPosted || activity.status === 'REVERSED') && (
             <>
               <div><dt className="text-sm text-gray-500">Inputs cost</dt><dd><span className="tabular-nums">{formatMoney(inputsCost)}</span></dd></div>
@@ -203,7 +199,7 @@ export default function ActivityDetailPage() {
 
       {isDraft && canEdit ? (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit draft</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Work date"><input type="date" value={activity_date} onChange={(e) => setActivityDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>

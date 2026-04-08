@@ -13,6 +13,7 @@ import { FormField } from '../../components/FormField';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { Term } from '../../components/Term';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 export default function ChargeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { formatMoney, formatDate } = useFormatting();
@@ -160,7 +161,7 @@ export default function ChargeDetailPage() {
         />
         <p className="text-gray-600">Charge not found.</p>
         <Link to="/app/machinery/charges" className="text-[#1F6F5C] font-medium hover:underline">
-          Back to Machinery Charges
+          Back to machinery charges
         </Link>
       </div>
     );
@@ -170,6 +171,8 @@ export default function ChargeDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={charge.charge_no || 'Machinery charge'}
+        description="Allocated machinery cost for a field cycle, crop cycle, and beneficiary pool."
+        helper="Generated from machine usage—review lines and rates before posting."
         backTo="/app/machinery/charges"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -189,26 +192,16 @@ export default function ChargeDetailPage() {
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
             <dd className="text-sm text-gray-900">
-              <span
-                className={`px-2 py-1 rounded text-xs ${
-                  charge.status === 'DRAFT'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : charge.status === 'POSTED'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {charge.status}
-              </span>
+              <PostingStatusBadge status={charge.status} />
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-gray-500">Project</dt>
-            <dd className="text-sm text-gray-900">{charge.project?.name || 'N/A'}</dd>
+            <dt className="text-sm font-medium text-gray-500">Field cycle</dt>
+            <dd className="text-sm text-gray-900">{charge.project?.name || '—'}</dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-gray-500">Crop Cycle</dt>
-            <dd className="text-sm text-gray-900">{charge.crop_cycle?.name || 'N/A'}</dd>
+            <dt className="text-sm font-medium text-gray-500">Crop cycle</dt>
+            <dd className="text-sm text-gray-900">{charge.crop_cycle?.name || '—'}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Beneficiary</dt>
@@ -217,17 +210,17 @@ export default function ChargeDetailPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-gray-500">Charge Date</dt>
-            <dd className="text-sm text-gray-900">{formatDate(charge.charge_date)}</dd>
+            <dt className="text-sm font-medium text-gray-500">Charge date</dt>
+            <dd className="text-sm text-gray-900 tabular-nums">{formatDate(charge.charge_date, { variant: 'medium' })}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500">Landlord</dt>
-            <dd className="text-sm text-gray-900">{charge.landlord_party?.name || 'N/A'}</dd>
+            <dd className="text-sm text-gray-900">{charge.landlord_party?.name || '—'}</dd>
           </div>
           {charge.posting_date && (
             <div>
-              <dt className="text-sm font-medium text-gray-500">Posting Date</dt>
-              <dd className="text-sm text-gray-900">{formatDate(charge.posting_date)}</dd>
+              <dt className="text-sm font-medium text-gray-500">Posting date</dt>
+              <dd className="text-sm text-gray-900 tabular-nums">{formatDate(charge.posting_date, { variant: 'medium' })}</dd>
             </div>
           )}
           {charge.posting_group_id && (
@@ -261,7 +254,7 @@ export default function ChargeDetailPage() {
 
       {/* Lines Table */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Charge Lines</h2>
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">Charge lines</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">

@@ -93,6 +93,8 @@ export default function OrchardDetailPage() {
     <div className="space-y-6" data-testid="orchard-detail-page">
       <PageHeader
         title={unit.name}
+        description="Long-lived orchard block for tagging work, harvests, and economics by year."
+        helper="Costs and revenue here roll up from activities and sales tagged to this unit."
         backTo="/app/orchards"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },

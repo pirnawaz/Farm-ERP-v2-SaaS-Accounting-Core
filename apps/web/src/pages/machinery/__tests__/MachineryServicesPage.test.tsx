@@ -49,24 +49,24 @@ describe('MachineryServicesPage', () => {
     });
   });
 
-  it('renders list page with title and New Service button', () => {
+  it('renders list page with title and New service button', () => {
     render(
       <MemoryRouter>
         <MachineryServicesPage />
       </MemoryRouter>
     );
     expect(screen.getByRole('heading', { name: 'Service History' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New Service/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New service/i })).toBeInTheDocument();
   });
 
-  it('New Service button navigates to new form', async () => {
+  it('New service button navigates to new form', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/app/machinery/services']}>
         <MachineryServicesPage />
       </MemoryRouter>
     );
-    const newButton = screen.getByRole('button', { name: /New Service/i });
+    const newButton = screen.getByRole('button', { name: /New service/i });
     await user.click(newButton);
     // Navigation is handled by react-router; in MemoryRouter we'd need to assert on location.
     // Just assert the button is present and clickable.

@@ -212,6 +212,8 @@ export default function LivestockDetailPage() {
     <div className="space-y-6" data-testid="livestock-detail-page">
       <PageHeader
         title={unit.name}
+        description="Herd or flock unit for events, headcount, and tagged costs and sales."
+        helper="Use this view to see current headcount and this year’s economics at a glance."
         backTo="/app/livestock"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },

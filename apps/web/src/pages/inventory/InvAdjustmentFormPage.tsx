@@ -64,6 +64,8 @@ export default function InvAdjustmentFormPage() {
     <div className="space-y-6">
       <PageHeader
         title="New stock adjustment"
+        description="Correct on-hand balances for counts, loss, damage, or other one-off changes."
+        helper="Use positive or negative line quantities—not the same as receiving goods or issuing to the field."
         backTo="/app/inventory/adjustments"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -108,7 +110,7 @@ export default function InvAdjustmentFormPage() {
             ))}
           </div>
         </div>
-        {canEdit && <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t"><button type="button" onClick={() => navigate('/app/inventory/adjustments')} className="px-4 py-2 border rounded">Cancel</button><button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">{createM.isPending ? 'Creating...' : 'Create'}</button></div>}
+        {canEdit && <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t"><button type="button" onClick={() => navigate('/app/inventory/adjustments')} className="px-4 py-2 border rounded">Cancel</button><button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">{createM.isPending ? 'Saving…' : 'Save'}</button></div>}
       </div>
     </div>
   );

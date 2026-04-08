@@ -20,6 +20,7 @@ import type { UpdateInvGrnPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 import toast from 'react-hot-toast';
 
 type Line = { item_id: string; qty: string; unit_cost: string };
@@ -128,6 +129,8 @@ export default function InvGrnDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={`${term('grnSingular')} ${grn.doc_no}`}
+        description="Receipt of stock into a store from a supplier or inbound movement."
+        helper="Goods received increases on-hand quantity when posted—not a transfer between your stores."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -141,12 +144,9 @@ export default function InvGrnDetailPage() {
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{grn.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Store</dt><dd className="font-medium">{grn.store?.name || grn.store_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Doc Date</dt><dd>{formatDate(grn.doc_date)}</dd></div>
+          <div><dt className="text-sm text-gray-500">Doc date</dt><dd className="tabular-nums">{formatDate(grn.doc_date, { variant: 'medium' })}</dd></div>
           <div><dt className="text-sm text-gray-500">Status</dt>
-            <dd><span className={`px-2 py-1 rounded text-xs ${
-              grn.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-              grn.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}>{grn.status}</span></dd>
+            <dd><PostingStatusBadge status={grn.status} /></dd>
           </div>
           {grn.supplier && <div><dt className="text-sm text-gray-500">Supplier</dt><dd>{grn.supplier.name}</dd></div>}
           {grn.posting_group_id && (
@@ -155,13 +155,13 @@ export default function InvGrnDetailPage() {
               <dd><Link to={`/app/posting-groups/${grn.posting_group_id}`} className="text-[#1F6F5C]">{grn.posting_group_id}</Link></dd>
             </div>
           )}
-          {grn.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(grn.posting_date)}</dd></div>}
+          {grn.posting_date && <div><dt className="text-sm text-gray-500">Posting date</dt><dd className="tabular-nums">{formatDate(grn.posting_date, { variant: 'medium' })}</dd></div>}
         </dl>
       </div>
 
       {isDraft && canEdit ? (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-medium mb-4">Edit (DRAFT)</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit draft</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormField label="Doc No"><input value={doc_no} onChange={(e) => setDocNo(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
             <FormField label="Doc Date" required><input type="date" value={doc_date} onChange={(e) => setDocDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>

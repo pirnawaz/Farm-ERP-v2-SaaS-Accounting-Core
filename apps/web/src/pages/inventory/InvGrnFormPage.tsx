@@ -89,13 +89,15 @@ export default function InvGrnFormPage() {
   return (
     <PageContainer width="form" className="space-y-6">
       <PageHeader
-        title="New Goods Received"
+        title="New goods received"
+        description="Record stock arriving into a store from a supplier or inbound source."
+        helper="This is a receipt (not a transfer between stores). Posting increases on-hand stock."
         backTo="/app/inventory/grns"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('grn'), to: '/app/inventory/grns' },
-          { label: 'New Goods Received' },
+          { label: 'New goods received' },
         ]}
       />
 
@@ -234,7 +236,7 @@ export default function InvGrnFormPage() {
               disabled={createM.isPending}
               className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
             >
-              {createM.isPending ? 'Creating...' : 'Create'}
+              {createM.isPending ? 'Saving…' : 'Save'}
             </button>
           </FormActions>
         )}

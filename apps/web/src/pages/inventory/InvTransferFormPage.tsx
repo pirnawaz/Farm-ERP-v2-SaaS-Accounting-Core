@@ -64,6 +64,8 @@ export default function InvTransferFormPage() {
     <div className="space-y-6">
       <PageHeader
         title="New stock transfer"
+        description="Move quantity from one store to another within your operation."
+        helper="Not a goods receipt or a stock issue—only reallocates stock between locations."
         backTo="/app/inventory/transfers"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -142,7 +144,7 @@ export default function InvTransferFormPage() {
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
             <button type="button" onClick={() => navigate('/app/inventory/transfers')} className="px-4 py-2 border rounded">Cancel</button>
             <button onClick={handleSubmit} disabled={createM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50">
-              {createM.isPending ? 'Creating...' : 'Create'}
+              {createM.isPending ? 'Saving…' : 'Save'}
             </button>
           </div>
         )}

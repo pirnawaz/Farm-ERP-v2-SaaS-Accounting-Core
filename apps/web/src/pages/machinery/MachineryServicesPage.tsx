@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useMachineryServicesQuery,
@@ -16,7 +16,6 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import type { MachineryService } from '../../types';
 import { Badge } from '../../components/Badge';
-import { FilterBar, FilterField, FilterGrid } from '../../components/FilterBar';
 
 export default function MachineryServicesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -97,11 +96,33 @@ export default function MachineryServicesPage() {
     setSearchParams(new URLSearchParams());
   };
 
+  const hasFilters = !!(
+    filters.status ||
+    filters.project_id ||
+    filters.machine_id ||
+    filters.from ||
+    filters.to
+  );
+
+  const serviceList = (services ?? []) as MachineryService[];
+
+  const summaryLine = useMemo(() => {
+    const n = serviceList.length;
+    const label = n === 1 ? 'service record' : 'service records';
+    return hasFilters ? `${n} ${label} (filtered)` : `${n} ${label}`;
+  }, [serviceList.length, hasFilters]);
+
   const columns: Column<MachineryService>[] = [
     {
       header: 'Date',
-      accessor: (row) =>
-        row.posting_date ? formatDate(row.posting_date) : (row.created_at ? formatDate(row.created_at) : '—'),
+      accessor: (row) => {
+        const d = row.posting_date || row.created_at;
+        return d ? (
+          <span className="tabular-nums text-gray-900">{formatDate(d, { variant: 'medium' })}</span>
+        ) : (
+          '—'
+        );
+      },
     },
     {
       header: 'Field cycle',
@@ -135,7 +156,7 @@ export default function MachineryServicesPage() {
     {
       header: 'Status',
       accessor: (row) => (
-        <Badge variant={row.status === 'DRAFT' ? 'warning' : row.status === 'POSTED' ? 'success' : 'danger'}>
+        <Badge variant={row.status === 'DRAFT' ? 'warning' : row.status === 'POSTED' ? 'success' : 'neutral'}>
           {row.status === 'DRAFT' ? 'Draft' : row.status === 'POSTED' ? 'Posted' : 'Reversed'}
         </Badge>
       ),
@@ -151,7 +172,7 @@ export default function MachineryServicesPage() {
               e.stopPropagation();
               navigate(`/app/machinery/services/${row.id}`);
             }}
-            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
+            className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             View
           </button>
@@ -163,7 +184,7 @@ export default function MachineryServicesPage() {
                   e.stopPropagation();
                   navigate(`/app/machinery/services/${row.id}/edit`);
                 }}
-                className="text-blue-600 hover:text-blue-800"
+                className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
               >
                 Edit
               </button>
@@ -199,10 +220,12 @@ export default function MachineryServicesPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="Service History"
         tooltip="View past service records for your machines."
+        description="View past service records for your machines."
+        helper="Service records capture machine servicing with field cycle context, quantities, and allocation where relevant."
         backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -214,95 +237,128 @@ export default function MachineryServicesPage() {
             <button
               type="button"
               onClick={() => navigate('/app/machinery/services/new')}
-              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
-              New Service
+              New service
             </button>
           ) : undefined
         }
       />
 
-      <div className="space-y-4">
-        <p className="text-sm text-gray-600">View past service records for your machines.</p>
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
-          <FilterBar>
-            <FilterGrid className="lg:grid-cols-3 xl:grid-cols-5">
-              <FilterField label="Status">
-                <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
-                  <option value="">All</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="POSTED">Posted</option>
-                  <option value="REVERSED">Reversed</option>
-                </select>
-              </FilterField>
-              <FilterField label="Field cycle">
-                <select
-                  value={filters.project_id}
-                  onChange={(e) => handleFilterChange('project_id', e.target.value)}
-                >
-                  <option value="">All</option>
-                  {projects?.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </FilterField>
-              <FilterField label="Machine">
-                <select
-                  value={filters.machine_id}
-                  onChange={(e) => handleFilterChange('machine_id', e.target.value)}
-                >
-                  <option value="">All</option>
-                  {machines?.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.code} – {m.name}
-                    </option>
-                  ))}
-                </select>
-              </FilterField>
-              <FilterField label="From">
-                <input type="date" value={filters.from} onChange={(e) => handleFilterChange('from', e.target.value)} />
-              </FilterField>
-              <FilterField label="To">
-                <input type="date" value={filters.to} onChange={(e) => handleFilterChange('to', e.target.value)} />
-              </FilterField>
-            </FilterGrid>
-          </FilterBar>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900 tabular-nums">{(services ?? []).length}</span>{' '}
-              {(services ?? []).length === 1 ? 'service record' : 'service records'}
-              {(filters.status || filters.project_id || filters.machine_id || filters.from || filters.to) ? (
-                <span className="text-gray-500"> (filtered)</span>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+      <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasFilters}
+            className="text-sm font-medium text-[#1F6F5C] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            Clear filters
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             >
-              Clear filters
-            </button>
+              <option value="">All</option>
+              <option value="DRAFT">Draft</option>
+              <option value="POSTED">Posted</option>
+              <option value="REVERSED">Reversed</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Field cycle</label>
+            <select
+              value={filters.project_id}
+              onChange={(e) => handleFilterChange('project_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {projects?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Machine</label>
+            <select
+              value={filters.machine_id}
+              onChange={(e) => handleFilterChange('machine_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {machines?.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.code} – {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">From</label>
+            <input
+              type="date"
+              value={filters.from}
+              onChange={(e) => handleFilterChange('from', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
+          </div>
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">To</label>
+            <input
+              type="date"
+              value={filters.to}
+              onChange={(e) => handleFilterChange('to', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
           </div>
         </div>
+      </section>
 
-        <div className="bg-white rounded-lg shadow">
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : (
-            <DataTable
-              data={(services ?? []) as MachineryService[]}
-              columns={columns}
-              onRowClick={(row) => navigate(`/app/machinery/services/${row.id}`)}
-              emptyMessage="No service records yet. Add a service entry to track machine servicing."
-            />
-          )}
-        </div>
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : serviceList.length === 0 && !hasFilters ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No service records yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Add a service record when you log machine servicing so you can review history here.
+          </p>
+        </div>
+      ) : serviceList.length === 0 && hasFilters ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No service records match your filters.</h3>
+          <p className="mt-2 text-sm text-gray-600">Try adjusting filters or clear them to see all records.</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-6 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
+          <DataTable
+            data={serviceList}
+            columns={columns}
+            onRowClick={(row) => navigate(`/app/machinery/services/${row.id}`)}
+            emptyMessage=""
+          />
+        </div>
+      )}
 
       {postingId && (
         <Modal isOpen={!!postingId} title="Post Service" onClose={() => setPostingId(null)}>

@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { UpdateLabWorkLogPayload } from '../../types';
 import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
+import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 
 export default function WorkLogDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -114,11 +115,13 @@ export default function WorkLogDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Work Log ${log.doc_no}`}
+        title={`Work log ${log.doc_no}`}
+        description="Labour time and pay for a worker against crop and field cycles."
+        helper="People and payables live here—field work without labour cost is under Crop Ops field work logs."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Labour', to: '/app/labour' },
+          { label: 'Labour Overview', to: '/app/labour' },
           { label: 'Work Logs', to: '/app/labour/work-logs' },
           { label: log.doc_no },
         ]}
@@ -128,17 +131,14 @@ export default function WorkLogDetailPage() {
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><dt className="text-sm text-gray-500">Doc No</dt><dd className="font-medium">{log.doc_no}</dd></div>
           <div><dt className="text-sm text-gray-500">Worker</dt><dd>{log.worker?.name || log.worker_id}</dd></div>
-          <div><dt className="text-sm text-gray-500">Work Date</dt><dd>{formatDate(log.work_date)}</dd></div>
-          <div><dt className="text-sm text-gray-500">Crop Cycle</dt><dd>{log.crop_cycle?.name || log.crop_cycle_id}</dd></div>
+          <div><dt className="text-sm text-gray-500">Work date</dt><dd className="tabular-nums">{formatDate(log.work_date, { variant: 'medium' })}</dd></div>
+          <div><dt className="text-sm text-gray-500">Crop cycle</dt><dd>{log.crop_cycle?.name || log.crop_cycle_id}</dd></div>
           <div><dt className="text-sm text-gray-500">{term('fieldCycle')}</dt><dd>{log.project?.name || log.project_id}</dd></div>
           {log.machine && (
             <div><dt className="text-sm text-gray-500">Machine</dt><dd>{log.machine.code} - {log.machine.name}</dd></div>
           )}
           <div><dt className="text-sm text-gray-500">Status</dt>
-            <dd><span className={`px-2 py-1 rounded text-xs ${
-              log.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800' :
-              log.status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}>{log.status}</span></dd>
+            <dd><PostingStatusBadge status={log.status} /></dd>
           </div>
           <div><dt className="text-sm text-gray-500">Units</dt><dd>{log.units}</dd></div>
           <div><dt className="text-sm text-gray-500">Rate</dt><dd><span className="tabular-nums">{formatMoney(log.rate)}</span></dd></div>

@@ -129,7 +129,7 @@ export default function WorkLogFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Edit usage entry"
+          title="Edit machine usage"
           backTo="/app/machinery/work-logs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -148,7 +148,7 @@ export default function WorkLogFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Usage entry"
+          title="Machine usage"
           backTo="/app/machinery/work-logs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -157,7 +157,7 @@ export default function WorkLogFormPage() {
             { label: 'Not found' },
           ]}
         />
-        <p className="text-gray-600">Usage entry not found.</p>
+        <p className="text-gray-600">Machine usage record not found.</p>
       </div>
     );
   }
@@ -165,7 +165,7 @@ export default function WorkLogFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title={`Usage entry ${workLog.work_log_no}`}
+          title={`Machine usage ${workLog.work_log_no}`}
           backTo={`/app/machinery/work-logs/${id}`}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
@@ -174,7 +174,7 @@ export default function WorkLogFormPage() {
             { label: workLog.work_log_no },
           ]}
         />
-        <p className="text-gray-600">Only DRAFT usage entries can be edited.</p>
+        <p className="text-gray-600">Only draft machine usage records can be edited.</p>
       </div>
     );
   }
@@ -182,7 +182,9 @@ export default function WorkLogFormPage() {
   return (
     <div className="space-y-6 pb-8">
       <PageHeader
-        title={isEdit ? `Edit usage entry ${workLog?.work_log_no ?? ''}` : 'New usage entry'}
+        title={isEdit ? `Edit machine usage ${workLog?.work_log_no ?? ''}` : 'New machine usage'}
+        description="Record machine work against a field cycle and split costs (fuel, operator, maintenance, other)."
+        helper="For repairs and scheduled servicing, use maintenance jobs or service history—not this form."
         backTo={isEdit ? `/app/machinery/work-logs/${id}` : '/app/machinery/work-logs'}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -395,7 +397,7 @@ export default function WorkLogFormPage() {
             disabled={!canSubmit || createM.isPending || updateM.isPending}
             className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded hover:bg-[#1a5a4a] disabled:opacity-50"
           >
-            {isEdit ? (updateM.isPending ? 'Saving…' : 'Save') : createM.isPending ? 'Creating…' : 'Create'}
+            {isEdit ? (updateM.isPending ? 'Saving…' : 'Save') : createM.isPending ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
