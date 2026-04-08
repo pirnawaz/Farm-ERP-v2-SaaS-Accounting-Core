@@ -55,7 +55,7 @@ describe('MachineryServicesPage', () => {
         <MachineryServicesPage />
       </MemoryRouter>
     );
-    expect(screen.getByText('Machinery Services')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Service History' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /New Service/i })).toBeInTheDocument();
   });
 

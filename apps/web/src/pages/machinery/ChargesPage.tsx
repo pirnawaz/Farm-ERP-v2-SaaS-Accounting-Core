@@ -12,7 +12,6 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import type { MachineryCharge } from '../../types';
-import { term } from '../../config/terminology';
 import { FilterBar, FilterField, FilterGrid } from '../../components/FilterBar';
 
 export default function ChargesPage() {
@@ -54,6 +53,19 @@ export default function ChargesPage() {
     setSearchParams(params);
   };
 
+  const clearFilters = () => {
+    const cleared = {
+      status: '',
+      project_id: '',
+      crop_cycle_id: '',
+      from: '',
+      to: '',
+      landlord_party_id: '',
+    };
+    setFilters(cleared);
+    setSearchParams(new URLSearchParams());
+  };
+
   const handleGenerate = async (payload: any) => {
     try {
       const result = await generateMutation.mutateAsync(payload);
@@ -73,25 +85,25 @@ export default function ChargesPage() {
   };
 
   const columns: Column<MachineryCharge>[] = [
-    { header: 'Charge No', accessor: 'charge_no' },
+    { header: 'Date', accessor: (row) => formatDate(row.charge_date) },
     {
-      header: term('fieldCycle'),
+      header: 'Field cycle',
       accessor: (row) => row.project?.name || 'N/A',
     },
     {
-      header: 'Crop Cycle',
+      header: 'Crop cycle',
       accessor: (row) => row.crop_cycle?.name || 'N/A',
     },
     {
       header: 'Beneficiary',
       accessor: (row) => (row.pool_scope === 'LANDLORD_ONLY' ? 'My farm' : row.pool_scope === 'HARI_ONLY' ? 'Hari only' : row.pool_scope === 'SHARED' ? 'Shared' : row.pool_scope ?? '—'),
     },
-    { header: 'Charge Date', accessor: (row) => formatDate(row.charge_date) },
     {
-      header: 'Total Amount',
+      header: 'Amount',
       accessor: (row) => <span className="tabular-nums">{formatMoney(row.total_amount)}</span>,
     },
-    { header: 'Status', accessor: 'status' },
+    { header: 'Status', accessor: (row) => (row.status === 'DRAFT' ? 'Draft' : row.status === 'POSTED' ? 'Posted' : 'Reversed') },
+    { header: 'Reference', accessor: (row) => <span className="tabular-nums">{row.charge_no || '—'}</span> },
     {
       header: 'Actions',
       accessor: (row) => (
@@ -115,11 +127,12 @@ export default function ChargesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Machinery Charges"
+        tooltip="Track costs associated with machine usage and operations."
         backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Charges' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Machinery Charges' },
         ]}
         right={
           canGenerate ? (
@@ -135,6 +148,7 @@ export default function ChargesPage() {
       />
 
       <div className="space-y-4">
+        <p className="text-sm text-gray-600">Track costs associated with machine usage and operations.</p>
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
           <FilterBar>
@@ -147,7 +161,7 @@ export default function ChargesPage() {
                   <option value="REVERSED">Reversed</option>
                 </select>
               </FilterField>
-              <FilterField label={term('fieldCycle')}>
+              <FilterField label="Field cycle">
                 <select value={filters.project_id} onChange={(e) => handleFilterChange('project_id', e.target.value)}>
                   <option value="">All</option>
                   {projects?.map((project) => (
@@ -170,7 +184,7 @@ export default function ChargesPage() {
                   ))}
                 </select>
               </FilterField>
-              <FilterField label="Landlord Party">
+              <FilterField label="Landlord">
                 <select
                   value={filters.landlord_party_id}
                   onChange={(e) => handleFilterChange('landlord_party_id', e.target.value)}
@@ -185,14 +199,30 @@ export default function ChargesPage() {
                     ))}
                 </select>
               </FilterField>
-              <FilterField label="Date From">
+              <FilterField label="From">
                 <input type="date" value={filters.from} onChange={(e) => handleFilterChange('from', e.target.value)} />
               </FilterField>
-              <FilterField label="Date To">
+              <FilterField label="To">
                 <input type="date" value={filters.to} onChange={(e) => handleFilterChange('to', e.target.value)} />
               </FilterField>
             </FilterGrid>
           </FilterBar>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-gray-600">
+              <span className="font-medium text-gray-900 tabular-nums">{(charges ?? []).length}</span>{' '}
+              {(charges ?? []).length === 1 ? 'machinery charge' : 'machinery charges'}
+              {(filters.status || filters.project_id || filters.crop_cycle_id || filters.from || filters.to || filters.landlord_party_id) ? (
+                <span className="text-gray-500"> (filtered)</span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+            >
+              Clear filters
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow">
@@ -205,6 +235,7 @@ export default function ChargesPage() {
               data={(charges ?? []) as MachineryCharge[]}
               columns={columns}
               onRowClick={(row) => navigate(`/app/machinery/charges/${row.id}`)}
+              emptyMessage="No machinery charges yet. Generate charges to record machinery-related costs."
             />
           )}
         </div>

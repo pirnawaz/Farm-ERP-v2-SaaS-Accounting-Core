@@ -96,8 +96,8 @@ export default function MaintenanceJobDetailPage() {
           backTo="/app/machinery/maintenance-jobs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Maintenance', to: '/app/machinery/maintenance-jobs' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs' },
             { label: '…' },
           ]}
         />
@@ -116,8 +116,8 @@ export default function MaintenanceJobDetailPage() {
           backTo="/app/machinery/maintenance-jobs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Maintenance', to: '/app/machinery/maintenance-jobs' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs' },
             { label: 'Not found' },
           ]}
         />
@@ -136,8 +136,8 @@ export default function MaintenanceJobDetailPage() {
         backTo="/app/machinery/maintenance-jobs"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Maintenance', to: '/app/machinery/maintenance-jobs' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs' },
           { label: job.job_no },
         ]}
       />
@@ -174,7 +174,7 @@ export default function MaintenanceJobDetailPage() {
             <dd className="text-sm text-gray-900">{job.maintenance_type?.name || 'N/A'}</dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-gray-500">Vendor Party</dt>
+            <dt className="text-sm font-medium text-gray-500">Vendor</dt>
             <dd className="text-sm text-gray-900">{job.vendor_party?.name || 'N/A'}</dd>
           </div>
           <div>

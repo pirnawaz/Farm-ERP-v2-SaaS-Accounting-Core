@@ -129,12 +129,12 @@ export default function ChargeDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Charge"
+          title="Machinery charge"
           backTo="/app/machinery/charges"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Charges', to: '/app/machinery/charges' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machinery Charges', to: '/app/machinery/charges' },
             { label: '…' },
           ]}
         />
@@ -149,18 +149,18 @@ export default function ChargeDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Charge"
+          title="Machinery charge"
           backTo="/app/machinery/charges"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Charges', to: '/app/machinery/charges' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machinery Charges', to: '/app/machinery/charges' },
             { label: 'Not found' },
           ]}
         />
         <p className="text-gray-600">Charge not found.</p>
         <Link to="/app/machinery/charges" className="text-[#1F6F5C] font-medium hover:underline">
-          Back to Charges
+          Back to Machinery Charges
         </Link>
       </div>
     );
@@ -169,12 +169,12 @@ export default function ChargeDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={charge.charge_no || 'Charge'}
+        title={charge.charge_no || 'Machinery charge'}
         backTo="/app/machinery/charges"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Charges', to: '/app/machinery/charges' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Machinery Charges', to: '/app/machinery/charges' },
           { label: charge.charge_no || 'Charge' },
         ]}
       />
@@ -221,7 +221,7 @@ export default function ChargeDetailPage() {
             <dd className="text-sm text-gray-900">{formatDate(charge.charge_date)}</dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-gray-500">Landlord Party</dt>
+            <dt className="text-sm font-medium text-gray-500">Landlord</dt>
             <dd className="text-sm text-gray-900">{charge.landlord_party?.name || 'N/A'}</dd>
           </div>
           {charge.posting_date && (

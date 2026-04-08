@@ -63,13 +63,13 @@ export default function InvTransferFormPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`New ${term('transferSingular')}`}
+        title="New stock transfer"
         backTo="/app/inventory/transfers"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('transfer'), to: '/app/inventory/transfers' },
-          { label: `New ${term('transferSingular')}` },
+          { label: 'New stock transfer' },
         ]}
       />
 

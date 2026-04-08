@@ -14,7 +14,7 @@ export const MODULE_NAV_IDS: Record<string, string[]> = {
   ar_sales: ['nav-sales'],
   inventory: ['nav-inventory'],
   labour: ['nav-labour'],
-  crop_ops: ['nav-crop-ops', 'nav-harvests'],
+  crop_ops: ['nav-crop-ops', 'nav-crop-ops-activities', 'nav-crop-ops-activity-types', 'nav-harvests'],
   machinery: [
     'nav-machinery-work-logs',
     'nav-machinery-services',

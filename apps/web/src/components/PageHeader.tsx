@@ -15,12 +15,16 @@ interface PageHeaderProps {
   title: string;
   /** Optional tooltip shown on hover over the title (e.g. short explanation of the page). */
   tooltip?: string;
+  /** Primary one-line description under the title (plain-language; matches Operations list pattern). */
+  description?: ReactNode;
+  /** Optional second line (smaller, muted) when extra context helps. */
+  helper?: ReactNode;
   backTo?: string;
   breadcrumbs?: Breadcrumb[];
   right?: ReactNode;
 }
 
-export function PageHeader({ title, tooltip, backTo, breadcrumbs, right }: PageHeaderProps) {
+export function PageHeader({ title, tooltip, description, helper, backTo, breadcrumbs, right }: PageHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -71,6 +75,10 @@ export function PageHeader({ title, tooltip, backTo, breadcrumbs, right }: PageH
           <h1 className="text-2xl font-semibold text-gray-900 break-words" title={tooltip}>
             {title}
           </h1>
+          {description ? (
+            <p className="mt-1 text-base text-gray-700 max-w-2xl">{description}</p>
+          ) : null}
+          {helper ? <p className="mt-1 text-sm text-gray-500 max-w-2xl">{helper}</p> : null}
         </div>
         {right && <div className="w-full sm:w-auto sm:flex-shrink-0">{right}</div>}
       </div>

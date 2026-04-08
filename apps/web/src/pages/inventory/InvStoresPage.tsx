@@ -34,16 +34,17 @@ export default function InvStoresPage() {
     <div className="space-y-6">
       <PageHeader
         title="Stores"
+        tooltip="Stores are the storage locations on your farm—sheds, silos, tanks, or bins where stock is kept."
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'Stores' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory Overview', to: '/app/inventory' }, { label: 'Stores' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Store</button>
+          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">Add Store</button>
         ) : undefined}
       />
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={stores || []} columns={cols} emptyMessage="No stores. Create one." />
+        <DataTable data={stores || []} columns={cols} emptyMessage="No storage locations yet. Add a store for each shed, silo, or place you keep stock." />
       </div>
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Store">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Store">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Name" required><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Type">

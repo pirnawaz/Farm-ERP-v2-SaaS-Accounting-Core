@@ -232,7 +232,7 @@ export interface CropCycleClosePreview {
   blocking_reasons: string[];
 }
 
-// Production Unit (long-duration crops e.g. Sugarcane)
+// Production Unit: long-lived operational continuity (orchards, livestock, multi-year crops). SEASONAL exists for legacy rows only.
 export type ProductionUnitType = 'SEASONAL' | 'LONG_CYCLE';
 export type ProductionUnitStatus = 'ACTIVE' | 'CLOSED';
 
@@ -258,7 +258,8 @@ export interface ProductionUnit {
 
 export interface CreateProductionUnitPayload {
   name: string;
-  type: ProductionUnitType;
+  /** New units must be LONG_CYCLE; SEASONAL is legacy-only and cannot be created via the API. */
+  type: 'LONG_CYCLE';
   start_date: string;
   end_date?: string | null;
   status?: ProductionUnitStatus;

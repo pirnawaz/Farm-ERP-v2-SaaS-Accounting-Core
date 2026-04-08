@@ -32,17 +32,18 @@ export default function InvUomsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Units of Measure"
+        title="Units"
+        tooltip="Units are how you measure stock—set up codes like kg or bag before you add items."
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: 'UoMs' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory Overview', to: '/app/inventory' }, { label: 'Units' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New UoM</button>
+          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">Add unit</button>
         ) : undefined}
       />
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={uoms || []} columns={cols} emptyMessage="No UoMs. Create one (e.g. KG, BAG, L) so you can add items." />
+        <DataTable data={uoms || []} columns={cols} emptyMessage="No units yet. Add units for measuring stock, like kg, bag, or litre, before you add items." />
       </div>
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New UoM">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add unit">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Code" required>
             <input

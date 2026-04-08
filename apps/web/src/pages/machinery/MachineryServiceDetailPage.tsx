@@ -67,12 +67,12 @@ export default function MachineryServiceDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Machinery Service"
+          title="Service record"
           backTo="/app/machinery/services"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Services', to: '/app/machinery/services' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Service History', to: '/app/machinery/services' },
             { label: '…' },
           ]}
         />
@@ -87,18 +87,18 @@ export default function MachineryServiceDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Machinery Service"
+          title="Service record"
           backTo="/app/machinery/services"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Services', to: '/app/machinery/services' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Service History', to: '/app/machinery/services' },
             { label: 'Not found' },
           ]}
         />
         <p className="text-gray-600">Service not found.</p>
         <button type="button" onClick={() => navigate('/app/machinery/services')} className="text-[#1F6F5C] font-medium hover:underline">
-          Back to Services
+          Back to Service History
         </button>
       </div>
     );
@@ -107,12 +107,12 @@ export default function MachineryServiceDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Machinery Service"
+        title="Service record"
         backTo="/app/machinery/services"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Services', to: '/app/machinery/services' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Service History', to: '/app/machinery/services' },
           { label: service.id.slice(0, 8) + '…' },
         ]}
         right={

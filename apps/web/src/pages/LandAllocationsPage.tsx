@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLandAllocations, useCreateLandAllocation, useUpdateLandAllocation, useDeleteLandAllocation } from '../hooks/useLandAllocations';
 import { useCropCycles } from '../hooks/useCropCycles';
@@ -134,26 +134,37 @@ export default function LandAllocationsPage() {
 
   const columns: Column<LandAllocation>[] = [
     {
-      header: 'Land Parcel',
-      accessor: (row) => row.land_parcel?.name || 'N/A',
+      header: 'Land parcel',
+      accessor: (row) => (
+        <span className="font-medium text-gray-900">{row.land_parcel?.name || '—'}</span>
+      ),
     },
     {
-      header: 'HARI',
-      accessor: (row) => row.party?.name || 'Owner-operated',
+      header: 'Assignee',
+      accessor: (row) => (
+        <span className="text-gray-800">{row.party?.name || 'Owner-operated'}</span>
+      ),
     },
-    { header: 'Allocated Acres', accessor: 'allocated_acres' },
     {
-      header: 'Project',
+      header: 'Allocated acres',
+      accessor: (row) => (
+        <span className="tabular-nums text-gray-900 text-right block">{row.allocated_acres}</span>
+      ),
+      numeric: true,
+      align: 'right',
+    },
+    {
+      header: 'Field cycle',
       accessor: (row) =>
         row.project ? (
           <Link
             to={`/app/projects/${row.project.id}`}
-            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
+            className="font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
           >
             {row.project.name}
           </Link>
         ) : (
-          'No project'
+          <span className="text-gray-500">—</span>
         ),
     },
     ...(canCreate
@@ -183,6 +194,21 @@ export default function LandAllocationsPage() {
       : []),
   ];
 
+  const allocationRows = allocations ?? [];
+  const hasFilter = selectedCropCycleId.length > 0;
+  const selectedCycleName = useMemo(
+    () => cropCycles?.find((c) => c.id === selectedCropCycleId)?.name,
+    [cropCycles, selectedCropCycleId],
+  );
+  const summaryLine = useMemo(() => {
+    const n = allocationRows.length;
+    const base = `${n} ${n === 1 ? 'allocation' : 'allocations'}`;
+    if (hasFilter && selectedCycleName) return `${base} · Crop cycle: ${selectedCycleName}`;
+    return base;
+  }, [allocationRows.length, hasFilter, selectedCycleName]);
+
+  const clearFilters = () => setSelectedCropCycleId('');
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -191,46 +217,100 @@ export default function LandAllocationsPage() {
     );
   }
 
+  const showEmpty = allocationRows.length === 0;
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Land Allocations</h1>
+    <div data-testid="land-allocations-page" className="space-y-6 max-w-7xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Land Allocation</h1>
+          <p className="mt-1 text-base text-gray-700">Track how land parcels are allocated for use.</p>
+          <p className="mt-1 text-sm text-gray-500 max-w-2xl">
+            Use land allocation to assign parcel area into crop and field planning.
+          </p>
+        </div>
         {canCreate && (
           <button
             data-testid="new-land-allocation"
+            type="button"
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            className="shrink-0 px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
           >
             New Allocation
           </button>
         )}
       </div>
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Filter by Crop Cycle
-        </label>
-        <select
-          value={selectedCropCycleId}
-          onChange={(e) => setSelectedCropCycleId(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
-        >
-          <option value="">All Crop Cycles</option>
-          {cropCycles?.map((cycle) => (
-            <option key={cycle.id} value={cycle.id}>
-              {cycle.name}
-            </option>
-          ))}
-        </select>
+      <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasFilter}
+            className="text-sm font-medium text-[#1F6F5C] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            Clear filters
+          </button>
+        </div>
+        <div className="max-w-md">
+          <label htmlFor="allocation-crop-cycle" className="block text-xs font-medium text-gray-600 mb-1">
+            Crop cycle
+          </label>
+          <select
+            id="allocation-crop-cycle"
+            value={selectedCropCycleId}
+            onChange={(e) => setSelectedCropCycleId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+          >
+            <option value="">All crop cycles</option>
+            {cropCycles?.map((cycle) => (
+              <option key={cycle.id} value={cycle.id}>
+                {cycle.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-gray-500">Show allocations for one season, or all seasons.</p>
+        </div>
+      </section>
+
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <DataTable
-          data={allocations || []}
-          columns={columns}
-          emptyMessage="No allocations found"
-        />
-      </div>
+      {showEmpty ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">
+            {hasFilter ? 'No allocations for this crop cycle.' : 'No land allocations yet.'}
+          </h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            {hasFilter
+              ? 'Try another crop cycle or clear filters to see all allocations.'
+              : 'Add one to assign land into use.'}
+          </p>
+          {hasFilter ? (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-6 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            >
+              Clear filters
+            </button>
+          ) : canCreate ? (
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a]"
+            >
+              New Allocation
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+          <DataTable data={allocationRows} columns={columns} emptyMessage="" />
+        </div>
+      )}
 
       <Modal
         isOpen={showCreateModal}

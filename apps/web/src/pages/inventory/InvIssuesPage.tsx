@@ -40,9 +40,9 @@ export default function InvIssuesPage() {
       <PageHeader
         title={term('issue')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('issue') }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory Overview', to: '/app/inventory' }, { label: term('issue') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button type="button" onClick={() => navigate('/app/inventory/issues/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('issueSingular')}</button>
+          <button type="button" onClick={() => navigate('/app/inventory/issues/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">Record Stock Used</button>
         ) : undefined}
       />
       <div className="space-y-4">
@@ -66,7 +66,7 @@ export default function InvIssuesPage() {
               data={(issues ?? []) as InvIssue[]}
               columns={cols}
               onRowClick={(r) => navigate(`/app/inventory/issues/${r.id}`, { state: { from: location.pathname + location.search } })}
-              emptyMessage="No issues. Create one."
+              emptyMessage="No stock used yet. Record when you take items from storage for field work, a project, or day-to-day farm use."
             />
           )}
         </div>

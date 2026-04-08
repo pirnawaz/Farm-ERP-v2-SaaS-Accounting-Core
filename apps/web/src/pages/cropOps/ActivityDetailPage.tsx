@@ -160,11 +160,15 @@ export default function ActivityDetailPage() {
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Crop Ops', to: '/app/crop-ops' },
-          { label: term('activities'), to: '/app/crop-ops/activities' },
+          { label: 'Crop Ops Overview', to: '/app/crop-ops' },
+          { label: 'Field Work Logs', to: '/app/crop-ops/activities' },
           { label: activity.doc_no },
         ]}
       />
+      <p className="-mt-2 mb-6 text-sm text-gray-500 max-w-2xl">
+        Field work log — operational crop activity on the farm. Worker pay and labour time are tracked under Labour (Labour
+        Work Logs), not here.
+      </p>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">

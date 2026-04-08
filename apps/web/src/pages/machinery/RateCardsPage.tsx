@@ -14,6 +14,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineRateCard, CreateMachineRateCardPayload, UpdateMachineRateCardPayload } from '../../types';
+import { Badge } from '../../components/Badge';
 
 export default function RateCardsPage() {
   const { data: rateCards, isLoading } = useRateCardsQuery();
@@ -45,31 +46,43 @@ export default function RateCardsPage() {
 
   const cols: Column<MachineRateCard>[] = [
     { 
-      header: 'Applies To', 
+      header: 'Machine / type',
       accessor: (r) => r.applies_to_mode === 'MACHINE' 
         ? (r.machine?.name || r.machine_id || 'N/A')
         : (r.machine_type || 'N/A')
     },
-    { header: 'Service', accessor: (r) => r.activity_type?.name || '—' },
-    { header: 'Rate Unit', accessor: 'rate_unit' },
-    { header: 'Pricing Model', accessor: 'pricing_model' },
+    { header: 'Activity (optional)', accessor: (r) => r.activity_type?.name || '—' },
     { 
-      header: 'Base Rate', 
-      accessor: (r) => formatMoney(parseFloat(r.base_rate))
+      header: 'Rate',
+      accessor: (r) => (
+        <span className="tabular-nums">
+          {formatMoney(parseFloat(r.base_rate))} / {r.rate_unit.toLowerCase()}
+        </span>
+      ),
     },
     { 
-      header: 'Cost Plus %', 
-      accessor: (r) => r.cost_plus_percent ? `${r.cost_plus_percent}%` : '-'
+      header: 'Pricing',
+      accessor: (r) =>
+        r.pricing_model === 'FIXED'
+          ? 'Fixed'
+          : `Cost plus${r.cost_plus_percent ? ` (${r.cost_plus_percent}%)` : ''}`,
     },
     { 
-      header: 'Effective From', 
-      accessor: (r) => formatDate(r.effective_from)
+      header: 'Effective',
+      accessor: (r) => (
+        <span className="tabular-nums">
+          {formatDate(r.effective_from)}{r.effective_to ? ` → ${formatDate(r.effective_to)}` : ' → open'}
+        </span>
+      ),
     },
-    { 
-      header: 'Effective To', 
-      accessor: (r) => r.effective_to ? formatDate(r.effective_to) : 'Open'
+    {
+      header: 'Status',
+      accessor: (r) => (
+        <Badge variant={r.is_active ? 'success' : 'neutral'}>
+          {r.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
     },
-    { header: 'Active', accessor: (r) => (r.is_active ? 'Yes' : 'No') },
     {
       header: 'Actions',
       accessor: (r) => (
@@ -176,8 +189,9 @@ export default function RateCardsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Rate Cards"
+        tooltip="Set machine usage rates and pricing rules."
         backTo="/app/machinery"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Rate Cards' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery Overview', to: '/app/machinery' }, { label: 'Rate Cards' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button
             type="button"
@@ -188,13 +202,21 @@ export default function RateCardsPage() {
           </button>
         ) : undefined}
       />
+      <div className="space-y-1">
+        <p className="text-sm text-gray-600">Set machine usage rates and pricing rules.</p>
+        <p className="text-xs text-gray-500">Use rate cards to define how machinery work is priced.</p>
+      </div>
+      <div className="text-sm text-gray-600">
+        <span className="font-medium text-gray-900 tabular-nums">{(rateCards ?? []).length}</span>{' '}
+        {(rateCards ?? []).length === 1 ? 'rate card' : 'rate cards'}
+      </div>
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner size="lg" />
           </div>
         ) : (
-          <DataTable data={rateCards || []} columns={cols} emptyMessage="No rate cards. Create one." />
+          <DataTable data={rateCards || []} columns={cols} emptyMessage="No rate cards yet. Create one to set usage rates." />
         )}
       </div>
       <Modal isOpen={showModal} onClose={handleCloseModal} title={editingRateCard ? 'Edit Rate Card' : 'New Rate Card'}>

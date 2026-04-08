@@ -45,9 +45,9 @@ export default function InvTransfersPage() {
       <PageHeader
         title={term('transfer')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('transfer') }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory Overview', to: '/app/inventory' }, { label: term('transfer') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button type="button" onClick={() => navigate('/app/inventory/transfers/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('transferSingular')}</button>
+          <button type="button" onClick={() => navigate('/app/inventory/transfers/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New stock transfer</button>
         ) : undefined}
       />
       <div className="space-y-4">
@@ -71,7 +71,7 @@ export default function InvTransfersPage() {
           {isLoading ? (
             <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
           ) : (
-            <DataTable data={(transfers ?? []) as InvTransfer[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage={`No ${term('transfer')}. Create one.`} />
+            <DataTable data={(transfers ?? []) as InvTransfer[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No stock transfers yet. Move stock between storage locations when you relocate items." />
           )}
         </div>
       </div>

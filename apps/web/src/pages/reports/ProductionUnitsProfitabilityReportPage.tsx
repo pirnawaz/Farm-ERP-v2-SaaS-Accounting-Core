@@ -60,7 +60,9 @@ export default function ProductionUnitsProfitabilityReportPage() {
 
       <ReportFilterCard className="space-y-3">
         <p className="text-sm text-gray-600">
-          Operational analytics across time. This report summarizes posted activity tagged to an orchard/livestock unit (not an accounting boundary).
+          Optional cross-cycle operational view by unit — useful for continuity across seasons. It is not the canonical seasonal accounting
+          structure (use Crop Cycle / Field Cycle and standard profitability reports for that). Summarizes posted activity tagged to a unit;
+          not an accounting boundary.
         </p>
         <FilterBar>
           <FilterGrid className="lg:grid-cols-4">

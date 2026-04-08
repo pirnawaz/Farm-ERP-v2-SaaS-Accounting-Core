@@ -294,11 +294,15 @@ export default function HarvestFormPage() {
               >
                 <option value="">None</option>
                 {(productionUnits ?? []).map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                    {u.type === 'SEASONAL' ? ' (legacy seasonal)' : ''}
+                  </option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Optional. Use this to attribute the harvest to an Orchard unit. Seasonal harvests usually leave this blank.
+                Optional tag for orchard, livestock, or long-cycle harvests. Leave blank for standard seasonal harvests where the crop cycle
+                is enough.
               </p>
             </FormField>
           ) : null}

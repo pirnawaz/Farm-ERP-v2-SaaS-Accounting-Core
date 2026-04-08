@@ -268,11 +268,14 @@ export default function ActivityFormPage() {
         backTo="/app/crop-ops/activities"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Crop Ops', to: '/app/crop-ops' },
-          { label: term('activities'), to: '/app/crop-ops/activities' },
+          { label: 'Crop Ops Overview', to: '/app/crop-ops' },
+          { label: 'Field Work Logs', to: '/app/crop-ops/activities' },
           { label: term('newActivity') },
         ]}
       />
+      <p className="-mt-2 mb-2 text-sm text-gray-500 max-w-2xl">
+        Record operational field work for crop operations. This is separate from Labour Work Logs (people and pay).
+      </p>
 
       {hasDraft && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex flex-wrap items-center gap-2">
@@ -387,11 +390,15 @@ export default function ActivityFormPage() {
                 >
                   <option value="">None</option>
                   {(productionUnits ?? []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                      {u.type === 'SEASONAL' ? ' (legacy seasonal)' : ''}
+                    </option>
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  Optional. Use this when you want to attribute work to an Orchard or Livestock unit. Seasonal workflows usually leave this blank.
+                  Optional operational tag for orchards, livestock, or other long-cycle units. Leave blank for typical seasonal crops — Crop
+                  Cycle and Field Cycle are the usual scope.
                 </p>
               </FormField>
             ) : null}

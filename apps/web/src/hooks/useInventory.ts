@@ -159,7 +159,7 @@ export function useUpdateStore() {
   });
 }
 
-// UoMs
+// Units (reference data; API path remains /uoms)
 export function useUoms() {
   return useQuery({
     queryKey: ['inventory', 'uoms'],
@@ -173,8 +173,8 @@ export function useCreateUom() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (p: { code: string; name: string }) => inventoryApi.uoms.create(p),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory', 'uoms'] }); toast.success('UoM created'); },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to create UoM'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory', 'uoms'] }); toast.success('Unit created'); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to create unit'),
   });
 }
 

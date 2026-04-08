@@ -47,9 +47,9 @@ export default function InvAdjustmentsPage() {
       <PageHeader
         title={term('adjustment')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('adjustment') }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory Overview', to: '/app/inventory' }, { label: term('adjustment') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button type="button" onClick={() => navigate('/app/inventory/adjustments/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('adjustmentSingular')}</button>
+          <button type="button" onClick={() => navigate('/app/inventory/adjustments/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New stock adjustment</button>
         ) : undefined}
       />
       <div className="space-y-4">
@@ -73,7 +73,7 @@ export default function InvAdjustmentsPage() {
           {isLoading ? (
             <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
           ) : (
-            <DataTable data={(adjustments ?? []) as InvAdjustment[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage={`No ${term('adjustment')}. Create one.`} />
+            <DataTable data={(adjustments ?? []) as InvAdjustment[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No stock adjustments yet. Use adjustments for loss, damage, or count differences." />
           )}
         </div>
       </div>

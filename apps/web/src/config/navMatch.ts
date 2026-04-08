@@ -8,6 +8,8 @@
  * See `docs/NAVIGATION.md` for how these fit the domain-based nav model.
  */
 
+import { getSectionNavItems, type NavSection } from './nav';
+
 /** True if pathname is this route or a nested detail/form path under it. */
 export function isPathUnderRoute(pathname: string, to: string): boolean {
   if (pathname === to) {
@@ -33,9 +35,9 @@ export function isNavItemActive(pathname: string, item: NavLike): boolean {
 }
 
 export type NavDomainLike = {
-  sections: { items: NavLike[] }[];
+  sections: NavSection[];
 };
 
 export function domainHasActivePath(pathname: string, domain: NavDomainLike): boolean {
-  return domain.sections.some((s) => s.items.some((item) => isNavItemActive(pathname, item)));
+  return domain.sections.some((s) => getSectionNavItems(s).some((item) => isNavItemActive(pathname, item)));
 }

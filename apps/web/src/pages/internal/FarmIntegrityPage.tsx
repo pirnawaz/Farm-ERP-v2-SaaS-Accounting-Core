@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageContainer } from '../../components/PageContainer';
 import { useRole } from '../../hooks';
 import { term } from '../../config/terminology';
+import { useOrchardLivestockAddonsEnabled } from '../../hooks/useModules';
 
 function IntegrityCard({
   title,
@@ -34,6 +35,7 @@ function IntegrityCard({
 
 export default function FarmIntegrityPage() {
   const { hasRole } = useRole();
+  const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
 
   if (!hasRole('tenant_admin')) {
     return <Navigate to="/app/dashboard" replace />;
@@ -97,8 +99,8 @@ export default function FarmIntegrityPage() {
           <IntegrityCard
             title="Long-lived units, no activity (last 30 days)"
             count={data.production_units_no_activity_last_30_days}
-            link="/app/production-units"
-            linkLabel="View production units (advanced)"
+            link={hasOrchardLivestockModule ? '/app/production-units' : '/app/admin/modules'}
+            linkLabel={hasOrchardLivestockModule ? 'View production units (advanced)' : 'Enable Orchards or Livestock (Modules)'}
           />
           <IntegrityCard
             title="Livestock units, negative headcount"

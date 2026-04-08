@@ -7,14 +7,36 @@ import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Badge } from '../components/Badge';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
 import type { Party, CreatePartyPayload, PartyType } from '../types';
 
-type FilterType = 'all' | 'haris' | 'vendors' | 'buyers' | 'kamdars';
-
 const PARTY_TYPES: PartyType[] = ['HARI', 'KAMDAR', 'VENDOR', 'BUYER', 'LENDER', 'CONTRACTOR', 'LANDLORD'];
+
+/** Display labels for directory UI — maps existing PartyType values only. */
+const ROLE_LABELS: Record<PartyType, string> = {
+  HARI: 'Hari',
+  KAMDAR: 'Kamdar',
+  VENDOR: 'Vendor',
+  BUYER: 'Buyer',
+  LENDER: 'Lender',
+  CONTRACTOR: 'Contractor',
+  LANDLORD: 'Landlord',
+};
+
+function RoleBadges({ types }: { types: PartyType[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {types.map((t) => (
+        <Badge key={t} variant="neutral" size="sm">
+          {ROLE_LABELS[t]}
+        </Badge>
+      ))}
+    </div>
+  );
+}
 
 export default function PartiesPage() {
   const { data: parties, isLoading } = useParties();
@@ -25,7 +47,8 @@ export default function PartiesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingParty, setEditingParty] = useState<Party | null>(null);
   const [deletePartyId, setDeletePartyId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'' | PartyType>('');
   const [formData, setFormData] = useState<CreatePartyPayload>({
     name: '',
     party_types: [],
@@ -34,16 +57,28 @@ export default function PartiesPage() {
 
   const canCreate = hasRole(['tenant_admin', 'accountant']);
 
-  // Filter parties based on selected filter
+  const hasActiveFilters = useMemo(() => !!(searchQuery.trim() || roleFilter), [searchQuery, roleFilter]);
+
   const filteredParties = useMemo(() => {
-    if (!parties) return [];
-    if (filter === 'all') return parties;
-    if (filter === 'haris') return parties.filter((p) => p.party_types.includes('HARI'));
-    if (filter === 'vendors') return parties.filter((p) => p.party_types.includes('VENDOR'));
-    if (filter === 'buyers') return parties.filter((p) => p.party_types.includes('BUYER'));
-    if (filter === 'kamdars') return parties.filter((p) => p.party_types.includes('KAMDAR'));
-    return parties;
-  }, [parties, filter]);
+    if (!parties?.length) return [];
+    let list = parties;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) => p.name.toLowerCase().includes(q));
+    }
+    if (roleFilter) {
+      list = list.filter((p) => p.party_types.includes(roleFilter));
+    }
+    return list;
+  }, [parties, searchQuery, roleFilter]);
+
+  const totalPeople = parties?.length ?? 0;
+  const visibleCount = filteredParties.length;
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setRoleFilter('');
+  };
 
   const isSystemLandlord = (party: Party): boolean => {
     return party.party_types.includes('LANDLORD') || party.name.toLowerCase() === 'landlord';
@@ -69,8 +104,9 @@ export default function PartiesPage() {
       setShowCreateModal(false);
       setFormData({ name: '', party_types: [] });
       setErrors({});
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create party');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to create party';
+      toast.error(msg);
     }
   };
 
@@ -95,8 +131,9 @@ export default function PartiesPage() {
       setEditingParty(null);
       setFormData({ name: '', party_types: [] });
       setErrors({});
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update party');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to update party';
+      toast.error(msg);
     }
   };
 
@@ -105,8 +142,9 @@ export default function PartiesPage() {
       await deleteMutation.mutateAsync(id);
       toast.success('Party deleted successfully');
       setDeletePartyId(null);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete party');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to delete party';
+      toast.error(msg);
     }
   };
 
@@ -117,7 +155,6 @@ export default function PartiesPage() {
         : [...prev.party_types, type];
       return { ...prev, party_types: newTypes };
     });
-    // Clear error when user selects a type
     if (errors.party_types) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -127,64 +164,57 @@ export default function PartiesPage() {
     }
   };
 
-  const formatPartyTypes = (types: PartyType[]): string => {
-    return types.join(', ');
-  };
-
   const { formatDate } = useFormatting();
 
   const columns: Column<Party>[] = [
     {
       header: 'Name',
       accessor: (row) => (
-        <Link
-          to={`/app/parties/${row.id}`}
-          className="text-[#1F6F5C] hover:text-[#1a5a4a] font-medium"
-        >
-          {row.name}
-        </Link>
+        <div>
+          <Link to={`/app/parties/${row.id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a] font-semibold text-gray-900">
+            {row.name}
+          </Link>
+        </div>
       ),
     },
     {
-      header: 'Types',
-      accessor: (row) => formatPartyTypes(row.party_types),
+      header: 'Roles',
+      accessor: (row) => <RoleBadges types={row.party_types} />,
     },
     {
-      header: 'Created At',
-      accessor: (row) => formatDate(row.created_at),
+      header: 'Created',
+      accessor: (row) => <span className="tabular-nums text-gray-700">{formatDate(row.created_at)}</span>,
+      cellClassName: 'whitespace-nowrap',
     },
     {
       header: 'Actions',
       accessor: (row) => (
         <div className="flex flex-wrap gap-2">
-          <Link
-            to={`/app/parties/${row.id}`}
-            className="text-[#1F6F5C] hover:text-[#1a5a4a]"
-          >
+          <Link to={`/app/parties/${row.id}`} className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]">
             View
           </Link>
           {canCreate && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 handleEdit(row);
               }}
-              className="text-[#1F6F5C] hover:text-[#1a5a4a]"
+              className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
             >
               Edit
             </button>
           )}
           {canCreate && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setDeletePartyId(row.id);
               }}
               disabled={isSystemLandlord(row)}
-              className={`${
-                isSystemLandlord(row)
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-red-600 hover:text-red-900'
+              className={`text-sm font-medium ${
+                isSystemLandlord(row) ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-900'
               }`}
               title={isSystemLandlord(row) ? 'System party' : 'Delete'}
             >
@@ -196,6 +226,12 @@ export default function PartiesPage() {
     },
   ];
 
+  const openCreate = () => {
+    setShowCreateModal(true);
+    setFormData({ name: '', party_types: [] });
+    setErrors({});
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -204,84 +240,119 @@ export default function PartiesPage() {
     );
   }
 
+  const summaryLine =
+    hasActiveFilters && totalPeople > 0
+      ? `${visibleCount} ${visibleCount === 1 ? 'person' : 'people'} (filtered)`
+      : `${visibleCount} ${visibleCount === 1 ? 'person' : 'people'}`;
+
+  const showFilteredEmpty = totalPeople > 0 && visibleCount === 0;
+  const showNoData = totalPeople === 0;
+
   return (
-    <div>
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="People & Partners"
+        description="Manage all people and partners you work with — workers, vendors, buyers, and landlords."
+        helper="Use this directory to maintain contact records and roles across your farm operations."
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'People & Partners' }]}
-        right={canCreate ? (
-          <button
-            onClick={() => {
-              setShowCreateModal(true);
-              setFormData({ name: '', party_types: [] });
-              setErrors({});
-            }}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
-          >
-            New Party
-          </button>
-        ) : undefined}
+        right={
+          canCreate ? (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+            >
+              Add person
+            </button>
+          ) : undefined
+        }
       />
 
-      {/* Quick Filters */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 text-sm font-medium rounded-md ${
-            filter === 'all'
-              ? 'bg-[#1F6F5C] text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setFilter('haris')}
-          className={`px-4 py-2 text-sm font-medium rounded-md ${
-            filter === 'haris'
-              ? 'bg-[#1F6F5C] text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Haris
-        </button>
-        <button
-          onClick={() => setFilter('vendors')}
-          className={`px-4 py-2 text-sm font-medium rounded-md ${
-            filter === 'vendors'
-              ? 'bg-[#1F6F5C] text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Vendors
-        </button>
-        <button
-          onClick={() => setFilter('buyers')}
-          className={`px-4 py-2 text-sm font-medium rounded-md ${
-            filter === 'buyers'
-              ? 'bg-[#1F6F5C] text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Buyers
-        </button>
-        <button
-          onClick={() => setFilter('kamdars')}
-          className={`px-4 py-2 text-sm font-medium rounded-md ${
-            filter === 'kamdars'
-              ? 'bg-[#1F6F5C] text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Kamdars
-        </button>
+      <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasActiveFilters}
+            className="text-sm font-medium text-[#1F6F5C] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            Clear filters
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="parties-search" className="block text-xs font-medium text-gray-600 mb-1">
+              Search by name
+            </label>
+            <input
+              id="parties-search"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search…"
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white"
+            />
+          </div>
+          <div>
+            <label htmlFor="parties-role" className="block text-xs font-medium text-gray-600 mb-1">
+              Role
+            </label>
+            <select
+              id="parties-role"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter((e.target.value || '') as '' | PartyType)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white"
+            >
+              <option value="">All roles</option>
+              {PARTY_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {ROLE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <DataTable data={filteredParties} columns={columns} emptyMessage="No parties found" />
-      </div>
+      {showNoData ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No people or partners yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Add your first person to start managing relationships.
+          </p>
+          {canCreate ? (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a]"
+            >
+              Add person
+            </button>
+          ) : null}
+        </div>
+      ) : showFilteredEmpty ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No people match your filters.</h3>
+          <p className="mt-2 text-sm text-gray-600">Try adjusting search or role, or clear filters to see everyone.</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-6 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+          <DataTable data={filteredParties} columns={columns} emptyMessage="" />
+        </div>
+      )}
 
-      {/* Create Modal */}
       <Modal
         isOpen={showCreateModal}
         onClose={() => {
@@ -289,7 +360,7 @@ export default function PartiesPage() {
           setFormData({ name: '', party_types: [] });
           setErrors({});
         }}
-        title="Create Party"
+        title="Add person"
       >
         <div className="space-y-4">
           <FormField label="Name" required error={errors.name}>
@@ -319,13 +390,14 @@ export default function PartiesPage() {
                     onChange={() => togglePartyType(type)}
                     className="mr-2 h-4 w-4 text-[#1F6F5C] focus:ring-[#1F6F5C] border-gray-300 rounded"
                   />
-                  <span className="text-sm text-gray-700">{type}</span>
+                  <span className="text-sm text-gray-700">{ROLE_LABELS[type]}</span>
                 </label>
               ))}
             </div>
           </FormField>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <button
+              type="button"
               onClick={() => {
                 setShowCreateModal(false);
                 setFormData({ name: '', party_types: [] });
@@ -336,17 +408,17 @@ export default function PartiesPage() {
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleCreate}
               disabled={createMutation.isPending}
               className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {createMutation.isPending ? 'Creating...' : 'Create'}
+              {createMutation.isPending ? 'Creating…' : 'Create'}
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* Edit Modal */}
       <Modal
         isOpen={!!editingParty}
         onClose={() => {
@@ -354,7 +426,7 @@ export default function PartiesPage() {
           setFormData({ name: '', party_types: [] });
           setErrors({});
         }}
-        title="Edit Party"
+        title="Edit person"
       >
         <div className="space-y-4">
           <FormField label="Name" required error={errors.name}>
@@ -384,13 +456,14 @@ export default function PartiesPage() {
                     onChange={() => togglePartyType(type)}
                     className="mr-2 h-4 w-4 text-[#1F6F5C] focus:ring-[#1F6F5C] border-gray-300 rounded"
                   />
-                  <span className="text-sm text-gray-700">{type}</span>
+                  <span className="text-sm text-gray-700">{ROLE_LABELS[type]}</span>
                 </label>
               ))}
             </div>
           </FormField>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <button
+              type="button"
               onClick={() => {
                 setEditingParty(null);
                 setFormData({ name: '', party_types: [] });
@@ -401,17 +474,17 @@ export default function PartiesPage() {
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleUpdate}
               disabled={updateMutation.isPending}
               className="px-4 py-2 text-sm font-medium text-white bg-[#1F6F5C] rounded-md hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {updateMutation.isPending ? 'Updating...' : 'Update'}
+              {updateMutation.isPending ? 'Updating…' : 'Update'}
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* Delete Confirmation */}
       <ConfirmDialog
         isOpen={!!deletePartyId}
         onClose={() => setDeletePartyId(null)}

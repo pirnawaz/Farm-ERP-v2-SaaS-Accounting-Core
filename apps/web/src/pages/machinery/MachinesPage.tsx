@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   useMachinesQuery,
   useCreateMachine,
@@ -11,6 +11,7 @@ import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import type { Machine, CreateMachinePayload, UpdateMachinePayload } from '../../types';
+import { Badge } from '../../components/Badge';
 
 export default function MachinesPage() {
   const { data: machines, isLoading } = useMachinesQuery();
@@ -19,6 +20,7 @@ export default function MachinesPage() {
   const { hasRole } = useRole();
   const [showModal, setShowModal] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+  const [filters, setFilters] = useState({ query: '', type: '', status: '' });
   type FormState = Omit<CreateMachinePayload, 'opening_meter'> & { opening_meter: string };
   const [form, setForm] = useState<FormState>({
     code: '',
@@ -31,13 +33,60 @@ export default function MachinesPage() {
     notes: null,
   });
 
+  const allMachines = machines ?? [];
+  const machineTypes = useMemo(() => {
+    const set = new Set<string>();
+    allMachines.forEach((m) => {
+      const t = (m.machine_type ?? '').trim();
+      if (t) set.add(t);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allMachines]);
+
+  const filteredMachines = useMemo(() => {
+    const q = filters.query.trim().toLowerCase();
+    return allMachines.filter((m) => {
+      const matchesQuery = !q
+        || (m.name ?? '').toLowerCase().includes(q)
+        || (m.code ?? '').toLowerCase().includes(q);
+      const matchesType = !filters.type || m.machine_type === filters.type;
+      const matchesStatus =
+        !filters.status
+        || (filters.status === 'ACTIVE' ? m.is_active : !m.is_active);
+      return matchesQuery && matchesType && matchesStatus;
+    });
+  }, [allMachines, filters.query, filters.type, filters.status]);
+
+  const hasFilters = !!(filters.query.trim() || filters.type || filters.status);
+
+  const clearFilters = () => setFilters({ query: '', type: '', status: '' });
+
+  const summaryLine = useMemo(() => {
+    const n = filteredMachines.length;
+    const label = n === 1 ? 'machine' : 'machines';
+    const base = hasFilters ? `${n} ${label} (filtered)` : `${n} ${label}`;
+    return base;
+  }, [filteredMachines.length, hasFilters]);
+
   const cols: Column<Machine>[] = [
-    { header: 'Code', accessor: 'code' },
-    { header: 'Name', accessor: 'name' },
-    { header: 'Type', accessor: 'machine_type' },
-    { header: 'Ownership', accessor: 'ownership_type' },
-    { header: 'Active', accessor: (r) => (r.is_active ? 'Yes' : 'No') },
-    { header: 'Meter Unit', accessor: 'meter_unit' },
+    {
+      header: 'Machine',
+      accessor: (r) => (
+        <div className="min-w-[12rem]">
+          <div className="font-medium text-gray-900">{r.name}</div>
+          <div className="text-xs text-gray-500 tabular-nums">{r.code || '—'}</div>
+        </div>
+      ),
+    },
+    { header: 'Type', accessor: (r) => r.machine_type || '—' },
+    {
+      header: 'Status',
+      accessor: (r) => (
+        <Badge variant={r.is_active ? 'success' : 'neutral'}>
+          {r.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
     {
       header: 'Actions',
       accessor: (r) => (
@@ -58,7 +107,7 @@ export default function MachinesPage() {
             });
             setShowModal(true);
           }}
-          className="px-3 py-1 text-sm text-[#1F6F5C] hover:text-[#1a5a4a]"
+          className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
         >
           Edit
         </button>
@@ -120,31 +169,125 @@ export default function MachinesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="Machines"
+        tooltip="View and manage your machines and equipment."
+        description="View and manage your machines and equipment."
         backTo="/app/machinery"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Machines' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery Overview', to: '/app/machinery' }, { label: 'Machines' }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+            className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
           >
-            New Machine
+            Add machine
           </button>
         ) : undefined}
       />
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <LoadingSpinner size="lg" />
+
+      <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasFilters}
+            className="text-sm font-medium text-[#1F6F5C] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            Clear filters
+          </button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <label htmlFor="mach-search" className="block text-xs font-medium text-gray-600 mb-1">
+              Search
+            </label>
+            <input
+              id="mach-search"
+              value={filters.query}
+              onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+              placeholder="Name or code"
+            />
           </div>
-        ) : (
-          <DataTable data={machines || []} columns={cols} emptyMessage="No machines. Create one." />
-        )}
+          <div>
+            <label htmlFor="mach-type" className="block text-xs font-medium text-gray-600 mb-1">
+              Type
+            </label>
+            <select
+              id="mach-type"
+              value={filters.type}
+              onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {machineTypes.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="mach-status" className="block text-xs font-medium text-gray-600 mb-1">
+              Status
+            </label>
+            <select
+              id="mach-status"
+              value={filters.status}
+              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
-      <Modal isOpen={showModal} onClose={handleCloseModal} title={editingMachine ? 'Edit Machine' : 'New Machine'}>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : filteredMachines.length === 0 && allMachines.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No machines yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+            Add a machine to start tracking usage and maintenance.
+          </p>
+          {hasRole(['tenant_admin', 'accountant', 'operator']) ? (
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a]"
+            >
+              Add machine
+            </button>
+          ) : null}
+        </div>
+      ) : filteredMachines.length === 0 && hasFilters ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No machines match your filters.</h3>
+          <p className="mt-2 text-sm text-gray-600">Try a different search or clear filters.</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-6 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
+          <DataTable data={filteredMachines} columns={cols} emptyMessage="" />
+        </div>
+      )}
+      <Modal isOpen={showModal} onClose={handleCloseModal} title={editingMachine ? 'Edit machine' : 'Add machine'}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Code">
             <input

@@ -97,7 +97,7 @@ export default function InvTransferDetailPage() {
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-  if (!transfer) return <div>{term('transferSingular')} not found.</div>;
+  if (!transfer) return <div>Stock transfer not found.</div>;
 
   const lineTotal = (l: { qty: string; unit_cost_snapshot?: string }) => (parseFloat(String(l.qty)) || 0) * (parseFloat(String(l.unit_cost_snapshot)) || 0);
   const total = (transfer.lines || []).reduce((a, l) => a + lineTotal(l), 0);
@@ -109,7 +109,7 @@ export default function InvTransferDetailPage() {
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('transfer'), to: '/app/inventory/transfers' },
           { label: transfer.doc_no },
         ]}
@@ -193,7 +193,7 @@ export default function InvTransferDetailPage() {
         <div className="mb-6"><button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button></div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={`${term('postAction')} ${term('transferSingular')}`}>
+      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={`${term('postAction')}: ${term('transfer')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
@@ -204,7 +204,7 @@ export default function InvTransferDetailPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={`${term('reverseAction')} ${term('transferSingular')}`}>
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={`${term('reverseAction')}: ${term('transfer')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Reason" required><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField>

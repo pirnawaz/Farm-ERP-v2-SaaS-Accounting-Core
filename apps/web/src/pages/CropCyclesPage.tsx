@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { term } from '../config/terminology';
 import { useCropCycles, useCreateCropCycle, useCloseCropCycle, useOpenCropCycle } from '../hooks/useCropCycles';
@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Badge } from '../components/Badge';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
@@ -92,9 +93,9 @@ export default function CropCyclesPage() {
 
   const columns: Column<CropCycle>[] = [
     {
-      header: 'Name',
+      header: 'Crop cycle',
       accessor: (row) => (
-        <Link to={`/app/crop-cycles/${row.id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a] font-medium">
+        <Link to={`/app/crop-cycles/${row.id}`} className="text-[#1F6F5C] hover:text-[#1a5a4a] font-semibold">
           {row.name}
         </Link>
       ),
@@ -104,14 +105,27 @@ export default function CropCyclesPage() {
       accessor: (row) => row.crop_display_name ?? row.crop_type ?? '—',
     },
     {
-      header: 'Start Date',
-      accessor: (r) => formatDate(r.start_date, { variant: 'medium' }),
+      header: 'Start date',
+      accessor: (r) => (
+        <span className="tabular-nums text-gray-900">{formatDate(r.start_date, { variant: 'medium' })}</span>
+      ),
     },
     {
-      header: 'End Date',
-      accessor: (r) => (r.end_date ? formatDate(r.end_date, { variant: 'medium' }) : '—'),
+      header: 'End date',
+      accessor: (r) => (
+        <span className="tabular-nums text-gray-900">
+          {r.end_date ? formatDate(r.end_date, { variant: 'medium' }) : '—'}
+        </span>
+      ),
     },
-    { header: 'Status', accessor: 'status' },
+    {
+      header: 'Status',
+      accessor: (row) => (
+        <Badge variant={row.status === 'OPEN' ? 'success' : 'neutral'} size="md">
+          {row.status === 'OPEN' ? 'Open' : 'Closed'}
+        </Badge>
+      ),
+    },
     {
       header: 'Actions',
       accessor: (row) => (
@@ -143,6 +157,15 @@ export default function CropCyclesPage() {
     },
   ];
 
+  const cycleList = cycles ?? [];
+  const openCount = useMemo(() => (cycles ?? []).filter((c) => c.status === 'OPEN').length, [cycles]);
+  const closedCount = useMemo(() => (cycles ?? []).filter((c) => c.status === 'CLOSED').length, [cycles]);
+  const summaryLine = useMemo(() => {
+    const n = (cycles ?? []).length;
+    if (n === 0) return '0 crop cycles';
+    return `${n} crop ${n === 1 ? 'cycle' : 'cycles'} · ${openCount} open, ${closedCount} closed`;
+  }, [cycles, openCount, closedCount]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -151,33 +174,70 @@ export default function CropCyclesPage() {
     );
   }
 
+  const showEmpty = cycleList.length === 0;
+
   return (
-    <div data-testid="crop-cycles-page">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Crop Cycles</h1>
+    <div data-testid="crop-cycles-page" className="space-y-6 max-w-7xl">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Crop Cycles</h1>
+          <p className="mt-1 text-base text-gray-700">Define and manage crop seasons used for planning and reporting.</p>
+          <p className="mt-1 text-sm text-gray-500 max-w-2xl">
+            Crop cycles organise seasonal work across land, fields, and operations.
+          </p>
+        </div>
         {canCreate && (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
             <Link
               to="/app/crop-cycles/season-setup"
               data-testid="season-setup-cta"
-              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+              className="inline-flex justify-center px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
               {term('assignFieldsToSeason')}
             </Link>
             <button
               data-testid="new-crop-cycle"
+              type="button"
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
+              className="inline-flex justify-center px-4 py-2 border border-gray-300 text-gray-800 rounded-md hover:bg-gray-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
-              New crop cycle (no fields)
+              New crop cycle (without fields)
             </button>
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <DataTable data={cycles || []} columns={columns} />
+      <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+        <span className="font-medium text-gray-900">{summaryLine}</span>
       </div>
+
+      {showEmpty ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center">
+          <h3 className="text-base font-semibold text-gray-900">No crop cycles yet.</h3>
+          <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">Create one to start planning seasonal work.</p>
+          {canCreate ? (
+            <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+              <Link
+                to="/app/crop-cycles/season-setup"
+                className="inline-flex justify-center px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
+              >
+                {term('assignFieldsToSeason')}
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex justify-center px-4 py-2 border border-gray-300 text-gray-800 rounded-md hover:bg-gray-50 text-sm font-medium"
+              >
+                New crop cycle (without fields)
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+          <DataTable data={cycleList} columns={columns} emptyMessage="" />
+        </div>
+      )}
 
       <Modal
         isOpen={showCreateModal}

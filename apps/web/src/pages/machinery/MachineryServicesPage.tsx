@@ -15,7 +15,6 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import type { MachineryService } from '../../types';
-import { term } from '../../config/terminology';
 import { Badge } from '../../components/Badge';
 import { FilterBar, FilterField, FilterGrid } from '../../components/FilterBar';
 
@@ -92,6 +91,12 @@ export default function MachineryServicesPage() {
     setSearchParams(params);
   };
 
+  const clearFilters = () => {
+    const cleared = { status: '', project_id: '', machine_id: '', from: '', to: '' };
+    setFilters(cleared);
+    setSearchParams(new URLSearchParams());
+  };
+
   const columns: Column<MachineryService>[] = [
     {
       header: 'Date',
@@ -99,17 +104,27 @@ export default function MachineryServicesPage() {
         row.posting_date ? formatDate(row.posting_date) : (row.created_at ? formatDate(row.created_at) : '—'),
     },
     {
-      header: term('fieldCycle'),
+      header: 'Field cycle',
       accessor: (row) => row.project?.name ?? row.project_id ?? '—',
     },
     {
       header: 'Machine',
       accessor: (row) => row.machine?.code ?? row.machine?.name ?? '—',
     },
-    { header: 'Scope', accessor: 'allocation_scope' },
     {
-      header: 'Qty',
-      accessor: (row) => (row.quantity != null ? String(row.quantity) : '—'),
+      header: 'Beneficiary',
+      accessor: (row) =>
+        row.allocation_scope === 'LANDLORD_ONLY'
+          ? 'My farm'
+          : row.allocation_scope === 'HARI_ONLY'
+            ? 'Hari only'
+            : row.allocation_scope === 'SHARED'
+              ? 'Shared'
+              : (row.allocation_scope ?? '—'),
+    },
+    {
+      header: 'Quantity',
+      accessor: (row) => <span className="tabular-nums">{row.quantity != null ? String(row.quantity) : '—'}</span>,
     },
     {
       header: 'Amount',
@@ -120,15 +135,12 @@ export default function MachineryServicesPage() {
     {
       header: 'Status',
       accessor: (row) => (
-        <Badge
-          variant={
-            row.status === 'DRAFT' ? 'warning' : row.status === 'POSTED' ? 'success' : 'danger'
-          }
-        >
-          {row.status}
+        <Badge variant={row.status === 'DRAFT' ? 'warning' : row.status === 'POSTED' ? 'success' : 'danger'}>
+          {row.status === 'DRAFT' ? 'Draft' : row.status === 'POSTED' ? 'Posted' : 'Reversed'}
         </Badge>
       ),
     },
+    { header: 'Reference', accessor: (row) => <span className="tabular-nums">{row.id.slice(0, 8)}…</span> },
     {
       header: 'Actions',
       accessor: (row) => (
@@ -189,12 +201,13 @@ export default function MachineryServicesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Machinery Services"
+        title="Service History"
+        tooltip="View past service records for your machines."
         backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Services' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Service History' },
         ]}
         right={
           canCreate ? (
@@ -210,6 +223,7 @@ export default function MachineryServicesPage() {
       />
 
       <div className="space-y-4">
+        <p className="text-sm text-gray-600">View past service records for your machines.</p>
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Filters</h2>
           <FilterBar>
@@ -222,7 +236,7 @@ export default function MachineryServicesPage() {
                   <option value="REVERSED">Reversed</option>
                 </select>
               </FilterField>
-              <FilterField label={term('fieldCycle')}>
+              <FilterField label="Field cycle">
                 <select
                   value={filters.project_id}
                   onChange={(e) => handleFilterChange('project_id', e.target.value)}
@@ -248,14 +262,30 @@ export default function MachineryServicesPage() {
                   ))}
                 </select>
               </FilterField>
-              <FilterField label="From date">
+              <FilterField label="From">
                 <input type="date" value={filters.from} onChange={(e) => handleFilterChange('from', e.target.value)} />
               </FilterField>
-              <FilterField label="To date">
+              <FilterField label="To">
                 <input type="date" value={filters.to} onChange={(e) => handleFilterChange('to', e.target.value)} />
               </FilterField>
             </FilterGrid>
           </FilterBar>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-gray-600">
+              <span className="font-medium text-gray-900 tabular-nums">{(services ?? []).length}</span>{' '}
+              {(services ?? []).length === 1 ? 'service record' : 'service records'}
+              {(filters.status || filters.project_id || filters.machine_id || filters.from || filters.to) ? (
+                <span className="text-gray-500"> (filtered)</span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+            >
+              Clear filters
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow">
@@ -268,6 +298,7 @@ export default function MachineryServicesPage() {
               data={(services ?? []) as MachineryService[]}
               columns={columns}
               onRowClick={(row) => navigate(`/app/machinery/services/${row.id}`)}
+              emptyMessage="No service records yet. Add a service entry to track machine servicing."
             />
           )}
         </div>

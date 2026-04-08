@@ -13,7 +13,6 @@ import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLogCostCode, MachineWorkLogPoolScope } from '../../types';
-import { term } from '../../config/terminology';
 
 const BENEFICIARY_OPTIONS: { value: MachineWorkLogPoolScope; label: string }[] = [
   { value: 'LANDLORD_ONLY', label: 'My farm' },
@@ -130,12 +129,12 @@ export default function WorkLogFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Edit Work Log"
+          title="Edit usage entry"
           backTo="/app/machinery/work-logs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machine Usage', to: '/app/machinery/work-logs' },
             { label: '…' },
           ]}
         />
@@ -149,16 +148,16 @@ export default function WorkLogFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Work Log"
+          title="Usage entry"
           backTo="/app/machinery/work-logs"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machine Usage', to: '/app/machinery/work-logs' },
             { label: 'Not found' },
           ]}
         />
-        <p className="text-gray-600">Work log not found.</p>
+        <p className="text-gray-600">Usage entry not found.</p>
       </div>
     );
   }
@@ -166,16 +165,16 @@ export default function WorkLogFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title={`Work Log ${workLog.work_log_no}`}
+          title={`Usage entry ${workLog.work_log_no}`}
           backTo={`/app/machinery/work-logs/${id}`}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machine Usage', to: '/app/machinery/work-logs' },
             { label: workLog.work_log_no },
           ]}
         />
-        <p className="text-gray-600">Only DRAFT work logs can be edited.</p>
+        <p className="text-gray-600">Only DRAFT usage entries can be edited.</p>
       </div>
     );
   }
@@ -183,12 +182,12 @@ export default function WorkLogFormPage() {
   return (
     <div className="space-y-6 pb-8">
       <PageHeader
-        title={isEdit ? `Edit Work Log ${workLog?.work_log_no ?? ''}` : 'New Work Log'}
+        title={isEdit ? `Edit usage entry ${workLog?.work_log_no ?? ''}` : 'New usage entry'}
         backTo={isEdit ? `/app/machinery/work-logs/${id}` : '/app/machinery/work-logs'}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Work Logs', to: '/app/machinery/work-logs' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Machine Usage', to: '/app/machinery/work-logs' },
           { label: isEdit ? (workLog?.work_log_no ?? 'Edit') : 'New' },
         ]}
       />
@@ -209,14 +208,14 @@ export default function WorkLogFormPage() {
               ))}
             </select>
           </FormField>
-          <FormField label={term('fieldCycle')} required>
+          <FormField label="Field cycle" required>
             <select
               value={project_id}
               onChange={(e) => setProjectId(e.target.value)}
               className="w-full px-3 py-2 border rounded"
               disabled={isEdit}
             >
-              <option value="">{`Select ${term('fieldCycle').toLowerCase()}`}</option>
+              <option value="">Select field cycle</option>
               {projects?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -224,7 +223,7 @@ export default function WorkLogFormPage() {
               ))}
             </select>
           </FormField>
-          <FormField label={`Crop cycle (from ${term('fieldCycle').toLowerCase()})`}>
+          <FormField label="Crop cycle (from field cycle)">
             <span className="text-gray-700">
               {selectedProject?.crop_cycle?.name ?? '—'}
             </span>

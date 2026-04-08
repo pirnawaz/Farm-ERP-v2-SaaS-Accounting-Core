@@ -111,8 +111,8 @@ export default function MaintenanceJobFormPage() {
         backTo="/app/machinery/maintenance-jobs"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Maintenance', to: '/app/machinery/maintenance-jobs' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs' },
           { label: isEdit ? 'Edit' : 'New' },
         ]}
       />
@@ -149,7 +149,7 @@ export default function MaintenanceJobFormPage() {
               ))}
             </select>
           </FormField>
-          <FormField label="Vendor Party">
+          <FormField label="Vendor">
             <select
               value={vendor_party_id}
               onChange={(e) => setVendorPartyId(e.target.value)}

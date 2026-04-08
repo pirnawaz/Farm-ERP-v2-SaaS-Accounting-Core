@@ -7,6 +7,7 @@ import {
   pruneDomainsForRole,
   filterDomainsByPermission,
   isSubmenuParent,
+  getSectionNavItems,
   type NavItem,
 } from '../config/nav';
 import { domainHasActivePath, isNavItemActive, isPathUnderRoute } from '../config/navMatch';
@@ -79,7 +80,7 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
   if (VITE_DEBUG_NAV) {
     visibleDomains.forEach((domain) => {
       domain.sections.forEach((section) => {
-        section.items.forEach((item) => {
+        getSectionNavItems(section).forEach((item) => {
           if (isSubmenuParent(item)) {
             item.children!.forEach((c) => {
               console.log('[VITE_DEBUG_NAV]', {
@@ -109,7 +110,7 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
     const itemsWithModules: { key: string; requiredModules?: string[]; isEnabled: boolean }[] = [];
     visibleDomains.forEach((domain) => {
       domain.sections.forEach((section) => {
-        section.items.forEach((item) => {
+        getSectionNavItems(section).forEach((item) => {
           if (isSubmenuParent(item)) {
             item.children!.forEach((c) => {
               itemsWithModules.push({
@@ -334,7 +335,20 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
                         {section.sectionTitle}
                       </div>
                     ) : null}
-                    <div className="space-y-1">{section.items.map((item) => renderItem(item))}</div>
+                    {section.itemGroups?.length ? (
+                      <div className="space-y-3">
+                        {section.itemGroups.map((g) => (
+                          <div key={g.groupTitle}>
+                            <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                              {g.groupTitle}
+                            </div>
+                            <div className="space-y-1">{g.items.map((item) => renderItem(item))}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-1">{section.items.map((item) => renderItem(item))}</div>
+                    )}
                   </div>
                 ))}
               </div>

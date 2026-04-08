@@ -48,7 +48,7 @@ export default function InvItemsPage() {
     { header: 'Name', accessor: 'name' },
     { header: 'SKU', accessor: (r) => r.sku || '—' },
     { header: term('inventoryCategorySingular'), accessor: (r) => r.category?.name || '—' },
-    { header: 'UoM', accessor: (r) => r.uom?.code || r.uom_id },
+    { header: 'Unit', accessor: (r) => r.uom?.code || r.uom_id },
     { header: 'Valuation', accessor: 'valuation_method' },
     { header: 'Active', accessor: (r) => (r.is_active ? 'Yes' : 'No') },
     ...(canAct
@@ -154,17 +154,17 @@ export default function InvItemsPage() {
       <PageHeader
         title={term('inventoryItem')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('inventoryItem') }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory Overview', to: '/app/inventory' }, { label: term('inventoryItem') }]}
         right={canAct ? (
-          <button onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('inventoryItemSingular')}</button>
+          <button onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">Add Item</button>
         ) : undefined}
       />
       <div className="bg-white rounded-lg shadow">
-        <DataTable data={items || []} columns={cols} emptyMessage={`No ${term('inventoryItem').toLowerCase()}. Create one.`} />
+        <DataTable data={items || []} columns={cols} emptyMessage={`No ${term('inventoryItem').toLowerCase()} yet. Add items you buy or use on the farm.`} />
       </div>
 
       {/* Create modal */}
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title={`New ${term('inventoryItemSingular')}`}>
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Add Item">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Name" required><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="SKU"><input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="Optional" /></FormField>
@@ -174,14 +174,14 @@ export default function InvItemsPage() {
               {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Unit of Measure" required>
+          <FormField label="Unit" required>
             {(uoms && uoms.length === 0) && (
               <p className="text-sm text-amber-700 mb-1">
-                No UoMs yet. <Link to="/app/inventory/uoms" className="text-[#1F6F5C] font-medium hover:underline">Create them in Inventory → UoMs</Link> first.
+                No units yet. <Link to="/app/inventory/uoms" className="text-[#1F6F5C] font-medium hover:underline">Create units in Inventory → Units</Link> first.
               </p>
             )}
             <select value={form.uom_id} onChange={e => setForm(f => ({ ...f, uom_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
-              <option value="">Select UoM</option>
+              <option value="">Select unit</option>
               {uoms?.map(u => <option key={u.id} value={u.id}>{u.code} ({u.name})</option>)}
             </select>
           </FormField>
@@ -212,9 +212,9 @@ export default function InvItemsPage() {
               {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Unit of Measure" required>
+          <FormField label="Unit" required>
             <select value={form.uom_id} onChange={e => setForm(f => ({ ...f, uom_id: e.target.value }))} className="w-full px-3 py-2 border rounded">
-              <option value="">Select UoM</option>
+              <option value="">Select unit</option>
               {uoms?.map(u => <option key={u.id} value={u.id}>{u.code} ({u.name})</option>)}
             </select>
           </FormField>

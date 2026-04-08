@@ -89,13 +89,13 @@ export default function InvGrnFormPage() {
   return (
     <PageContainer width="form" className="space-y-6">
       <PageHeader
-        title={`New ${term('grnSingular')}`}
+        title="New Goods Received"
         backTo="/app/inventory/grns"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('grn'), to: '/app/inventory/grns' },
-          { label: `New ${term('grnSingular')}` },
+          { label: 'New Goods Received' },
         ]}
       />
 

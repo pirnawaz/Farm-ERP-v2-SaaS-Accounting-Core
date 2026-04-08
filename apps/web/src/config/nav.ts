@@ -44,12 +44,30 @@ export type NavItem = {
   submenuKey?: string;
 };
 
+export type NavItemGroup = {
+  groupTitle: string;
+  items: NavItem[];
+};
+
 export type NavSection = {
   sectionKey: string;
   /** Optional heading under a domain (e.g. "Land & Crops"). Null = no sub-heading. */
   sectionTitle: string | null;
   items: NavItem[];
+  /**
+   * Optional labeled subgroups inside a section (sidebar only).
+   * When present, use an empty `items` array and put links only in groups.
+   */
+  itemGroups?: NavItemGroup[];
 };
+
+/** Flatten a section's links for pruning, active-route matching, and legacy flatteners. */
+export function getSectionNavItems(section: NavSection): NavItem[] {
+  if (section.itemGroups?.length) {
+    return section.itemGroups.flatMap((g) => g.items);
+  }
+  return section.items;
+}
 
 export type NavDomain = {
   domainKey: string;
@@ -82,10 +100,23 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'production-units',
     'land-leases',
     'harvests',
-    // Stock overview is useful for valuation / GRN/issue context.
-    'inventory',
+    // Inventory (overview, stock, transactions, setup).
+    'inventory-overview',
+    'inventory-stock-on-hand',
+    'inventory-stock-history',
+    'inventory-grns',
+    'inventory-issues',
+    'inventory-transfers',
+    'inventory-adjustments',
+    'inventory-items',
+    'inventory-categories',
+    'inventory-uoms',
+    'inventory-stores',
     // Labour and people balances often drive accruals and payments.
-    'labour',
+    'labour-overview',
+    'labour-workers',
+    'labour-work-logs',
+    'labour-payables',
     'parties',
     // Draft entries are useful context for accounting review.
     'pending-review',
@@ -109,7 +140,9 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'land-leases',
     'orchards',
     'livestock',
-    'crop-ops',
+    'crop-ops-overview',
+    'crop-ops-field-work-logs',
+    'crop-ops-work-types',
     'harvests',
     'pending-review',
     'machinery-machines',
@@ -119,8 +152,22 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'machinery-maintenance',
     'machinery-maintenance-setup',
     'machinery-rate-cards',
-    'inventory',
-    'labour',
+    'machinery-overview',
+    'inventory-overview',
+    'inventory-stock-on-hand',
+    'inventory-stock-history',
+    'inventory-grns',
+    'inventory-issues',
+    'inventory-transfers',
+    'inventory-adjustments',
+    'inventory-items',
+    'inventory-categories',
+    'inventory-uoms',
+    'inventory-stores',
+    'labour-overview',
+    'labour-workers',
+    'labour-work-logs',
+    'labour-payables',
     'parties',
 
     // Limited finance (operationally necessary)
@@ -153,6 +200,16 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
       })
       .filter((x): x is NavItem => x !== null);
 
+  const pruneSection = (s: NavSection): NavSection => {
+    if (s.itemGroups?.length) {
+      const itemGroups = s.itemGroups
+        .map((g) => ({ ...g, items: pruneItems(g.items) }))
+        .filter((g) => g.items.length > 0);
+      return { ...s, itemGroups, items: [] };
+    }
+    return { ...s, items: pruneItems(s.items) };
+  };
+
   return domains
     .filter((d) => allowedDomains.has(d.domainKey))
     .map((d) => ({
@@ -161,9 +218,9 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
         .map((s) => {
           // For accountants we keep all Finance sections as-is (still permission-filtered later).
           if (keepAllFinance && d.domainKey === 'finance') return s;
-          return { ...s, items: pruneItems(s.items) };
+          return pruneSection(s);
         })
-        .filter((s) => s.items.length > 0),
+        .filter((s) => getSectionNavItems(s).length > 0),
     }))
     .filter((d) => d.sections.length > 0);
 }
@@ -197,17 +254,24 @@ function filterNavItems(items: NavItem[], can: CanFn): NavItem[] {
     .filter((item): item is NavItem => item !== null);
 }
 
+function filterSectionByPermission(s: NavSection, can: CanFn): NavSection {
+  if (s.itemGroups?.length) {
+    const itemGroups = s.itemGroups
+      .map((g) => ({ ...g, items: filterNavItems(g.items, can) }))
+      .filter((g) => g.items.length > 0);
+    return { ...s, itemGroups, items: [] };
+  }
+  return { ...s, items: filterNavItems(s.items, can) };
+}
+
 /** Drop empty sections/domains after permission filtering (same semantics as pre-refactor sidebar). */
 export function filterDomainsByPermission(domains: NavDomain[], can: CanFn): NavDomain[] {
   return domains
     .map((d) => ({
       ...d,
       sections: d.sections
-        .map((s) => ({
-          ...s,
-          items: filterNavItems(s.items, can),
-        }))
-        .filter((s) => s.items.length > 0),
+        .map((s) => filterSectionByPermission(s, can))
+        .filter((s) => getSectionNavItems(s).length > 0),
     }))
     .filter((d) => d.sections.length > 0);
 }
@@ -273,32 +337,103 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
   const MODULES = CAPABILITIES.TENANT_MODULES_MANAGE;
   const hasOrchardLivestockAddons = showOrchards || showLivestock;
 
+  const inventoryItems: NavItem[] = [
+    { key: 'inventory-overview', label: 'Inventory Overview', to: '/app/inventory', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-stock-on-hand', label: 'Current Stock', to: '/app/inventory/stock-on-hand', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-stock-history', label: 'Stock History', to: '/app/inventory/stock-movements', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-grns', label: 'Goods Received', to: '/app/inventory/grns', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-issues', label: 'Stock Used', to: '/app/inventory/issues', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-transfers', label: 'Transfer Stock', to: '/app/inventory/transfers', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-adjustments', label: 'Adjust Stock', to: '/app/inventory/adjustments', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-items', label: 'Items', to: '/app/inventory/items', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-categories', label: 'Categories', to: '/app/inventory/categories', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-uoms', label: 'Units', to: '/app/inventory/uoms', requiredPermission: VIEW, requiredModules: ['inventory'] },
+    { key: 'inventory-stores', label: 'Stores', to: '/app/inventory/stores', requiredPermission: VIEW, requiredModules: ['inventory'] },
+  ];
+
   const machineryItems: NavItem[] = [
+    { key: 'machinery-overview', label: 'Machinery Overview', to: '/app/machinery', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-machines', label: 'Machines', to: '/app/machinery/machines', requiredPermission: VIEW, requiredModules: ['machinery'] },
-    { key: 'machinery-work-logs', label: 'Machine Work Logs', to: '/app/machinery/work-logs', requiredPermission: VIEW, requiredModules: ['machinery'] },
-    { key: 'machinery-services', label: 'Services', to: '/app/machinery/services', requiredPermission: VIEW, requiredModules: ['machinery'] },
-    { key: 'machinery-charges', label: 'Charges', to: '/app/machinery/charges', requiredPermission: VIEW, requiredModules: ['machinery'] },
-    { key: 'machinery-maintenance', label: 'Maintenance', to: '/app/machinery/maintenance-jobs', requiredPermission: VIEW, requiredModules: ['machinery'] },
+    { key: 'machinery-work-logs', label: 'Machine Usage', to: '/app/machinery/work-logs', requiredPermission: VIEW, requiredModules: ['machinery'] },
+    { key: 'machinery-services', label: 'Service History', to: '/app/machinery/services', requiredPermission: VIEW, requiredModules: ['machinery'] },
+    { key: 'machinery-charges', label: 'Machinery Charges', to: '/app/machinery/charges', requiredPermission: VIEW, requiredModules: ['machinery'] },
+    { key: 'machinery-maintenance', label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-maintenance-setup', label: 'Maintenance Setup', to: '/app/machinery/maintenance-types', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-rate-cards', label: 'Rate Cards', to: '/app/machinery/rate-cards', requiredPermission: VIEW, requiredModules: ['machinery'] },
   ];
 
-  const landAndCrops: NavItem[] = [
-    { key: 'fields', label: term('navFields'), to: '/app/projects', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
-    { key: 'land', label: 'Land Parcels', to: '/app/land', requiredPermission: VIEW, requiredModules: ['land'] },
-    { key: 'crop-cycles', label: 'Crop Cycles', to: '/app/crop-cycles', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
-    { key: 'allocations', label: 'Land Allocation', to: '/app/allocations', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
-    { key: 'land-leases', label: 'Land Leases (Maqada)', to: '/app/land-leases', requiredPermission: MODULES, requiredModules: ['land_leases'] },
-    ...(showOrchards ? [{ key: 'orchards', label: 'Orchards', to: '/app/orchards', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] } as NavItem] : []),
-    ...(showLivestock ? [{ key: 'livestock', label: 'Livestock', to: '/app/livestock', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] } as NavItem] : []),
-    { key: 'production-units', label: 'Production Units (Advanced)', to: '/app/production-units', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+  /** Land & Crops: grouped in sidebar only (keys, routes, modules unchanged). */
+  const landCropItemGroups: NavItemGroup[] = [
+    {
+      groupTitle: 'Land Setup',
+      items: [
+        { key: 'land', label: 'Land Parcels', to: '/app/land', requiredPermission: VIEW, requiredModules: ['land'] },
+        { key: 'allocations', label: 'Land Allocation', to: '/app/allocations', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+        { key: 'land-leases', label: 'Land Leases (Maqada)', to: '/app/land-leases', requiredPermission: MODULES, requiredModules: ['land_leases'] },
+      ],
+    },
+    {
+      groupTitle: 'Crop Planning',
+      items: [
+        { key: 'crop-cycles', label: 'Crop Cycles', to: '/app/crop-cycles', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+        { key: 'fields', label: term('navFields'), to: '/app/projects', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+        ...(showOrchards
+          ? [{ key: 'orchards', label: 'Orchards', to: '/app/orchards', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] } as NavItem]
+          : []),
+        ...(showLivestock
+          ? [{ key: 'livestock', label: 'Livestock', to: '/app/livestock', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] } as NavItem]
+          : []),
+      ],
+    },
+    ...(hasOrchardLivestockAddons
+      ? [
+          {
+            groupTitle: 'Advanced',
+            items: [
+              {
+                key: 'production-units',
+                label: 'Production Units (Advanced)',
+                to: '/app/production-units',
+                requiredPermission: VIEW,
+                requiredModules: ['projects_crop_cycles'],
+              },
+            ],
+          },
+        ]
+      : []),
   ];
 
-  const workAndHarvest: NavItem[] = [
-    { key: 'crop-ops', label: 'Work Logs', to: '/app/crop-ops', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
-    { key: 'harvests', label: 'Harvests', to: '/app/harvests', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
-    { key: 'pending-review', label: 'Draft Entries', to: '/app/transactions', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+  /** Work & Harvest: Crop Ops lifecycle + drafts (grouped in sidebar only). */
+  const workHarvestItemGroups: NavItemGroup[] = [
+    {
+      groupTitle: 'Crop Ops',
+      items: [
+        { key: 'crop-ops-overview', label: 'Crop Ops Overview', to: '/app/crop-ops', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
+        { key: 'crop-ops-field-work-logs', label: 'Field Work Logs', to: '/app/crop-ops/activities', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
+        { key: 'harvests', label: 'Harvests', to: '/app/harvests', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
+        { key: 'crop-ops-work-types', label: 'Work Types', to: '/app/crop-ops/activity-types', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
+      ],
+    },
+    {
+      groupTitle: 'Other',
+      items: [
+        { key: 'pending-review', label: 'Draft Entries', to: '/app/transactions', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+      ],
+    },
   ];
+
+  const labourNavItems: NavItem[] = [
+    { key: 'labour-overview', label: 'Labour Overview', to: '/app/labour', requiredPermission: VIEW, requiredModules: ['labour'] },
+    { key: 'labour-workers', label: 'Workers', to: '/app/labour/workers', requiredPermission: VIEW, requiredModules: ['labour'] },
+    { key: 'labour-work-logs', label: 'Labour Work Logs', to: '/app/labour/work-logs', requiredPermission: VIEW, requiredModules: ['labour'] },
+    { key: 'labour-payables', label: 'Payables', to: '/app/labour/payables', requiredPermission: VIEW, requiredModules: ['labour'] },
+  ];
+  const partiesNavItem: NavItem = {
+    key: 'parties',
+    label: 'People & Partners',
+    to: '/app/parties',
+    requiredPermission: VIEW,
+  };
 
   return [
     {
@@ -320,20 +455,31 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
       domainKey: 'operations',
       name: term('navDomainOperations'),
       sections: [
-        { sectionKey: 'ops-land-crops', sectionTitle: 'Land & Crops', items: landAndCrops },
-        { sectionKey: 'ops-work-harvest', sectionTitle: 'Work & Harvest', items: workAndHarvest },
+        {
+          sectionKey: 'ops-land-crops',
+          sectionTitle: 'Land & Crops',
+          items: [],
+          itemGroups: landCropItemGroups,
+        },
+        {
+          sectionKey: 'ops-work-harvest',
+          sectionTitle: 'Work & Harvest',
+          items: [],
+          itemGroups: workHarvestItemGroups,
+        },
         { sectionKey: 'ops-machinery', sectionTitle: 'Machinery', items: machineryItems },
         {
           sectionKey: 'ops-inventory',
           sectionTitle: 'Inventory',
-          items: [{ key: 'inventory', label: 'Stock Overview', to: '/app/inventory', requiredPermission: VIEW, requiredModules: ['inventory'] }],
+          items: inventoryItems,
         },
         {
           sectionKey: 'ops-people',
-          sectionTitle: 'People',
-          items: [
-            { key: 'labour', label: 'Labour', to: '/app/labour', requiredPermission: VIEW, requiredModules: ['labour'] },
-            { key: 'parties', label: 'People & Partners', to: '/app/parties', requiredPermission: VIEW },
+          sectionTitle: 'People & Workforce',
+          items: [],
+          itemGroups: [
+            { groupTitle: 'Workforce', items: labourNavItems },
+            { groupTitle: 'Directory', items: [partiesNavItem] },
           ],
         },
       ],
@@ -433,6 +579,6 @@ export function getNavGroups(term: TermFn, showOrchards: boolean, showLivestock:
   const domains = getNavDomains(term, showOrchards, showLivestock);
   return domains.map((d) => ({
     name: d.name,
-    items: d.sections.flatMap((s) => s.items),
+    items: d.sections.flatMap((s) => getSectionNavItems(s)),
   }));
 }

@@ -16,9 +16,10 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import type { MachineMaintenanceJob } from '../../types';
+import { Badge } from '../../components/Badge';
 
 export default function MaintenanceJobsPage() {
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatDate } = useFormatting();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
@@ -88,6 +89,11 @@ export default function MaintenanceJobsPage() {
     setSearchParams(params);
   };
 
+  const clearFilters = () => {
+    setFilters({ status: '', machine_id: '', from: '', to: '', vendor_party_id: '' });
+    setSearchParams(new URLSearchParams());
+  };
+
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this maintenance job?')) {
@@ -100,21 +106,35 @@ export default function MaintenanceJobsPage() {
   };
 
   const columns: Column<MachineMaintenanceJob>[] = [
-    { header: 'Job No', accessor: 'job_no' },
+    { header: 'Date', accessor: (row) => formatDate(row.job_date) },
     {
       header: 'Machine',
-      accessor: (row) => row.machine?.code || 'N/A',
-    },
-    { header: 'Job Date', accessor: (row) => formatDate(row.job_date) },
-    {
-      header: 'Vendor',
-      accessor: (row) => row.vendor_party?.name || '—',
+      accessor: (row) => row.machine?.name || row.machine?.code || '—',
     },
     {
-      header: 'Total Amount',
-      accessor: (row) => <span className="tabular-nums">{formatMoney(row.total_amount)}</span>,
+      header: 'Maintenance type',
+      accessor: (row) => row.maintenance_type?.name || '—',
     },
-    { header: 'Status', accessor: 'status' },
+    {
+      header: 'Note',
+      accessor: (row) =>
+        row.notes ? (
+          <span className="block max-w-[24rem] truncate" title={row.notes}>
+            {row.notes}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      header: 'Status',
+      accessor: (row) => (
+        <Badge variant={row.status === 'DRAFT' ? 'warning' : row.status === 'POSTED' ? 'success' : 'neutral'}>
+          {row.status === 'DRAFT' ? 'Draft' : row.status === 'POSTED' ? 'Posted' : 'Reversed'}
+        </Badge>
+      ),
+    },
+    { header: 'Reference', accessor: (row) => <span className="tabular-nums">{row.job_no}</span> },
     {
       header: 'Actions',
       accessor: (row) => (
@@ -184,11 +204,12 @@ export default function MaintenanceJobsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Maintenance Jobs"
+        tooltip="Track maintenance work and repairs for your machines."
         backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Maintenance' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Maintenance Jobs' },
         ]}
         right={
           canCreate ? (
@@ -202,6 +223,7 @@ export default function MaintenanceJobsPage() {
           ) : undefined
         }
       />
+      <p className="text-sm text-gray-600">Track maintenance work and repairs for your machines.</p>
 
       <div className="space-y-4">
         <div className="bg-white rounded-lg shadow p-6">
@@ -236,7 +258,7 @@ export default function MaintenanceJobsPage() {
               </select>
             </div>
             <div className="flex flex-col gap-1 min-w-[12rem]">
-              <label className="text-sm font-medium text-gray-700">Vendor Party</label>
+              <label className="text-sm font-medium text-gray-700">Vendor</label>
               <select
                 value={filters.vendor_party_id}
                 onChange={(e) => handleFilterChange('vendor_party_id', e.target.value)}
@@ -251,7 +273,7 @@ export default function MaintenanceJobsPage() {
               </select>
             </div>
             <div className="flex flex-col gap-1 min-w-[10rem]">
-              <label className="text-sm font-medium text-gray-700">Date From</label>
+              <label className="text-sm font-medium text-gray-700">From</label>
               <input
                 type="date"
                 value={filters.from}
@@ -260,7 +282,7 @@ export default function MaintenanceJobsPage() {
               />
             </div>
             <div className="flex flex-col gap-1 min-w-[10rem]">
-              <label className="text-sm font-medium text-gray-700">Date To</label>
+              <label className="text-sm font-medium text-gray-700">To</label>
               <input
                 type="date"
                 value={filters.to}
@@ -268,6 +290,26 @@ export default function MaintenanceJobsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
               />
             </div>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+            >
+              Clear filters
+            </button>
+          </div>
+
+          <div className="mt-4 text-sm text-gray-600">
+            <span className="font-medium text-gray-900 tabular-nums">{(jobs ?? []).length}</span>{' '}
+            {(jobs ?? []).length === 1 ? 'maintenance job' : 'maintenance jobs'}
+            {filters.status || filters.machine_id || filters.from || filters.to || filters.vendor_party_id ? (
+              <span className="text-gray-500"> (filtered)</span>
+            ) : null}
+            {(() => {
+              const list = (jobs ?? []) as MachineMaintenanceJob[];
+              const draftCount = list.filter((j) => j.status === 'DRAFT').length;
+              return draftCount ? <span className="text-gray-500"> · {draftCount} draft</span> : null;
+            })()}
           </div>
         </div>
 
@@ -281,6 +323,7 @@ export default function MaintenanceJobsPage() {
               data={(jobs ?? []) as MachineMaintenanceJob[]}
               columns={columns}
               onRowClick={(row) => navigate(`/app/machinery/maintenance-jobs/${row.id}`)}
+              emptyMessage="No maintenance jobs yet. Create one to track repairs or servicing."
             />
           )}
         </div>

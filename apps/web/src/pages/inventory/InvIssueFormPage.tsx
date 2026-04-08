@@ -342,13 +342,13 @@ export default function InvIssueFormPage() {
   return (
     <PageContainer width="form" className="space-y-6">
       <PageHeader
-        title={`New ${term('issueSingular')}`}
+        title="Record Stock Used"
         backTo="/app/inventory/issues"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('issue'), to: '/app/inventory/issues' },
-          { label: `New ${term('issueSingular')}` },
+          { label: 'Record Stock Used' },
         ]}
       />
 
@@ -405,11 +405,15 @@ export default function InvIssueFormPage() {
               >
                 <option value="">None</option>
                 {(productionUnits ?? []).map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                    {u.type === 'SEASONAL' ? ' (legacy seasonal)' : ''}
+                  </option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Optional. Use this when issuing inputs for an Orchard or Livestock unit. Seasonal issues usually leave this blank.
+                Optional tag for inputs used on orchards, livestock, or other long-cycle units. Leave blank for normal seasonal issues tied to
+                the crop cycle only.
               </p>
             </FormField>
           ) : null}

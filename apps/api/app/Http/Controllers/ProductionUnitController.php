@@ -9,6 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 
+/**
+ * Production units are optional operational continuity for long-lived work (orchards, livestock, multi-year crops).
+ *
+ * SEASONAL type is legacy-only: rows may still exist in the database for historical tenants; the API no longer
+ * allows creating new SEASONAL units or converting existing LONG_CYCLE units to SEASONAL. This avoids duplicate
+ * “seasonal crop cycle” modeling — seasonal accounting scope remains Crop Cycle + Field Cycle.
+ */
 class ProductionUnitController extends Controller
 {
     private function effectiveCategory(?string $current, array $validated): ?string
@@ -19,6 +26,32 @@ class ProductionUnitController extends Controller
             return (string) $v;
         }
         return $current;
+    }
+
+    private function normalizeNullableCategory(Request $request): void
+    {
+        if ($request->has('category') && $request->input('category') === '') {
+            $request->merge(['category' => null]);
+        }
+    }
+
+    /**
+     * Allow SEASONAL only when the row is already SEASONAL (legacy); block new SEASONAL and downgrades to SEASONAL.
+     */
+    private function assertAllowedProductionUnitType(?ProductionUnit $existing, array $validated): void
+    {
+        if (! array_key_exists('type', $validated)) {
+            return;
+        }
+        if ($validated['type'] !== ProductionUnit::TYPE_SEASONAL) {
+            return;
+        }
+        if ($existing === null) {
+            abort(422, 'Creating SEASONAL production units is no longer supported. Use Crop Cycle and Field Cycle for seasonal work, or LONG_CYCLE for orchards, livestock, and other long-lived units.');
+        }
+        if ($existing->type !== ProductionUnit::TYPE_SEASONAL) {
+            abort(422, 'Cannot change type to SEASONAL.');
+        }
     }
 
     private function validateCategorySemantics(array $validated, ?string $currentCategory = null): void
@@ -75,15 +108,16 @@ class ProductionUnitController extends Controller
     public function store(Request $request): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
+        $this->normalizeNullableCategory($request);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'string', Rule::in([ProductionUnit::TYPE_SEASONAL, ProductionUnit::TYPE_LONG_CYCLE])],
+            'type' => ['required', 'string', Rule::in([ProductionUnit::TYPE_LONG_CYCLE])],
             'start_date' => ['required', 'date', 'date_format:Y-m-d'],
             'end_date' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'status' => ['nullable', 'string', Rule::in([ProductionUnit::STATUS_ACTIVE, ProductionUnit::STATUS_CLOSED])],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'category' => ['nullable', 'string', 'max:64'],
+            'category' => ['nullable', 'string', Rule::in([ProductionUnit::CATEGORY_ORCHARD, ProductionUnit::CATEGORY_LIVESTOCK])],
             'orchard_crop' => ['nullable', 'string', 'max:128'],
             'planting_year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'area_acres' => ['nullable', 'numeric', 'min:0'],
@@ -130,6 +164,7 @@ class ProductionUnitController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
+        $this->normalizeNullableCategory($request);
 
         $unit = ProductionUnit::where('id', $id)
             ->where('tenant_id', $tenantId)
@@ -142,7 +177,7 @@ class ProductionUnitController extends Controller
             'end_date' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'status' => ['sometimes', 'required', 'string', Rule::in([ProductionUnit::STATUS_ACTIVE, ProductionUnit::STATUS_CLOSED])],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'category' => ['nullable', 'string', 'max:64'],
+            'category' => ['nullable', 'string', Rule::in([ProductionUnit::CATEGORY_ORCHARD, ProductionUnit::CATEGORY_LIVESTOCK])],
             'orchard_crop' => ['nullable', 'string', 'max:128'],
             'planting_year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'area_acres' => ['nullable', 'numeric', 'min:0'],
@@ -151,6 +186,7 @@ class ProductionUnitController extends Controller
             'herd_start_count' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        $this->assertAllowedProductionUnitType($unit, $validated);
         $this->validateCategorySemantics($validated, $unit->category);
 
         $allowedKeys = ['name', 'type', 'start_date', 'end_date', 'status', 'notes', 'category', 'orchard_crop', 'planting_year', 'area_acres', 'tree_count', 'livestock_type', 'herd_start_count'];

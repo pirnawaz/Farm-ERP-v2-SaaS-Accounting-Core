@@ -190,7 +190,7 @@ export default function InvIssueDetailPage() {
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-  if (!issue) return <div>{term('issueSingular')} not found.</div>;
+  if (!issue) return <div>Stock used record not found.</div>;
 
   return (
     <div className="space-y-6">
@@ -199,7 +199,7 @@ export default function InvIssueDetailPage() {
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('issue'), to: '/app/inventory/issues' },
           { label: issue.doc_no },
         ]}
@@ -504,7 +504,7 @@ export default function InvIssueDetailPage() {
         </div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={`${term('postAction')} ${term('issueSingular')}`}>
+      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={`${term('postAction')}: ${term('issue')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
@@ -553,7 +553,7 @@ export default function InvIssueDetailPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={`${term('reverseAction')} ${term('issueSingular')}`}>
+      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={`${term('reverseAction')}: ${term('issue')}`}>
         <div className="space-y-4">
           <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
           <FormField label="Reason" required><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField>

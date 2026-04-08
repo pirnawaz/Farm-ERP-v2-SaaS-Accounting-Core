@@ -92,6 +92,7 @@ import ChargeDetailPage from './pages/machinery/ChargeDetailPage';
 import MaintenanceJobsPage from './pages/machinery/MaintenanceJobsPage';
 import MaintenanceJobFormPage from './pages/machinery/MaintenanceJobFormPage';
 import MaintenanceJobDetailPage from './pages/machinery/MaintenanceJobDetailPage';
+import MachineryOverviewPage from './pages/machinery/MachineryOverviewPage';
 import MachineryWorkLogsPage from './pages/machinery/WorkLogsPage';
 import MachineryWorkLogFormPage from './pages/machinery/WorkLogFormPage';
 import MachineryWorkLogDetailPage from './pages/machinery/WorkLogDetailPage';
@@ -263,7 +264,7 @@ function App() {
         <Route path="harvests" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestsPage /></ModuleProtectedRoute>} />
         <Route path="harvests/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestFormPage /></ModuleProtectedRoute>} />
         <Route path="harvests/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestDetailPage /></ModuleProtectedRoute>} />
-        <Route path="machinery" element={<Navigate to="/app/machinery/work-logs" replace />} />
+        <Route path="machinery" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryOverviewPage /></ModuleProtectedRoute>} />
         <Route path="machinery/work-logs" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryWorkLogsPage /></ModuleProtectedRoute>} />
         <Route path="machinery/work-logs/new" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryWorkLogFormPage /></ModuleProtectedRoute>} />
         <Route path="machinery/work-logs/:id" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryWorkLogDetailPage /></ModuleProtectedRoute>} />

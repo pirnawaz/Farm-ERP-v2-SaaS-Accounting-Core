@@ -63,13 +63,13 @@ export default function InvAdjustmentFormPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`New ${term('adjustmentSingular')}`}
+        title="New stock adjustment"
         backTo="/app/inventory/adjustments"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Inventory', to: '/app/inventory' },
+          { label: 'Inventory Overview', to: '/app/inventory' },
           { label: term('adjustment'), to: '/app/inventory/adjustments' },
-          { label: `New ${term('adjustmentSingular')}` },
+          { label: 'New stock adjustment' },
         ]}
       />
       <div className="bg-white rounded-lg shadow p-6 space-y-6">

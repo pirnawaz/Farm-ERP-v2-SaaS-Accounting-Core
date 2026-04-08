@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   useWorkLogsQuery,
@@ -16,11 +16,10 @@ import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLog } from '../../types';
-import { term } from '../../config/terminology';
 import { Badge } from '../../components/Badge';
 
 export default function WorkLogsPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [machineId, setMachineId] = useState(searchParams.get('machine_id') ?? '');
   const [cropCycleId, setCropCycleId] = useState(searchParams.get('crop_cycle_id') ?? '');
@@ -49,30 +48,57 @@ export default function WorkLogsPage() {
   const reverseM = useReverseWorkLog();
   const navigate = useNavigate();
   const location = useLocation();
-  const { formatMoney, formatDate } = useFormatting();
+  const { formatDate } = useFormatting();
   const { hasRole } = useRole();
 
   const canPost = hasRole(['tenant_admin', 'accountant']);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
 
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!value) next.delete(key);
+    else next.set(key, value);
+    setSearchParams(next);
+  };
+
+  const clearFilters = () => {
+    setStatus('');
+    setMachineId('');
+    setCropCycleId('');
+    setProjectId('');
+    setFrom('');
+    setTo('');
+    setSearchParams(new URLSearchParams());
+  };
+
+  const hasFilters = !!(status || machineId || cropCycleId || projectId || from || to);
+
   const cols: Column<MachineWorkLog>[] = [
-    { header: 'Work Log No', accessor: 'work_log_no' },
-    { header: 'Machine', accessor: (r) => r.machine?.name ?? r.machine_id },
-    { header: 'Work Date', accessor: (r) => (r.work_date ? formatDate(r.work_date) : '—') },
-    { header: term('fieldCycle'), accessor: (r) => r.project?.name ?? r.project_id },
-    { header: 'Usage', accessor: (r) => (r.usage_qty != null ? String(r.usage_qty) : '—') },
     {
-      header: 'Total',
-      accessor: (r) => {
-        const total = (r.lines ?? []).reduce((s, l) => s + parseFloat(String(l.amount || 0)), 0);
-        return <span className="tabular-nums text-right block">{formatMoney(total)}</span>;
-      },
+      header: 'Date',
+      accessor: (r) =>
+        r.work_date ? (
+          <span className="tabular-nums text-gray-900">{formatDate(r.work_date, { variant: 'medium' })}</span>
+        ) : (
+          '—'
+        ),
+    },
+    { header: 'Machine', accessor: (r) => r.machine?.name ?? r.machine_id },
+    { header: 'Field cycle', accessor: (r) => r.project?.name ?? r.project_id },
+    {
+      header: 'Usage',
+      accessor: (r) => <span className="tabular-nums">{r.usage_qty != null ? String(r.usage_qty) : '—'}</span>,
+    },
+    { header: 'Reference', accessor: (r) => <span className="tabular-nums">{r.work_log_no}</span> },
+    {
+      header: 'Note',
+      accessor: (r) => (r.notes ? <span className="block max-w-[24rem] truncate" title={r.notes}>{r.notes}</span> : '—'),
     },
     {
       header: 'Status',
       accessor: (r) => (
         <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
-          {r.status}
+          {r.status === 'DRAFT' ? 'Draft' : r.status === 'POSTED' ? 'Posted' : 'Reversed'}
         </Badge>
       ),
     },
@@ -144,88 +170,140 @@ export default function WorkLogsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <PageHeader
-        title="Work Logs"
+        title="Machine Usage"
+        tooltip="Track how machines are used across work and field activities."
+        description="Track how machines are used across work and field activities."
         backTo="/app/machinery"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery', to: '/app/machinery' }, { label: 'Work Logs' }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery Overview', to: '/app/machinery' }, { label: 'Machine Usage' }]}
         right={
           canEdit ? (
             <button
               type="button"
               onClick={() => navigate('/app/machinery/work-logs/new')}
-              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]"
+              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
             >
-              New Work Log
+              New usage entry
             </button>
           ) : undefined
         }
       />
-      <div className="flex flex-wrap gap-4 items-end">
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-2 border rounded text-sm"
-        >
-          <option value="">All statuses</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="POSTED">POSTED</option>
-          <option value="REVERSED">REVERSED</option>
-        </select>
-        <select
-          value={machineId}
-          onChange={(e) => setMachineId(e.target.value)}
-          className="px-3 py-2 border rounded text-sm"
-        >
-          <option value="">All machines</option>
-          {machines?.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={cropCycleId}
-          onChange={(e) => {
-            setCropCycleId(e.target.value);
-            setProjectId('');
-          }}
-          className="px-3 py-2 border rounded text-sm"
-        >
-          <option value="">All crop cycles</option>
-          {cropCycles?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          className="px-3 py-2 border rounded text-sm"
-        >
-          <option value="">All projects</option>
-          {projects?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          className="px-3 py-2 border rounded text-sm"
-          placeholder="From"
-        />
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          className="px-3 py-2 border rounded text-sm"
-          placeholder="To"
-        />
-      </div>
+
+      <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasFilters}
+            className="text-sm font-medium text-[#1F6F5C] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
+            Clear filters
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setParam('status', e.target.value);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              <option value="DRAFT">Draft</option>
+              <option value="POSTED">Posted</option>
+              <option value="REVERSED">Reversed</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Machine</label>
+            <select
+              value={machineId}
+              onChange={(e) => {
+                setMachineId(e.target.value);
+                setParam('machine_id', e.target.value);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {machines?.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Crop cycle</label>
+            <select
+              value={cropCycleId}
+              onChange={(e) => {
+                setCropCycleId(e.target.value);
+                setProjectId('');
+                setParam('crop_cycle_id', e.target.value);
+                setParam('project_id', '');
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {cropCycles?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Field cycle</label>
+            <select
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setParam('project_id', e.target.value);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All</option>
+              {projects?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">From</label>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => {
+                setFrom(e.target.value);
+                setParam('from', e.target.value);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
+          </div>
+          <div className="flex flex-col gap-1 min-w-[10rem]">
+            <label className="text-sm font-medium text-gray-700">To</label>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => {
+                setTo(e.target.value);
+                setParam('to', e.target.value);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            />
+          </div>
+        </div>
+
+        <UsageSummary workLogs={workLogs ?? []} status={status} machineId={machineId} from={from} to={to} machines={machines ?? []} />
+      </section>
+
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         {isLoading ? (
           <div className="flex justify-center py-12">
@@ -238,7 +316,7 @@ export default function WorkLogsPage() {
             onRowClick={(r) =>
               navigate(`/app/machinery/work-logs/${r.id}`, { state: { from: location.pathname + location.search } })
             }
-            emptyMessage="No work logs. Create one."
+            emptyMessage="No usage recorded yet. Add a usage entry to track machine work."
           />
         )}
       </div>
@@ -246,7 +324,7 @@ export default function WorkLogsPage() {
       <Modal
         isOpen={!!postTarget}
         onClose={() => setPostTarget(null)}
-        title="Post Work Log"
+        title="Post usage entry"
       >
         <div className="space-y-4">
           <FormField label="Posting Date" required>
@@ -283,7 +361,7 @@ export default function WorkLogsPage() {
           setReverseTarget(null);
           setReverseReason('');
         }}
-        title="Reverse Work Log"
+        title="Reverse usage entry"
       >
         <div className="space-y-4">
           <FormField label="Posting Date" required>
@@ -325,6 +403,42 @@ export default function WorkLogsPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function UsageSummary({
+  workLogs,
+  status,
+  machineId,
+  from,
+  to,
+  machines,
+}: {
+  workLogs: MachineWorkLog[];
+  status: string;
+  machineId: string;
+  from: string;
+  to: string;
+  machines: Array<{ id: string; name: string }>;
+}) {
+  const machineName = useMemo(() => {
+    if (!machineId) return '';
+    return machines.find((m) => m.id === machineId)?.name ?? '';
+  }, [machineId, machines]);
+
+  const bits: string[] = [];
+  if (machineName) bits.push(machineName);
+  if (status) bits.push(status.toLowerCase());
+  if (from && to) bits.push(`${from} to ${to}`);
+  else if (from) bits.push(`from ${from}`);
+  else if (to) bits.push(`to ${to}`);
+
+  return (
+    <div className="text-sm text-gray-600">
+      <span className="font-medium text-gray-900 tabular-nums">{workLogs.length}</span>{' '}
+      {workLogs.length === 1 ? 'usage entry' : 'usage entries'}
+      {bits.length ? <span className="text-gray-500"> · {bits.join(' · ')}</span> : null}
     </div>
   );
 }

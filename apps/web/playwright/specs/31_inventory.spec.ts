@@ -38,7 +38,7 @@ test.describe('@all Inventory module', () => {
     await page.goto('/app/inventory/items', { waitUntil: 'domcontentloaded' });
     await waitForModulesReady(page);
 
-    await page.getByRole('button', { name: /New Item/i }).click();
+    await page.getByRole('button', { name: /Add Item/i }).click();
     await fillByLabel(page, 'Name', `Item-${runId}`);
 
     // InvItemsPage: Unit of Measure (required), Category, SKU, Active

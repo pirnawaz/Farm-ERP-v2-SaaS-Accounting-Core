@@ -318,11 +318,15 @@ export default function WorkLogFormPage() {
                 >
                   <option value="">None</option>
                   {(productionUnits ?? []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                      {u.type === 'SEASONAL' ? ' (legacy seasonal)' : ''}
+                    </option>
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  Optional. Use this when logging work for an Orchard or Livestock unit. Seasonal work usually leaves this blank.
+                  Optional tag for orchards, livestock, or other long-cycle units. Leave blank for typical seasonal labour — the crop and field
+                  cycle carry the main seasonal context.
                 </p>
               </FormField>
             ) : null}

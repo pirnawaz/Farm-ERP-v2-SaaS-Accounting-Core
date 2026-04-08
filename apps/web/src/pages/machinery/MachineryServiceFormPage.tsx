@@ -14,7 +14,6 @@ import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { CreateMachineryServicePayload, UpdateMachineryServicePayload, MachineryServiceAllocationScope } from '../../types';
-import { term } from '../../config/terminology';
 
 const BENEFICIARY_OPTIONS: { value: MachineryServiceAllocationScope; label: string }[] = [
   { value: 'LANDLORD_ONLY', label: 'My farm' },
@@ -128,8 +127,8 @@ export default function MachineryServiceFormPage() {
           backTo="/app/machinery/services"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Services', to: '/app/machinery/services' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Service History', to: '/app/machinery/services' },
             { label: isEdit ? 'Edit' : 'New' },
           ]}
         />
@@ -148,8 +147,8 @@ export default function MachineryServiceFormPage() {
           backTo={`/app/machinery/services/${id}`}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Services', to: '/app/machinery/services' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Service History', to: '/app/machinery/services' },
             { label: 'Edit' },
           ]}
         />
@@ -172,22 +171,22 @@ export default function MachineryServiceFormPage() {
         backTo="/app/machinery/services"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Services', to: '/app/machinery/services' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Service History', to: '/app/machinery/services' },
           { label: isEdit ? 'Edit' : 'New' },
         ]}
       />
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label={term('fieldCycle')} required error={errors.project_id}>
+          <FormField label="Field cycle" required error={errors.project_id}>
             <select
               value={project_id}
               onChange={(e) => setProjectId(e.target.value)}
               disabled={isEdit}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
             >
-              <option value="">{`Select ${term('fieldCycle').toLowerCase()}`}</option>
+              <option value="">Select field cycle</option>
               {projects?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

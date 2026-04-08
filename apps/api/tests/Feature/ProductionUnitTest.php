@@ -316,4 +316,142 @@ class ProductionUnitTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function test_store_rejects_seasonal_type_even_without_category(): void
+    {
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->postJson('/api/production-units', [
+                'name' => 'Rice 2025 duplicate',
+                'type' => 'SEASONAL',
+                'start_date' => '2025-01-01',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['type']);
+    }
+
+    public function test_store_rejects_invalid_category_string(): void
+    {
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->postJson('/api/production-units', [
+                'name' => 'Bad category',
+                'type' => 'LONG_CYCLE',
+                'start_date' => '2025-01-01',
+                'category' => 'SEASONAL_DUPLICATE',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['category']);
+    }
+
+    public function test_update_cannot_change_long_cycle_to_seasonal(): void
+    {
+        $unit = ProductionUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Long only',
+            'type' => 'LONG_CYCLE',
+            'start_date' => '2024-01-01',
+            'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->patchJson('/api/production-units/' . $unit->id, [
+                'type' => 'SEASONAL',
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_update_allows_legacy_seasonal_to_change_to_long_cycle(): void
+    {
+        $unit = ProductionUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Legacy seasonal',
+            'type' => 'SEASONAL',
+            'start_date' => '2020-01-01',
+            'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->patchJson('/api/production-units/' . $unit->id, [
+                'type' => 'LONG_CYCLE',
+            ]);
+
+        $response->assertStatus(200);
+        $this->assertSame('LONG_CYCLE', $response->json('type'));
+    }
+
+    public function test_update_legacy_seasonal_can_keep_type_when_sent(): void
+    {
+        $unit = ProductionUnit::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Legacy seasonal',
+            'type' => 'SEASONAL',
+            'start_date' => '2020-01-01',
+            'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->withHeaders($this->headers('tenant_admin'))
+            ->patchJson('/api/production-units/' . $unit->id, [
+                'type' => 'SEASONAL',
+                'name' => 'Renamed legacy',
+            ]);
+
+        $response->assertStatus(200);
+        $this->assertSame('SEASONAL', $response->json('type'));
+        $this->assertSame('Renamed legacy', $response->json('name'));
+    }
+
+    /**
+     * Defense in depth: RFC 8259 allows duplicate keys; PHP json_decode keeps the last value, so "LONG_CYCLE" then
+     * "SEASONAL" resolves to SEASONAL. Ensure the API still rejects creation and does not persist a new row.
+     */
+    public function test_store_rejects_raw_json_duplicate_type_keys_when_last_value_is_seasonal(): void
+    {
+        $rawBody = '{"name":"Duplicate key tamper","start_date":"2025-01-01","type":"LONG_CYCLE","type":"SEASONAL"}';
+
+        $response = $this->call(
+            'POST',
+            '/api/production-units',
+            [],
+            [],
+            [],
+            [
+                'HTTP_X_TENANT_ID' => $this->tenant->id,
+                'HTTP_X_USER_ROLE' => 'tenant_admin',
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json',
+            ],
+            $rawBody
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['type']);
+        $this->assertDatabaseMissing('production_units', [
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Duplicate key tamper',
+        ]);
+    }
+
+    /**
+     * Non-JSON POST (form parameters, not postJson) must hit the same validation. Accept: application/json ensures a 422 JSON
+     * response instead of a redirect when validation fails (standard Laravel API testing behaviour).
+     */
+    public function test_store_rejects_seasonal_via_non_json_post_body(): void
+    {
+        $response = $this->withHeaders(array_merge($this->headers('tenant_admin'), [
+            'Accept' => 'application/json',
+        ]))->post('/api/production-units', [
+            'name' => 'Form body seasonal',
+            'type' => 'SEASONAL',
+            'start_date' => '2025-01-01',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['type']);
+        $this->assertDatabaseMissing('production_units', [
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Form body seasonal',
+        ]);
+    }
 }

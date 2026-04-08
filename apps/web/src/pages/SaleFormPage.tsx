@@ -541,11 +541,15 @@ export default function SaleFormPage() {
               >
                 <option value="">None</option>
                 {productionUnits?.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                    {u.type === 'SEASONAL' ? ' (legacy seasonal)' : ''}
+                  </option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Optional. Use this when the sale belongs to an Orchard or Livestock unit. Seasonal sales usually leave this blank.
+                Optional tag when revenue belongs to an orchard, livestock herd, or other long-cycle unit. Leave blank for typical seasonal
+                sales (crop cycle is usually enough).
               </p>
             </FormField>
           ) : null}

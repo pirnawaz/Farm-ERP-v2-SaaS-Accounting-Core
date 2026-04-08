@@ -13,6 +13,7 @@ class ProductionUnit extends Model
 
     protected $table = 'production_units';
 
+    /** Legacy DB value only — API `store` rejects new SEASONAL rows; seasonal workflows use Crop Cycle + Field Cycle. */
     public const TYPE_SEASONAL = 'SEASONAL';
     public const TYPE_LONG_CYCLE = 'LONG_CYCLE';
     public const STATUS_ACTIVE = 'ACTIVE';

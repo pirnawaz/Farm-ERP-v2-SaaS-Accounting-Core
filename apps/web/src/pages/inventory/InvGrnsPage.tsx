@@ -39,9 +39,9 @@ export default function InvGrnsPage() {
       <PageHeader
         title={term('grn')}
         backTo="/app/inventory"
-        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory', to: '/app/inventory' }, { label: term('grn') }]}
+        breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Inventory Overview', to: '/app/inventory' }, { label: term('grn') }]}
         right={hasRole(['tenant_admin', 'accountant', 'operator']) ? (
-          <button type="button" onClick={() => navigate('/app/inventory/grns/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New {term('grnSingular')}</button>
+          <button type="button" onClick={() => navigate('/app/inventory/grns/new')} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a]">New Goods Received</button>
         ) : undefined}
       />
       <div className="space-y-4">
@@ -65,7 +65,7 @@ export default function InvGrnsPage() {
               data={(grns ?? []) as InvGrn[]}
               columns={cols}
               onRowClick={(r) => navigate(`/app/inventory/grns/${r.id}`, { state: { from: location.pathname + location.search } })}
-              emptyMessage={`No ${term('grn')}. Create one.`}
+              emptyMessage="Nothing here yet. When stock arrives on the farm, use New Goods Received to record it."
             />
           )}
         </div>

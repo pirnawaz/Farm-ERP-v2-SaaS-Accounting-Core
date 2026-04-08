@@ -61,12 +61,12 @@ export default function WorkLogDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Work Log"
+          title="Usage entry"
           backTo={backTo}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machine Usage', to: '/app/machinery/work-logs' },
             { label: '…' },
           ]}
         />
@@ -80,18 +80,18 @@ export default function WorkLogDetailPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Work Log"
+          title="Usage entry"
           backTo={backTo}
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
-            { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Work Logs', to: '/app/machinery/work-logs' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machine Usage', to: '/app/machinery/work-logs' },
             { label: 'Not found' },
           ]}
         />
-        <p className="text-gray-600">Work log not found.</p>
+        <p className="text-gray-600">Usage entry not found.</p>
         <Link to="/app/machinery/work-logs" className="text-[#1F6F5C] font-medium hover:underline">
-          Back to Work Logs
+          Back to Machine Usage
         </Link>
       </div>
     );
@@ -105,12 +105,12 @@ export default function WorkLogDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Work Log ${log.work_log_no}`}
+        title={`Usage entry ${log.work_log_no}`}
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
-          { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Work Logs', to: '/app/machinery/work-logs' },
+          { label: 'Machinery Overview', to: '/app/machinery' },
+          { label: 'Machine Usage', to: '/app/machinery/work-logs' },
           { label: log.work_log_no },
         ]}
         right={
