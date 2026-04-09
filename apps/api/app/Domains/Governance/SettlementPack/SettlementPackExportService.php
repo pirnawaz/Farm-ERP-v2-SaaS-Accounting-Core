@@ -5,12 +5,13 @@ namespace App\Domains\Governance\SettlementPack;
 use App\Models\SettlementPack;
 use App\Models\SettlementPackDocument;
 use App\Services\Document\SettlementPackPdfRenderer;
+use App\Support\TenantScoped;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Versioned PDF bundle export for Settlement Packs.
- * Builds PDF strictly from pack.summary_json (no recalculation). FINAL packs only.
+ * Builds PDF strictly from the pack snapshot (latest settlement_pack_versions.snapshot_json). FINALIZED packs only.
  */
 class SettlementPackExportService
 {
@@ -21,22 +22,19 @@ class SettlementPackExportService
     /**
      * Generate a new PDF bundle for the pack. Only FINAL packs are allowed.
      *
-     * @return SettlementPackDocument
-     * @throws ValidationException if pack is not FINAL
+     * @throws ValidationException if pack is not FINALIZED
      */
     public function generatePdfBundle(string $tenantId, string $packId, ?string $userId): SettlementPackDocument
     {
-        $pack = SettlementPack::where('id', $packId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)->findOrFail($packId);
 
-        if ($pack->status !== SettlementPack::STATUS_FINAL) {
+        if ($pack->status !== SettlementPack::STATUS_FINALIZED) {
             throw ValidationException::withMessages([
                 'status' => ['PDF export is only allowed for finalized settlement packs.'],
             ]);
         }
 
-        $nextVersion = (int) SettlementPackDocument::where('tenant_id', $tenantId)
+        $nextVersion = (int) TenantScoped::for(SettlementPackDocument::query(), $tenantId)
             ->where('settlement_pack_id', $packId)
             ->max('version') + 1;
         if ($nextVersion < 1) {
@@ -45,7 +43,7 @@ class SettlementPackExportService
 
         $pdfBytes = $this->pdfRenderer->render($pack, $nextVersion, '');
         $sha256Hex = strtolower(bin2hex(hash('sha256', $pdfBytes, true)));
-        $snapshotSha256 = $this->snapshotHash($pack->summary_json ?? []);
+        $snapshotSha256 = $this->snapshotHash($pack->snapshotJson());
 
         $storageKey = sprintf(
             'settlement_packs/%s/%s/v%d.pdf',
@@ -80,7 +78,7 @@ class SettlementPackExportService
      */
     public function listDocuments(string $tenantId, string $packId): array
     {
-        $docs = SettlementPackDocument::where('tenant_id', $tenantId)
+        $docs = TenantScoped::for(SettlementPackDocument::query(), $tenantId)
             ->where('settlement_pack_id', $packId)
             ->orderBy('version', 'desc')
             ->get();
@@ -95,7 +93,7 @@ class SettlementPackExportService
 
     public function getDocument(string $tenantId, string $packId, int $version): SettlementPackDocument
     {
-        return SettlementPackDocument::where('tenant_id', $tenantId)
+        return TenantScoped::for(SettlementPackDocument::query(), $tenantId)
             ->where('settlement_pack_id', $packId)
             ->where('version', $version)
             ->firstOrFail();
@@ -104,6 +102,7 @@ class SettlementPackExportService
     private function snapshotHash(array $summaryJson): string
     {
         $canonical = json_encode($summaryJson, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
         return strtolower(bin2hex(hash('sha256', $canonical, true)));
     }
 }

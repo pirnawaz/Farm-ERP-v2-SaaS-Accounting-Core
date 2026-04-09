@@ -18,6 +18,9 @@ abstract class TestCase extends BaseTestCase
     {
         $this->preflightTestDatabase();
         parent::setUp();
+
+        // Feature tests seed LedgerEntry directly; production requires LedgerWriteGuard::scoped().
+        config(['ledger_write_allowlist.allow_unguarded_in_tests' => true]);
     }
 
     /**

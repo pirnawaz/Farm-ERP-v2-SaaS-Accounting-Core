@@ -7,6 +7,7 @@ use App\Models\LedgerEntry;
 use App\Models\OperationalTransaction;
 use App\Models\PostingGroup;
 use App\Models\ReclassCorrection;
+use App\Services\LedgerWriteGuard;
 use App\Services\SystemAccountService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ use Illuminate\Support\Str;
  * posted with SHARED or null allocation_scope. Creates one ACCOUNTING_CORRECTION
  * PostingGroup per candidate with two AllocationRows (-SHARED, +party_only) and
  * balanced clearing ledger entries. Idempotent via reclass_corrections table.
+ *
+ * Ledger writes run only in local/development/testing — see handle().
  */
 class ReclassifyLegacyPartyOnlyExpenses extends Command
 {
@@ -101,6 +104,12 @@ class ReclassifyLegacyPartyOnlyExpenses extends Command
             return self::SUCCESS;
         }
 
+        if (! app()->environment(['local', 'development', 'dev', 'testing'])) {
+            $this->error('This maintenance command may only apply corrections in local, development, dev, or testing environments.');
+
+            return self::FAILURE;
+        }
+
         $created = 0;
         foreach ($filtered as $txn) {
             try {
@@ -118,7 +127,8 @@ class ReclassifyLegacyPartyOnlyExpenses extends Command
 
     private function createCorrectionForTransaction(OperationalTransaction $txn): void
     {
-        DB::transaction(function () use ($txn) {
+        LedgerWriteGuard::scoped(self::class, function () use ($txn) {
+            DB::transaction(function () use ($txn) {
             if (ReclassCorrection::where('operational_transaction_id', $txn->id)->exists()) {
                 return;
             }
@@ -199,6 +209,7 @@ class ReclassifyLegacyPartyOnlyExpenses extends Command
                 'credit_amount' => $amountStr,
                 'currency_code' => 'GBP',
             ]);
+            });
         });
     }
 }

@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Playwright E2E specs live under apps/web/playwright; do not collect them as Vitest tests.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/playwright/**'],
   },
   resolve: {
     alias: {

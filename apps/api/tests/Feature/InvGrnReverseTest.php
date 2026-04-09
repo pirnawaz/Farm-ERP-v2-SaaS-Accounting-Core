@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\CropCycle;
+use App\Models\Party;
+use App\Models\Project;
 use App\Models\Tenant;
 use App\Models\Module;
 use App\Models\TenantModule;
@@ -42,6 +45,26 @@ class InvGrnReverseTest extends TestCase
         $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
         SystemAccountsSeeder::runForTenant($tenant->id);
         $this->enableInventory($tenant);
+
+        $cycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => '2024',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $landlord = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Landlord',
+            'party_types' => ['LANDLORD'],
+        ]);
+        Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $landlord->id,
+            'crop_cycle_id' => $cycle->id,
+            'name' => 'Inv Project',
+            'status' => 'ACTIVE',
+        ]);
 
         $uom = InvUom::create(['tenant_id' => $tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
         $cat = InvItemCategory::create(['tenant_id' => $tenant->id, 'name' => 'Fertilizer']);

@@ -88,17 +88,16 @@ test.describe('@all Settlements module', () => {
   });
 
   // ─── Settlement Pack ─────────────────────────────────────────
-  test('@all settlement pack page loads', async ({ page }) => {
-    await page.goto('/app/settlement-pack', { waitUntil: 'domcontentloaded' });
+  test('@all settlement packs list page loads', async ({ page }) => {
+    await page.goto('/app/settlement-packs', { waitUntil: 'domcontentloaded' });
     await waitForModulesReady(page);
-    await expect(page.locator('body')).toContainText(/Settlement Pack/i);
+    await expect(page.locator('body')).toContainText(/Settlement pack/i);
   });
 
-  test('@all settlement pack shows summary and register', async ({ page }) => {
-    await page.goto('/app/settlement-pack', { waitUntil: 'domcontentloaded' });
+  test('@all settlement pack detail shows summary and register', async ({ page }) => {
+    await page.goto('/app/settlement', { waitUntil: 'domcontentloaded' });
     await waitForModulesReady(page);
 
-    // Select a project that has settlement data
     const projectSelect = page.locator('label:has-text("Project")').locator('..').locator('select').first();
     if (await projectSelect.count() === 0) {
       test.skip(true, 'No projects available for settlement pack');
@@ -106,18 +105,18 @@ test.describe('@all Settlements module', () => {
     }
     await projectSelect.selectOption({ index: 1 });
 
-    // Wait for data to load
-    await page.waitForTimeout(2000);
+    const genPackBtn = page.getByRole('button', { name: /Generate settlement pack/i });
+    if (!(await genPackBtn.isVisible())) {
+      test.skip(true, 'Generate settlement pack not available');
+      return;
+    }
+    await genPackBtn.click();
+    await page.waitForURL(/\/app\/settlement-packs\//, { timeout: 15000 });
 
     const summary = page.getByTestId('settlement-pack-summary');
     const register = page.getByTestId('settlement-pack-register');
-
-    if (await summary.isVisible()) {
-      await expect(summary).toBeVisible();
-    }
-    if (await register.isVisible()) {
-      await expect(register).toBeVisible();
-    }
+    await expect(summary).toBeVisible({ timeout: 10000 });
+    await expect(register).toBeVisible({ timeout: 10000 });
   });
 
   // ─── Settlements List ────────────────────────────────────────

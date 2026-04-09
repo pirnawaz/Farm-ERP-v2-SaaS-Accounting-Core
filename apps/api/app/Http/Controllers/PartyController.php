@@ -197,7 +197,7 @@ class PartyController extends Controller
 
         return response()->json([
             'party' => $party,
-            'allocated_payable_total' => $balanceSummary['open_bills_total'] ?? $balanceSummary['allocated_total'] ?? '0.00',
+            'allocated_payable_total' => $balanceSummary['outstanding_total'] ?? $balanceSummary['open_bills_total'] ?? $balanceSummary['allocated_total'] ?? '0.00',
             'paid_total' => $balanceSummary['paid_total'],
             'outstanding_total' => $balanceSummary['outstanding_total'],
             'unapplied_supplier_payments_total' => $balanceSummary['unapplied_supplier_payments_total'] ?? '0.00',
@@ -258,6 +258,28 @@ class PartyController extends Controller
         }
 
         $statement = $this->statementService->getARStatement($tenantId, $id, $from, $to);
+
+        return response()->json($statement);
+    }
+
+    public function supplierStatement(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        Party::where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $to = $request->input('to');
+        $from = $request->input('from');
+        if (!$to) {
+            $to = Carbon::today()->format('Y-m-d');
+        }
+        if (!$from) {
+            $from = Carbon::parse($to)->subYear()->format('Y-m-d');
+        }
+
+        $statement = $this->statementService->getSupplierStatement($tenantId, $id, $from, $to);
 
         return response()->json($statement);
     }

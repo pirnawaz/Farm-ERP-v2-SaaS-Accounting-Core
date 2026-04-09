@@ -80,4 +80,49 @@ class InvTransferPostIdempotencyTest extends TestCase
         $this->assertNotNull($balB);
         $this->assertEquals(3, (float) $balB->qty_on_hand);
     }
+
+    /**
+     * No idempotency_key in body: deterministic key source_type:source_id — double POST must not create two posting groups.
+     */
+    public function test_posting_transfer_twice_without_idempotency_key_does_not_duplicate_posting_group(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T2', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableInventory($tenant);
+
+        $uom = InvUom::create(['tenant_id' => $tenant->id, 'code' => 'KG', 'name' => 'Kg']);
+        $cat = InvItemCategory::create(['tenant_id' => $tenant->id, 'name' => 'Seed']);
+        $item = InvItem::create([
+            'tenant_id' => $tenant->id, 'name' => 'Seed Bag', 'uom_id' => $uom->id,
+            'category_id' => $cat->id, 'valuation_method' => 'WAC', 'is_active' => true,
+        ]);
+        $storeA = InvStore::create(['tenant_id' => $tenant->id, 'name' => 'S1', 'type' => 'MAIN', 'is_active' => true]);
+        $storeB = InvStore::create(['tenant_id' => $tenant->id, 'name' => 'S2', 'type' => 'MAIN', 'is_active' => true]);
+
+        $grn = InvGrn::create(['tenant_id' => $tenant->id, 'doc_no' => 'GRN-2', 'store_id' => $storeA->id, 'doc_date' => '2024-06-15', 'status' => 'DRAFT']);
+        InvGrnLine::create(['tenant_id' => $tenant->id, 'grn_id' => $grn->id, 'item_id' => $item->id, 'qty' => 10, 'unit_cost' => 50, 'line_total' => 500]);
+        $this->withHeader('X-Tenant-Id', $tenant->id)->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/inventory/grns/{$grn->id}/post", ['posting_date' => '2024-06-15', 'idempotency_key' => 'g2']);
+
+        $transfer = InvTransfer::create(['tenant_id' => $tenant->id, 'doc_no' => 'TRF-2', 'from_store_id' => $storeA->id, 'to_store_id' => $storeB->id, 'doc_date' => '2024-06-16', 'status' => 'DRAFT']);
+        InvTransferLine::create(['tenant_id' => $tenant->id, 'transfer_id' => $transfer->id, 'item_id' => $item->id, 'qty' => 2]);
+
+        $payload = ['posting_date' => '2024-06-16'];
+        $r1 = $this->withHeader('X-Tenant-Id', $tenant->id)->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/inventory/transfers/{$transfer->id}/post", $payload);
+        $r1->assertStatus(201);
+        $pgId1 = $r1->json('id');
+
+        $r2 = $this->withHeader('X-Tenant-Id', $tenant->id)->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/inventory/transfers/{$transfer->id}/post", $payload);
+        $r2->assertStatus(201);
+        $this->assertEquals($pgId1, $r2->json('id'));
+
+        $expectedKey = 'INVENTORY_TRANSFER:' . $transfer->id;
+        $this->assertEquals(1, PostingGroup::where('tenant_id', $tenant->id)->where('source_type', 'INVENTORY_TRANSFER')->where('source_id', $transfer->id)->count());
+        $this->assertEquals(1, PostingGroup::where('tenant_id', $tenant->id)->where('idempotency_key', $expectedKey)->count());
+    }
 }
+

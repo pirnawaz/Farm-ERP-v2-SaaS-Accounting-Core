@@ -9,6 +9,7 @@ use App\Models\LedgerEntry;
 use App\Models\CropCycle;
 use App\Models\AllocationRow;
 use App\Services\Accounting\PostValidationService;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\PartyAccountService;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,8 @@ class AdvanceService
         ?string $cropCycleId = null,
         ?string $userRole = null
     ): PostingGroup {
-        return DB::transaction(function () use ($advanceId, $tenantId, $postingDate, $idempotencyKey, $cropCycleId, $userRole) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($advanceId, $tenantId, $postingDate, $idempotencyKey, $cropCycleId, $userRole) {
+            return DB::transaction(function () use ($advanceId, $tenantId, $postingDate, $idempotencyKey, $cropCycleId, $userRole) {
             // Validate role
             if ($userRole && !in_array($userRole, ['accountant', 'tenant_admin'])) {
                 throw new \Exception('Only accountant or tenant_admin can post advances');
@@ -208,6 +210,7 @@ class AdvanceService
 
             // Reload posting group with relationships
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 }

@@ -11,6 +11,8 @@ use App\Models\AllocationRow;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
+use App\Services\LedgerWriteGuard;
+use App\Services\OperationalPostingGuard;
 use App\Services\PostingDateGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -20,7 +22,8 @@ class SaleService
     public function __construct(
         private SystemAccountService $accountService,
         private SaleCOGSService $cogsService,
-        private PostingDateGuard $postingDateGuard
+        private PostingDateGuard $postingDateGuard,
+        private OperationalPostingGuard $guard,
     ) {}
 
     /**
@@ -43,7 +46,8 @@ class SaleService
         string $idempotencyKey,
         ?string $userRole = null
     ): PostingGroup {
-        return DB::transaction(function () use ($saleId, $tenantId, $postingDate, $idempotencyKey, $userRole) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($saleId, $tenantId, $postingDate, $idempotencyKey, $userRole) {
+            return DB::transaction(function () use ($saleId, $tenantId, $postingDate, $idempotencyKey, $userRole) {
             // Validate role
             if ($userRole && !in_array($userRole, ['accountant', 'tenant_admin'])) {
                 throw new \Exception('Only accountant or tenant_admin can post sales');
@@ -98,8 +102,13 @@ class SaleService
                     ->where('tenant_id', $tenantId)
                     ->firstOrFail();
                 $finalCropCycleId = $project->crop_cycle_id;
+                $this->guard->ensureProjectNotClosed($sale->project_id, $tenantId);
+                if ($project->crop_cycle_id) {
+                    $this->guard->ensureCropCycleOpen($project->crop_cycle_id, $tenantId);
+                }
             } elseif ($sale->crop_cycle_id) {
                 $finalCropCycleId = $sale->crop_cycle_id;
+                $this->guard->ensureCropCycleOpen($finalCropCycleId, $tenantId);
             }
 
             // If crop cycle is set, verify it exists and posting_date is within cycle
@@ -242,6 +251,7 @@ class SaleService
 
             // Reload posting group with relationships
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 }

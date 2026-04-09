@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\PostingGroup;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\PostingDateGuard;
 use App\Models\AllocationRow;
@@ -138,7 +139,8 @@ class SaleCOGSService
      */
     public function postSaleWithCOGS(Sale $sale, string $postingDate, string $idempotencyKey): PostingGroup
     {
-        return DB::transaction(function () use ($sale, $postingDate, $idempotencyKey) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($sale, $postingDate, $idempotencyKey) {
+            return DB::transaction(function () use ($sale, $postingDate, $idempotencyKey) {
             // Check idempotency first
             $existingPostingGroup = PostingGroup::where('tenant_id', $sale->tenant_id)
                 ->where(function ($query) use ($sale, $idempotencyKey) {
@@ -437,6 +439,7 @@ class SaleCOGSService
             ]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 

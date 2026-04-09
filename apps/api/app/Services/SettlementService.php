@@ -17,6 +17,7 @@ use App\Models\Sale;
 use App\Models\ShareRule;
 use App\Models\ShareRuleLine;
 use App\Services\Accounting\PostValidationService;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -363,7 +364,8 @@ class SettlementService
         bool $applyAdvanceOffset = false,
         ?float $advanceOffsetAmount = null
     ): array {
-        return DB::transaction(function () use ($projectId, $tenantId, $postingDate, $idempotencyKey, $upToDate, $applyAdvanceOffset, $advanceOffsetAmount) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($projectId, $tenantId, $postingDate, $idempotencyKey, $upToDate, $applyAdvanceOffset, $advanceOffsetAmount) {
+            return DB::transaction(function () use ($projectId, $tenantId, $postingDate, $idempotencyKey, $upToDate, $applyAdvanceOffset, $advanceOffsetAmount) {
             // Check idempotency
             $existingPostingGroup = PostingGroup::where('tenant_id', $tenantId)
                 ->where('idempotency_key', $idempotencyKey)
@@ -660,6 +662,7 @@ class SettlementService
                 'settlement' => $settlement->load(['postingGroup', 'offsets']),
                 'posting_group' => $postingGroup->load(['allocationRows', 'ledgerEntries.account']),
             ];
+            });
         });
     }
 
@@ -733,7 +736,8 @@ class SettlementService
      */
     public function settleCropCycle(string $cropCycleId, string $tenantId, string $postingDate, string $idempotencyKey): array
     {
-        return DB::transaction(function () use ($cropCycleId, $tenantId, $postingDate, $idempotencyKey) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($cropCycleId, $tenantId, $postingDate, $idempotencyKey) {
+            return DB::transaction(function () use ($cropCycleId, $tenantId, $postingDate, $idempotencyKey) {
             $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
                 return ['posting_group' => $existing->load(['allocationRows', 'ledgerEntries.account'])];
@@ -824,6 +828,7 @@ class SettlementService
             }
 
             return ['posting_group' => $postingGroup->load(['allocationRows', 'ledgerEntries.account'])];
+            });
         });
     }
 
@@ -1041,7 +1046,8 @@ class SettlementService
      */
     public function post(Settlement $settlement, string $postingDate): array
     {
-        return DB::transaction(function () use ($settlement, $postingDate) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($settlement, $postingDate) {
+            return DB::transaction(function () use ($settlement, $postingDate) {
             // Idempotent: already posted -> return existing result
             if ($settlement->status === 'POSTED' && $settlement->posting_group_id) {
                 $postingGroup = PostingGroup::with(['allocationRows', 'ledgerEntries.account'])->find($settlement->posting_group_id);
@@ -1178,6 +1184,7 @@ class SettlementService
                 'settlement' => $settlement->fresh(['postingGroup', 'lines.party', 'sales']),
                 'posting_group' => $postingGroup->load(['allocationRows', 'ledgerEntries.account']),
             ];
+            });
         });
     }
 
@@ -1190,7 +1197,8 @@ class SettlementService
      */
     public function reverse(Settlement $settlement, string $reversalDate): array
     {
-        return DB::transaction(function () use ($settlement, $reversalDate) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($settlement, $reversalDate) {
+            return DB::transaction(function () use ($settlement, $reversalDate) {
             // Assert status is POSTED
             if ($settlement->status !== 'POSTED') {
                 throw new \Exception('Settlement must be in POSTED status to reverse');
@@ -1224,6 +1232,7 @@ class SettlementService
                 'settlement' => $settlement->fresh(['postingGroup', 'reversalPostingGroup', 'lines.party']),
                 'reversal_posting_group' => $reversalPostingGroup->load(['allocationRows', 'ledgerEntries.account']),
             ];
+            });
         });
     }
 

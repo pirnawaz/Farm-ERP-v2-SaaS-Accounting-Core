@@ -33,6 +33,7 @@
         }
     },
     "scripts": {
+        "check:accounting": "php scripts/check-accounting-invariants.php",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

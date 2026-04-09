@@ -195,7 +195,7 @@ class MachineryChargeController extends Controller
         $idempotencyKey = $request->header('X-Idempotency-Key') ?? $request->input('idempotency_key');
 
         $validated = $request->validate([
-            'posting_date' => ['required', 'date'],
+            'posting_date' => ['required', 'date', 'date_format:Y-m-d'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -231,7 +231,7 @@ class MachineryChargeController extends Controller
         $tenantId = TenantContext::getTenantId($request);
 
         $validated = $request->validate([
-            'posting_date' => ['required', 'date'],
+            'posting_date' => ['required', 'date', 'date_format:Y-m-d'],
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 

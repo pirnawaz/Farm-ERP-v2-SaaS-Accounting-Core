@@ -10,6 +10,7 @@ use App\Http\Requests\UpdatePaymentRequest;
 use App\Http\Requests\PostPaymentRequest;
 use App\Http\Requests\ReversePaymentRequest;
 use App\Services\TenantContext;
+use App\Support\TenantScoped;
 use App\Services\PaymentService;
 use App\Services\SaleARService;
 use App\Services\BillPaymentService;
@@ -27,7 +28,7 @@ class PaymentController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
         
-        $query = Payment::where('tenant_id', $tenantId)
+        $query = TenantScoped::for(Payment::query(), $tenantId)
             ->with(['party', 'settlement']);
 
         if ($request->has('status')) {
@@ -62,15 +63,11 @@ class PaymentController extends Controller
         $tenantId = TenantContext::getTenantId($request);
 
         // Verify party belongs to tenant
-        Party::where('id', $request->party_id)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        TenantScoped::for(Party::query(), $tenantId)->findOrFail($request->party_id);
 
         // Verify settlement belongs to tenant if provided
         if ($request->settlement_id) {
-            Settlement::where('id', $request->settlement_id)
-                ->where('tenant_id', $tenantId)
-                ->firstOrFail();
+            TenantScoped::for(Settlement::query(), $tenantId)->findOrFail($request->settlement_id);
         }
 
         $payment = Payment::create([
@@ -94,10 +91,9 @@ class PaymentController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
 
-        $payment = Payment::where('id', $id)
-            ->where('tenant_id', $tenantId)
+        $payment = TenantScoped::for(Payment::query(), $tenantId)
             ->with(['party', 'settlement', 'postingGroup', 'saleAllocations.sale'])
-            ->firstOrFail();
+            ->findOrFail($id);
 
         return response()->json($payment);
     }
@@ -106,23 +102,18 @@ class PaymentController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
 
-        $payment = Payment::where('id', $id)
-            ->where('tenant_id', $tenantId)
+        $payment = TenantScoped::for(Payment::query(), $tenantId)
             ->where('status', 'DRAFT')
-            ->firstOrFail();
+            ->findOrFail($id);
 
         // Verify party belongs to tenant if changed
         if ($request->has('party_id')) {
-            Party::where('id', $request->party_id)
-                ->where('tenant_id', $tenantId)
-                ->firstOrFail();
+            TenantScoped::for(Party::query(), $tenantId)->findOrFail($request->party_id);
         }
 
         // Verify settlement belongs to tenant if changed
         if ($request->has('settlement_id') && $request->settlement_id) {
-            Settlement::where('id', $request->settlement_id)
-                ->where('tenant_id', $tenantId)
-                ->firstOrFail();
+            TenantScoped::for(Settlement::query(), $tenantId)->findOrFail($request->settlement_id);
         }
 
         $payment->update($request->validated());
@@ -134,10 +125,9 @@ class PaymentController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
 
-        $payment = Payment::where('id', $id)
-            ->where('tenant_id', $tenantId)
+        $payment = TenantScoped::for(Payment::query(), $tenantId)
             ->where('status', 'DRAFT')
-            ->firstOrFail();
+            ->findOrFail($id);
 
         $payment->delete();
 
@@ -157,9 +147,7 @@ class PaymentController extends Controller
         }
 
         // Verify party belongs to tenant
-        Party::where('id', $partyId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        TenantScoped::for(Party::query(), $tenantId)->findOrFail($partyId);
 
         $preview = $this->saleARService->getAllocationPreview($partyId, $tenantId, $amount, $postingDate);
 
@@ -274,6 +262,76 @@ class PaymentController extends Controller
             return response()->json(['allocations' => $created, 'summary' => $this->billPaymentService->getPaymentAllocationSummary($tenantId, $id)], 201);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible.'], 404);
+        }
+    }
+
+    /**
+     * GET /payments/{id}/apply-supplier-invoices/preview
+     */
+    public function applySupplierInvoicesPreview(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $mode = $request->input('mode', 'FIFO');
+        if (! in_array($mode, ['FIFO', 'MANUAL'], true)) {
+            return response()->json(['error' => 'mode must be FIFO or MANUAL'], 422);
+        }
+        try {
+            $preview = $this->billPaymentService->previewApplyPaymentToSupplierInvoices($tenantId, $id, $mode);
+
+            return response()->json($preview);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible (must be posted, not reversed, direction OUT).'], 404);
+        }
+    }
+
+    /**
+     * POST /payments/{id}/apply-supplier-invoices
+     * Body: mode, allocation_date?, allocations[] (MANUAL: supplier_invoice_id, amount)
+     */
+    public function applySupplierInvoices(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $mode = $request->input('mode', 'FIFO');
+        if (! in_array($mode, ['FIFO', 'MANUAL'], true)) {
+            return response()->json(['error' => 'mode must be FIFO or MANUAL'], 422);
+        }
+        $allocationDate = $request->input('allocation_date');
+        $allocations = $request->input('allocations');
+        if ($mode === 'MANUAL' && (! is_array($allocations) || count($allocations) === 0)) {
+            return response()->json(['error' => 'allocations array is required for MANUAL mode'], 422);
+        }
+        $createdBy = $request->user()?->id;
+
+        try {
+            $created = $this->billPaymentService->applyPaymentToSupplierInvoices($tenantId, $id, $mode, $allocations, $allocationDate, $createdBy);
+
+            return response()->json([
+                'allocations' => $created,
+                'summary' => $this->billPaymentService->getPaymentAllocationSummary($tenantId, $id),
+            ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Payment not found or not eligible.'], 404);
+        }
+    }
+
+    /**
+     * POST /payments/{id}/unapply-supplier-invoices
+     * Body: { "supplier_invoice_id": "..." } optional; if omitted, unapply all supplier-invoice allocations for this payment.
+     */
+    public function unapplySupplierInvoices(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $supplierInvoiceId = $request->input('supplier_invoice_id');
+        $voidedBy = $request->user()?->id;
+
+        try {
+            $summary = $this->billPaymentService->unapplyPaymentFromSupplierInvoices($tenantId, $id, $supplierInvoiceId, $voidedBy);
+
+            return response()->json($summary);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['error' => 'Payment not found or not eligible.'], 404);
         }

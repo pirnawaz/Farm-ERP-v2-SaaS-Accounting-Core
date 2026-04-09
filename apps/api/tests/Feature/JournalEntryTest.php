@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\CropCycle;
 use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Models\LedgerEntry;
+use App\Models\Party;
 use App\Models\PostingGroup;
+use App\Models\Project;
 use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -26,6 +29,26 @@ class JournalEntryTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Journal Test Tenant', 'status' => 'active']);
         SystemAccountsSeeder::runForTenant($tenant->id);
+        $cycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => '2024',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $party = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Journal Landlord',
+            'party_types' => ['LANDLORD'],
+        ]);
+        Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $party->id,
+            'crop_cycle_id' => $cycle->id,
+            'name' => 'Journal Project',
+            'status' => 'ACTIVE',
+        ]);
+
         return $tenant;
     }
 
@@ -57,7 +80,7 @@ class JournalEntryTest extends TestCase
 
         $post = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
-            ->postJson("/api/journals/{$journalId}/post");
+            ->postJson("/api/journals/{$journalId}/post", []);
         $post->assertStatus(200);
 
         $journal = JournalEntry::where('id', $journalId)->where('tenant_id', $tenant->id)->first();
@@ -264,5 +287,61 @@ class JournalEntryTest extends TestCase
         $listA->assertStatus(200);
         $this->assertGreaterThanOrEqual(1, count($listA->json()));
         $this->assertContains($journalAId, collect($listA->json())->pluck('id')->all());
+    }
+
+    /**
+     * Journal post does not accept posting_date; ledger date is derived from entry_date.
+     */
+    public function test_journal_post_rejects_posting_date_in_request_body(): void
+    {
+        $tenant = $this->tenantWithAccounts();
+        $cash = Account::where('tenant_id', $tenant->id)->where('code', 'CASH')->first();
+        $expense = Account::where('tenant_id', $tenant->id)->where('code', 'INPUTS_EXPENSE')->first();
+
+        $create = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/journals', [
+                'entry_date' => '2024-06-15',
+                'lines' => [
+                    ['account_id' => $expense->id, 'debit_amount' => 100, 'credit_amount' => 0],
+                    ['account_id' => $cash->id, 'debit_amount' => 0, 'credit_amount' => 100],
+                ],
+            ]);
+        $create->assertStatus(201);
+        $journalId = $create->json('id');
+
+        $post = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/journals/{$journalId}/post", [
+                'posting_date' => '2024-06-20',
+            ]);
+        $post->assertStatus(422);
+    }
+
+    public function test_post_fails_when_crop_cycle_closed(): void
+    {
+        $tenant = $this->tenantWithAccounts();
+        $cash = Account::where('tenant_id', $tenant->id)->where('code', 'CASH')->first();
+        $expense = Account::where('tenant_id', $tenant->id)->where('code', 'INPUTS_EXPENSE')->first();
+
+        $create = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/journals', [
+                'entry_date' => '2024-06-15',
+                'lines' => [
+                    ['account_id' => $expense->id, 'debit_amount' => 100, 'credit_amount' => 0],
+                    ['account_id' => $cash->id, 'debit_amount' => 0, 'credit_amount' => 100],
+                ],
+            ]);
+        $create->assertStatus(201);
+        $journalId = $create->json('id');
+
+        $project = Project::where('tenant_id', $tenant->id)->firstOrFail();
+        CropCycle::where('id', $project->crop_cycle_id)->update(['status' => 'CLOSED']);
+
+        $post = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/journals/{$journalId}/post", []);
+        $post->assertStatus(422);
     }
 }

@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $currency_code Functional / reporting currency (single base currency per tenant).
+ */
 class Tenant extends Model
 {
     use HasUuids;

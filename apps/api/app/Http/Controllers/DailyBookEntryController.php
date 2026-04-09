@@ -7,6 +7,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
+/**
+ * Not registered in routes — legacy CRUD only. Operational postings use OperationalTransaction + PostingService::postOperationalTransaction.
+ */
 class DailyBookEntryController extends Controller
 {
     public function index(Request $request): JsonResponse
@@ -154,36 +157,5 @@ class DailyBookEntryController extends Controller
         $entry->delete();
         
         return response()->json(['message' => 'Deleted successfully'], 200);
-    }
-
-    public function post(Request $request, string $id): JsonResponse
-    {
-        $tenantId = $request->attributes->get('tenant_id');
-        
-        $validator = Validator::make($request->all(), [
-            'posting_date' => 'required|date',
-        ]);
-        
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-        
-        try {
-            $postingService = new \App\Services\PostingService();
-            $postingGroup = $postingService->postDailyBookEntry(
-                $id,
-                $tenantId,
-                $request->input('posting_date')
-            );
-            
-            return response()->json($postingGroup, 201);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json(['error' => 'Entry not found or not in DRAFT status'], 404);
-        } catch (\Exception $e) {
-            // DB exceptions (closed cycle, date range, etc.) will surface here
-            return response()->json([
-                'error' => $e->getMessage()
-            ], 422);
-        }
     }
 }

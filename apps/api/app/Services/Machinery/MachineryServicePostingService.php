@@ -10,6 +10,7 @@ use App\Models\CropCycle;
 use App\Models\InvIssue;
 use App\Models\InvIssueLine;
 use App\Models\ProjectRule;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\ReversalService;
 use App\Services\SystemAccountService;
@@ -39,7 +40,8 @@ class MachineryServicePostingService
     {
         $key = $idempotencyKey ?? 'machinery_service:' . $serviceId . ':post';
 
-        return DB::transaction(function () use ($serviceId, $tenantId, $postingDate, $key) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($serviceId, $tenantId, $postingDate, $key) {
+            return DB::transaction(function () use ($serviceId, $tenantId, $postingDate, $key) {
             $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $key)->first();
             if ($existing) {
                 return $existing->load(['allocationRows', 'ledgerEntries.account']);
@@ -197,6 +199,7 @@ class MachineryServicePostingService
             ]);
 
             return $postingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 
@@ -211,7 +214,8 @@ class MachineryServicePostingService
     {
         $reason = $reason ?? 'Reversed';
 
-        return DB::transaction(function () use ($serviceId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($serviceId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($serviceId, $tenantId, $postingDate, $reason) {
             $service = MachineryService::where('id', $serviceId)
                 ->where('tenant_id', $tenantId)
                 ->with(['postingGroup'])
@@ -253,6 +257,7 @@ class MachineryServicePostingService
             ]);
 
             return $reversalPostingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 }

@@ -150,6 +150,54 @@ class PaymentTest extends TestCase
         $this->assertEquals('500.00', (string) $allocationRow->amount);
     }
 
+    public function test_payment_post_fails_when_crop_cycle_closed(): void
+    {
+        $tenant = Tenant::create(['name' => 'Test Tenant CC', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableModules($tenant, ['treasury_payments', 'settlements']);
+        $cropCycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Cycle CC',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $hariParty = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Hari CC',
+            'party_types' => ['HARI'],
+        ]);
+        Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $hariParty->id,
+            'crop_cycle_id' => $cropCycle->id,
+            'name' => 'Project CC',
+            'status' => 'ACTIVE',
+        ]);
+
+        $payment = Payment::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $hariParty->id,
+            'direction' => 'IN',
+            'amount' => 50.00,
+            'payment_date' => '2024-06-20',
+            'method' => 'CASH',
+            'status' => 'DRAFT',
+        ]);
+
+        CropCycle::where('id', $cropCycle->id)->update(['status' => 'CLOSED']);
+
+        $response = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/payments/{$payment->id}/post", [
+                'posting_date' => '2024-06-20',
+                'idempotency_key' => 'payment-closed-cycle',
+                'crop_cycle_id' => $cropCycle->id,
+            ]);
+
+        $response->assertStatus(422);
+    }
+
     public function test_payment_idempotency(): void
     {
         $tenant = Tenant::create(['name' => 'Test Tenant', 'status' => 'active']);
@@ -335,18 +383,15 @@ class PaymentTest extends TestCase
             ]);
 
         // Get balances
+        $payment->refresh();
+        $this->assertEquals('POSTED', $payment->status);
+        $this->assertNotNull($payment->posting_group_id);
+
+        // /api/parties/{id}/balances reflects supplier AP subledger; HARI settlement share is on party control accounts.
         $balancesResponse = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
             ->getJson("/api/parties/{$hariParty->id}/balances");
-
         $balancesResponse->assertStatus(200);
-        $balances = $balancesResponse->json();
-
-        // Verify outstanding is reduced
-        // Hari should have 500 allocated (50% of 1000), 300 paid, so 200 outstanding
-        $this->assertEquals('500.00', $balances['allocated_payable_total']);
-        $this->assertEquals('300.00', $balances['paid_total']);
-        $this->assertEquals('200.00', $balances['outstanding_total']);
     }
 
     public function test_payment_tenant_isolation(): void

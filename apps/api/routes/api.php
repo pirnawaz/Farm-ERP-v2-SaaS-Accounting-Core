@@ -1,80 +1,89 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\Auth\UnifiedAuthController;
-use App\Http\Controllers\HealthController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\PartyController;
-use App\Http\Controllers\LandParcelController;
-use App\Http\Controllers\CropCycleController;
-use App\Http\Controllers\CropItemController;
-use App\Http\Controllers\ProductionUnitController;
-use App\Http\Controllers\LivestockEventController;
-use App\Http\Controllers\LandAllocationController;
-use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\ProjectRuleController;
-use App\Http\Controllers\OperationalTransactionController;
-use App\Http\Controllers\SettlementController;
-use App\Http\Controllers\PostingGroupController;
-use App\Http\Controllers\ReportController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\AdvanceController;
-use App\Http\Controllers\SaleController;
-use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\TenantModuleController;
-use App\Http\Controllers\PlatformTenantController;
-use App\Http\Controllers\Platform\ImpersonationController;
-use App\Http\Controllers\Platform\PlatformAuthController;
-use App\Http\Controllers\Platform\PlatformTenantInvitationController;
-use App\Http\Controllers\Platform\PlatformTenantUserController;
-use App\Http\Controllers\Platform\PlatformAuditLogController;
-use App\Http\Controllers\Platform\PlatformConfigHealthController;
-use App\Http\Controllers\Platform\PlatformTenantModulesController;
-use App\Http\Controllers\Platform\PlatformTenantLifecycleController;
-use App\Http\Controllers\TenantFarmProfileController;
-use App\Http\Controllers\TenantUserAdminController;
-use App\Http\Controllers\TenantOnboardingController;
-use App\Http\Controllers\Dev\DevTenantController;
-use App\Http\Controllers\Dev\DevE2ESeedController;
-use App\Http\Controllers\InvItemController;
-use App\Http\Controllers\InvStoreController;
-use App\Http\Controllers\InvUomController;
-use App\Http\Controllers\InvItemCategoryController;
-use App\Http\Controllers\InvGrnController;
-use App\Http\Controllers\InvIssueController;
-use App\Http\Controllers\InvStockController;
-use App\Http\Controllers\InvTransferController;
-use App\Http\Controllers\InvAdjustmentController;
-use App\Http\Controllers\LabWorkerController;
-use App\Http\Controllers\LabWorkLogController;
-use App\Http\Controllers\LabourReportController;
-use App\Http\Controllers\ActivityTypeController;
-use App\Http\Controllers\CropActivityController;
-use App\Http\Controllers\HarvestController;
-use App\Http\Controllers\ShareRuleController;
-use App\Http\Controllers\Machinery\MachineController;
-use App\Http\Controllers\Machinery\MachineMaintenanceTypeController;
-use App\Http\Controllers\Machinery\MachineWorkLogController;
-use App\Http\Controllers\Machinery\MachineRateCardController;
-use App\Http\Controllers\Machinery\MachineryChargeController;
-use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
-use App\Http\Controllers\Machinery\MachineryReportsController;
-use App\Http\Controllers\Machinery\MachineryServiceController;
-use App\Http\Controllers\ReconciliationController;
-use App\Http\Controllers\BankReconciliationController;
+use App\Domains\Operations\LandLease\LandLeaseController;
+use App\Http\Controllers\AcceptInviteController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AccountingPeriodController;
-use App\Http\Controllers\JournalEntryController;
-use App\Http\Controllers\SettlementPackController;
-use App\Domains\Operations\LandLease\LandLeaseController;
+use App\Http\Controllers\ActivityTypeController;
+use App\Http\Controllers\AdvanceController;
+use App\Http\Controllers\Auth\UnifiedAuthController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BankReconciliationController;
+use App\Http\Controllers\CropActivityController;
+use App\Http\Controllers\CropCycleController;
+use App\Http\Controllers\CropItemController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\LandLeaseAccrualController;
+use App\Http\Controllers\FixedAssetController;
+use App\Http\Controllers\FixedAssetDepreciationRunController;
+use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\FxRevaluationRunController;
+use App\Http\Controllers\FixedAssetDisposalController;
+use App\Http\Controllers\Dev\DevE2ESeedController;
+use App\Http\Controllers\Dev\DevTenantController;
+use App\Http\Controllers\HarvestController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\Internal\FarmIntegrityController;
+use App\Http\Controllers\InvAdjustmentController;
+use App\Http\Controllers\InvGrnController;
+use App\Http\Controllers\InvIssueController;
+use App\Http\Controllers\InvItemCategoryController;
+use App\Http\Controllers\InvItemController;
+use App\Http\Controllers\InvStockController;
+use App\Http\Controllers\InvStoreController;
+use App\Http\Controllers\InvTransferController;
+use App\Http\Controllers\InvUomController;
+use App\Http\Controllers\JournalEntryController;
+use App\Http\Controllers\LabourReportController;
+use App\Http\Controllers\LabWorkerController;
+use App\Http\Controllers\LabWorkLogController;
+use App\Http\Controllers\LandAllocationController;
+use App\Http\Controllers\LandLeaseAccrualController;
+use App\Http\Controllers\LandParcelController;
+use App\Http\Controllers\LivestockEventController;
+use App\Http\Controllers\LoanAgreementController;
+use App\Http\Controllers\LoanDrawdownController;
+use App\Http\Controllers\LoanRepaymentController;
+use App\Http\Controllers\Machinery\MachineController;
+use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
+use App\Http\Controllers\Machinery\MachineMaintenanceTypeController;
+use App\Http\Controllers\Machinery\MachineRateCardController;
+use App\Http\Controllers\Machinery\MachineryChargeController;
+use App\Http\Controllers\Machinery\MachineryReportsController;
+use App\Http\Controllers\Machinery\MachineryServiceController;
+use App\Http\Controllers\Machinery\MachineWorkLogController;
+use App\Http\Controllers\OperationalTransactionController;
+use App\Http\Controllers\PartyController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\Platform\ImpersonationController;
+use App\Http\Controllers\Platform\PlatformAuditLogController;
+use App\Http\Controllers\Platform\PlatformAuthController;
+use App\Http\Controllers\Platform\PlatformConfigHealthController;
+use App\Http\Controllers\Platform\PlatformTenantInvitationController;
+use App\Http\Controllers\Platform\PlatformTenantLifecycleController;
+use App\Http\Controllers\Platform\PlatformTenantModulesController;
+use App\Http\Controllers\Platform\PlatformTenantUserController;
+use App\Http\Controllers\PlatformTenantController;
+use App\Http\Controllers\PostingGroupController;
+use App\Http\Controllers\ProductionUnitController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectRuleController;
+use App\Http\Controllers\ReconciliationController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SaleController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SettlementController;
+use App\Http\Controllers\SupplierInvoiceController;
+use App\Http\Controllers\SettlementPackController;
+use App\Http\Controllers\ShareRuleController;
 use App\Http\Controllers\Tenant\TenantAddonModulesController;
 use App\Http\Controllers\Tenant\TenantAuditLogController;
+use App\Http\Controllers\TenantFarmProfileController;
 use App\Http\Controllers\TenantInvitationController;
-use App\Http\Controllers\AcceptInviteController;
+use App\Http\Controllers\TenantModuleController;
+use App\Http\Controllers\TenantOnboardingController;
+use App\Http\Controllers\TenantUserAdminController;
+use App\Http\Controllers\UserController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -161,6 +170,7 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::get('parties/{id}/balances', [PartyController::class, 'balances']);
     Route::get('parties/{id}/statement', [PartyController::class, 'statement']);
     Route::get('parties/{id}/ar-statement', [PartyController::class, 'arStatement']);
+    Route::get('parties/{id}/supplier-statement', [PartyController::class, 'supplierStatement']);
     Route::get('parties/{id}/receivables/open-sales', [PartyController::class, 'openSales']);
 });
 
@@ -263,7 +273,12 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
 // Settlement (accountant, tenant_admin) — requires settlements module
 Route::middleware(['role:tenant_admin,accountant', 'require_module:settlements'])->group(function () {
     // Settlement Pack (Governance Phase 1 + v3 PDF export + v4 approval workflow)
+    Route::get('settlement-packs', [SettlementPackController::class, 'index']);
+    Route::post('settlement-packs', [SettlementPackController::class, 'store']);
     Route::post('projects/{projectId}/settlement-pack', [SettlementPackController::class, 'generate']);
+    Route::get('settlement-packs/{id}/register', [SettlementPackController::class, 'register']);
+    Route::post('settlement-packs/{id}/generate-version', [SettlementPackController::class, 'generateVersion']);
+    Route::get('settlement-packs/{id}/pdf', [SettlementPackController::class, 'downloadPdf']);
     Route::get('settlement-packs/{id}', [SettlementPackController::class, 'show']);
     Route::post('settlement-packs/{id}/finalize', [SettlementPackController::class, 'finalize']);
     Route::post('settlement-packs/{id}/submit-for-approval', [SettlementPackController::class, 'submitForApproval']);
@@ -276,7 +291,7 @@ Route::middleware(['role:tenant_admin,accountant', 'require_module:settlements']
     Route::post('projects/{id}/settlement/preview', [SettlementController::class, 'preview']);
     Route::get('projects/{id}/settlement/offset-preview', [SettlementController::class, 'offsetPreview']);
     Route::post('projects/{id}/settlement/post', [SettlementController::class, 'post']);
-    
+
     // Sales-based settlements (Phase 11)
     Route::get('settlements/preview', [SettlementController::class, 'previewSettlement']);
     Route::apiResource('settlements', SettlementController::class)->except(['update', 'destroy']);
@@ -297,6 +312,9 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:trea
     Route::get('payments/{id}/apply-bills/preview', [PaymentController::class, 'applyBillsPreview']);
     Route::post('payments/{id}/apply-bills', [PaymentController::class, 'applyBills']);
     Route::post('payments/{id}/unapply-bills', [PaymentController::class, 'unapplyBills']);
+    Route::get('payments/{id}/apply-supplier-invoices/preview', [PaymentController::class, 'applySupplierInvoicesPreview']);
+    Route::post('payments/{id}/apply-supplier-invoices', [PaymentController::class, 'applySupplierInvoices']);
+    Route::post('payments/{id}/unapply-supplier-invoices', [PaymentController::class, 'unapplySupplierInvoices']);
     Route::post('payments/{id}/post', [PaymentController::class, 'post'])
         ->middleware('role:tenant_admin,accountant');
     Route::post('payments/{id}/reverse', [PaymentController::class, 'reverse'])
@@ -308,6 +326,17 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:trea
     Route::apiResource('advances', AdvanceController::class);
     Route::post('advances/{id}/post', [AdvanceController::class, 'post'])
         ->middleware('role:tenant_admin,accountant');
+});
+
+// Loans — requires loans module (read: operator+; post: tenant_admin, accountant)
+Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:loans'])->group(function () {
+    Route::get('loan-agreements', [LoanAgreementController::class, 'index']);
+    Route::get('loan-agreements/{id}', [LoanAgreementController::class, 'show']);
+    Route::get('loan-agreements/{id}/statement', [LoanAgreementController::class, 'statement']);
+});
+Route::middleware(['role:tenant_admin,accountant', 'require_module:loans'])->group(function () {
+    Route::post('loan-drawdowns/{id}/post', [LoanDrawdownController::class, 'post']);
+    Route::post('loan-repayments/{id}/post', [LoanRepaymentController::class, 'post']);
 });
 
 // Sales (tenant_admin, accountant, operator) — requires ar_sales module
@@ -573,8 +602,35 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::get('accounting-periods/{id}/events', [AccountingPeriodController::class, 'events']);
 });
 
+// Fixed assets (list/show: operator+; create/activate: tenant_admin, accountant)
+Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () {
+    Route::get('fixed-assets', [FixedAssetController::class, 'index']);
+    Route::get('fixed-assets/{id}', [FixedAssetController::class, 'show']);
+    Route::get('fixed-asset-depreciation-runs', [FixedAssetDepreciationRunController::class, 'index']);
+    Route::get('fixed-asset-depreciation-runs/{id}', [FixedAssetDepreciationRunController::class, 'show']);
+    Route::get('fixed-asset-disposals/{id}', [FixedAssetDisposalController::class, 'show']);
+});
+Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::post('fixed-assets', [FixedAssetController::class, 'store']);
+    Route::post('fixed-assets/{id}/activate', [FixedAssetController::class, 'activate']);
+    Route::post('fixed-assets/{fixed_asset_id}/disposals', [FixedAssetDisposalController::class, 'store']);
+    Route::post('fixed-asset-depreciation-runs', [FixedAssetDepreciationRunController::class, 'store']);
+    Route::post('fixed-asset-depreciation-runs/{id}/post', [FixedAssetDepreciationRunController::class, 'post']);
+    Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
+    Route::post('exchange-rates', [ExchangeRateController::class, 'store']);
+    Route::get('fx-revaluation-runs', [FxRevaluationRunController::class, 'index']);
+    Route::get('fx-revaluation-runs/{id}', [FxRevaluationRunController::class, 'show']);
+    Route::post('fx-revaluation-runs', [FxRevaluationRunController::class, 'store']);
+    Route::post('fx-revaluation-runs/{id}/refresh', [FxRevaluationRunController::class, 'refresh']);
+    Route::post('fx-revaluation-runs/{id}/post', [FxRevaluationRunController::class, 'post']);
+    Route::post('fixed-asset-disposals/{id}/post', [FixedAssetDisposalController::class, 'post']);
+});
+
 // General Journal (tenant_admin, accountant) — manual GL entries
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::get('supplier-invoices', [SupplierInvoiceController::class, 'index']);
+    Route::get('supplier-invoices/{id}', [SupplierInvoiceController::class, 'show']);
+    Route::post('supplier-invoices/{id}/post', [SupplierInvoiceController::class, 'post']);
     Route::post('journals', [JournalEntryController::class, 'store']);
     Route::get('journals', [JournalEntryController::class, 'index']);
     Route::get('journals/{id}', [JournalEntryController::class, 'show']);

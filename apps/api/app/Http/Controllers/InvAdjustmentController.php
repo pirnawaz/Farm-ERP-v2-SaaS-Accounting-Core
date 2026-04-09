@@ -144,9 +144,7 @@ class InvAdjustmentController extends Controller
         $this->authorizePosting($request);
         
         $tenantId = TenantContext::getTenantId($request);
-        $idempotencyKey = $request->filled('idempotency_key')
-            ? $request->idempotency_key
-            : 'inv_adjustment:' . $id . ':post';
+        $idempotencyKey = $request->filled('idempotency_key') ? $request->idempotency_key : null;
         $pg = $this->postingService->postAdjustment($id, $tenantId, $request->posting_date, $idempotencyKey);
         return response()->json($pg, 201);
     }

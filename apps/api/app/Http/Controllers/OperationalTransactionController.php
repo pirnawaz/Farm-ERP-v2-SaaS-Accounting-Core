@@ -10,6 +10,7 @@ use App\Models\CropCycle;
 use App\Http\Requests\PostOperationalTransactionRequest;
 use App\Services\TenantContext;
 use App\Services\PostingService;
+use App\Support\TenantScoped;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -150,7 +151,9 @@ class OperationalTransactionController extends Controller
             });
 
             $correctionPgId = ReclassCorrection::where('operational_transaction_id', $transaction->id)->value('posting_group_id');
-            $correctionPg = $correctionPgId ? PostingGroup::find($correctionPgId) : null;
+            $correctionPg = $correctionPgId
+                ? TenantScoped::for(PostingGroup::query(), $tenantId)->find($correctionPgId)
+                : null;
 
             if ($allScopesNullOrShared && ! $correctionPg) {
                 $payload['posting_scope_mismatch'] = true;

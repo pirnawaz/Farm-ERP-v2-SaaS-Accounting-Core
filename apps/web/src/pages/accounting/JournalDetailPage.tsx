@@ -11,7 +11,7 @@ export default function JournalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { formatMoney, formatDate } = useFormatting();
-  const { data: journal, isLoading, error } = useJournalEntry(id ?? undefined);
+  const { data: journal, isPending, isError, error } = useJournalEntry(id ?? undefined);
   const reverseM = useReverseJournal(id ?? '');
 
   const [showReverseConfirm, setShowReverseConfirm] = useState(false);
@@ -25,7 +25,18 @@ export default function JournalDetailPage() {
     setShowReverseConfirm(false);
   };
 
-  if (isLoading || !journal) {
+  if (!id) {
+    return (
+      <div className="p-4 text-red-800 bg-red-50 rounded-md">
+        Missing journal id.{' '}
+        <button type="button" onClick={() => navigate('/app/accounting/journals')} className="underline">
+          Back to list
+        </button>
+      </div>
+    );
+  }
+
+  if (isPending) {
     return (
       <div className="flex justify-center items-center h-64">
         <LoadingSpinner size="lg" />
@@ -33,10 +44,26 @@ export default function JournalDetailPage() {
     );
   }
 
-  if (error) {
+  if (isError) {
+    const msg =
+      error instanceof Error ? error.message : 'Journal could not be loaded (not found or no access).';
+    return (
+      <div className="p-4 text-red-800 bg-red-50 rounded-md space-y-2">
+        <p>{msg}</p>
+        <button type="button" onClick={() => navigate('/app/accounting/journals')} className="underline">
+          Back to list
+        </button>
+      </div>
+    );
+  }
+
+  if (!journal) {
     return (
       <div className="p-4 text-red-800 bg-red-50 rounded-md">
-        Failed to load journal. <button type="button" onClick={() => navigate('/app/accounting/journals')} className="underline">Back to list</button>
+        Journal not found.{' '}
+        <button type="button" onClick={() => navigate('/app/accounting/journals')} className="underline">
+          Back to list
+        </button>
       </div>
     );
   }

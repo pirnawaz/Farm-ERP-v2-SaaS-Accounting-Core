@@ -2,23 +2,21 @@
 
 namespace App\Domains\Governance\SettlementPack;
 
+use App\Domains\Reporting\BalanceSheetService;
+use App\Domains\Reporting\ProfitLossService;
+use App\Domains\Reporting\TrialBalanceService;
 use App\Models\Project;
 use App\Models\SettlementPack;
 use App\Models\SettlementPackApproval;
-use App\Models\AllocationRow;
-use App\Models\CropCycle;
+use App\Models\SettlementPackVersion;
 use App\Models\User;
-use App\Domains\Reporting\TrialBalanceService;
-use App\Domains\Reporting\ProfitLossService;
-use App\Domains\Reporting\BalanceSheetService;
+use App\Support\TenantScoped;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Generates and retrieves Settlement Packs (read-only snapshot of project transaction register).
- * Embeds financial statement snapshots. State: DRAFT → PENDING_APPROVAL → FINAL.
- * Finalization (FINAL + project CLOSED) occurs only when all required approvals are APPROVED.
- * No ledger or posting group mutations.
+ * Embeds financial statement snapshots. State: DRAFT → FINALIZED (via approvals). No ledger or posting group mutations.
  */
 class SettlementPackService
 {
@@ -28,30 +26,34 @@ class SettlementPackService
     public function __construct(
         private TrialBalanceService $trialBalanceService,
         private ProfitLossService $profitLossService,
-        private BalanceSheetService $balanceSheetService
+        private BalanceSheetService $balanceSheetService,
+        private SettlementPackBuilder $settlementPackBuilder,
+        private SettlementPackRegisterQuery $settlementPackRegisterQuery,
+        private FinalizeSettlementPackAction $finalizeSettlementPackAction
     ) {}
 
     /**
-     * Generate or return existing settlement pack for project + register_version (idempotent).
+     * Generate or return existing settlement pack for project + reference_no (idempotent).
      *
      * @return array{pack: SettlementPack, summary: array, register_row_count: int}
      */
     public function generateOrReturn(
         string $projectId,
         string $tenantId,
-        ?string $generatedByUserId,
-        string $registerVersion = 'default'
+        ?string $preparedByUserId,
+        string $referenceNo = 'default'
     ): array {
         $project = Project::where('id', $projectId)->where('tenant_id', $tenantId)->firstOrFail();
 
-        $existing = SettlementPack::where('tenant_id', $tenantId)
+        $existing = TenantScoped::for(SettlementPack::query(), $tenantId)
             ->where('project_id', $projectId)
-            ->where('register_version', $registerVersion)
+            ->where('reference_no', $referenceNo)
             ->first();
 
         if ($existing) {
-            $summary = $existing->summary_json ?? [];
-            $registerRowCount = $this->countRegisterRows($projectId, $tenantId);
+            $summary = $existing->snapshotJson();
+            $registerRowCount = (int) ($summary['row_count'] ?? count($summary['register_rows'] ?? []));
+
             return [
                 'pack' => $existing,
                 'summary' => $summary,
@@ -59,8 +61,11 @@ class SettlementPackService
             ];
         }
 
-        $registerRows = $this->buildRegisterRows($projectId, $tenantId);
-        $registerSummary = $this->buildSummary($registerRows);
+        if (! $project->crop_cycle_id) {
+            throw ValidationException::withMessages([
+                'project' => ['Project must have a crop cycle before creating a settlement pack.'],
+            ]);
+        }
 
         $project->load('cropCycle');
         $cropCycle = $project->cropCycle;
@@ -68,6 +73,8 @@ class SettlementPackService
             ? $cropCycle->start_date->format('Y-m-d')
             : now()->startOfYear()->format('Y-m-d');
         $asOf = $this->maxPostingDateForProject($projectId, $tenantId) ?? $from;
+
+        $registerSnapshot = $this->settlementPackBuilder->build($tenantId, $projectId, $asOf);
 
         $filters = [
             'project_id' => $projectId,
@@ -77,16 +84,7 @@ class SettlementPackService
         $profitLoss = $this->profitLossService->getProfitLoss($tenantId, $from, $asOf, $filters);
         $balanceSheet = $this->balanceSheetService->getBalanceSheet($tenantId, $asOf, $filters);
 
-        $registerRowsForSnapshot = array_map(function (array $row) {
-            $r = $row;
-            if (isset($r['posting_date']) && is_object($r['posting_date'])) {
-                $r['posting_date'] = $r['posting_date']->format('Y-m-d');
-            }
-            return $r;
-        }, $registerRows);
-
-        $summary = array_merge($registerSummary, [
-            'register_rows' => $registerRowsForSnapshot,
+        $summary = array_merge($registerSnapshot, [
             'financial_statements' => [
                 'trial_balance' => $trialBalance,
                 'profit_loss' => $profitLoss,
@@ -94,72 +92,208 @@ class SettlementPackService
             ],
         ]);
 
-        $pack = SettlementPack::create([
-            'tenant_id' => $tenantId,
-            'project_id' => $projectId,
-            'generated_by_user_id' => $generatedByUserId,
-            'generated_at' => now(),
-            'status' => SettlementPack::STATUS_DRAFT,
-            'summary_json' => $summary,
-            'register_version' => $registerVersion,
-        ]);
+        $pack = DB::transaction(function () use (
+            $tenantId,
+            $projectId,
+            $project,
+            $preparedByUserId,
+            $referenceNo,
+            $asOf,
+            $summary
+        ) {
+            $pack = SettlementPack::create([
+                'tenant_id' => $tenantId,
+                'project_id' => $projectId,
+                'crop_cycle_id' => $project->crop_cycle_id,
+                'prepared_by_user_id' => $preparedByUserId,
+                'prepared_at' => now(),
+                'status' => SettlementPack::STATUS_DRAFT,
+                'reference_no' => $referenceNo,
+                'as_of_date' => $asOf,
+                'notes' => null,
+            ]);
+
+            SettlementPackVersion::create([
+                'tenant_id' => $tenantId,
+                'settlement_pack_id' => $pack->id,
+                'version_no' => 1,
+                'snapshot_json' => $summary,
+                'generated_by_user_id' => $preparedByUserId,
+                'generated_at' => now(),
+                'pdf_path' => null,
+            ]);
+
+            return $pack;
+        });
 
         return [
             'pack' => $pack,
             'summary' => $summary,
-            'register_row_count' => count($registerRows),
+            'register_row_count' => (int) ($registerSnapshot['row_count'] ?? 0),
         ];
     }
 
     /**
-     * Finalize a settlement pack: only allowed when status is PENDING_APPROVAL and all required
-     * approvals are APPROVED. Transition is normally done inside approve(); this method is for
-     * explicit finalize when all approvals are already in.
+     * Finalize a settlement pack (DRAFT → FINALIZED). Requires a snapshot version; does not mutate accounting data or close the project.
      *
-     * @throws ValidationException if pack is not PENDING_APPROVAL or not all required approved
      * @return array{pack: SettlementPack}
+     *
+     * @throws ValidationException if pack cannot be finalized
      */
     public function finalize(string $packId, string $tenantId, ?string $userId): array
     {
-        $pack = SettlementPack::where('id', $packId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)->findOrFail($packId);
 
-        if ($pack->status === SettlementPack::STATUS_DRAFT) {
-            throw ValidationException::withMessages([
-                'status' => ['Use submit-for-approval first, then obtain all required approvals.'],
-            ]);
-        }
+        $pack = $this->finalizeSettlementPackAction->execute($pack, $userId);
 
-        if ($pack->status === SettlementPack::STATUS_PENDING_APPROVAL) {
-            if (!$this->allRequiredApprovalsGranted($packId, $tenantId)) {
-                throw ValidationException::withMessages([
-                    'status' => ['All required approvers must approve before finalization.'],
-                ]);
-            }
-            $this->transitionPackToFinal($pack);
-            return ['pack' => $pack->fresh()];
-        }
-
-        if ($pack->status === SettlementPack::STATUS_FINAL) {
-            return ['pack' => $pack->fresh()];
-        }
-
-        throw ValidationException::withMessages([
-            'status' => ['Pack cannot be finalized in current status.'],
-        ]);
+        return ['pack' => $pack];
     }
 
     /**
-     * Submit pack for approval: DRAFT → PENDING_APPROVAL. Creates approval rows for required roles.
+     * List settlement packs for the tenant (most recently updated first).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listForTenant(string $tenantId, ?string $statusFilter = null): array
+    {
+        $q = TenantScoped::for(SettlementPack::query(), $tenantId)
+            ->with(['project:id,name'])
+            ->orderByDesc('updated_at')
+            ->limit(200);
+        if ($statusFilter !== null && $statusFilter !== '') {
+            $q->where('status', $statusFilter);
+        }
+
+        return $q->get()->map(function (SettlementPack $p) {
+            return [
+                'id' => $p->id,
+                'project_id' => $p->project_id,
+                'reference_no' => $p->reference_no,
+                'status' => $p->status,
+                'as_of_date' => $p->as_of_date?->format('Y-m-d'),
+                'prepared_at' => $p->prepared_at?->toIso8601String(),
+                'finalized_at' => $p->finalized_at?->toIso8601String(),
+                'is_read_only' => $p->isReadOnly(),
+                'project' => $p->project ? [
+                    'id' => $p->project->id,
+                    'name' => $p->project->name,
+                ] : null,
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * Register payload for API: rows, detailed lines, and snapshot metrics (from persisted snapshot when available).
+     *
+     * @return array{register_rows: array, register_lines: array, metrics: mixed, content_hash: ?string, as_of_date: string}
+     */
+    public function getRegisterPayload(string $packId, string $tenantId): array
+    {
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)->findOrFail($packId);
+        $summary = $pack->snapshotJson();
+        $asOf = $pack->as_of_date?->format('Y-m-d') ?? now()->format('Y-m-d');
+
+        $registerRows = $summary['register_rows'] ?? [];
+        if ($registerRows === []) {
+            $registerRows = $this->settlementPackRegisterQuery->allocationRegisterRows($tenantId, $pack->project_id, $asOf);
+        }
+
+        $registerLines = $summary['register_lines'] ?? [];
+        if ($registerLines === [] && ! $pack->isReadOnly()) {
+            $registerLines = $this->settlementPackRegisterQuery->registerLines($tenantId, $pack->project_id, $asOf);
+        }
+
+        return [
+            'register_rows' => $registerRows,
+            'register_lines' => $registerLines,
+            'metrics' => $summary['metrics'] ?? null,
+            'content_hash' => $summary['content_hash'] ?? null,
+            'as_of_date' => $asOf,
+        ];
+    }
+
+    /**
+     * Append a new snapshot version (rebuilds register + financial statements). Does not post to the ledger.
+     *
+     * @return array{pack: SettlementPack, summary: array, version_no: int}
+     */
+    public function generateNextSnapshotVersion(string $packId, string $tenantId, ?string $userId): array
+    {
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)
+            ->with('project.cropCycle')
+            ->findOrFail($packId);
+
+        if ($pack->isReadOnly()) {
+            throw ValidationException::withMessages([
+                'status' => ['Cannot generate a new snapshot version while the pack is finalized.'],
+            ]);
+        }
+
+        $project = $pack->project;
+        if (! $project || ! $project->crop_cycle_id) {
+            throw ValidationException::withMessages([
+                'project' => ['Project must have a crop cycle.'],
+            ]);
+        }
+
+        $asOf = $pack->as_of_date?->format('Y-m-d')
+            ?? $this->maxPostingDateForProject($pack->project_id, $tenantId)
+            ?? now()->format('Y-m-d');
+
+        $cropCycle = $project->cropCycle;
+        $from = $cropCycle && $cropCycle->start_date
+            ? $cropCycle->start_date->format('Y-m-d')
+            : now()->startOfYear()->format('Y-m-d');
+
+        $registerSnapshot = $this->settlementPackBuilder->build($tenantId, $pack->project_id, $asOf);
+
+        $filters = [
+            'project_id' => $pack->project_id,
+            'crop_cycle_id' => $project->crop_cycle_id,
+        ];
+        $trialBalance = $this->trialBalanceService->getTrialBalance($tenantId, $asOf, $filters);
+        $profitLoss = $this->profitLossService->getProfitLoss($tenantId, $from, $asOf, $filters);
+        $balanceSheet = $this->balanceSheetService->getBalanceSheet($tenantId, $asOf, $filters);
+
+        $summary = array_merge($registerSnapshot, [
+            'financial_statements' => [
+                'trial_balance' => $trialBalance,
+                'profit_loss' => $profitLoss,
+                'balance_sheet' => $balanceSheet,
+            ],
+        ]);
+
+        $nextVersion = (int) (TenantScoped::for(SettlementPackVersion::query(), $tenantId)
+            ->where('settlement_pack_id', $packId)
+            ->max('version_no')) + 1;
+
+        DB::transaction(function () use ($tenantId, $packId, $userId, $summary, $nextVersion) {
+            SettlementPackVersion::create([
+                'tenant_id' => $tenantId,
+                'settlement_pack_id' => $packId,
+                'version_no' => $nextVersion,
+                'snapshot_json' => $summary,
+                'generated_by_user_id' => $userId,
+                'generated_at' => now(),
+                'pdf_path' => null,
+            ]);
+        });
+
+        return [
+            'pack' => $pack->fresh(),
+            'summary' => $summary,
+            'version_no' => $nextVersion,
+        ];
+    }
+
+    /**
+     * Submit pack for approval: creates approval rows for required roles. Pack remains DRAFT until finalized via approvals.
      *
      * @return array{pack: SettlementPack, approvals: array}
      */
     public function submitForApproval(string $packId, string $tenantId, ?string $userId): array
     {
-        $pack = SettlementPack::where('id', $packId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)->findOrFail($packId);
 
         if ($pack->status !== SettlementPack::STATUS_DRAFT) {
             throw ValidationException::withMessages([
@@ -167,8 +301,8 @@ class SettlementPackService
             ]);
         }
 
-        $summary = $pack->summary_json ?? [];
-        if (empty($summary)) {
+        $summary = $pack->snapshotJson();
+        if (empty($summary['register_rows'] ?? null) && empty($summary['register_lines'] ?? null)) {
             throw ValidationException::withMessages([
                 'summary' => ['Pack must have a snapshot before submitting for approval.'],
             ]);
@@ -205,8 +339,6 @@ class SettlementPackService
             ]);
         }
 
-        $pack->update(['status' => SettlementPack::STATUS_PENDING_APPROVAL]);
-
         return [
             'pack' => $pack->fresh(),
             'approvals' => $this->formatApprovalsForResponse($pack->id, $tenantId),
@@ -214,19 +346,17 @@ class SettlementPackService
     }
 
     /**
-     * Record approval by the given user. If all required approvals are APPROVED, transition pack to FINAL.
+     * Record approval by the given user. If all required approvals are APPROVED, transition pack to FINALIZED.
      *
      * @return array{pack: SettlementPack, approvals: array}
      */
     public function approve(string $packId, string $tenantId, string $userId, ?string $comment = null): array
     {
-        $pack = SettlementPack::where('id', $packId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)->findOrFail($packId);
 
-        if ($pack->status !== SettlementPack::STATUS_PENDING_APPROVAL) {
+        if ($pack->status !== SettlementPack::STATUS_DRAFT) {
             throw ValidationException::withMessages([
-                'status' => ['Pack must be in PENDING_APPROVAL status to record approval.'],
+                'status' => ['Pack must be in DRAFT status to record approval.'],
             ]);
         }
 
@@ -241,7 +371,7 @@ class SettlementPackService
             ]);
         }
 
-        $currentSnapshotHash = $this->snapshotHash($pack->summary_json ?? []);
+        $currentSnapshotHash = $this->snapshotHash($pack->snapshotJson());
         if ($currentSnapshotHash !== $approval->snapshot_sha256) {
             throw ValidationException::withMessages([
                 'snapshot' => ['Pack snapshot has changed since submission; approval rejected for integrity.'],
@@ -255,7 +385,7 @@ class SettlementPackService
         ]);
 
         if ($this->allRequiredApprovalsGranted($packId, $tenantId)) {
-            $this->transitionPackToFinal($pack);
+            $this->finalizeSettlementPackAction->execute($pack->fresh(), $userId);
         }
 
         return [
@@ -265,19 +395,17 @@ class SettlementPackService
     }
 
     /**
-     * Record rejection. Pack remains PENDING_APPROVAL.
+     * Record rejection. Pack remains DRAFT.
      *
      * @return array{pack: SettlementPack, approvals: array}
      */
     public function reject(string $packId, string $tenantId, string $userId, ?string $comment = null): array
     {
-        $pack = SettlementPack::where('id', $packId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)->findOrFail($packId);
 
-        if ($pack->status !== SettlementPack::STATUS_PENDING_APPROVAL) {
+        if ($pack->status !== SettlementPack::STATUS_DRAFT) {
             throw ValidationException::withMessages([
-                'status' => ['Pack must be in PENDING_APPROVAL status to record rejection.'],
+                'status' => ['Pack must be in DRAFT status to record rejection.'],
             ]);
         }
 
@@ -313,17 +441,8 @@ class SettlementPackService
         $required = SettlementPackApproval::where('tenant_id', $tenantId)
             ->where('settlement_pack_id', $packId)
             ->count();
-        return $required > 0 && $count === $required;
-    }
 
-    private function transitionPackToFinal(SettlementPack $pack): void
-    {
-        $pack->update([
-            'status' => SettlementPack::STATUS_FINAL,
-            'finalized_at' => now(),
-            'finalized_by_user_id' => null,
-        ]);
-        $pack->project()->update(['status' => 'CLOSED']);
+        return $required > 0 && $count === $required;
     }
 
     /**
@@ -348,6 +467,7 @@ class SettlementPackService
     private function snapshotHash(array $summaryJson): string
     {
         $canonical = json_encode($summaryJson, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
         return strtolower(bin2hex(hash('sha256', $canonical, true)));
     }
 
@@ -363,10 +483,11 @@ class SettlementPackService
             ->selectRaw('MAX(pg.posting_date) as max_date')
             ->first();
 
-        if (!$row || !$row->max_date) {
+        if (! $row || ! $row->max_date) {
             return null;
         }
         $date = $row->max_date;
+
         return is_object($date) && method_exists($date, 'format')
             ? $date->format('Y-m-d')
             : (string) $date;
@@ -379,13 +500,22 @@ class SettlementPackService
      */
     public function getWithRegister(string $packId, string $tenantId): array
     {
-        $pack = SettlementPack::where('id', $packId)
-            ->where('tenant_id', $tenantId)
-            ->with(['project', 'generatedByUser'])
-            ->firstOrFail();
+        $pack = TenantScoped::for(SettlementPack::query(), $tenantId)
+            ->with(['project', 'preparedByUser'])
+            ->findOrFail($packId);
 
-        $registerRows = $this->buildRegisterRows($pack->project_id, $tenantId);
-        $summary = $pack->summary_json ?? $this->buildSummary($registerRows);
+        $summary = $pack->snapshotJson();
+        $asOf = $pack->as_of_date?->format('Y-m-d') ?? $this->maxPostingDateForProject($pack->project_id, $tenantId) ?? now()->format('Y-m-d');
+
+        if (! empty($summary['register_rows'])) {
+            $registerRows = $summary['register_rows'];
+        } else {
+            $registerRows = $this->settlementPackRegisterQuery->allocationRegisterRows($tenantId, $pack->project_id, $asOf);
+        }
+
+        if ($summary === [] && $registerRows !== []) {
+            $summary = $this->buildSummaryFromAllocationRows($registerRows);
+        }
 
         return [
             'pack' => $pack,
@@ -396,59 +526,34 @@ class SettlementPackService
 
     /**
      * Build transaction register rows for the project (allocation rows + posting group info).
+     * Posted, non-reversed posting groups only; respects as-of when used from {@see SettlementPackRegisterQuery}.
      *
      * @return list<array{posting_group_id: string, posting_date: string, source_type: string, source_id: string, allocation_row_id: string, allocation_type: string, amount: string, party_id: string|null}>
      */
     public function buildRegisterRows(string $projectId, string $tenantId): array
     {
-        $rows = DB::table('allocation_rows as ar')
-            ->join('posting_groups as pg', 'pg.id', '=', 'ar.posting_group_id')
-            ->where('ar.tenant_id', $tenantId)
-            ->where('ar.project_id', $projectId)
-            ->select([
-                'pg.id as posting_group_id',
-                'pg.posting_date',
-                'pg.source_type',
-                'pg.source_id',
-                'ar.id as allocation_row_id',
-                'ar.allocation_type',
-                'ar.amount',
-                'ar.party_id',
-            ])
-            ->orderBy('pg.posting_date')
-            ->orderBy('pg.created_at')
-            ->orderBy('ar.id')
-            ->get();
+        $asOf = $this->maxPostingDateForProject($projectId, $tenantId) ?? now()->format('Y-m-d');
+        $rows = $this->settlementPackRegisterQuery->allocationRegisterRows($tenantId, $projectId, $asOf);
 
-        $result = [];
-        foreach ($rows as $row) {
-            $result[] = [
-                'posting_group_id' => $row->posting_group_id,
-                'posting_date' => $row->posting_date,
-                'source_type' => $row->source_type,
-                'source_id' => $row->source_id,
-                'allocation_row_id' => $row->allocation_row_id,
-                'allocation_type' => $row->allocation_type,
-                'amount' => (string) $row->amount,
-                'party_id' => $row->party_id,
+        return array_map(function (array $row) {
+            return [
+                'posting_group_id' => $row['posting_group_id'],
+                'posting_date' => $row['posting_date'],
+                'source_type' => $row['source_type'],
+                'source_id' => $row['source_id'],
+                'allocation_row_id' => $row['allocation_row_id'],
+                'allocation_type' => $row['allocation_type'],
+                'amount' => $row['amount'],
+                'party_id' => $row['party_id'],
             ];
-        }
-        return $result;
-    }
-
-    private function countRegisterRows(string $projectId, string $tenantId): int
-    {
-        return (int) DB::table('allocation_rows')
-            ->where('tenant_id', $tenantId)
-            ->where('project_id', $projectId)
-            ->count();
+        }, $rows);
     }
 
     /**
-     * @param list<array{amount: string, allocation_type: string}> $registerRows
+     * @param  list<array{amount: string, allocation_type: string}>  $registerRows
      * @return array{total_amount: string, row_count: int, by_allocation_type: array<string, string>}
      */
-    private function buildSummary(array $registerRows): array
+    private function buildSummaryFromAllocationRows(array $registerRows): array
     {
         $total = '0';
         $byType = [];
@@ -458,6 +563,7 @@ class SettlementPackService
             $type = $row['allocation_type'] ?? 'OTHER';
             $byType[$type] = (string) (floatval($byType[$type] ?? '0') + floatval($amt));
         }
+
         return [
             'total_amount' => $total,
             'row_count' => count($registerRows),

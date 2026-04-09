@@ -61,6 +61,7 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'PAYABLE_LANDLORD', 'name' => 'Payable to Landlord', 'type' => 'liability'],
             ['code' => 'PAYABLE_KAMDAR', 'name' => 'Payable to Kamdar', 'type' => 'liability'],
             ['code' => 'LOAN_PAYABLE', 'name' => 'Loans Payable', 'type' => 'liability'],
+            ['code' => 'LOAN_INTEREST_EXPENSE', 'name' => 'Loan Interest Expense', 'type' => 'expense'],
             ['code' => 'PROJECT_REVENUE', 'name' => 'Project Revenue', 'type' => 'income'],
             ['code' => 'EXP_SHARED', 'name' => 'Shared Project Expense', 'type' => 'expense'],
             ['code' => 'EXP_HARI_ONLY', 'name' => 'Hari-only Project Expense', 'type' => 'expense'],
@@ -89,6 +90,15 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'EXPENSE_RECLASS_CLEARING', 'name' => 'Expense Reclass Clearing (memo)', 'type' => 'equity'],
             ['code' => 'EXPENSE_RECLASS_OFFSET', 'name' => 'Expense Reclass Offset (memo)', 'type' => 'equity'],
             ['code' => 'MACHINERY_INTERNAL_SERVICE_CLEARING', 'name' => 'Machinery Internal Service Clearing', 'type' => 'equity'],
+            ['code' => 'FIXED_ASSET', 'name' => 'Property, Plant & Equipment', 'type' => 'asset'],
+            ['code' => 'AP_CLEARING', 'name' => 'Accounts Payable Clearing (fixed asset acquisition)', 'type' => 'liability'],
+            ['code' => 'EQUITY_INJECTION', 'name' => 'Equity Injection / Owner Funding', 'type' => 'equity'],
+            ['code' => 'FIXED_ASSET_DEPRECIATION_EXPENSE', 'name' => 'Fixed Asset Depreciation Expense', 'type' => 'expense'],
+            ['code' => 'ACCUMULATED_DEPRECIATION', 'name' => 'Accumulated Depreciation', 'type' => 'asset'],
+            ['code' => 'GAIN_ON_FIXED_ASSET_DISPOSAL', 'name' => 'Gain on Fixed Asset Disposal', 'type' => 'income'],
+            ['code' => 'LOSS_ON_FIXED_ASSET_DISPOSAL', 'name' => 'Loss on Fixed Asset Disposal', 'type' => 'expense'],
+            ['code' => 'FX_UNREALIZED_LOSS', 'name' => 'Unrealized Foreign Exchange Loss', 'type' => 'expense'],
+            ['code' => 'FX_UNREALIZED_GAIN', 'name' => 'Unrealized Foreign Exchange Gain', 'type' => 'income'],
         ];
     }
 }

@@ -8,6 +8,8 @@ use App\Models\JournalEntryLine;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
 use App\Services\Accounting\PostValidationService;
+use App\Services\LedgerWriteGuard;
+use App\Services\OperationalPostingGuard;
 use App\Services\PostingDateGuard;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +20,9 @@ class JournalEntryService
     public function __construct(
         private PostValidationService $postValidationService,
         private ReversalService $reversalService,
-        private PostingDateGuard $postingDateGuard
+        private OperationalPostingGuard $operationalPostingGuard,
+        private PostingDateGuard $postingDateGuard,
+        private PostingIdempotencyService $postingIdempotency
     ) {}
 
     /**
@@ -72,10 +76,13 @@ class JournalEntryService
     /**
      * Post journal: create posting_group + ledger_entries, set status POSTED.
      * Validates: DRAFT, balanced (decimal-safe), >=2 lines, entry_date, accounts tenant-scoped and not deprecated.
+     *
+     * Posting date: PostingGroup.posting_date is derived from journal entry_date (canonical Y-m-d); no separate posting_date input.
      */
     public function postJournal(string $journalId, string $tenantId, ?string $postedBy = null): PostingGroup
     {
-        return DB::transaction(function () use ($journalId, $tenantId, $postedBy) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($journalId, $tenantId, $postedBy) {
+            return DB::transaction(function () use ($journalId, $tenantId, $postedBy) {
             $journal = JournalEntry::where('id', $journalId)
                 ->where('tenant_id', $tenantId)
                 ->with('lines.account')
@@ -107,20 +114,19 @@ class JournalEntryService
                 throw new InvalidArgumentException('Journal is not balanced: debits must equal credits.', 422);
             }
 
-            // Idempotency: one posting group per journal
-            $existing = PostingGroup::where('tenant_id', $tenantId)
-                ->where('source_type', 'JOURNAL_ENTRY')
-                ->where('source_id', $journal->id)
-                ->first();
-            if ($existing) {
+            $resolved = $this->postingIdempotency->resolveOrCreate($tenantId, null, 'JOURNAL_ENTRY', $journal->id);
+            if ($resolved['posting_group'] !== null) {
+                $existing = $resolved['posting_group'];
                 $journal->update([
                     'status' => JournalEntry::STATUS_POSTED,
                     'posting_group_id' => $existing->id,
                     'posted_at' => now(),
                     'posted_by' => $postedBy,
                 ]);
+
                 return $existing->load(['ledgerEntries.account']);
             }
+            $effectiveKey = $resolved['effective_key'];
 
             // Validate accounts: tenant-scoped and not deprecated
             $ledgerLines = $lines->map(fn ($l) => ['account_id' => $l->account_id])->all();
@@ -131,13 +137,15 @@ class JournalEntryService
 
             $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateStr));
 
+            $this->operationalPostingGuard->ensureCropCycleOpenViaAnyOpenProject($tenantId);
+
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
                 'crop_cycle_id' => null,
                 'source_type' => 'JOURNAL_ENTRY',
                 'source_id' => $journal->id,
                 'posting_date' => $postingDateStr,
-                'idempotency_key' => 'journal:' . $journal->id,
+                'idempotency_key' => $effectiveKey,
             ]);
 
             foreach ($lines as $line) {
@@ -159,6 +167,7 @@ class JournalEntryService
             ]);
 
             return $postingGroup->fresh(['ledgerEntries.account']);
+            });
         });
     }
 

@@ -9,6 +9,7 @@ use App\Models\LedgerEntry;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Services\Accounting\PostValidationService;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 
@@ -39,7 +40,8 @@ class PostingService
         string $postingDate,
         string $idempotencyKey
     ): PostingGroup {
-        return DB::transaction(function () use ($transactionId, $tenantId, $postingDate, $idempotencyKey) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($transactionId, $tenantId, $postingDate, $idempotencyKey) {
+            return DB::transaction(function () use ($transactionId, $tenantId, $postingDate, $idempotencyKey) {
             // Check idempotency first
             $existingPostingGroup = PostingGroup::where('tenant_id', $tenantId)
                 ->where('idempotency_key', $idempotencyKey)
@@ -237,6 +239,7 @@ class PostingService
 
             // Reload posting group with relationships
             return $postingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 }

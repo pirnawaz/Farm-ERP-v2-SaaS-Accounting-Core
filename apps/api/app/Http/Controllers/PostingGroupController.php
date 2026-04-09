@@ -60,8 +60,8 @@ class PostingGroupController extends Controller
         $tenantId = $request->attributes->get('tenant_id');
         
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-            'posting_date' => 'required|date',
-            'reason' => 'required|string|max:1000',
+            'posting_date' => ['required', 'date', 'date_format:Y-m-d'],
+            'reason' => ['required', 'string', 'max:1000'],
         ]);
         
         if ($validator->fails()) {

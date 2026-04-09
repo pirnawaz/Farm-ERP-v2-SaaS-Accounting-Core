@@ -7,6 +7,7 @@ use App\Models\HarvestLine;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\PostingGroup;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
@@ -20,7 +21,8 @@ class HarvestService
         private SystemAccountService $accountService,
         private InventoryStockService $stockService,
         private ReversalService $reversalService,
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private PostingIdempotencyService $postingIdempotency
     ) {}
 
     /**
@@ -276,28 +278,26 @@ class HarvestService
      */
     public function post(Harvest $harvest, array $payload): Harvest
     {
-        return DB::transaction(function () use ($harvest, $payload) {
-            // Check idempotency first - if already posted, return existing
-            $idempotencyKey = "HARVEST:{$harvest->id}:POST";
-            $existingPostingGroup = PostingGroup::where('tenant_id', $harvest->tenant_id)
-                ->where('idempotency_key', $idempotencyKey)
-                ->first();
-
-            if ($existingPostingGroup) {
-                // Already posted - return existing harvest with posting group
+        return LedgerWriteGuard::scoped(static::class, function () use ($harvest, $payload) {
+            return DB::transaction(function () use ($harvest, $payload) {
+            $clientKey = isset($payload['idempotency_key']) ? (string) $payload['idempotency_key'] : null;
+            $resolved = $this->postingIdempotency->resolveOrCreate($harvest->tenant_id, $clientKey, 'HARVEST', $harvest->id);
+            if ($resolved['posting_group'] !== null) {
+                $existingPostingGroup = $resolved['posting_group'];
                 $harvest->refresh();
                 if ($harvest->posting_group_id === $existingPostingGroup->id) {
                     return $harvest->fresh(['cropCycle', 'postingGroup', 'lines.item', 'lines.store']);
                 }
-                // Update harvest to link to existing posting group
                 $harvest->update([
                     'status' => 'POSTED',
                     'posting_date' => $payload['posting_date'] ?? $harvest->posting_date,
                     'posted_at' => $harvest->posted_at ?? now(),
                     'posting_group_id' => $existingPostingGroup->id,
                 ]);
+
                 return $harvest->fresh(['cropCycle', 'postingGroup', 'lines.item', 'lines.store']);
             }
+            $idempotencyKey = $resolved['effective_key'];
 
             // Validate harvest status
             if (!$harvest->isDraft()) {
@@ -449,6 +449,7 @@ class HarvestService
             ]);
 
             return $harvest->fresh();
+            });
         });
     }
 
@@ -459,7 +460,8 @@ class HarvestService
      */
     public function reverse(Harvest $harvest, array $payload): Harvest
     {
-        return DB::transaction(function () use ($harvest, $payload) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($harvest, $payload) {
+            return DB::transaction(function () use ($harvest, $payload) {
             // Validate harvest status
             if (!$harvest->isPosted()) {
                 throw new \Exception('Only POSTED harvests can be reversed.');
@@ -538,6 +540,7 @@ class HarvestService
             ]);
 
             return $harvest->fresh();
+            });
         });
     }
 }

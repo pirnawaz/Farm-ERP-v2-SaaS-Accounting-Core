@@ -41,7 +41,10 @@ import TransactionsPage from './pages/TransactionsPage';
 import TransactionDetailPage from './pages/TransactionDetailPage';
 import TransactionFormPage from './pages/TransactionFormPage';
 import SettlementPage from './pages/SettlementPage';
-import SettlementPackPage from './pages/SettlementPackPage';
+import SettlementPacksPage from './pages/SettlementPacksPage';
+import SettlementPackDetailPage from './pages/SettlementPackDetailPage';
+import LoansPage from './pages/LoansPage';
+import LoanAgreementDetailPage from './pages/LoanAgreementDetailPage';
 import PaymentsPage from './pages/PaymentsPage';
 import PaymentFormPage from './pages/PaymentFormPage';
 import PaymentDetailPage from './pages/PaymentDetailPage';
@@ -113,6 +116,9 @@ import ProductionUnitsProfitabilityReportPage from './pages/reports/ProductionUn
 import AccountBalancesPage from './pages/AccountBalancesPage';
 import CashbookPage from './pages/CashbookPage';
 import ARAgeingPage from './pages/ARAgeingPage';
+import APAgeingPage from './pages/APAgeingPage';
+import SupplierInvoicesPage from './pages/SupplierInvoicesPage';
+import SupplierInvoiceDetailPage from './pages/SupplierInvoiceDetailPage';
 import SalesMarginPage from './pages/SalesMarginPage';
 import PartyLedgerPage from './pages/PartyLedgerPage';
 import PartySummaryPage from './pages/PartySummaryPage';
@@ -124,6 +130,14 @@ import JournalsPage from './pages/accounting/JournalsPage';
 import JournalFormPage from './pages/accounting/JournalFormPage';
 import JournalDetailPage from './pages/accounting/JournalDetailPage';
 import AccountingPeriodsPage from './pages/accounting/AccountingPeriodsPage';
+import FixedAssetsPage from './pages/accounting/fixed-assets/FixedAssetsPage';
+import FixedAssetFormPage from './pages/accounting/fixed-assets/FixedAssetFormPage';
+import FixedAssetDetailPage from './pages/accounting/fixed-assets/FixedAssetDetailPage';
+import FixedAssetDepreciationRunsPage from './pages/accounting/fixed-assets/FixedAssetDepreciationRunsPage';
+import FixedAssetDepreciationRunDetailPage from './pages/accounting/fixed-assets/FixedAssetDepreciationRunDetailPage';
+import ExchangeRatesPage from './pages/accounting/multi-currency/ExchangeRatesPage';
+import FXRevaluationRunsPage from './pages/accounting/multi-currency/FXRevaluationRunsPage';
+import FXRevaluationRunDetailPage from './pages/accounting/multi-currency/FXRevaluationRunDetailPage';
 import LocalisationSettingsPage from './pages/LocalisationSettingsPage';
 import ModuleTogglePage from './pages/ModuleTogglePage';
 import AdminFarmProfilePage from './pages/AdminFarmProfilePage';
@@ -218,7 +232,10 @@ function App() {
         <Route path="transactions/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><TransactionDetailPage /></ModuleProtectedRoute>} />
         <Route path="transactions/:id/edit" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><TransactionFormPage /></ModuleProtectedRoute>} />
         <Route path="settlement" element={<ModuleProtectedRoute requiredModule="settlements"><SettlementPage /></ModuleProtectedRoute>} />
-        <Route path="settlement-packs/:id" element={<ModuleProtectedRoute requiredModule="settlements"><SettlementPackPage /></ModuleProtectedRoute>} />
+        <Route path="settlement-packs" element={<ModuleProtectedRoute requiredModule="settlements"><SettlementPacksPage /></ModuleProtectedRoute>} />
+        <Route path="settlement-packs/:id" element={<ModuleProtectedRoute requiredModule="settlements"><SettlementPackDetailPage /></ModuleProtectedRoute>} />
+        <Route path="loans" element={<ModuleProtectedRoute requiredModule="loans"><LoansPage /></ModuleProtectedRoute>} />
+        <Route path="loans/:id" element={<ModuleProtectedRoute requiredModule="loans"><LoanAgreementDetailPage /></ModuleProtectedRoute>} />
         <Route path="payments" element={<ModuleProtectedRoute requiredModule="treasury_payments"><PaymentsPage /></ModuleProtectedRoute>} />
         <Route path="payments/new" element={<ModuleProtectedRoute requiredModule="treasury_payments"><PaymentFormPage /></ModuleProtectedRoute>} />
         <Route path="payments/:id" element={<ModuleProtectedRoute requiredModule="treasury_payments"><PaymentDetailPage /></ModuleProtectedRoute>} />
@@ -296,6 +313,7 @@ function App() {
         <Route path="reports/account-balances" element={<ModuleProtectedRoute requiredModule="reports"><AccountBalancesPage /></ModuleProtectedRoute>} />
         <Route path="reports/cashbook" element={<ModuleProtectedRoute requiredModule="reports"><CashbookPage /></ModuleProtectedRoute>} />
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />
+        <Route path="reports/ap-ageing" element={<ModuleProtectedRoute requiredModule="reports"><APAgeingPage /></ModuleProtectedRoute>} />
         <Route path="reports/sales-margin" element={<ModuleProtectedRoute requiredModule="reports"><SalesMarginPage /></ModuleProtectedRoute>} />
         <Route path="reports/party-ledger" element={<ModuleProtectedRoute requiredModule="reports"><PartyLedgerPage /></ModuleProtectedRoute>} />
         <Route path="reports/landlord-statement" element={<ModuleProtectedRoute requiredModule="land_leases"><LandlordStatementPage /></ModuleProtectedRoute>} />
@@ -308,7 +326,87 @@ function App() {
         <Route path="accounting/journals/new" element={<ModuleProtectedRoute requiredModule="reports"><JournalFormPage /></ModuleProtectedRoute>} />
         <Route path="accounting/journals/:id" element={<ModuleProtectedRoute requiredModule="reports"><JournalDetailPage /></ModuleProtectedRoute>} />
         <Route path="accounting/journals/:id/edit" element={<ModuleProtectedRoute requiredModule="reports"><JournalFormPage /></ModuleProtectedRoute>} />
+        <Route
+          path="accounting/exchange-rates"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ExchangeRatesPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/fx-revaluation-runs"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <FXRevaluationRunsPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/fx-revaluation-runs/:id"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <FXRevaluationRunDetailPage />
+            </ModuleProtectedRoute>
+          }
+        />
         <Route path="accounting/periods" element={<ModuleProtectedRoute requiredModule="reports"><AccountingPeriodsPage /></ModuleProtectedRoute>} />
+        <Route
+          path="accounting/fixed-assets/depreciation-runs/:id"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <FixedAssetDepreciationRunDetailPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/fixed-assets/depreciation-runs"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <FixedAssetDepreciationRunsPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/fixed-assets/new"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <FixedAssetFormPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/fixed-assets/:id"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <FixedAssetDetailPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/fixed-assets"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <FixedAssetsPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/supplier-invoices"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <SupplierInvoicesPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/supplier-invoices/:id"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <SupplierInvoiceDetailPage />
+            </ModuleProtectedRoute>
+          }
+        />
         <Route path="posting-groups/:id" element={<PostingGroupDetailPage />} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />
         <Route path="admin/farm" element={<AdminFarmProfilePage />} />

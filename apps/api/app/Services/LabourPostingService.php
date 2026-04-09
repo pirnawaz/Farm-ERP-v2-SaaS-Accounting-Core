@@ -10,6 +10,7 @@ use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -32,7 +33,8 @@ class LabourPostingService
     {
         $key = $idempotencyKey ?? "lab_work_log:{$workLogId}:post";
 
-        return DB::transaction(function () use ($workLogId, $tenantId, $postingDate, $key) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($workLogId, $tenantId, $postingDate, $key) {
+            return DB::transaction(function () use ($workLogId, $tenantId, $postingDate, $key) {
             $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $key)->first();
             if ($existing) {
                 return $existing->load(['ledgerEntries.account', 'allocationRows']);
@@ -121,6 +123,7 @@ class LabourPostingService
             $workLog->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 
@@ -131,7 +134,8 @@ class LabourPostingService
      */
     public function reverseWorkLog(string $workLogId, string $tenantId, string $postingDate, string $reason): PostingGroup
     {
-        return DB::transaction(function () use ($workLogId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($workLogId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($workLogId, $tenantId, $postingDate, $reason) {
             $workLog = LabWorkLog::where('id', $workLogId)->where('tenant_id', $tenantId)->firstOrFail();
             if (!$workLog->isPosted()) {
                 throw new \Exception('Only posted work logs can be reversed.');
@@ -159,6 +163,7 @@ class LabourPostingService
             $workLog->update(['status' => 'REVERSED']);
 
             return $reversalPG;
+            });
         });
     }
 }

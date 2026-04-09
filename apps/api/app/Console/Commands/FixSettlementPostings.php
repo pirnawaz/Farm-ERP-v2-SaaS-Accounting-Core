@@ -6,6 +6,7 @@ use App\Models\AccountingCorrection;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
+use App\Services\LedgerWriteGuard;
 use App\Services\SystemAccountService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ use Illuminate\Support\Str;
  * and create reversal + corrected posting groups. Idempotent via accounting_corrections table.
  *
  * Run with --dry-run to only report and show would-be IDs; without to apply corrections.
+ *
+ * Ledger writes run only in local/development/testing — see handle().
  */
 class FixSettlementPostings extends Command
 {
@@ -110,6 +113,12 @@ class FixSettlementPostings extends Command
             return self::SUCCESS;
         }
 
+        if (! app()->environment(['local', 'development', 'dev', 'testing'])) {
+            $this->error('This maintenance command may only apply corrections in local, development, dev, or testing environments.');
+
+            return self::FAILURE;
+        }
+
         $correctedCount = 0;
         foreach ($badGroups as $originalPg) {
             try {
@@ -134,25 +143,27 @@ class FixSettlementPostings extends Command
 
     private function fixOnePostingGroup(PostingGroup $originalPg): void
     {
-        DB::transaction(function () use ($originalPg) {
-            $tenantId = $originalPg->tenant_id;
-            $postingDate = $originalPg->posting_date->format('Y-m-d');
+        LedgerWriteGuard::scoped(self::class, function () use ($originalPg) {
+            DB::transaction(function () use ($originalPg) {
+                $tenantId = $originalPg->tenant_id;
+                $postingDate = $originalPg->posting_date->format('Y-m-d');
 
-            if (AccountingCorrection::where('tenant_id', $tenantId)->where('original_posting_group_id', $originalPg->id)->exists()) {
-                return;
-            }
+                if (AccountingCorrection::where('tenant_id', $tenantId)->where('original_posting_group_id', $originalPg->id)->exists()) {
+                    return;
+                }
 
-            $reversalPg = $this->createReversalPostingGroup($originalPg);
-            $correctedPg = $this->createCorrectedPostingGroup($originalPg);
+                $reversalPg = $this->createReversalPostingGroup($originalPg);
+                $correctedPg = $this->createCorrectedPostingGroup($originalPg);
 
-            AccountingCorrection::create([
-                'tenant_id' => $tenantId,
-                'original_posting_group_id' => $originalPg->id,
-                'reversal_posting_group_id' => $reversalPg->id,
-                'corrected_posting_group_id' => $correctedPg->id,
-                'reason' => AccountingCorrection::REASON_OPERATIONAL_PG_CONTAINS_PROFIT_DISTRIBUTION,
-                'correction_batch_run_at' => now(),
-            ]);
+                AccountingCorrection::create([
+                    'tenant_id' => $tenantId,
+                    'original_posting_group_id' => $originalPg->id,
+                    'reversal_posting_group_id' => $reversalPg->id,
+                    'corrected_posting_group_id' => $correctedPg->id,
+                    'reason' => AccountingCorrection::REASON_OPERATIONAL_PG_CONTAINS_PROFIT_DISTRIBUTION,
+                    'correction_batch_run_at' => now(),
+                ]);
+            });
         });
     }
 

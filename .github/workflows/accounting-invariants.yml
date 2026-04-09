@@ -1,0 +1,27 @@
+# Phase 1H.8 — lightweight accounting invariant checks (no DB, no PHPUnit).
+name: Accounting invariants
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Install Composer dependencies (API)
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --working-dir=apps/api
+
+      - name: Run accounting invariant checks
+        run: composer run check:accounting --working-dir=apps/api

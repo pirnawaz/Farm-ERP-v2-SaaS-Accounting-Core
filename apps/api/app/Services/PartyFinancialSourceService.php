@@ -63,8 +63,8 @@ class PartyFinancialSourceService
     }
 
     /**
-     * Get supplier payable from GRN (AllocationRow SUPPLIER_AP) for a party.
-     * Excludes reversed GRNs (PG has been reversed).
+     * Get supplier payable from GRN and supplier-invoice postings (AllocationRow SUPPLIER_AP) for a party.
+     * Excludes reversed posting groups.
      *
      * @param string $partyId
      * @param string $tenantId
@@ -82,7 +82,7 @@ class PartyFinancialSourceService
             ->where('allocation_rows.party_id', $partyId)
             ->where('allocation_rows.allocation_type', 'SUPPLIER_AP')
             ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
-            ->where('posting_groups.source_type', 'INVENTORY_GRN');
+            ->whereIn('posting_groups.source_type', ['INVENTORY_GRN', 'SUPPLIER_INVOICE']);
         PostingGroup::applyActiveOn($sub, 'posting_groups');
 
         if ($from) {

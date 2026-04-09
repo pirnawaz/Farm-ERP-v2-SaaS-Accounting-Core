@@ -7,6 +7,7 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
 use App\Models\CropCycle;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\ReversalService;
 use App\Services\SystemAccountService;
@@ -33,7 +34,8 @@ class MachineryChargePostingService
     {
         $key = $idempotencyKey ?? 'machinery_charge:' . $chargeId . ':post';
 
-        return DB::transaction(function () use ($chargeId, $tenantId, $postingDate, $key) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($chargeId, $tenantId, $postingDate, $key) {
+            return DB::transaction(function () use ($chargeId, $tenantId, $postingDate, $key) {
             // Check idempotency by key
             $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $key)->first();
             if ($existing) {
@@ -166,6 +168,7 @@ class MachineryChargePostingService
             ]);
 
             return $postingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 
@@ -178,7 +181,8 @@ class MachineryChargePostingService
     {
         $reason = $reason ?? 'Reversed';
 
-        return DB::transaction(function () use ($chargeId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($chargeId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($chargeId, $tenantId, $postingDate, $reason) {
             // Load charge
             $charge = MachineryCharge::where('id', $chargeId)
                 ->where('tenant_id', $tenantId)
@@ -216,6 +220,7 @@ class MachineryChargePostingService
             // Note: We do NOT unset machinery_charge_id on work logs to keep the reservation intact
 
             return $reversalPostingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 }

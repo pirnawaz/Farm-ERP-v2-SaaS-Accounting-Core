@@ -6,7 +6,9 @@ use App\Models\AllocationRow;
 use App\Models\CropCycle;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
+use App\Services\PostingIdempotencyService;
 use App\Services\SystemAccountService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +19,8 @@ class LandLeaseAccrualPostingService
 
     public function __construct(
         private SystemAccountService $accountService,
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private PostingIdempotencyService $postingIdempotency
     ) {}
 
     /**
@@ -34,13 +37,11 @@ class LandLeaseAccrualPostingService
     ): PostingGroup {
         $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
 
-        return DB::transaction(function () use ($accrualId, $tenantId, $postingDateObj, $postedByUserId) {
-            $existing = PostingGroup::where('tenant_id', $tenantId)
-                ->where('source_type', self::SOURCE_TYPE)
-                ->where('source_id', $accrualId)
-                ->first();
-
-            if ($existing) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($accrualId, $tenantId, $postingDateObj, $postedByUserId) {
+            return DB::transaction(function () use ($accrualId, $tenantId, $postingDateObj, $postedByUserId) {
+            $resolved = $this->postingIdempotency->resolveOrCreate($tenantId, null, self::SOURCE_TYPE, $accrualId);
+            if ($resolved['posting_group'] !== null) {
+                $existing = $resolved['posting_group'];
                 $accrual = LandLeaseAccrual::where('id', $accrualId)
                     ->where('tenant_id', $tenantId)
                     ->first();
@@ -52,8 +53,10 @@ class LandLeaseAccrualPostingService
                         'posted_by' => $postedByUserId,
                     ]);
                 }
+
                 return $existing->load(['allocationRows', 'ledgerEntries.account']);
             }
+            $effectiveKey = $resolved['effective_key'];
 
             $accrual = LandLeaseAccrual::where('id', $accrualId)
                 ->where('tenant_id', $tenantId)
@@ -93,6 +96,7 @@ class LandLeaseAccrualPostingService
                 'source_type' => self::SOURCE_TYPE,
                 'source_id' => $accrual->id,
                 'posting_date' => $postingDateObj,
+                'idempotency_key' => $effectiveKey,
             ]);
 
             $amount = (string) $accrual->amount;
@@ -150,6 +154,7 @@ class LandLeaseAccrualPostingService
             ]);
 
             return $postingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 }

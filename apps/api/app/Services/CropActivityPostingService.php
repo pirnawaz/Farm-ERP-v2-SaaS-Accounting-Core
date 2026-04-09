@@ -12,6 +12,7 @@ use App\Models\AllocationRow;
 use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\Project;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -35,7 +36,8 @@ class CropActivityPostingService
     {
         $key = $idempotencyKey ?? "crop_activity:{$activityId}:post";
 
-        return DB::transaction(function () use ($activityId, $tenantId, $postingDate, $key) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($activityId, $tenantId, $postingDate, $key) {
+            return DB::transaction(function () use ($activityId, $tenantId, $postingDate, $key) {
             $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $key)->first();
             if ($existing) {
                 return $existing->load(['ledgerEntries.account', 'allocationRows']);
@@ -202,6 +204,7 @@ class CropActivityPostingService
             ]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 
@@ -212,7 +215,8 @@ class CropActivityPostingService
      */
     public function reverseActivity(string $activityId, string $tenantId, string $postingDate, string $reason = '', ?string $idempotencyKey = null): PostingGroup
     {
-        return DB::transaction(function () use ($activityId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($activityId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($activityId, $tenantId, $postingDate, $reason) {
             $activity = CropActivity::where('id', $activityId)->where('tenant_id', $tenantId)->firstOrFail();
             $activity->load(['inputs', 'labour']);
 
@@ -270,6 +274,7 @@ class CropActivityPostingService
             $activity->update(['status' => 'REVERSED', 'reversed_at' => now()]);
 
             return $reversalPG->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 }

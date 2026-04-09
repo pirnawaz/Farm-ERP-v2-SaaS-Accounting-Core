@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\CropCycle;
+use App\Models\Party;
+use App\Models\Project;
 use App\Models\Tenant;
 use App\Models\Module;
 use App\Models\TenantModule;
@@ -42,6 +45,26 @@ class InvGrnDraftCreateAndPostTest extends TestCase
         $tenant = Tenant::create(['name' => 'T', 'status' => 'active']);
         SystemAccountsSeeder::runForTenant($tenant->id);
         $this->enableInventory($tenant);
+
+        $cycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => '2024',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $landlord = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Landlord',
+            'party_types' => ['LANDLORD'],
+        ]);
+        Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $landlord->id,
+            'crop_cycle_id' => $cycle->id,
+            'name' => 'Inv Project',
+            'status' => 'ACTIVE',
+        ]);
 
         $uom = InvUom::create(['tenant_id' => $tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
         $cat = InvItemCategory::create(['tenant_id' => $tenant->id, 'name' => 'Fertilizer']);
@@ -92,5 +115,69 @@ class InvGrnDraftCreateAndPostTest extends TestCase
         $this->assertNotNull($mov);
         $this->assertEquals(10, (float) $mov->qty_delta);
         $this->assertEquals(500, (float) $mov->value_delta);
+    }
+
+    public function test_grn_post_fails_when_crop_cycle_closed(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T2', 'status' => 'active']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+        $this->enableInventory($tenant);
+
+        $cycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => '2024',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-12-31',
+            'status' => 'OPEN',
+        ]);
+        $landlord = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Landlord',
+            'party_types' => ['LANDLORD'],
+        ]);
+        Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $landlord->id,
+            'crop_cycle_id' => $cycle->id,
+            'name' => 'P',
+            'status' => 'ACTIVE',
+        ]);
+
+        $uom = InvUom::create(['tenant_id' => $tenant->id, 'code' => 'BAG', 'name' => 'Bag']);
+        $cat = InvItemCategory::create(['tenant_id' => $tenant->id, 'name' => 'Fertilizer']);
+        $item = InvItem::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Fertilizer Bag',
+            'uom_id' => $uom->id,
+            'category_id' => $cat->id,
+            'valuation_method' => 'WAC',
+            'is_active' => true,
+        ]);
+        $store = InvStore::create(['tenant_id' => $tenant->id, 'name' => 'Main Store', 'type' => 'MAIN', 'is_active' => true]);
+
+        $create = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/v1/inventory/grns', [
+                'doc_no' => 'GRN-CLOSED',
+                'store_id' => $store->id,
+                'doc_date' => '2024-06-15',
+                'lines' => [
+                    ['item_id' => $item->id, 'qty' => 10, 'unit_cost' => 50],
+                ],
+            ]);
+        $create->assertStatus(201);
+        $grnId = $create->json('id');
+
+        CropCycle::where('id', $cycle->id)->update(['status' => 'CLOSED']);
+
+        $post = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/v1/inventory/grns/{$grnId}/post", [
+                'posting_date' => '2024-06-15',
+                'idempotency_key' => 'grn-closed',
+            ]);
+        $post->assertStatus(422);
     }
 }

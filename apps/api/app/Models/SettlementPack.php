@@ -2,35 +2,41 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SettlementPack extends Model
 {
     use HasUuids;
 
     public const STATUS_DRAFT = 'DRAFT';
-    public const STATUS_PENDING_APPROVAL = 'PENDING_APPROVAL';
-    public const STATUS_FINAL = 'FINAL';
+
+    public const STATUS_FINALIZED = 'FINALIZED';
+
+    public const STATUS_VOID = 'VOID';
 
     protected $fillable = [
         'tenant_id',
         'project_id',
-        'generated_by_user_id',
-        'generated_at',
+        'crop_cycle_id',
         'status',
-        'finalized_at',
+        'reference_no',
+        'prepared_by_user_id',
         'finalized_by_user_id',
-        'summary_json',
-        'register_version',
+        'prepared_at',
+        'finalized_at',
+        'as_of_date',
+        'notes',
     ];
 
     protected $casts = [
-        'generated_at' => 'datetime',
+        'prepared_at' => 'datetime',
         'finalized_at' => 'datetime',
-        'summary_json' => 'array',
+        'as_of_date' => 'date',
         'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo
@@ -43,9 +49,14 @@ class SettlementPack extends Model
         return $this->belongsTo(Project::class);
     }
 
-    public function generatedByUser(): BelongsTo
+    public function cropCycle(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'generated_by_user_id');
+        return $this->belongsTo(CropCycle::class);
+    }
+
+    public function preparedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'prepared_by_user_id');
     }
 
     public function finalizedByUser(): BelongsTo
@@ -53,8 +64,36 @@ class SettlementPack extends Model
         return $this->belongsTo(User::class, 'finalized_by_user_id');
     }
 
-    public function approvals(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function approvals(): HasMany
     {
         return $this->hasMany(SettlementPackApproval::class);
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(SettlementPackVersion::class);
+    }
+
+    public function signoffs(): HasMany
+    {
+        return $this->hasMany(SettlementPackSignoff::class);
+    }
+
+    public function latestVersion(): ?SettlementPackVersion
+    {
+        return $this->versions()->orderByDesc('version_no')->first();
+    }
+
+    /** Snapshot JSON for the current pack snapshot (latest version row). */
+    public function snapshotJson(): array
+    {
+        $v = $this->latestVersion();
+
+        return $v?->snapshot_json ?? [];
+    }
+
+    public function isReadOnly(): bool
+    {
+        return $this->status === self::STATUS_FINALIZED;
     }
 }

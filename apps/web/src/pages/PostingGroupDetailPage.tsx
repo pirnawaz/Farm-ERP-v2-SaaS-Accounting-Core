@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { PostingGroup, apiClient } from '@farm-erp/shared'
+import { PostingGroup, type LedgerEntry, apiClient } from '@farm-erp/shared'
 import { useFormatting } from '../hooks/useFormatting'
 import { term } from '../config/terminology'
 import { Term } from '../components/Term'
@@ -11,6 +11,16 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 import { PageContainer } from '../components/PageContainer'
 
 const GL_LIST_PATH = '/app/reports/general-ledger'
+
+function ledgerDr(e: LedgerEntry): number {
+  const v = e.debit ?? e.debit_amount
+  return v !== undefined && v !== null ? parseFloat(String(v)) : 0
+}
+
+function ledgerCr(e: LedgerEntry): number {
+  const v = e.credit ?? e.credit_amount
+  return v !== undefined && v !== null ? parseFloat(String(v)) : 0
+}
 
 function PostingGroupDetailPage() {
   const { id } = useParams()
@@ -103,6 +113,11 @@ function PostingGroupDetailPage() {
 
   const titleLabel = `${term('postingGroup')} · ${postingGroup.id.length > 12 ? `${postingGroup.id.slice(0, 8)}…` : postingGroup.id}`
 
+  const showLedgerBaseCols =
+    postingGroup.ledger_entries?.some(
+      (e) => e.debit_amount_base != null || e.credit_amount_base != null
+    ) ?? false
+
   return (
     <PageContainer className="space-y-6">
       <PageHeader
@@ -152,6 +167,27 @@ function PostingGroupDetailPage() {
               {formatDateTime(postingGroup.created_at)}
             </dd>
           </div>
+          {postingGroup.currency_code && (
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Transaction currency</dt>
+              <dd className="mt-1 text-sm font-mono text-gray-900">{postingGroup.currency_code}</dd>
+            </div>
+          )}
+          {postingGroup.base_currency_code && (
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Functional (base) currency</dt>
+              <dd className="mt-1 text-sm font-mono text-gray-900">{postingGroup.base_currency_code}</dd>
+            </div>
+          )}
+          {postingGroup.fx_rate != null &&
+            postingGroup.fx_rate !== '' &&
+            String(postingGroup.fx_rate) !== '1' &&
+            String(postingGroup.fx_rate) !== '1.00000000' && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500">FX rate (base per 1 transaction unit)</dt>
+                <dd className="mt-1 text-sm text-gray-900 tabular-nums">{String(postingGroup.fx_rate)}</dd>
+              </div>
+            )}
           {postingGroup.reversal_of_posting_group_id && (
             <>
               <div>
@@ -264,6 +300,16 @@ function PostingGroupDetailPage() {
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Currency
                   </th>
+                  {showLedgerBaseCols && (
+                    <>
+                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Debit ({postingGroup.base_currency_code ?? 'base'})
+                      </th>
+                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Credit ({postingGroup.base_currency_code ?? 'base'})
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -274,14 +320,28 @@ function PostingGroupDetailPage() {
                       <span className="text-gray-500 ml-2">({entry.account?.code || 'N/A'})</span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                      {parseFloat(entry.debit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.debit)}</span> : '-'}
+                      {ledgerDr(entry) > 0 ? <span className="tabular-nums">{formatMoney(ledgerDr(entry))}</span> : '-'}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                      {parseFloat(entry.credit.toString()) > 0 ? <span className="tabular-nums">{formatMoney(entry.credit)}</span> : '-'}
+                      {ledgerCr(entry) > 0 ? <span className="tabular-nums">{formatMoney(ledgerCr(entry))}</span> : '-'}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                       {entry.currency_code}
                     </td>
+                    {showLedgerBaseCols && (
+                      <>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right text-gray-800">
+                          {entry.debit_amount_base != null && parseFloat(String(entry.debit_amount_base)) > 0
+                            ? <span className="tabular-nums">{formatMoney(entry.debit_amount_base)}</span>
+                            : '—'}
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right text-gray-800">
+                          {entry.credit_amount_base != null && parseFloat(String(entry.credit_amount_base)) > 0
+                            ? <span className="tabular-nums">{formatMoney(entry.credit_amount_base)}</span>
+                            : '—'}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
                 <tr className="bg-gray-50 font-semibold">
@@ -289,16 +349,36 @@ function PostingGroupDetailPage() {
                   <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right">
                     <span className="tabular-nums">{formatMoney(
                       postingGroup.ledger_entries
-                        .reduce((sum, e) => sum + parseFloat(e.debit.toString()), 0)
+                        .reduce((sum, e) => sum + ledgerDr(e), 0)
                     )}</span>
                   </td>
                   <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right">
                     <span className="tabular-nums">{formatMoney(
                       postingGroup.ledger_entries
-                        .reduce((sum, e) => sum + parseFloat(e.credit.toString()), 0)
+                        .reduce((sum, e) => sum + ledgerCr(e), 0)
                     )}</span>
                   </td>
                   <td></td>
+                  {showLedgerBaseCols && (
+                    <>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right">
+                        <span className="tabular-nums">{formatMoney(
+                          postingGroup.ledger_entries.reduce(
+                            (sum, e) => sum + (e.debit_amount_base != null ? parseFloat(String(e.debit_amount_base)) : 0),
+                            0
+                          )
+                        )}</span>
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-right">
+                        <span className="tabular-nums">{formatMoney(
+                          postingGroup.ledger_entries.reduce(
+                            (sum, e) => sum + (e.credit_amount_base != null ? parseFloat(String(e.credit_amount_base)) : 0),
+                            0
+                          )
+                        )}</span>
+                      </td>
+                    </>
+                  )}
                 </tr>
               </tbody>
             </table>

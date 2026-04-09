@@ -1658,6 +1658,98 @@ export interface ARAgeingReport {
   };
 }
 
+/** GET /api/reports/ap-ageing */
+export interface APAgeingReport {
+  as_of: string;
+  buckets: string[];
+  rows: Array<{
+    supplier_party_id: string;
+    supplier_name: string;
+    total_outstanding: string;
+    bucket_0_30: string;
+    bucket_31_60: string;
+    bucket_61_90: string;
+    bucket_90_plus: string;
+  }>;
+  totals: {
+    total_outstanding: string;
+    bucket_0_30: string;
+    bucket_31_60: string;
+    bucket_61_90: string;
+    bucket_90_plus: string;
+  };
+  reconciliation?: {
+    subledger_open_total: string;
+  };
+}
+
+export type SupplierInvoiceStatus = 'DRAFT' | 'POSTED' | 'PAID';
+
+export interface SupplierInvoiceListItem {
+  id: string;
+  tenant_id: string;
+  party_id: string;
+  project_id: string | null;
+  grn_id: string | null;
+  reference_no: string | null;
+  invoice_date: string | null;
+  currency_code: string;
+  subtotal_amount: string | null;
+  tax_amount: string | null;
+  total_amount: string | null;
+  status: SupplierInvoiceStatus;
+  posting_group_id: string | null;
+  posted_at: string | null;
+  notes: string | null;
+  created_at: string | null;
+  party?: { id: string; name: string } | null;
+  project?: { id: string; name: string } | null;
+  posting_group?: { id: string; posting_date: string } | null;
+}
+
+export interface SupplierInvoiceDetail extends SupplierInvoiceListItem {
+  party?: { id: string; name: string; party_types?: string[] } | null;
+  lines: Array<{
+    id: string;
+    line_no: number | null;
+    description: string | null;
+    qty: string | null;
+    unit_price: string | null;
+    line_total: string | null;
+    tax_amount: string | null;
+  }>;
+  grn?: { id: string; doc_no: string | null; posting_date: string | null } | null;
+}
+
+export interface SupplierStatementLine {
+  posting_date: string;
+  description: string;
+  source_type: string;
+  source_id: string;
+  posting_group_id: string | null;
+  debit: string;
+  credit: string;
+  net: string;
+  running_balance: string;
+}
+
+export interface SupplierStatementResponse {
+  party: { id: string; name: string; party_types?: string[] };
+  period: { from: string | null; to: string | null };
+  lines: SupplierStatementLine[];
+  totals: {
+    debit_total: string;
+    credit_total: string;
+    opening_balance: string;
+    closing_balance: string;
+  };
+  reconciliation: {
+    subledger_outstanding_at_to: string;
+    statement_balance_at_to: string;
+    delta: string;
+  };
+}
+
 export interface PartyStatementGroup {
   crop_cycle_id?: string;
   crop_cycle_name?: string;

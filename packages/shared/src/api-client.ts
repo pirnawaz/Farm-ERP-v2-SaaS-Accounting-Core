@@ -175,6 +175,83 @@ async function request<T>(
   }
 }
 
+/**
+ * GET binary response (e.g. PDF) with the same tenant / user headers as JSON requests.
+ * Does not parse the body as JSON.
+ */
+async function requestBlob(endpoint: string): Promise<Blob> {
+  const tenantId = getTenantId()
+  const userRole = getUserRole()
+  const userId = getUserId()
+
+  const isDevRoute = endpoint.includes('/api/dev/') || endpoint.includes('api/dev/')
+  const isPlatformRoute = endpoint.includes('/api/platform/') || endpoint.includes('api/platform/')
+  const isAuthUnifiedRoute =
+    endpoint.includes('/api/auth/login') || endpoint.includes('/api/auth/select-tenant')
+  if (!isDevRoute && !isPlatformRoute && !isAuthUnifiedRoute && !tenantId) {
+    throw new Error('No tenant selected. Please select a tenant.')
+  }
+
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`
+
+  const headers: Record<string, string> = {
+    Accept: '*/*',
+  }
+  if (!isPlatformRoute && tenantId?.trim()) {
+    headers['X-Tenant-Id'] = tenantId.trim()
+  }
+  if (userRole?.trim()) {
+    headers['X-User-Role'] = userRole.trim()
+  }
+  if (userId?.trim()) {
+    headers['X-User-Id'] = userId.trim()
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+    cache: 'no-store',
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      try {
+        const error = JSON.parse(text) as {
+          message?: string
+          error?: string
+          errors?: Record<string, string[]>
+        }
+        if (error.errors && typeof error.errors === 'object') {
+          const parts: string[] = []
+          for (const key of Object.keys(error.errors)) {
+            const msgs = error.errors[key]
+            if (Array.isArray(msgs)) {
+              for (const m of msgs) {
+                parts.push(`${key}: ${m}`)
+              }
+            }
+          }
+          if (parts.length > 0) {
+            throw new Error(parts.join(' '))
+          }
+        }
+        const msg = error.message || error.error || `HTTP ${response.status}: ${response.statusText}`
+        throw new Error(msg)
+      } catch (parseError) {
+        if (!(parseError instanceof SyntaxError)) {
+          throw parseError
+        }
+      }
+    }
+    throw new Error(`HTTP ${response.status}: ${response.statusText}${text ? ` — ${text.substring(0, 200)}` : ''}`)
+  }
+
+  return response.blob()
+}
+
 function buildQueryString(params: Record<string, string | number | undefined | null>): string {
   const searchParams = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
@@ -190,6 +267,8 @@ export const apiClient = {
   get: <T>(endpoint: string): Promise<T> => {
     return request<T>(endpoint, { method: 'GET', cache: 'no-store' })
   },
+
+  getBlob: (endpoint: string): Promise<Blob> => requestBlob(endpoint),
 
   post: <T>(endpoint: string, data: unknown, options?: RequestInit): Promise<T> => {
     return request<T>(endpoint, {

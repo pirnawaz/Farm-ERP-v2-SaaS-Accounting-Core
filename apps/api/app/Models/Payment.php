@@ -76,6 +76,11 @@ class Payment extends Model
         return $this->hasMany(GrnPaymentAllocation::class);
     }
 
+    public function supplierInvoiceAllocations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SupplierPaymentAllocation::class);
+    }
+
     /**
      * Scope to filter payments by tenant.
      */

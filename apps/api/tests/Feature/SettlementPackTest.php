@@ -2,19 +2,19 @@
 
 namespace Tests\Feature;
 
-use App\Models\Tenant;
-use App\Models\Module;
-use App\Models\TenantModule;
-use App\Models\CropCycle;
-use App\Models\Party;
-use App\Models\Project;
-use App\Models\PostingGroup;
 use App\Models\AllocationRow;
+use App\Models\CropCycle;
+use App\Models\Module;
+use App\Models\Party;
+use App\Models\PostingGroup;
+use App\Models\Project;
 use App\Models\SettlementPack;
+use App\Models\Tenant;
+use App\Models\TenantModule;
+use Database\Seeders\ModulesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
-use Database\Seeders\ModulesSeeder;
 
 class SettlementPackTest extends TestCase
 {
@@ -198,6 +198,6 @@ class SettlementPackTest extends TestCase
         $id2 = $r2->json('id');
 
         $this->assertSame($id1, $id2);
-        $this->assertEquals(1, SettlementPack::where('tenant_id', $tenant->id)->where('project_id', $project->id)->where('register_version', $version)->count());
+        $this->assertEquals(1, SettlementPack::where('tenant_id', $tenant->id)->where('project_id', $project->id)->where('reference_no', $version)->count());
     }
 }

@@ -42,12 +42,14 @@ class SettlementController extends Controller
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        $postingDate = $request->input('posting_date');
-        if (!$postingDate) {
-            return response()->json(['error' => 'posting_date is required'], 400);
+        $validator = Validator::make($request->all(), [
+            'posting_date' => ['required', 'date', 'date_format:Y-m-d'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $preview = $this->settlementService->offsetPreview($id, $tenantId, $postingDate);
+        $preview = $this->settlementService->offsetPreview($id, $tenantId, $request->input('posting_date'));
 
         return response()->json($preview);
     }
@@ -184,7 +186,7 @@ class SettlementController extends Controller
         $tenantId = TenantContext::getTenantId($request);
 
         $validator = Validator::make($request->all(), [
-            'posting_date' => ['required', 'date'],
+            'posting_date' => ['required', 'date', 'date_format:Y-m-d'],
         ]);
 
         if ($validator->fails()) {
@@ -217,7 +219,7 @@ class SettlementController extends Controller
         $tenantId = TenantContext::getTenantId($request);
 
         $validator = Validator::make($request->all(), [
-            'reversal_date' => ['required', 'date'],
+            'reversal_date' => ['required', 'date', 'date_format:Y-m-d'],
         ]);
 
         if ($validator->fails()) {
@@ -251,7 +253,7 @@ class SettlementController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         CropCycle::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
         $upToDate = $request->input('up_to_date', now()->format('Y-m-d'));
-        $validator = Validator::make(['up_to_date' => $upToDate], ['up_to_date' => ['required', 'date']]);
+        $validator = Validator::make(['up_to_date' => $upToDate], ['up_to_date' => ['required', 'date', 'date_format:Y-m-d']]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
@@ -272,7 +274,7 @@ class SettlementController extends Controller
         $this->authorizePosting($request);
         $tenantId = TenantContext::getTenantId($request);
         $validator = Validator::make($request->all(), [
-            'posting_date' => ['required', 'date'],
+            'posting_date' => ['required', 'date', 'date_format:Y-m-d'],
             'idempotency_key' => ['required', 'string', 'max:255'],
         ]);
         if ($validator->fails()) {

@@ -378,6 +378,27 @@ class APCoreTest extends TestCase
 
         $openTotal = app(BillPaymentService::class)->getSupplierOpenBillsTotal($supplier->id, $tenant->id, '2024-06-15');
         $this->assertEqualsWithDelta(250, $openTotal, 0.01);
+
+        $this->assertArrayHasKey('reconciliation', $body);
+        $this->assertEquals('250.00', $body['reconciliation']['subledger_open_total']);
+        $this->assertEquals($body['totals']['total_outstanding'], $body['reconciliation']['subledger_open_total']);
+    }
+
+    public function test_supplier_statement_returns_lines_and_reconciliation(): void
+    {
+        $data = $this->seedTenantWithSupplier();
+        $tenant = $data['tenant'];
+        $supplier = $data['supplier'];
+
+        $res = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->getJson('/api/parties/' . $supplier->id . '/supplier-statement?from=2024-01-01&to=2024-12-31');
+        $res->assertStatus(200);
+        $body = $res->json();
+        $this->assertEquals($supplier->id, $body['party']['id']);
+        $this->assertArrayHasKey('lines', $body);
+        $this->assertArrayHasKey('reconciliation', $body);
+        $this->assertArrayHasKey('subledger_outstanding_at_to', $body['reconciliation']);
     }
 
     /**

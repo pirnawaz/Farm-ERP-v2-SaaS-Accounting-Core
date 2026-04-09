@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\PostJournalRequest;
 use App\Http\Requests\ReverseJournalRequest;
 use App\Http\Requests\StoreJournalRequest;
 use App\Http\Requests\UpdateJournalRequest;
 use App\Models\JournalEntry;
+use App\Exceptions\CropCycleClosedException;
 use App\Services\JournalEntryService;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -126,8 +128,11 @@ class JournalEntryController extends Controller
 
     /**
      * POST /api/journals/{id}/post
+     *
+     * posting_date is not accepted on the request; ledger PostingGroup.posting_date is derived from entry_date
+     * (JournalEntryService::postJournal uses Carbon::parse(entry_date)->format('Y-m-d')).
      */
-    public function post(Request $request, string $id): JsonResponse
+    public function post(PostJournalRequest $request, string $id): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
         $postedBy = $request->user()?->id;
@@ -143,6 +148,8 @@ class JournalEntryController extends Controller
         } catch (InvalidArgumentException $e) {
             $code = $e->getCode() === 422 ? 422 : 409;
             return response()->json(['message' => $e->getMessage()], $code);
+        } catch (CropCycleClosedException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
     }
 

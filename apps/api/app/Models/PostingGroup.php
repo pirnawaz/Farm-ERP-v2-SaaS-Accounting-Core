@@ -18,6 +18,9 @@ class PostingGroup extends Model
         'source_type',
         'source_id',
         'posting_date',
+        'currency_code',
+        'base_currency_code',
+        'fx_rate',
         'idempotency_key',
         'reversal_of_posting_group_id',
         'correction_reason',
@@ -25,8 +28,25 @@ class PostingGroup extends Model
 
     protected $casts = [
         'posting_date' => 'date',
+        'fx_rate' => 'decimal:8',
         'created_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (PostingGroup $pg) {
+            $base = Tenant::query()->where('id', $pg->tenant_id)->value('currency_code') ?? 'GBP';
+            if ($pg->base_currency_code === null) {
+                $pg->base_currency_code = $base;
+            }
+            if ($pg->fx_rate === null) {
+                $pg->fx_rate = 1;
+            }
+            if ($pg->currency_code === null) {
+                $pg->currency_code = $base;
+            }
+        });
+    }
 
     public function tenant(): BelongsTo
     {

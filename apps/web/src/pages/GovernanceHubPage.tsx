@@ -24,7 +24,7 @@ const HUB_CARDS: HubCard[] = [
     key: 'settlement',
     title: 'Settlement Packs',
     description: 'Create and manage settlement packs for projects and crop cycles.',
-    to: '/app/settlement',
+    to: '/app/settlement-packs',
     linkLabel: 'Open',
     roles: ['tenant_admin', 'accountant', 'operator'],
     requiredModule: 'settlements',

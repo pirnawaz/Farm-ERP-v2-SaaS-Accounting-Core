@@ -7,6 +7,7 @@ use App\Models\CropCycle;
 use App\Models\LedgerEntry;
 use App\Models\PeriodCloseRun;
 use App\Models\PostingGroup;
+use App\Services\LedgerWriteGuard;
 use App\Services\SystemAccountService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,8 @@ final class PeriodCloseService
      */
     public function closeCropCycle(string $tenantId, string $cropCycleId, ?string $userId = null, ?string $asOf = null): array
     {
-        return DB::transaction(function () use ($tenantId, $cropCycleId, $userId, $asOf) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($tenantId, $cropCycleId, $userId, $asOf) {
+            return DB::transaction(function () use ($tenantId, $cropCycleId, $userId, $asOf) {
             $existingRun = PeriodCloseRun::where('tenant_id', $tenantId)
                 ->where('crop_cycle_id', $cropCycleId)
                 ->first();
@@ -238,6 +240,7 @@ final class PeriodCloseService
                 'closed_at' => $closedAt->toIso8601String(),
                 'closed_by_user_id' => $userId,
             ];
+            });
         });
     }
 

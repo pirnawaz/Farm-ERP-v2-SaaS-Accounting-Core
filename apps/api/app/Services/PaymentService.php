@@ -13,12 +13,14 @@ use App\Models\Project;
 use App\Models\CropCycle;
 use App\Models\AllocationRow;
 use App\Models\SalePaymentAllocation;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\PartyAccountService;
 use App\Services\ReversalService;
 use App\Services\SaleARService;
 use App\Services\Accounting\PostValidationService;
 use App\Services\PostingDateGuard;
+use App\Support\TenantScoped;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -32,7 +34,8 @@ class PaymentService
         private PostValidationService $postValidationService,
         private OperationalPostingGuard $guard,
         private ReversalService $reversalService,
-        private PostingDateGuard $postingDateGuard
+        private PostingDateGuard $postingDateGuard,
+        private PostingIdempotencyService $postingIdempotency
     ) {}
 
     /**
@@ -43,7 +46,7 @@ class PaymentService
      * @param string $paymentId
      * @param string $tenantId
      * @param string $postingDate YYYY-MM-DD format
-     * @param string $idempotencyKey
+     * @param string|null $idempotencyKey Client key or null for deterministic PAYMENT:payment_id
      * @param string|null $cropCycleId Required if payment has no settlement_id
      * @param string|null $userRole For role validation
      * @return PostingGroup
@@ -53,28 +56,23 @@ class PaymentService
         string $paymentId,
         string $tenantId,
         string $postingDate,
-        string $idempotencyKey,
+        ?string $idempotencyKey = null,
         ?string $cropCycleId = null,
         ?string $userRole = null,
         ?string $allocationMode = null,
         ?array $manualAllocations = null
     ): PostingGroup {
-        return DB::transaction(function () use ($paymentId, $tenantId, $postingDate, $idempotencyKey, $cropCycleId, $userRole, $allocationMode, $manualAllocations) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($paymentId, $tenantId, $postingDate, $idempotencyKey, $cropCycleId, $userRole, $allocationMode, $manualAllocations) {
+            return DB::transaction(function () use ($paymentId, $tenantId, $postingDate, $idempotencyKey, $cropCycleId, $userRole, $allocationMode, $manualAllocations) {
             // Validate role
             if ($userRole && !in_array($userRole, ['accountant', 'tenant_admin'])) {
                 throw new \Exception('Only accountant or tenant_admin can post payments');
             }
 
-            // Check idempotency first
-            $existingPostingGroup = PostingGroup::where('tenant_id', $tenantId)
-                ->where('idempotency_key', $idempotencyKey)
-                ->first();
-
-            if ($existingPostingGroup) {
-                // Ensure payment is linked
-                $payment = Payment::where('id', $paymentId)
-                    ->where('tenant_id', $tenantId)
-                    ->first();
+            $resolved = $this->postingIdempotency->resolveOrCreate($tenantId, $idempotencyKey, 'PAYMENT', $paymentId);
+            if ($resolved['posting_group'] !== null) {
+                $existingPostingGroup = $resolved['posting_group'];
+                $payment = TenantScoped::for(Payment::query(), $tenantId)->find($paymentId);
                 if ($payment && $payment->status !== 'POSTED') {
                     $payment->update([
                         'status' => 'POSTED',
@@ -82,14 +80,15 @@ class PaymentService
                         'posted_at' => now(),
                     ]);
                 }
+
                 return $existingPostingGroup->load(['ledgerEntries.account']);
             }
+            $effectiveKey = $resolved['effective_key'];
 
             // Load payment, must be DRAFT and belong to tenant
-            $payment = Payment::where('id', $paymentId)
-                ->where('tenant_id', $tenantId)
+            $payment = TenantScoped::for(Payment::query(), $tenantId)
                 ->where('status', 'DRAFT')
-                ->firstOrFail();
+                ->findOrFail($paymentId);
 
             // CREDIT_NOTE method payments are synthetic; created only when posting a credit note sale. Do not post via this endpoint.
             if ($payment->method === 'CREDIT_NOTE') {
@@ -97,18 +96,15 @@ class PaymentService
             }
 
             // Load party to determine payable account
-            $party = Party::where('id', $payment->party_id)
-                ->where('tenant_id', $tenantId)
-                ->firstOrFail();
+            $party = TenantScoped::for(Party::query(), $tenantId)->findOrFail($payment->party_id);
 
             // Determine crop_cycle_id
             $finalCropCycleId = null;
             if ($payment->settlement_id) {
                 // Validate settlement
-                $settlement = Settlement::where('id', $payment->settlement_id)
-                    ->where('tenant_id', $tenantId)
+                $settlement = TenantScoped::for(Settlement::query(), $tenantId)
                     ->with('project')
-                    ->firstOrFail();
+                    ->findOrFail($payment->settlement_id);
 
                 // Validate party matches (check allocation_rows on settlement's posting_group)
                 $allocationExists = AllocationRow::where('posting_group_id', $settlement->posting_group_id)
@@ -120,13 +116,10 @@ class PaymentService
                     throw new \Exception('Payment party does not match settlement allocations');
                 }
 
-                // Get crop_cycle_id from settlement's project
-                $project = Project::where('id', $settlement->project_id)
-                    ->where('tenant_id', $tenantId)
-                    ->firstOrFail();
-                $finalCropCycleId = $project->crop_cycle_id;
+                $this->guard->ensureCropCycleOpenForProject($settlement->project_id, $tenantId);
 
-                $this->guard->ensureCropCycleOpen($finalCropCycleId, $tenantId);
+                $project = TenantScoped::for(Project::query(), $tenantId)->findOrFail($settlement->project_id);
+                $finalCropCycleId = $project->crop_cycle_id;
             } else {
                 // No settlement, require crop_cycle_id parameter
                 if (!$cropCycleId) {
@@ -138,13 +131,13 @@ class PaymentService
                 $this->guard->ensureCropCycleOpen($finalCropCycleId, $tenantId);
             }
 
-            $cropCycle = CropCycle::where('id', $finalCropCycleId)
-                ->where('tenant_id', $tenantId)
-                ->firstOrFail();
+            $cropCycle = TenantScoped::for(CropCycle::query(), $tenantId)->findOrFail($finalCropCycleId);
 
-            // Validate Payment OUT (non-WAGES) does not exceed outstanding payable
+            // Validate Payment OUT to suppliers: do not exceed AP (GRN + supplier invoices − payments).
+            // HARI/LANDLORD/KAMDAR use party control accounts; outstanding is not the supplier subledger.
             $isWages = $payment->direction === 'OUT' && (string) ($payment->purpose ?? '') === 'WAGES';
-            if ($payment->direction === 'OUT' && !$isWages) {
+            $partyTypesEarly = $party->party_types ?? [];
+            if ($payment->direction === 'OUT' && ! $isWages && in_array('VENDOR', $partyTypesEarly, true)) {
                 $balanceSummary = $this->getPartyPayableBalance($payment->party_id, $tenantId, $postingDate);
                 $outstandingTotal = (float) $balanceSummary['outstanding_total'];
                 if ($payment->amount > $outstandingTotal) {
@@ -204,7 +197,7 @@ class PaymentService
                 'source_type' => 'PAYMENT',
                 'source_id' => $payment->id,
                 'posting_date' => Carbon::parse($postingDate)->format('Y-m-d'),
-                'idempotency_key' => $idempotencyKey,
+                'idempotency_key' => $effectiveKey,
             ]);
 
             // Create ledger entries
@@ -345,6 +338,7 @@ class PaymentService
 
             // Reload posting group with relationships
             return $postingGroup->fresh(['ledgerEntries.account']);
+            });
         });
     }
 
@@ -366,9 +360,7 @@ class PaymentService
         ?string $reason = null,
         ?string $reversedByUserId = null
     ): PostingGroup {
-        $payment = Payment::where('id', $paymentId)
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
+        $payment = TenantScoped::for(Payment::query(), $tenantId)->findOrFail($paymentId);
 
         if ($payment->status !== 'POSTED') {
             throw new \InvalidArgumentException('Only posted payments can be reversed');
@@ -425,6 +417,8 @@ class PaymentService
     {
         $billPaymentService = app(BillPaymentService::class);
         $openBillsTotal = $billPaymentService->getSupplierOpenBillsTotal($partyId, $tenantId, $asOfDate);
+        $openSupplierInvoicesTotal = $billPaymentService->getSupplierOpenSupplierInvoicesTotal($partyId, $tenantId, $asOfDate);
+        $openApTotal = $openBillsTotal + $openSupplierInvoicesTotal;
 
         $paymentData = app(PartyFinancialSourceService::class)->getPostedPaymentsTotals(
             $partyId,
@@ -442,9 +436,10 @@ class PaymentService
 
         return [
             'open_bills_total' => number_format($openBillsTotal, 2, '.', ''),
+            'open_supplier_invoices_total' => number_format($openSupplierInvoicesTotal, 2, '.', ''),
             'paid_total' => number_format($paidTotal, 2, '.', ''),
             'unapplied_supplier_payments_total' => number_format($unappliedOut, 2, '.', ''),
-            'outstanding_total' => number_format($openBillsTotal, 2, '.', ''),
+            'outstanding_total' => number_format($openApTotal, 2, '.', ''),
         ];
     }
 }

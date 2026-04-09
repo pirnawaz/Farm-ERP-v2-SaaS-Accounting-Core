@@ -10,6 +10,7 @@ use App\Models\Harvest;
 use App\Models\OperationalTransaction;
 use App\Models\Project;
 use App\Models\SettlementPack;
+use App\Support\TenantScoped;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,7 +25,7 @@ final class DashboardSummaryService
     ) {}
 
     /**
-     * @param array{scope_type?: string, scope_id?: string} $params
+     * @param  array{scope_type?: string, scope_id?: string}  $params
      * @return array{scope: array{type: string, id: string|null, label: string}, farm: array, money: array, profit: array, governance: array, alerts: array}
      */
     public function getSummary(string $tenantId, array $params = []): array
@@ -50,6 +51,7 @@ final class DashboardSummaryService
 
     /**
      * Resolve scope: crop_cycle | project | year. Default: active crop cycle or current year.
+     *
      * @return array{type: string, id: string|null, label: string}
      */
     private function resolveScope(string $tenantId, array $params): array
@@ -158,15 +160,16 @@ final class DashboardSummaryService
 
     private function getAccountBalances(string $tenantId, string $asOf): array
     {
-        $sql = "
+        $sql = '
             SELECT a.code AS account_code, SUM(le.debit_amount - le.credit_amount) AS balance
             FROM ledger_entries le
             JOIN accounts a ON a.id = le.account_id
             JOIN posting_groups pg ON pg.id = le.posting_group_id
             WHERE le.tenant_id = :tenant_id AND pg.posting_date <= :as_of
             GROUP BY a.id, a.code
-        ";
+        ';
         $rows = DB::select($sql, ['tenant_id' => $tenantId, 'as_of' => $asOf]);
+
         return array_map(fn ($r) => ['account_code' => $r->account_code, 'balance' => $r->balance], $rows);
     }
 
@@ -177,6 +180,7 @@ final class DashboardSummaryService
                 return (float) ($row['balance'] ?? 0);
             }
         }
+
         return 0.0;
     }
 
@@ -227,7 +231,7 @@ final class DashboardSummaryService
         $bestProfit = null;
         foreach ($projects as $project) {
             $from = $scope['type'] === 'crop_cycle' && $scope['id']
-                ? (CropCycle::find($scope['id'])?->start_date?->format('Y-m-d') ?? $yearStart)
+                ? (TenantScoped::for(CropCycle::query(), $tenantId)->find($scope['id'])?->start_date?->format('Y-m-d') ?? $yearStart)
                 : $yearStart;
             $to = $asOf;
             $pl = $this->profitLossService->getProfitLoss($tenantId, $from, $to, ['project_id' => $project->id]);
@@ -237,13 +241,14 @@ final class DashboardSummaryService
                 $best = ['project_id' => $project->id, 'name' => $project->name, 'profit' => round($net, 2)];
             }
         }
+
         return $best;
     }
 
     private function governanceMetrics(string $tenantId, array $scope): array
     {
         $settlementsPendingCount = SettlementPack::where('tenant_id', $tenantId)
-            ->whereIn('status', [SettlementPack::STATUS_DRAFT, SettlementPack::STATUS_PENDING_APPROVAL])
+            ->where('status', SettlementPack::STATUS_DRAFT)
             ->count();
 
         $cyclesClosedCount = CropCycle::where('tenant_id', $tenantId)->where('status', 'CLOSED')->count();
@@ -257,7 +262,7 @@ final class DashboardSummaryService
         foreach ($closedPeriods as $p) {
             $locksWarning[] = [
                 'type' => 'period_closed',
-                'label' => $p->name ?? $p->period_start->format('Y-m-d') . ' to ' . $p->period_end->format('Y-m-d'),
+                'label' => $p->name ?? $p->period_start->format('Y-m-d').' to '.$p->period_end->format('Y-m-d'),
                 'date' => $p->period_end->format('Y-m-d'),
             ];
         }
@@ -279,7 +284,7 @@ final class DashboardSummaryService
             $alerts[] = [
                 'severity' => 'warn',
                 'title' => 'Unposted records',
-                'detail' => (string) $farm['unposted_records_count'] . ' draft record(s) pending posting.',
+                'detail' => (string) $farm['unposted_records_count'].' draft record(s) pending posting.',
                 'action' => ['label' => 'View transactions', 'to' => '/app/transactions?status=DRAFT'],
             ];
         }
@@ -287,18 +292,19 @@ final class DashboardSummaryService
             $alerts[] = [
                 'severity' => 'info',
                 'title' => 'Settlements pending',
-                'detail' => (string) $governance['settlements_pending_count'] . ' settlement pack(s) in draft or pending approval.',
+                'detail' => (string) $governance['settlements_pending_count'].' settlement pack(s) in draft or pending approval.',
                 'action' => ['label' => 'View settlements', 'to' => '/app/settlement'],
             ];
         }
-        if (!empty($governance['locks_warning'])) {
+        if (! empty($governance['locks_warning'])) {
             $alerts[] = [
                 'severity' => 'info',
                 'title' => 'Closed periods',
-                'detail' => count($governance['locks_warning']) . ' accounting period(s) closed.',
+                'detail' => count($governance['locks_warning']).' accounting period(s) closed.',
                 'action' => ['label' => 'Accounting periods', 'to' => '/app/accounting/periods'],
             ];
         }
+
         return $alerts;
     }
 }

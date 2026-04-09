@@ -6,6 +6,7 @@ use App\Models\PostingGroup;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Accounting\Rules\DailyBookEntryRuleResolver;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\PostingDateGuard;
 use Illuminate\Support\Facades\DB;
@@ -14,9 +15,9 @@ use Illuminate\Support\Facades\Log;
 class ReversalService
 {
     public function __construct(
-        private DailyBookEntryRuleResolver $ruleResolver = new DailyBookEntryRuleResolver(),
         private OperationalPostingGuard $guard,
-        private PostingDateGuard $postingDateGuard
+        private PostingDateGuard $postingDateGuard,
+        private DailyBookEntryRuleResolver $ruleResolver = new DailyBookEntryRuleResolver(),
     ) {}
 
     /**
@@ -37,7 +38,8 @@ class ReversalService
         string $postingDate,
         string $reason
     ): PostingGroup {
-        return DB::transaction(function () use ($postingGroupId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($postingGroupId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($postingGroupId, $tenantId, $postingDate, $reason) {
             // Load original posting group (tenant-scoped)
             $originalPostingGroup = PostingGroup::where('id', $postingGroupId)
                 ->where('tenant_id', $tenantId)
@@ -83,6 +85,9 @@ class ReversalService
                 'posting_date' => $postingDateObj->format('Y-m-d'),
                 'reversal_of_posting_group_id' => $originalPostingGroup->id,
                 'correction_reason' => $reason,
+                'currency_code' => $originalPostingGroup->currency_code,
+                'base_currency_code' => $originalPostingGroup->base_currency_code,
+                'fx_rate' => $originalPostingGroup->fx_rate,
             ]);
 
             // Create AllocationRows that mirror the original, with amount negated so allocation-driven totals net to zero
@@ -95,6 +100,10 @@ class ReversalService
                     ? (string) (-(float) $originalRow->amount)
                     : null;
 
+                $reversalAmountBase = $originalRow->amount_base !== null
+                    ? (string) round(-(float) $originalRow->amount_base, 2)
+                    : null;
+
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $reversalPostingGroup->id,
@@ -103,6 +112,10 @@ class ReversalService
                     'allocation_type' => $originalRow->allocation_type,
                     'allocation_scope' => $originalRow->allocation_scope,
                     'amount' => $reversalAmount,
+                    'currency_code' => $originalRow->currency_code,
+                    'base_currency_code' => $originalRow->base_currency_code,
+                    'fx_rate' => $originalRow->fx_rate,
+                    'amount_base' => $reversalAmountBase,
                     'quantity' => $originalRow->quantity,
                     'unit' => $originalRow->unit,
                     'machine_id' => $originalRow->machine_id,
@@ -119,11 +132,16 @@ class ReversalService
                     'debit_amount' => $originalEntry->credit_amount,
                     'credit_amount' => $originalEntry->debit_amount,
                     'currency_code' => $originalEntry->currency_code ?? 'GBP',
+                    'base_currency_code' => $originalEntry->base_currency_code,
+                    'fx_rate' => $originalEntry->fx_rate,
+                    'debit_amount_base' => $originalEntry->credit_amount_base,
+                    'credit_amount_base' => $originalEntry->debit_amount_base,
                 ]);
             }
 
             // Reload reversal posting group with relationships
             return $reversalPostingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 }

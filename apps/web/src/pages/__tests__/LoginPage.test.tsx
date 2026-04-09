@@ -1,7 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LoginPage from '../LoginPage';
+
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: vi.fn(),
+}));
+
+import { useAuth } from '../../hooks/useAuth';
 
 // Mock the devApi
 vi.mock('../api/dev', () => ({
@@ -11,6 +17,14 @@ vi.mock('../api/dev', () => ({
 }));
 
 describe('LoginPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useAuth as any).mockReturnValue({
+      setIdentityFromUnifiedLogin: vi.fn(),
+      setDevIdentity: vi.fn(),
+    });
+  });
+
   it('renders login form', () => {
     render(
       <BrowserRouter>
@@ -18,18 +32,19 @@ describe('LoginPage', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText(/Welcome back to Terrava|Terrava/i)).toBeInTheDocument();
-    expect(screen.getByText('Select Role')).toBeInTheDocument();
+    expect(screen.getByText(/Welcome back to Terrava/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Email$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Password$/i)).toBeInTheDocument();
+    expect(screen.getByTestId('login-submit')).toHaveTextContent(/sign in/i);
   });
 
-  it('has role selection dropdown', () => {
+  it('exposes sign-in as the primary submit action', () => {
     render(
       <BrowserRouter>
         <LoginPage />
       </BrowserRouter>
     );
 
-    const roleSelect = screen.getByLabelText('Select Role');
-    expect(roleSelect).toBeInTheDocument();
+    expect(screen.getByTestId('login-submit')).toBeEnabled();
   });
 });

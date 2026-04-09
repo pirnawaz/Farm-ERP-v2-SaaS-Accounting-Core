@@ -10,15 +10,14 @@ use App\Models\Module;
 use App\Models\Party;
 use App\Models\PostingGroup;
 use App\Models\Project;
-use App\Models\SettlementPack;
 use App\Models\Tenant;
 use App\Models\TenantModule;
 use App\Models\User;
+use Database\Seeders\ModulesSeeder;
+use Database\Seeders\SystemAccountsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
-use Database\Seeders\ModulesSeeder;
-use Database\Seeders\SystemAccountsSeeder;
 
 class SettlementPackV2Test extends TestCase
 {
@@ -78,7 +77,7 @@ class SettlementPackV2Test extends TestCase
             'source_type' => 'JOURNAL_ENTRY',
             'source_id' => (string) \Illuminate\Support\Str::uuid(),
             'posting_date' => '2024-06-15',
-            'idempotency_key' => 'v2-test-' . \Illuminate\Support\Str::uuid(),
+            'idempotency_key' => 'v2-test-'.\Illuminate\Support\Str::uuid(),
         ]);
         LedgerEntry::create(['tenant_id' => $tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $bank->id, 'debit_amount' => 500, 'credit_amount' => 0, 'currency_code' => 'GBP']);
         LedgerEntry::create(['tenant_id' => $tenant->id, 'posting_group_id' => $pg->id, 'account_id' => $revenue->id, 'debit_amount' => 0, 'credit_amount' => 500, 'currency_code' => 'GBP']);
@@ -97,7 +96,7 @@ class SettlementPackV2Test extends TestCase
             'source_type' => 'JOURNAL_ENTRY',
             'source_id' => (string) \Illuminate\Support\Str::uuid(),
             'posting_date' => '2024-06-20',
-            'idempotency_key' => 'v2-test-2-' . \Illuminate\Support\Str::uuid(),
+            'idempotency_key' => 'v2-test-2-'.\Illuminate\Support\Str::uuid(),
         ]);
         LedgerEntry::create(['tenant_id' => $tenant->id, 'posting_group_id' => $pg2->id, 'account_id' => $expense->id, 'debit_amount' => 200, 'credit_amount' => 0, 'currency_code' => 'GBP']);
         LedgerEntry::create(['tenant_id' => $tenant->id, 'posting_group_id' => $pg2->id, 'account_id' => $bank->id, 'debit_amount' => 0, 'credit_amount' => 200, 'currency_code' => 'GBP']);
@@ -113,7 +112,7 @@ class SettlementPackV2Test extends TestCase
         $userAdmin = User::create([
             'tenant_id' => $tenant->id,
             'name' => 'Admin',
-            'email' => 'admin-v2@test.' . $tenant->id,
+            'email' => 'admin-v2@test.'.$tenant->id,
             'password' => Hash::make('password'),
             'role' => 'tenant_admin',
             'is_enabled' => true,
@@ -121,7 +120,7 @@ class SettlementPackV2Test extends TestCase
         $userAccountant = User::create([
             'tenant_id' => $tenant->id,
             'name' => 'Accountant',
-            'email' => 'accountant-v2@test.' . $tenant->id,
+            'email' => 'accountant-v2@test.'.$tenant->id,
             'password' => Hash::make('password'),
             'role' => 'accountant',
             'is_enabled' => true,
@@ -205,7 +204,7 @@ class SettlementPackV2Test extends TestCase
             'source_type' => 'JOURNAL_ENTRY',
             'source_id' => (string) \Illuminate\Support\Str::uuid(),
             'posting_date' => '2024-07-01',
-            'idempotency_key' => 'v2-extra-' . \Illuminate\Support\Str::uuid(),
+            'idempotency_key' => 'v2-extra-'.\Illuminate\Support\Str::uuid(),
         ]);
         LedgerEntry::create(['tenant_id' => $tenant->id, 'posting_group_id' => $pgNew->id, 'account_id' => $bank->id, 'debit_amount' => 100, 'credit_amount' => 0, 'currency_code' => 'GBP']);
         LedgerEntry::create(['tenant_id' => $tenant->id, 'posting_group_id' => $pgNew->id, 'account_id' => $revenue->id, 'debit_amount' => 0, 'credit_amount' => 100, 'currency_code' => 'GBP']);
@@ -227,7 +226,7 @@ class SettlementPackV2Test extends TestCase
         $this->assertEqualsWithDelta((float) $originalPlTotal, (float) ($summary['financial_statements']['profit_loss']['totals']['net_profit'] ?? 0), 0.01, 'Embedded P&L snapshot unchanged');
     }
 
-    public function test_finalization_locks_project(): void
+    public function test_finalization_does_not_close_project(): void
     {
         $data = $this->createTenantWithProjectAndLedgerPostings();
         $tenant = $data['tenant'];
@@ -245,13 +244,13 @@ class SettlementPackV2Test extends TestCase
             ->withHeader('X-User-Role', 'accountant')
             ->getJson("/api/settlement-packs/{$packId}");
         $showRes->assertStatus(200);
-        $this->assertSame('FINAL', $showRes->json('status'));
+        $this->assertSame('FINALIZED', $showRes->json('status'));
         $this->assertNotNull($showRes->json('finalized_at'));
+        $this->assertTrue($showRes->json('is_read_only'));
 
         $project->refresh();
-        $this->assertSame('CLOSED', $project->status);
+        $this->assertSame('ACTIVE', $project->status);
 
-        $this->expectException(\App\Exceptions\ProjectClosedException::class);
         $guard = app(\App\Services\OperationalPostingGuard::class);
         $guard->ensureProjectNotClosed($project->id, $tenant->id);
     }
@@ -272,9 +271,10 @@ class SettlementPackV2Test extends TestCase
 
         $r2 = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
+            ->withHeader('X-User-Id', $data['user_accountant']->id)
             ->postJson("/api/settlement-packs/{$packId}/finalize");
         $r2->assertStatus(200);
-        $this->assertSame('FINAL', $r2->json('status'));
+        $this->assertSame('FINALIZED', $r2->json('status'));
     }
 
     public function test_tenant_isolation_finalize(): void

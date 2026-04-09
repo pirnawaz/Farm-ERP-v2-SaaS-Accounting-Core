@@ -7,6 +7,7 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\Party;
 use App\Models\PostingGroup;
+use App\Services\LedgerWriteGuard;
 use App\Services\SystemAccountService;
 use App\Services\ReversalService;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +33,8 @@ class MachineMaintenancePostingService
     {
         $key = $idempotencyKey ?? 'machine_maintenance_job:' . $jobId . ':post';
 
-        return DB::transaction(function () use ($jobId, $tenantId, $postingDate, $key) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($jobId, $tenantId, $postingDate, $key) {
+            return DB::transaction(function () use ($jobId, $tenantId, $postingDate, $key) {
             // Check idempotency by key
             $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $key)->first();
             if ($existing) {
@@ -152,6 +154,7 @@ class MachineMaintenancePostingService
             ]);
 
             return $postingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 
@@ -164,7 +167,8 @@ class MachineMaintenancePostingService
     {
         $reason = $reason ?? 'Reversed';
 
-        return DB::transaction(function () use ($jobId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($jobId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($jobId, $tenantId, $postingDate, $reason) {
             // Load job
             $job = MachineMaintenanceJob::where('id', $jobId)
                 ->where('tenant_id', $tenantId)
@@ -198,6 +202,7 @@ class MachineMaintenancePostingService
             ]);
 
             return $reversalPostingGroup->fresh(['allocationRows', 'ledgerEntries.account']);
+            });
         });
     }
 }

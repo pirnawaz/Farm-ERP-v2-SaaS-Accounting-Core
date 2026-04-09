@@ -18,6 +18,7 @@ use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
 use App\Services\Accounting\PostValidationService;
+use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\PostingDateGuard;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,8 @@ class InventoryPostingService
         private SystemPartyService $partyService,
         private PostValidationService $postValidationService,
         private OperationalPostingGuard $guard,
-        private PostingDateGuard $postingDateGuard
+        private PostingDateGuard $postingDateGuard,
+        private PostingIdempotencyService $postingIdempotency
     ) {}
 
     /**
@@ -41,13 +43,15 @@ class InventoryPostingService
      *
      * @throws \Exception
      */
-    public function postGRN(string $grnId, string $tenantId, string $postingDate, string $idempotencyKey): PostingGroup
+    public function postGRN(string $grnId, string $tenantId, string $postingDate, ?string $idempotencyKey = null): PostingGroup
     {
-        return DB::transaction(function () use ($grnId, $tenantId, $postingDate, $idempotencyKey) {
-            $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $idempotencyKey)->first();
-            if ($existing) {
-                return $existing->load(['ledgerEntries.account']);
+        return LedgerWriteGuard::scoped(static::class, function () use ($grnId, $tenantId, $postingDate, $idempotencyKey) {
+            return DB::transaction(function () use ($grnId, $tenantId, $postingDate, $idempotencyKey) {
+            $resolved = $this->postingIdempotency->resolveOrCreate($tenantId, $idempotencyKey, 'INVENTORY_GRN', $grnId);
+            if ($resolved['posting_group'] !== null) {
+                return $resolved['posting_group']->load(['ledgerEntries.account']);
             }
+            $effectiveKey = $resolved['effective_key'];
 
             $grn = InvGrn::where('id', $grnId)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
             $grn->load(['lines.item', 'store']);
@@ -59,6 +63,8 @@ class InventoryPostingService
                 InvItem::where('id', $line->item_id)->where('tenant_id', $tenantId)->firstOrFail();
             }
 
+            $this->guard->ensureCropCycleOpenViaAnyOpenProject($tenantId);
+
             $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
             $postingGroup = PostingGroup::create([
@@ -67,7 +73,7 @@ class InventoryPostingService
                 'source_type' => 'INVENTORY_GRN',
                 'source_id' => $grn->id,
                 'posting_date' => $postingDateObj,
-                'idempotency_key' => $idempotencyKey,
+                'idempotency_key' => $effectiveKey,
             ]);
 
             $totalValue = '0';
@@ -134,6 +140,7 @@ class InventoryPostingService
             $grn->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 
@@ -142,13 +149,15 @@ class InventoryPostingService
      *
      * @throws \Exception
      */
-    public function postIssue(string $issueId, string $tenantId, string $postingDate, string $idempotencyKey): PostingGroup
+    public function postIssue(string $issueId, string $tenantId, string $postingDate, ?string $idempotencyKey = null): PostingGroup
     {
-        return DB::transaction(function () use ($issueId, $tenantId, $postingDate, $idempotencyKey) {
-            $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $idempotencyKey)->first();
-            if ($existing) {
-                return $existing->load(['ledgerEntries.account', 'allocationRows']);
+        return LedgerWriteGuard::scoped(static::class, function () use ($issueId, $tenantId, $postingDate, $idempotencyKey) {
+            return DB::transaction(function () use ($issueId, $tenantId, $postingDate, $idempotencyKey) {
+            $resolved = $this->postingIdempotency->resolveOrCreate($tenantId, $idempotencyKey, 'INVENTORY_ISSUE', $issueId);
+            if ($resolved['posting_group'] !== null) {
+                return $resolved['posting_group']->load(['ledgerEntries.account', 'allocationRows']);
             }
+            $effectiveKey = $resolved['effective_key'];
 
             $issue = InvIssue::where('id', $issueId)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
             $issue->load(['lines.item', 'store', 'project', 'cropCycle']);
@@ -187,7 +196,7 @@ class InventoryPostingService
                 'source_type' => 'INVENTORY_ISSUE',
                 'source_id' => $issue->id,
                 'posting_date' => $postingDateObj,
-                'idempotency_key' => $idempotencyKey,
+                'idempotency_key' => $effectiveKey,
             ]);
 
             $totalValue = 0.0;
@@ -365,6 +374,7 @@ class InventoryPostingService
             $issue->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 
@@ -375,7 +385,8 @@ class InventoryPostingService
      */
     public function reverseGRN(string $grnId, string $tenantId, string $postingDate, string $reason): PostingGroup
     {
-        return DB::transaction(function () use ($grnId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($grnId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($grnId, $tenantId, $postingDate, $reason) {
             $grn = InvGrn::where('id', $grnId)->where('tenant_id', $tenantId)->firstOrFail();
             if (!$grn->isPosted()) {
                 throw new \Exception('Only posted GRNs can be reversed.');
@@ -421,6 +432,7 @@ class InventoryPostingService
             $grn->update(['status' => 'REVERSED']);
 
             return $reversalPG->fresh(['ledgerEntries.account']);
+            });
         });
     }
 
@@ -431,7 +443,8 @@ class InventoryPostingService
      */
     public function reverseIssue(string $issueId, string $tenantId, string $postingDate, string $reason): PostingGroup
     {
-        return DB::transaction(function () use ($issueId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($issueId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($issueId, $tenantId, $postingDate, $reason) {
             $issue = InvIssue::where('id', $issueId)->where('tenant_id', $tenantId)->firstOrFail();
             if (!$issue->isPosted()) {
                 throw new \Exception('Only posted Issues can be reversed.');
@@ -474,6 +487,7 @@ class InventoryPostingService
             $issue->update(['status' => 'REVERSED']);
 
             return $reversalPG->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 
@@ -482,13 +496,15 @@ class InventoryPostingService
      *
      * @throws \Exception
      */
-    public function postTransfer(string $transferId, string $tenantId, string $postingDate, string $idempotencyKey): PostingGroup
+    public function postTransfer(string $transferId, string $tenantId, string $postingDate, ?string $idempotencyKey = null): PostingGroup
     {
-        return DB::transaction(function () use ($transferId, $tenantId, $postingDate, $idempotencyKey) {
-            $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $idempotencyKey)->first();
-            if ($existing) {
-                return $existing->load(['ledgerEntries.account']);
+        return LedgerWriteGuard::scoped(static::class, function () use ($transferId, $tenantId, $postingDate, $idempotencyKey) {
+            return DB::transaction(function () use ($transferId, $tenantId, $postingDate, $idempotencyKey) {
+            $resolved = $this->postingIdempotency->resolveOrCreate($tenantId, $idempotencyKey, 'INVENTORY_TRANSFER', $transferId);
+            if ($resolved['posting_group'] !== null) {
+                return $resolved['posting_group']->load(['ledgerEntries.account']);
             }
+            $effectiveKey = $resolved['effective_key'];
 
             $transfer = InvTransfer::where('id', $transferId)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
             $transfer->load(['lines.item', 'fromStore', 'toStore']);
@@ -502,6 +518,8 @@ class InventoryPostingService
             InvStore::where('id', $transfer->from_store_id)->where('tenant_id', $tenantId)->firstOrFail();
             InvStore::where('id', $transfer->to_store_id)->where('tenant_id', $tenantId)->firstOrFail();
 
+            $this->guard->ensureCropCycleOpenViaAnyOpenProject($tenantId);
+
             $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
             $postingGroup = PostingGroup::create([
@@ -510,7 +528,7 @@ class InventoryPostingService
                 'source_type' => 'INVENTORY_TRANSFER',
                 'source_id' => $transfer->id,
                 'posting_date' => $postingDateObj,
-                'idempotency_key' => $idempotencyKey,
+                'idempotency_key' => $effectiveKey,
             ]);
 
             foreach ($transfer->lines as $line) {
@@ -560,6 +578,7 @@ class InventoryPostingService
             $transfer->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 
             return $postingGroup->fresh(['ledgerEntries.account']);
+            });
         });
     }
 
@@ -570,7 +589,8 @@ class InventoryPostingService
      */
     public function reverseTransfer(string $transferId, string $tenantId, string $postingDate, string $reason): PostingGroup
     {
-        return DB::transaction(function () use ($transferId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($transferId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($transferId, $tenantId, $postingDate, $reason) {
             $transfer = InvTransfer::where('id', $transferId)->where('tenant_id', $tenantId)->firstOrFail();
             if (!$transfer->isPosted()) {
                 throw new \Exception('Only posted transfers can be reversed.');
@@ -611,6 +631,7 @@ class InventoryPostingService
             $transfer->update(['status' => 'REVERSED']);
 
             return $reversalPG->fresh(['ledgerEntries.account']);
+            });
         });
     }
 
@@ -619,13 +640,15 @@ class InventoryPostingService
      *
      * @throws \Exception
      */
-    public function postAdjustment(string $adjustmentId, string $tenantId, string $postingDate, string $idempotencyKey): PostingGroup
+    public function postAdjustment(string $adjustmentId, string $tenantId, string $postingDate, ?string $idempotencyKey = null): PostingGroup
     {
-        return DB::transaction(function () use ($adjustmentId, $tenantId, $postingDate, $idempotencyKey) {
-            $existing = PostingGroup::where('tenant_id', $tenantId)->where('idempotency_key', $idempotencyKey)->first();
-            if ($existing) {
-                return $existing->load(['ledgerEntries.account']);
+        return LedgerWriteGuard::scoped(static::class, function () use ($adjustmentId, $tenantId, $postingDate, $idempotencyKey) {
+            return DB::transaction(function () use ($adjustmentId, $tenantId, $postingDate, $idempotencyKey) {
+            $resolved = $this->postingIdempotency->resolveOrCreate($tenantId, $idempotencyKey, 'INVENTORY_ADJUSTMENT', $adjustmentId);
+            if ($resolved['posting_group'] !== null) {
+                return $resolved['posting_group']->load(['ledgerEntries.account']);
             }
+            $effectiveKey = $resolved['effective_key'];
 
             $adj = InvAdjustment::where('id', $adjustmentId)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
             $adj->load(['lines.item', 'store']);
@@ -633,6 +656,8 @@ class InventoryPostingService
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
 
             InvStore::where('id', $adj->store_id)->where('tenant_id', $tenantId)->firstOrFail();
+
+            $this->guard->ensureCropCycleOpenViaAnyOpenProject($tenantId);
 
             $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
@@ -642,7 +667,7 @@ class InventoryPostingService
                 'source_type' => 'INVENTORY_ADJUSTMENT',
                 'source_id' => $adj->id,
                 'posting_date' => $postingDateObj,
-                'idempotency_key' => $idempotencyKey,
+                'idempotency_key' => $effectiveKey,
             ]);
 
             $inventoryAccount = $this->accountService->getByCode($tenantId, 'INVENTORY_INPUTS');
@@ -731,6 +756,7 @@ class InventoryPostingService
             $adj->update(['status' => 'POSTED', 'posting_group_id' => $postingGroup->id, 'posting_date' => $postingDateObj]);
 
             return $postingGroup->fresh(['ledgerEntries.account']);
+            });
         });
     }
 
@@ -741,7 +767,8 @@ class InventoryPostingService
      */
     public function reverseAdjustment(string $adjustmentId, string $tenantId, string $postingDate, string $reason): PostingGroup
     {
-        return DB::transaction(function () use ($adjustmentId, $tenantId, $postingDate, $reason) {
+        return LedgerWriteGuard::scoped(static::class, function () use ($adjustmentId, $tenantId, $postingDate, $reason) {
+            return DB::transaction(function () use ($adjustmentId, $tenantId, $postingDate, $reason) {
             $adj = InvAdjustment::where('id', $adjustmentId)->where('tenant_id', $tenantId)->firstOrFail();
             if (!$adj->isPosted()) {
                 throw new \Exception('Only posted adjustments can be reversed.');
@@ -782,6 +809,7 @@ class InventoryPostingService
             $adj->update(['status' => 'REVERSED']);
 
             return $reversalPG->fresh(['ledgerEntries.account']);
+            });
         });
     }
 }

@@ -29,6 +29,7 @@ export const MODULE_KEY_LABELS: Record<string, string> = Object.fromEntries(
     'ar_sales',
     'reports',
     'settlements',
+    'loans',
   ].map((k) => [k, getModuleLabel(k)]),
 );
 
@@ -173,6 +174,10 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     // Limited finance (operationally necessary)
     'payments',
     'advances',
+    'loans',
+    'fixed-assets',
+    'exchange-rates',
+    'fx-revaluation-runs',
   ]);
 
   const keepAllFinance = role === 'accountant';
@@ -282,6 +287,7 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
   reports: NavItem[];
   analysis: NavItem[];
   receivables: NavItem[];
+  payables: NavItem[];
   reconciliation: NavItem[];
   governance: NavItem[];
 } {
@@ -294,6 +300,27 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
     accounting: [
       { key: 'dashboard', label: 'Accounting Overview', to: '/app/dashboard', requiredPermission: VIEW },
       { key: 'journals', label: 'General Journal', to: '/app/accounting/journals', requiredPermission: VIEW, requiredModules: ['reports'] },
+      {
+        key: 'fixed-assets',
+        label: 'Fixed assets',
+        to: '/app/accounting/fixed-assets',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
+      {
+        key: 'exchange-rates',
+        label: 'Exchange rates',
+        to: '/app/accounting/exchange-rates',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
+      {
+        key: 'fx-revaluation-runs',
+        label: 'FX revaluation',
+        to: '/app/accounting/fx-revaluation-runs',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
       { key: 'accounting-periods', label: 'Accounting Periods', to: '/app/accounting/periods', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'general-ledger', label: term('generalLedger'), to: '/app/reports/general-ledger', requiredPermission: VIEW, requiredModules: ['reports'] },
     ],
@@ -307,7 +334,8 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
       { key: 'party-summary', label: 'Party Summary', to: '/app/reports/party-summary', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'party-ageing', label: 'Party Ageing', to: '/app/reports/role-ageing', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'landlord-statement', label: 'Landlord Statement', to: '/app/reports/landlord-statement', requiredPermission: VIEW, requiredModules: ['land_leases'] },
-      { key: 'settlement-packs', label: 'Settlement Packs', to: '/app/settlement', requiredPermission: VIEW, requiredModules: ['settlements'] },
+      { key: 'settlement-packs', label: 'Settlement Packs', to: '/app/settlement-packs', requiredPermission: VIEW, requiredModules: ['settlements'] },
+      { key: 'loans', label: 'Loans', to: '/app/loans', requiredPermission: VIEW, requiredModules: ['loans'] },
     ],
     analysis: [
       { key: 'crop-profitability', label: 'Crop Profitability', to: '/app/reports/crop-profitability', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
@@ -318,6 +346,16 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
       { key: 'machinery-profitability', label: 'Machinery Profitability', to: '/app/machinery/reports/profitability', requiredPermission: VIEW, requiredModules: ['machinery'] },
     ],
     receivables: [{ key: 'ar-ageing', label: term('arAgeing'), to: '/app/reports/ar-ageing', requiredPermission: VIEW, requiredModules: ['ar_sales'] }],
+    payables: [
+      { key: 'ap-ageing', label: 'AP ageing', to: '/app/reports/ap-ageing', requiredPermission: VIEW, requiredModules: ['reports'] },
+      {
+        key: 'supplier-invoices',
+        label: 'Supplier invoices',
+        to: '/app/accounting/supplier-invoices',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
+    ],
     reconciliation: [
       { key: 'bank-reconciliation', label: 'Bank Reconciliation', to: '/app/reports/bank-reconciliation', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'reconciliation-dashboard', label: 'Reconcile Accounts', to: '/app/reports/reconciliation-dashboard', requiredPermission: VIEW, requiredModules: ['reports'] },
@@ -525,6 +563,11 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
           sectionKey: 'fin-receivables',
           sectionTitle: 'Receivables',
           items: financeSectionItems(term, VIEW).receivables,
+        },
+        {
+          sectionKey: 'fin-payables',
+          sectionTitle: 'Payables',
+          items: financeSectionItems(term, VIEW).payables,
         },
         {
           sectionKey: 'fin-reconciliation',

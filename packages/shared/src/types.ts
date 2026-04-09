@@ -48,13 +48,19 @@ export interface Account {
 export interface PostingGroup {
   id: string
   tenant_id: string
-  project_id: string
+  project_id?: string | null
   source_type: string
   source_id: string
   posting_date: string
   reversal_of_posting_group_id?: string | null
   correction_reason?: string | null
   created_at: string
+  /** Transaction / document currency (ISO 4217). */
+  currency_code?: string | null
+  /** Functional / reporting currency (ISO 4217). */
+  base_currency_code?: string | null
+  /** Base units per one unit of transaction currency when applicable. */
+  fx_rate?: string | number | null
   project?: Project
   allocation_rows?: AllocationRow[]
   ledger_entries?: LedgerEntry[]
@@ -81,9 +87,15 @@ export interface LedgerEntry {
   tenant_id: string
   posting_group_id: string
   account_id: string
-  debit: string | number
-  credit: string | number
+  debit?: string | number
+  credit?: string | number
+  debit_amount?: string | number
+  credit_amount?: string | number
   currency_code: string
+  base_currency_code?: string | null
+  fx_rate?: string | number | null
+  debit_amount_base?: string | number | null
+  credit_amount_base?: string | number | null
   created_at: string
   account?: Account
 }
@@ -447,7 +459,8 @@ export interface ReconciliationResponse {
 }
 
 // Settlement Pack (Governance Phase 1)
-export type SettlementPackStatus = 'DRAFT' | 'FINAL'
+/** Backend uses FINALIZED; FINAL kept for legacy responses. */
+export type SettlementPackStatus = 'DRAFT' | 'FINALIZED' | 'VOID' | 'FINAL'
 
 export interface SettlementPackSummary {
   total_amount: string
@@ -466,6 +479,34 @@ export interface SettlementPackRegisterRow {
   party_id: string | null
 }
 
+export interface SettlementPackVersionRow {
+  version_no: number
+  generated_at: string | null
+  generated_by_user_id: string | null
+  content_hash: string | null
+  has_pdf: boolean
+}
+
+export interface SettlementPackApprovalRow {
+  approver_user_id: string | null
+  approver_role: string
+  status: string
+  approved_at: string | null
+  rejected_at: string | null
+}
+
+export interface SettlementPackListItem {
+  id: string
+  project_id: string
+  reference_no: string
+  status: SettlementPackStatus
+  as_of_date: string | null
+  prepared_at: string | null
+  finalized_at: string | null
+  is_read_only: boolean
+  project: { id: string; name: string } | null
+}
+
 export interface SettlementPackResponse {
   id: string
   tenant_id: string
@@ -478,6 +519,103 @@ export interface SettlementPackResponse {
   register_version: string
   register_row_count?: number
   register_rows?: SettlementPackRegisterRow[]
+  finalized_at?: string | null
+  finalized_by_user_id?: string | null
+  is_read_only?: boolean
+  versions?: SettlementPackVersionRow[]
+  approvals?: SettlementPackApprovalRow[]
+  notes?: string | null
+  as_of_date?: string | null
+  prepared_at?: string | null
+}
+
+export interface SettlementPackRegisterPayload {
+  register_rows: SettlementPackRegisterRow[]
+  register_lines: unknown[]
+  metrics: unknown
+  content_hash: string | null
+  as_of_date: string
+}
+
+export interface SettlementPackGenerateVersionResponse {
+  settlement_pack_id: string
+  version_no: number
+  summary_json: SettlementPackSummary
+}
+
+export interface SettlementPackExportPdfResponse {
+  pack_id: string
+  version: number
+  sha256_hex: string
+  generated_at: string
+}
+
+// Loans (Phase 1B)
+export type LoanAgreementStatus = 'DRAFT' | 'ACTIVE' | 'POSTED' | 'CLOSED'
+
+export interface LoanAgreementListItem {
+  id: string
+  reference_no: string | null
+  status: LoanAgreementStatus
+  principal_amount: string | null
+  currency_code: string
+  start_date: string | null
+  maturity_date: string | null
+  project: { id: string; name: string } | null
+  lender_party: { id: string; name: string } | null
+  updated_at: string | null
+}
+
+export interface LoanAgreementDetail extends LoanAgreementListItem {
+  tenant_id: string
+  project_id: string
+  lender_party_id: string | null
+  interest_rate_annual: string | null
+  notes: string | null
+  created_at: string | null
+}
+
+export interface LoanStatementDrawdown {
+  id: string
+  drawdown_date: string | null
+  posting_date: string
+  amount: string
+  reference_no: string | null
+  posting_group_id: string | null
+}
+
+export interface LoanStatementRepayment {
+  id: string
+  repayment_date: string | null
+  posting_date: string
+  amount: string
+  principal_amount: string
+  interest_amount: string
+  reference_no: string | null
+  posting_group_id: string | null
+}
+
+export interface LoanStatementLine {
+  kind: 'DRAWDOWN' | 'REPAYMENT'
+  id: string
+  date: string
+  amount: string
+  principal: string | null
+  interest: string | null
+  reference_no: string | null
+  balance_after: string
+}
+
+export interface LoanAgreementStatement {
+  loan_agreement_id: string
+  currency_code: string
+  from: string | null
+  to: string | null
+  opening_balance: string
+  closing_balance: string
+  drawdowns: LoanStatementDrawdown[]
+  repayments: LoanStatementRepayment[]
+  lines: LoanStatementLine[]
 }
 
 // Payment reversal (treasury)
@@ -489,4 +627,154 @@ export interface ReversePaymentPayload {
 export interface ReversePaymentResponse {
   reversal_posting_group_id: string
   reversal_posting_group: PostingGroup
+}
+
+/** Fixed assets (Phase 2A) */
+export interface FixedAssetBook {
+  id: string
+  tenant_id: string
+  fixed_asset_id: string
+  book_type: string
+  asset_cost: string | number
+  accumulated_depreciation: string | number
+  carrying_amount: string | number
+  last_depreciation_date?: string | null
+}
+
+export interface FixedAssetDisposal {
+  id: string
+  tenant_id: string
+  fixed_asset_id: string
+  disposal_date: string
+  proceeds_amount: string | number
+  proceeds_account?: 'BANK' | 'CASH' | null
+  status: 'DRAFT' | 'POSTED'
+  posting_date?: string | null
+  posted_at?: string | null
+  posting_group_id?: string | null
+  carrying_amount_at_post?: string | number | null
+  gain_amount?: string | number | null
+  loss_amount?: string | number | null
+  notes?: string | null
+  posting_group?: PostingGroup | null
+}
+
+export interface FixedAsset {
+  id: string
+  tenant_id: string
+  project_id?: string | null
+  asset_code: string
+  name: string
+  category: string
+  acquisition_date: string
+  in_service_date?: string | null
+  status: 'DRAFT' | 'ACTIVE' | 'DISPOSED' | 'RETIRED'
+  currency_code: string
+  acquisition_cost: string | number
+  residual_value: string | number
+  useful_life_months: number
+  depreciation_method: string
+  notes?: string | null
+  activation_posting_group_id?: string | null
+  activated_at?: string | null
+  project?: Project | null
+  activation_posting_group?: PostingGroup | null
+  books?: FixedAssetBook[]
+  disposals?: FixedAssetDisposal[]
+}
+
+export interface FixedAssetDepreciationLine {
+  id: string
+  tenant_id: string
+  depreciation_run_id: string
+  fixed_asset_id: string
+  depreciation_amount: string | number
+  opening_carrying_amount: string | number
+  closing_carrying_amount: string | number
+  depreciation_start: string
+  depreciation_end: string
+  fixed_asset?: FixedAsset
+}
+
+export interface FixedAssetDepreciationRun {
+  id: string
+  tenant_id: string
+  reference_no: string
+  status: 'DRAFT' | 'POSTED' | 'VOID'
+  period_start: string
+  period_end: string
+  posting_date?: string | null
+  posted_at?: string | null
+  posting_group_id?: string | null
+  lines?: FixedAssetDepreciationLine[]
+  lines_count?: number
+  posting_group?: PostingGroup | null
+}
+
+export type CreateFixedAssetPayload = {
+  project_id?: string | null
+  asset_code: string
+  name: string
+  category: string
+  acquisition_date: string
+  in_service_date?: string | null
+  currency_code: string
+  acquisition_cost: number
+  residual_value?: number
+  useful_life_months: number
+  depreciation_method: 'STRAIGHT_LINE'
+  notes?: string | null
+}
+
+/** Stored FX: base units per 1 quote unit (see API docs). */
+export interface ExchangeRateRow {
+  id: string
+  tenant_id: string
+  rate_date: string
+  base_currency_code: string
+  quote_currency_code: string
+  rate: string | number
+  source?: string | null
+  created_by?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type CreateExchangeRatePayload = {
+  rate_date: string
+  base_currency_code: string
+  quote_currency_code: string
+  rate: number
+  source?: string | null
+}
+
+export interface FxRevaluationLine {
+  id: string
+  tenant_id: string
+  fx_revaluation_run_id: string
+  source_type: string
+  source_id: string
+  currency_code: string
+  original_base_amount: string | number
+  revalued_base_amount: string | number
+  delta_amount: string | number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface FxRevaluationRun {
+  id: string
+  tenant_id: string
+  reference_no: string
+  status: 'DRAFT' | 'POSTED' | 'VOID'
+  as_of_date: string
+  posting_date?: string | null
+  posting_group_id?: string | null
+  posted_at?: string | null
+  posted_by_user_id?: string | null
+  created_at?: string
+  updated_at?: string
+  lines?: FxRevaluationLine[]
+  lines_count?: number
+  posting_group?: PostingGroup | null
 }

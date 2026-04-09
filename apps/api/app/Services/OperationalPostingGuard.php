@@ -63,4 +63,30 @@ class OperationalPostingGuard
 
         $this->ensureCropCycleOpen($project->crop_cycle_id, $tenantId);
     }
+
+    /**
+     * For postings with no document-level project (e.g. GL journal, warehouse GRN/transfer/adjustment),
+     * resolve any tenant project whose crop cycle is OPEN and run {@see ensureCropCycleOpenForProject}.
+     *
+     * @throws CropCycleClosedException
+     * @throws ProjectClosedException
+     */
+    public function ensureCropCycleOpenViaAnyOpenProject(string $tenantId): void
+    {
+        $project = Project::query()
+            ->where('tenant_id', $tenantId)
+            ->where('status', '!=', 'CLOSED')
+            ->whereNotNull('crop_cycle_id')
+            ->whereHas('cropCycle', function ($q) {
+                $q->where('status', 'OPEN');
+            })
+            ->orderBy('created_at')
+            ->first();
+
+        if (! $project) {
+            throw new CropCycleClosedException('No open crop cycle available for posting.');
+        }
+
+        $this->ensureCropCycleOpenForProject($project->id, $tenantId);
+    }
 }

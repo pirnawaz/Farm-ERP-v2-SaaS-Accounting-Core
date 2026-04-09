@@ -7,6 +7,7 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
 use App\Models\Account;
+use App\Services\LedgerWriteGuard;
 use App\Services\PartyAccountService;
 use App\Services\SystemAccountService;
 use Illuminate\Console\Command;
@@ -23,6 +24,8 @@ use Carbon\Carbon;
  * - KAMDAR: PAYABLE_KAMDAR, ADVANCE_KAMDAR, DUE_FROM_KAMDAR -> PARTY_CONTROL_KAMDAR
  * 
  * Idempotent via accounting_corrections table (tenant_id + reason unique).
+ *
+ * Ledger writes run only in local/development/testing — see handle().
  */
 class ConsolidatePartyControls extends Command
 {
@@ -128,6 +131,12 @@ class ConsolidatePartyControls extends Command
             return self::SUCCESS;
         }
 
+        if (! app()->environment(['local', 'development', 'dev', 'testing'])) {
+            $this->error('This maintenance command may only apply consolidation in local, development, dev, or testing environments.');
+
+            return self::FAILURE;
+        }
+
         // Create consolidation posting group
         try {
             $postingGroup = $this->createConsolidationPostingGroup(
@@ -192,7 +201,8 @@ class ConsolidatePartyControls extends Command
         string $postingDate,
         array $consolidations
     ): PostingGroup {
-        return DB::transaction(function () use ($tenantId, $postingDate, $consolidations) {
+        return LedgerWriteGuard::scoped(self::class, function () use ($tenantId, $postingDate, $consolidations) {
+            return DB::transaction(function () use ($tenantId, $postingDate, $consolidations) {
             // Create PostingGroup (source_id required NOT NULL; use UUID for consolidation run)
             $postingGroup = PostingGroup::create([
                 'tenant_id' => $tenantId,
@@ -334,6 +344,7 @@ class ConsolidatePartyControls extends Command
             ]);
 
             return $postingGroup->fresh(['ledgerEntries.account', 'allocationRows']);
+            });
         });
     }
 }

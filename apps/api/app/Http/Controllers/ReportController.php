@@ -2074,7 +2074,8 @@ class ReportController extends Controller
 
     /**
      * GET /api/reports/ap-ageing
-     * Supplier payables ageing (bill-only). GRNs = bills; allocation cutoff allocation_date <= as_of; ACTIVE only.
+     * Supplier payables ageing: open GRN bills + open posted supplier invoices.
+     * Due date: GRN = posting_date (bill); supplier invoice = invoice_date or posted date; allocation cutoff allocation_date <= as_of; ACTIVE only.
      */
     public function apAgeing(Request $request): JsonResponse
     {
@@ -2085,9 +2086,8 @@ class ReportController extends Controller
         $billPaymentService = app(BillPaymentService::class);
 
         $suppliers = Party::where('tenant_id', $tenantId)
-            ->whereHas('supplierGrns', function ($q) {
-                $q->where('status', 'POSTED');
-            })
+            ->whereJsonContains('party_types', 'VENDOR')
+            ->orderBy('name')
             ->get();
 
         $rows = [];
@@ -2101,7 +2101,8 @@ class ReportController extends Controller
 
         foreach ($suppliers as $supplier) {
             $openBills = $billPaymentService->getSupplierOpenBills($supplier->id, $tenantId, $asOfDate);
-            if (empty($openBills)) {
+            $openSis = $billPaymentService->getSupplierOpenSupplierInvoices($supplier->id, $tenantId, $asOfDate);
+            if (empty($openBills) && empty($openSis)) {
                 continue;
             }
 
@@ -2116,19 +2117,15 @@ class ReportController extends Controller
             foreach ($openBills as $bill) {
                 $outstanding = (float) $bill['outstanding'];
                 $dueDate = $bill['due_date'] ?? $bill['posting_date'];
-                $dueDateObj = Carbon::parse($dueDate);
-                $daysOverdue = (int) $asOfDateObj->diffInDays($dueDateObj, false);
-
-                $supplierTotals['total_outstanding'] += $outstanding;
-                if ($daysOverdue <= 30) {
-                    $supplierTotals['bucket_0_30'] += $outstanding;
-                } elseif ($daysOverdue <= 60) {
-                    $supplierTotals['bucket_31_60'] += $outstanding;
-                } elseif ($daysOverdue <= 90) {
-                    $supplierTotals['bucket_61_90'] += $outstanding;
-                } else {
-                    $supplierTotals['bucket_90_plus'] += $outstanding;
+                $this->addApAgeingOutstanding($outstanding, (string) $dueDate, $asOfDateObj, $supplierTotals);
+            }
+            foreach ($openSis as $si) {
+                $outstanding = (float) $si['outstanding'];
+                $dueDate = $si['due_date'] ?? $si['invoice_date'] ?? $si['posted_at'];
+                if ($dueDate === null) {
+                    continue;
                 }
+                $this->addApAgeingOutstanding($outstanding, (string) $dueDate, $asOfDateObj, $supplierTotals);
             }
 
             if ($supplierTotals['total_outstanding'] > 0) {
@@ -2149,6 +2146,12 @@ class ReportController extends Controller
             }
         }
 
+        $subledgerCheck = 0.0;
+        foreach ($suppliers as $supplier) {
+            $subledgerCheck += $billPaymentService->getSupplierOpenBillsTotal($supplier->id, $tenantId, $asOfDate);
+            $subledgerCheck += $billPaymentService->getSupplierOpenSupplierInvoicesTotal($supplier->id, $tenantId, $asOfDate);
+        }
+
         return response()->json([
             'as_of' => $asOfDate,
             'buckets' => ['0-30', '31-60', '61-90', '90+'],
@@ -2160,7 +2163,33 @@ class ReportController extends Controller
                 'bucket_61_90' => number_format($totals['bucket_61_90'], 2, '.', ''),
                 'bucket_90_plus' => number_format($totals['bucket_90_plus'], 2, '.', ''),
             ],
+            'reconciliation' => [
+                'subledger_open_total' => number_format($subledgerCheck, 2, '.', ''),
+            ],
         ]);
+    }
+
+    /**
+     * @param  array<string, float>  $supplierTotals
+     */
+    private function addApAgeingOutstanding(float $outstanding, string $dueDate, Carbon $asOfDateObj, array &$supplierTotals): void
+    {
+        if ($outstanding <= 0) {
+            return;
+        }
+        $dueDateObj = Carbon::parse($dueDate);
+        $daysOverdue = (int) $asOfDateObj->diffInDays($dueDateObj, false);
+
+        $supplierTotals['total_outstanding'] += $outstanding;
+        if ($daysOverdue <= 30) {
+            $supplierTotals['bucket_0_30'] += $outstanding;
+        } elseif ($daysOverdue <= 60) {
+            $supplierTotals['bucket_31_60'] += $outstanding;
+        } elseif ($daysOverdue <= 90) {
+            $supplierTotals['bucket_61_90'] += $outstanding;
+        } else {
+            $supplierTotals['bucket_90_plus'] += $outstanding;
+        }
     }
 
     /**

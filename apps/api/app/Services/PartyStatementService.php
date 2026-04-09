@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Domains\Commercial\Payables\SupplierInvoice;
 use App\Models\Party;
 use App\Models\AllocationRow;
+use App\Models\InvGrn;
 use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\SalePaymentAllocation;
@@ -693,6 +695,187 @@ class PartyStatementService
                 'credit_total' => number_format($creditTotal, 2, '.', ''),
                 'opening_balance' => number_format($openingBalance, 2, '.', ''),
                 'closing_balance' => number_format($runningBalance, 2, '.', ''),
+            ],
+        ];
+    }
+
+    /**
+     * Supplier (AP) activity statement: posted GRN bills, posted supplier invoices, and payments OUT.
+     * Running balance = opening + (bills + supplier invoices) − payments (cash-style, same basis as AR statement).
+     * Reconciliation exposes open-document subledger at `to` (BillPaymentService) for tie-out to AP ageing.
+     *
+     * @return array{party: array, period: array{from: string, to: string}, lines: array, totals: array, reconciliation: array}
+     */
+    public function getSupplierStatement(string $tenantId, string $partyId, string $from, string $to): array
+    {
+        $party = Party::where('id', $partyId)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $bps = app(BillPaymentService::class);
+
+        $openingGrnBills = (float) InvGrn::where('tenant_id', $tenantId)
+            ->where('supplier_party_id', $partyId)
+            ->where('status', 'POSTED')
+            ->where('posting_date', '<', $from)
+            ->get()
+            ->sum(fn ($g) => $bps->getGrnBillTotal($g->id, $tenantId));
+
+        $openingSi = (float) SupplierInvoice::query()
+            ->where('supplier_invoices.tenant_id', $tenantId)
+            ->where('supplier_invoices.party_id', $partyId)
+            ->where('supplier_invoices.status', SupplierInvoice::STATUS_POSTED)
+            ->whereNotNull('supplier_invoices.posting_group_id')
+            ->join('posting_groups', function ($join) use ($tenantId) {
+                $join->on('posting_groups.id', '=', 'supplier_invoices.posting_group_id')
+                    ->where('posting_groups.tenant_id', '=', $tenantId);
+            })
+            ->where('posting_groups.posting_date', '<', $from)
+            ->sum('supplier_invoices.total_amount');
+
+        $openingPaymentsOut = (float) Payment::where('tenant_id', $tenantId)
+            ->where('party_id', $partyId)
+            ->posted()
+            ->notReversed()
+            ->where('direction', 'OUT')
+            ->where('payment_date', '<', $from)
+            ->sum('amount');
+
+        $openingBalance = $openingGrnBills + $openingSi - $openingPaymentsOut;
+
+        $grns = InvGrn::where('tenant_id', $tenantId)
+            ->where('supplier_party_id', $partyId)
+            ->where('status', 'POSTED')
+            ->whereBetween('posting_date', [$from, $to])
+            ->orderBy('posting_date')
+            ->orderBy('created_at')
+            ->get();
+
+        $sis = SupplierInvoice::query()
+            ->where('supplier_invoices.tenant_id', $tenantId)
+            ->where('supplier_invoices.party_id', $partyId)
+            ->where('supplier_invoices.status', SupplierInvoice::STATUS_POSTED)
+            ->whereNotNull('supplier_invoices.posting_group_id')
+            ->join('posting_groups', function ($join) use ($tenantId) {
+                $join->on('posting_groups.id', '=', 'supplier_invoices.posting_group_id')
+                    ->where('posting_groups.tenant_id', '=', $tenantId);
+            })
+            ->whereBetween('posting_groups.posting_date', [$from, $to])
+            ->select('supplier_invoices.*')
+            ->orderBy('posting_groups.posting_date')
+            ->orderBy('supplier_invoices.created_at')
+            ->with('postingGroup')
+            ->get();
+
+        $paymentsOut = Payment::where('tenant_id', $tenantId)
+            ->where('party_id', $partyId)
+            ->posted()
+            ->notReversed()
+            ->where('direction', 'OUT')
+            ->whereBetween('payment_date', [$from, $to])
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get();
+
+        $rawLines = [];
+        foreach ($grns as $grn) {
+            $total = $bps->getGrnBillTotal($grn->id, $tenantId);
+            $date = $grn->posting_date instanceof \Carbon\Carbon
+                ? $grn->posting_date->format('Y-m-d')
+                : (string) $grn->posting_date;
+            $rawLines[] = [
+                'posting_date' => $date,
+                'sort_key' => $date . '_GRN_' . $grn->id,
+                'description' => 'GRN ' . ($grn->doc_no ?? $grn->id),
+                'source_type' => 'GRN_BILL',
+                'source_id' => $grn->id,
+                'posting_group_id' => $grn->posting_group_id,
+                'debit' => '0.00',
+                'credit' => number_format($total, 2, '.', ''),
+                'net' => number_format($total, 2, '.', ''),
+                'debit_val' => 0.0,
+                'credit_val' => $total,
+            ];
+        }
+        foreach ($sis as $inv) {
+            $pg = $inv->postingGroup;
+            $date = $pg && $pg->posting_date
+                ? Carbon::parse($pg->posting_date)->format('Y-m-d')
+                : ($inv->posted_at ? $inv->posted_at->format('Y-m-d') : $from);
+            $total = (float) $inv->total_amount;
+            $rawLines[] = [
+                'posting_date' => $date,
+                'sort_key' => $date . '_SI_' . $inv->id,
+                'description' => 'Supplier invoice' . ($inv->reference_no ? ' ' . $inv->reference_no : ''),
+                'source_type' => 'SUPPLIER_INVOICE',
+                'source_id' => $inv->id,
+                'posting_group_id' => $inv->posting_group_id,
+                'debit' => '0.00',
+                'credit' => number_format($total, 2, '.', ''),
+                'net' => number_format($total, 2, '.', ''),
+                'debit_val' => 0.0,
+                'credit_val' => $total,
+            ];
+        }
+        foreach ($paymentsOut as $payment) {
+            $date = $payment->payment_date->format('Y-m-d');
+            $amt = (float) $payment->amount;
+            $rawLines[] = [
+                'posting_date' => $date,
+                'sort_key' => $date . '_PAYMENT_' . $payment->id,
+                'description' => 'Payment OUT - ' . ($payment->method ?? ''),
+                'source_type' => 'PAYMENT',
+                'source_id' => $payment->id,
+                'posting_group_id' => $payment->posting_group_id,
+                'debit' => number_format($amt, 2, '.', ''),
+                'credit' => '0.00',
+                'net' => number_format(-$amt, 2, '.', ''),
+                'debit_val' => $amt,
+                'credit_val' => 0.0,
+            ];
+        }
+
+        usort($rawLines, fn ($a, $b) => strcmp($a['sort_key'], $b['sort_key']));
+
+        $runningBalance = $openingBalance;
+        $debitTotal = 0.0;
+        $creditTotal = 0.0;
+        $lines = [];
+        foreach ($rawLines as $raw) {
+            $runningBalance += $raw['credit_val'] - $raw['debit_val'];
+            $debitTotal += $raw['debit_val'];
+            $creditTotal += $raw['credit_val'];
+            $lines[] = [
+                'posting_date' => $raw['posting_date'],
+                'description' => $raw['description'],
+                'source_type' => $raw['source_type'],
+                'source_id' => $raw['source_id'],
+                'posting_group_id' => $raw['posting_group_id'],
+                'debit' => $raw['debit'],
+                'credit' => $raw['credit'],
+                'net' => $raw['net'],
+                'running_balance' => number_format($runningBalance, 2, '.', ''),
+            ];
+        }
+
+        $subledgerOpen = $bps->getSupplierOpenBillsTotal($partyId, $tenantId, $to)
+            + $bps->getSupplierOpenSupplierInvoicesTotal($partyId, $tenantId, $to);
+        $delta = round($runningBalance - $subledgerOpen, 2);
+
+        return [
+            'party' => $party->only(['id', 'name', 'party_types']),
+            'period' => ['from' => $from, 'to' => $to],
+            'lines' => $lines,
+            'totals' => [
+                'debit_total' => number_format($debitTotal, 2, '.', ''),
+                'credit_total' => number_format($creditTotal, 2, '.', ''),
+                'opening_balance' => number_format($openingBalance, 2, '.', ''),
+                'closing_balance' => number_format($runningBalance, 2, '.', ''),
+            ],
+            'reconciliation' => [
+                'subledger_outstanding_at_to' => number_format($subledgerOpen, 2, '.', ''),
+                'statement_balance_at_to' => number_format($runningBalance, 2, '.', ''),
+                'delta' => number_format($delta, 2, '.', ''),
             ],
         ];
     }
