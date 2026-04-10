@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { Badge } from '../../components/Badge';
+import { AdvancedWorkflowBanner } from '../../components/workflow/AdvancedWorkflowBanner';
 import type { LabWorkLog } from '../../types';
 
 export default function WorkLogsPage() {
@@ -100,6 +101,7 @@ export default function WorkLogsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <AdvancedWorkflowBanner />
       <PageHeader
         title="Work Logs"
         tooltip="Track labour activity recorded for workers."

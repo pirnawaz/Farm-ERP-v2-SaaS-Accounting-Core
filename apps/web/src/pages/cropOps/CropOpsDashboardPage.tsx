@@ -222,6 +222,9 @@ export default function CropOpsDashboardPage() {
             </div>
 
             <div className="mt-6 flex flex-col gap-2">
+              <ActionLink to="/app/farm-activity" variant="secondary">
+                Farm activity timeline
+              </ActionLink>
               <ActionLink to="/app/crop-ops/activities" variant="secondary">
                 View Field Work Logs
               </ActionLink>

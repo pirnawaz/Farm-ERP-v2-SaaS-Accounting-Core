@@ -17,6 +17,7 @@ import { getActiveCropCycleId, getStored, setStored, formStorageKeys, getLastSub
 import toast from 'react-hot-toast';
 import type { CreateHarvestPayload } from '../../types';
 import { term } from '../../config/terminology';
+import { PrimaryWorkflowBanner } from '../../components/workflow/PrimaryWorkflowBanner';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
 
@@ -219,6 +220,7 @@ export default function HarvestFormPage() {
           { label: 'New' },
         ]}
       />
+      <PrimaryWorkflowBanner variant="harvest" />
       {hasDraft && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex flex-wrap items-center gap-2">
           <span>Restore draft?</span>

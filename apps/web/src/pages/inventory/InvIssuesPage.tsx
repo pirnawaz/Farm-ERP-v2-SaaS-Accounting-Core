@@ -8,6 +8,7 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { term } from '../../config/terminology';
 import { Badge } from '../../components/Badge';
+import { AdvancedWorkflowBanner } from '../../components/workflow/AdvancedWorkflowBanner';
 import type { InvIssue } from '../../types';
 
 export default function InvIssuesPage() {
@@ -37,6 +38,7 @@ export default function InvIssuesPage() {
 
   return (
     <div className="space-y-6">
+      <AdvancedWorkflowBanner />
       <PageHeader
         title={term('issue')}
         backTo="/app/inventory"

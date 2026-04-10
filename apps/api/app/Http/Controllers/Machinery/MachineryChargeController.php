@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Party;
 use App\Services\Machinery\MachineryChargeService;
 use App\Services\Machinery\MachineryChargePostingService;
+use App\Services\OperationalTraceabilityService;
 use App\Services\SystemPartyService;
 use App\Services\TenantContext;
 use App\Exceptions\Machinery\DomainValidationException;
@@ -55,7 +56,7 @@ class MachineryChargeController extends Controller
             ->header('Vary', 'X-Tenant-Id');
     }
 
-    public function show(Request $request, string $id)
+    public function show(Request $request, string $id, OperationalTraceabilityService $traceability)
     {
         $tenantId = TenantContext::getTenantId($request);
         $charge = MachineryCharge::where('id', $id)
@@ -70,7 +71,10 @@ class MachineryChargeController extends Controller
                 'reversalPostingGroup'
             ])
             ->firstOrFail();
-        return response()->json($charge);
+
+        return response()->json(array_merge($charge->toArray(), [
+            'traceability' => $traceability->summarizeForMachineryCharge($charge),
+        ]));
     }
 
     public function generate(Request $request)

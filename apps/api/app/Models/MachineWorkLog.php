@@ -100,6 +100,12 @@ class MachineWorkLog extends Model
         return $this->belongsTo(MachineryCharge::class);
     }
 
+    /** Field job machine lines that reference this usage log (read-model / traceability). */
+    public function fieldJobMachines(): HasMany
+    {
+        return $this->hasMany(FieldJobMachine::class, 'source_work_log_id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === self::STATUS_DRAFT;

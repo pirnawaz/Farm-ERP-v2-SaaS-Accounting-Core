@@ -7,6 +7,7 @@ use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
 use App\Models\CropCycle;
+use App\Services\DuplicateWorkflowGuard;
 use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\ReversalService;
@@ -21,7 +22,8 @@ class MachineryChargePostingService
     public function __construct(
         private SystemAccountService $accountService,
         private ReversalService $reversalService,
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private DuplicateWorkflowGuard $duplicateWorkflowGuard,
     ) {}
 
     /**
@@ -61,6 +63,8 @@ class MachineryChargePostingService
             if (!$charge->crop_cycle_id || !$charge->project_id) {
                 throw new \Exception('Crop cycle and project are required for posting a machinery charge.');
             }
+
+            $this->duplicateWorkflowGuard->assertMachineryChargePostAllowed($charge);
 
             $this->guard->ensureCropCycleOpen($charge->crop_cycle_id, $tenantId);
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Machinery;
 
 use App\Http\Controllers\Controller;
+use App\Services\MachineProfitabilityService;
 use App\Services\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,9 @@ use Illuminate\Support\Facades\Validator;
 
 class MachineryReportsController extends Controller
 {
+    public function __construct(
+        private MachineProfitabilityService $machineProfitabilityService
+    ) {}
     /**
      * GET /api/v1/machinery/reports/charges-by-machine
      * Returns charges grouped by machine for a date range
@@ -104,6 +108,7 @@ class MachineryReportsController extends Controller
                 AND ar.machine_id IS NOT NULL
                 AND ar.amount IS NOT NULL
                 AND pg.posting_date BETWEEN :from AND :to
+                AND NOT (pg.source_type = 'HARVEST' AND ar.allocation_type = 'HARVEST_PRODUCTION')
             GROUP BY ar.machine_id, m.code, m.name
             ORDER BY m.code
         ";
@@ -126,6 +131,7 @@ class MachineryReportsController extends Controller
                 AND ar.machine_id IS NOT NULL
                 AND ar.amount IS NOT NULL
                 AND pg.posting_date BETWEEN :from AND :to
+                AND NOT (pg.source_type = 'HARVEST' AND ar.allocation_type = 'HARVEST_PRODUCTION')
             GROUP BY ar.machine_id, ar.allocation_type
             ORDER BY ar.machine_id, ar.allocation_type
         ";
@@ -173,6 +179,7 @@ class MachineryReportsController extends Controller
         $validator = Validator::make($request->all(), [
             'from' => ['required', 'date', 'date_format:Y-m-d'],
             'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'crop_cycle_id' => ['nullable', 'uuid'],
         ]);
 
         if ($validator->fails()) {
@@ -182,7 +189,15 @@ class MachineryReportsController extends Controller
         $from = $request->input('from');
         $to = $request->input('to');
 
-        // Get usage from work logs (POSTED, posting_date in range)
+        $filters = [
+            'from' => $from,
+            'to' => $to,
+            'crop_cycle_id' => $request->input('crop_cycle_id'),
+        ];
+
+        $profitability = $this->machineProfitabilityService->getMachineProfitability($tenantId, $filters);
+
+        // Usage qty from work logs (all meter units) for per-unit metrics — POSTED, same window
         $usageQuery = "
             SELECT
                 m.id AS machine_id,
@@ -195,117 +210,61 @@ class MachineryReportsController extends Controller
             WHERE mwl.tenant_id = :tenant_id
                 AND mwl.status = 'POSTED'
                 AND mwl.posting_date BETWEEN :from AND :to
+                ".($filters['crop_cycle_id'] ? 'AND mwl.crop_cycle_id = :crop_cycle_id' : '')."
             GROUP BY m.id, m.code, m.name, m.meter_unit
         ";
 
-        $usage = DB::select($usageQuery, [
+        $usageBindings = [
             'tenant_id' => $tenantId,
             'from' => $from,
             'to' => $to,
-        ]);
+        ];
+        if ($filters['crop_cycle_id']) {
+            $usageBindings['crop_cycle_id'] = $filters['crop_cycle_id'];
+        }
 
-        // Revenue = income postings (MACHINERY_SERVICE_INCOME) by machine from allocation_rows
-        // Exclude reversed: only include PG where source record has reversal_posting_group_id IS NULL
-        $revenueQuery = "
-            SELECT
-                ar.machine_id,
-                COALESCE(SUM(ar.amount), 0) AS revenue_total
-            FROM allocation_rows ar
-            INNER JOIN posting_groups pg ON pg.id = ar.posting_group_id
-            LEFT JOIN machinery_services ms ON ms.id::text = pg.source_id::text AND pg.source_type = 'MACHINERY_SERVICE'
-            LEFT JOIN machinery_charges mc ON mc.id::text = pg.source_id::text AND pg.source_type = 'MACHINERY_CHARGE'
-            WHERE ar.tenant_id = :tenant_id
-                AND ar.machine_id IS NOT NULL
-                AND ar.amount IS NOT NULL
-                AND ar.allocation_type IN ('MACHINERY_SERVICE', 'MACHINERY_CHARGE')
-                AND pg.posting_date BETWEEN :from AND :to
-                AND (
-                    (pg.source_type = 'MACHINERY_SERVICE' AND ms.posting_group_id = pg.id AND ms.reversal_posting_group_id IS NULL)
-                    OR (pg.source_type = 'MACHINERY_CHARGE' AND mc.posting_group_id = pg.id AND mc.reversal_posting_group_id IS NULL)
-                )
-            GROUP BY ar.machine_id
-        ";
+        $usage = DB::select($usageQuery, $usageBindings);
 
-        $revenue = DB::select($revenueQuery, [
-            'tenant_id' => $tenantId,
-            'from' => $from,
-            'to' => $to,
-        ]);
-
-        // Costs = allocation rows with machine_id excluding revenue types (MACHINERY_SERVICE, MACHINERY_CHARGE)
-        // e.g. MACHINERY_MAINTENANCE and work log cost postings; exclude reversed via source
-        $costsQuery = "
-            SELECT
-                ar.machine_id,
-                COALESCE(SUM(ar.amount), 0) AS costs_total
-            FROM allocation_rows ar
-            INNER JOIN posting_groups pg ON pg.id = ar.posting_group_id
-            WHERE ar.tenant_id = :tenant_id
-                AND ar.machine_id IS NOT NULL
-                AND ar.amount IS NOT NULL
-                AND (ar.allocation_type IS NULL OR ar.allocation_type NOT IN ('MACHINERY_SERVICE', 'MACHINERY_CHARGE'))
-                AND pg.posting_date BETWEEN :from AND :to
-            GROUP BY ar.machine_id
-        ";
-
-        $costs = DB::select($costsQuery, [
-            'tenant_id' => $tenantId,
-            'from' => $from,
-            'to' => $to,
-        ]);
-
-        // Index by machine_id for easy lookup
         $usageByMachine = [];
         foreach ($usage as $u) {
             $usageByMachine[$u->machine_id] = $u;
         }
 
-        $revenueByMachine = [];
-        foreach ($revenue as $r) {
-            $revenueByMachine[$r->machine_id] = (float) $r->revenue_total;
+        $profitByMachine = [];
+        foreach ($profitability as $p) {
+            $profitByMachine[$p['machine_id']] = $p;
         }
 
-        $costsByMachine = [];
-        foreach ($costs as $c) {
-            $costsByMachine[$c->machine_id] = (float) $c->costs_total;
-        }
-
-        // Get all unique machines from usage, revenue, or costs
         $allMachineIds = array_unique(array_merge(
             array_keys($usageByMachine),
-            array_keys($revenueByMachine),
-            array_keys($costsByMachine)
+            array_keys($profitByMachine)
         ));
 
-        // Build result rows
         $rows = [];
         foreach ($allMachineIds as $machineId) {
             $usageData = $usageByMachine[$machineId] ?? null;
-            $revenueTotal = $revenueByMachine[$machineId] ?? 0;
-            $costTotal = $costsByMachine[$machineId] ?? 0;
+            $p = $profitByMachine[$machineId] ?? null;
+
+            $revenueTotal = $p['revenue'] ?? 0.0;
+            $costTotal = $p['cost'] ?? 0.0;
+            $margin = $p['profit'] ?? ($revenueTotal - $costTotal);
+            $usageHours = $p['usage_hours'] ?? 0.0;
 
             $machineCode = $usageData->machine_code ?? null;
             $machineName = $usageData->machine_name ?? null;
             $unit = $usageData->meter_unit ?? null;
 
-            // Map meter_unit (HOURS/KM) to unit (HOUR/KM)
             if ($unit === 'HOURS') {
                 $unit = 'HOUR';
             }
 
-            // Get usage from work logs (primary source)
             $usageQty = $usageData ? (float) $usageData->usage_qty : 0;
 
-            // Margin = revenue (income) - costs
-            $margin = $revenueTotal - $costTotal;
-
-            // Calculate per-unit values (null if usage_qty = 0)
             $costPerUnit = $usageQty > 0 ? ($costTotal / $usageQty) : null;
             $chargePerUnit = $usageQty > 0 ? ($revenueTotal / $usageQty) : null;
             $marginPerUnit = $usageQty > 0 ? ($margin / $usageQty) : null;
 
-            // If we don't have machine info from usage, fetch it
-            if (!$machineCode || !$machineName) {
+            if (! $machineCode || ! $machineName) {
                 $machine = DB::table('machines')
                     ->where('id', $machineId)
                     ->where('tenant_id', $tenantId)
@@ -313,7 +272,7 @@ class MachineryReportsController extends Controller
                 if ($machine) {
                     $machineCode = $machine->code;
                     $machineName = $machine->name;
-                    if (!$unit) {
+                    if (! $unit) {
                         $unit = $machine->meter_unit === 'HOURS' ? 'HOUR' : ($machine->meter_unit === 'KM' ? 'KM' : null);
                     }
                 }
@@ -324,6 +283,7 @@ class MachineryReportsController extends Controller
                 'machine_code' => $machineCode,
                 'machine_name' => $machineName,
                 'unit' => $unit,
+                'usage_hours' => (string) round($usageHours, 4),
                 'usage_qty' => (string) round($usageQty, 2),
                 'charges_total' => (string) round($revenueTotal, 2),
                 'costs_total' => (string) round($costTotal, 2),
@@ -334,8 +294,7 @@ class MachineryReportsController extends Controller
             ];
         }
 
-        // Sort by machine_code
-        usort($rows, fn($a, $b) => strcmp($a['machine_code'] ?? '', $b['machine_code'] ?? ''));
+        usort($rows, fn ($a, $b) => strcmp($a['machine_code'] ?? '', $b['machine_code'] ?? ''));
 
         return response()->json($rows);
     }

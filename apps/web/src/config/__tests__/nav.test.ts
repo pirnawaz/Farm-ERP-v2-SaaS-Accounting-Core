@@ -101,7 +101,13 @@ describe('getNavDomains', () => {
     const land = ops.sections.find((s) => s.sectionKey === 'ops-land-crops')!;
     expect(land.itemGroups?.map((g) => g.groupTitle)).toEqual(['Land Setup', 'Crop Planning', 'Advanced']);
     expect(land.itemGroups?.[0].items.map((i) => i.key)).toEqual(['land', 'allocations', 'land-leases']);
-    expect(land.itemGroups?.[1].items.map((i) => i.key)).toEqual(['crop-cycles', 'fields', 'orchards', 'livestock']);
+    expect(land.itemGroups?.[1].items.map((i) => i.key)).toEqual([
+      'crop-cycles',
+      'fields',
+      'project-planning',
+      'orchards',
+      'livestock',
+    ]);
     expect(land.itemGroups?.[2].items.map((i) => i.key)).toEqual(['production-units']);
   });
 
@@ -120,7 +126,9 @@ describe('getNavDomains', () => {
     expect(work.itemGroups?.[0].items.map((i) => i.key)).toEqual([
       'crop-ops-overview',
       'crop-ops-field-work-logs',
+      'crop-ops-field-jobs',
       'harvests',
+      'crop-ops-agreements',
       'crop-ops-work-types',
     ]);
     expect(work.itemGroups?.[1].items.map((i) => i.key)).toEqual(['pending-review']);

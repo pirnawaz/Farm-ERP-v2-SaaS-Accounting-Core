@@ -11,6 +11,7 @@ use App\Models\Machine;
 use App\Models\Party;
 use App\Models\Project;
 use App\Services\Machinery\MachineryPostingService;
+use App\Services\OperationalTraceabilityService;
 use App\Services\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -105,13 +106,16 @@ class MachineWorkLogController extends Controller
         return response()->json($log->load(['machine', 'project', 'cropCycle', 'lines.party']), 201);
     }
 
-    public function show(Request $request, string $id)
+    public function show(Request $request, string $id, OperationalTraceabilityService $traceability)
     {
         $tenantId = TenantContext::getTenantId($request);
         $log = MachineWorkLog::where('id', $id)->where('tenant_id', $tenantId)
-            ->with(['machine', 'project', 'cropCycle', 'postingGroup', 'reversalPostingGroup', 'lines.party'])
+            ->with(['machine', 'project', 'cropCycle', 'postingGroup', 'reversalPostingGroup', 'lines.party', 'machineryCharge'])
             ->firstOrFail();
-        return response()->json($log);
+
+        return response()->json(array_merge($log->toArray(), [
+            'traceability' => $traceability->summarizeForMachineWorkLog($log),
+        ]));
     }
 
     public function update(Request $request, string $id)

@@ -4,19 +4,31 @@ namespace App\Http\Controllers;
 
 use App\Models\Harvest;
 use App\Models\HarvestLine;
+use App\Models\HarvestShareLine;
+use App\Http\Requests\AddHarvestShareLineRequest;
+use App\Http\Requests\UpdateHarvestShareLineRequest;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\InvItem;
 use App\Models\InvStore;
 use App\Services\TenantContext;
+use App\Services\HarvestAgreementApplyService;
+use App\Services\HarvestEconomicsService;
 use App\Services\HarvestService;
+use App\Services\HarvestSharePreviewService;
+use App\Services\OperationalTraceabilityService;
+use App\Services\SuggestionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class HarvestController extends Controller
 {
     public function __construct(
-        private HarvestService $harvestService
+        private HarvestService $harvestService,
+        private HarvestSharePreviewService $sharePreviewService,
+        private SuggestionService $suggestionService,
+        private HarvestAgreementApplyService $harvestAgreementApplyService,
+        private HarvestEconomicsService $harvestEconomicsService
     ) {}
 
     public function index(Request $request)
@@ -88,17 +100,38 @@ class HarvestController extends Controller
             'notes' => $request->notes,
         ]);
 
-        return response()->json($harvest->load(['cropCycle', 'project', 'landParcel', 'lines']), 201);
+        return response()->json($harvest->load(Harvest::detailWithRelations()), 201);
     }
 
-    public function show(Request $request, string $id)
+    public function show(Request $request, string $id, OperationalTraceabilityService $traceability)
     {
         $tenantId = TenantContext::getTenantId($request);
         $harvest = Harvest::where('id', $id)
             ->where('tenant_id', $tenantId)
-            ->with(['cropCycle', 'project', 'landParcel', 'postingGroup', 'reversalPostingGroup', 'lines.item', 'lines.store'])
+            ->with(Harvest::detailWithRelations())
             ->firstOrFail();
-        return response()->json($harvest);
+
+        return response()->json(array_merge($harvest->toArray(), [
+            'traceability' => $traceability->summarizeForHarvest($harvest),
+        ]));
+    }
+
+    /**
+     * GET /api/v1/crop-ops/harvests/{id}/economics
+     * Posted harvest output split (totals, retained, shared) from allocation snapshots — read-only.
+     */
+    public function economics(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        Harvest::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+
+        try {
+            $data = $this->harvestEconomicsService->getHarvestEconomics($id, $tenantId);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($data);
     }
 
     public function update(Request $request, string $id)
@@ -140,7 +173,7 @@ class HarvestController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        return response()->json($harvest->load(['cropCycle', 'project', 'landParcel', 'lines']));
+        return response()->json($harvest->load(Harvest::detailWithRelations()));
     }
 
     public function addLine(Request $request, string $id)
@@ -232,6 +265,80 @@ class HarvestController extends Controller
         return response()->json(null, 204);
     }
 
+    public function sharePreview(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $harvest = Harvest::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+
+        $postingDate = $request->query('posting_date');
+        $data = $this->sharePreviewService->preview(
+            $harvest,
+            is_string($postingDate) && $postingDate !== '' ? $postingDate : null
+        );
+
+        return response()->json($data);
+    }
+
+    public function suggestions(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $harvest = Harvest::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+
+        return response()->json($this->suggestionService->forHarvest($harvest));
+    }
+
+    /**
+     * Draft only: create share lines from resolved active agreements (no posting).
+     * Body: optional { "overwrite": true } to replace existing share lines.
+     */
+    public function applyAgreements(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $harvest = Harvest::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+
+        $overwrite = filter_var($request->input('overwrite', false), FILTER_VALIDATE_BOOLEAN);
+
+        $result = $this->harvestAgreementApplyService->applyToDraft($harvest, $overwrite);
+
+        return response()->json($result);
+    }
+
+    public function storeShareLine(AddHarvestShareLineRequest $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $harvest = Harvest::where('id', $id)->where('tenant_id', $tenantId)->firstOrFail();
+
+        $harvest = $this->harvestService->addShareLine($harvest, $request->validated());
+
+        return response()->json($harvest, 201);
+    }
+
+    public function updateShareLine(UpdateHarvestShareLineRequest $request, string $id, string $shareLineId)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $shareLine = HarvestShareLine::where('id', $shareLineId)
+            ->where('harvest_id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $harvest = $this->harvestService->updateShareLine($shareLine, $request->validated());
+
+        return response()->json($harvest);
+    }
+
+    public function destroyShareLine(Request $request, string $id, string $shareLineId)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $shareLine = HarvestShareLine::where('id', $shareLineId)
+            ->where('harvest_id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $this->harvestService->deleteShareLine($shareLine);
+
+        return response()->json(null, 204);
+    }
+
     public function post(Request $request, string $id)
     {
         $this->authorizePosting($request);
@@ -251,11 +358,13 @@ class HarvestController extends Controller
             $harvest = $this->harvestService->post($harvest, [
                 'posting_date' => $request->posting_date,
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        return response()->json($harvest->load(['cropCycle', 'project', 'postingGroup', 'lines.item', 'lines.store']), 200);
+        return response()->json($harvest->load(Harvest::detailWithRelations()), 200);
     }
 
     public function reverse(Request $request, string $id)
@@ -283,6 +392,7 @@ class HarvestController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        return response()->json($harvest->load(['cropCycle', 'project', 'postingGroup', 'reversalPostingGroup', 'lines.item', 'lines.store']), 200);
+        return response()->json($harvest->load(Harvest::detailWithRelations()), 200);
     }
+
 }

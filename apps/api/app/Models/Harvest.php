@@ -62,6 +62,37 @@ class Harvest extends Model
         return $this->belongsTo(LandParcel::class);
     }
 
+    /**
+     * Eager-load graph for harvest API reads (detail, post, reverse, share-line mutations).
+     * Keeps share lines with posted snapshots and display relations in one place.
+     *
+     * @return array<int, string|\Closure>
+     */
+    public static function detailWithRelations(): array
+    {
+        return [
+            'cropCycle',
+            'project',
+            'landParcel',
+            'productionUnit',
+            'postingGroup',
+            'reversalPostingGroup',
+            'lines.item',
+            'lines.store',
+            'shareLines.beneficiaryParty',
+            'shareLines.machine',
+            'shareLines.worker',
+            'shareLines.sourceFieldJob',
+            'shareLines.sourceLabWorkLog',
+            'shareLines.sourceMachineryCharge',
+            'shareLines.sourceSettlement',
+            'shareLines.store',
+            'shareLines.inventoryItem',
+            'shareLines.harvestLine.item',
+            'shareLines.harvestLine.store',
+        ];
+    }
+
     public function postingGroup(): BelongsTo
     {
         return $this->belongsTo(PostingGroup::class);
@@ -75,6 +106,11 @@ class Harvest extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(HarvestLine::class);
+    }
+
+    public function shareLines(): HasMany
+    {
+        return $this->hasMany(HarvestShareLine::class)->orderBy('sort_order');
     }
 
     public function isDraft(): bool

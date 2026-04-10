@@ -215,9 +215,20 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
     const disabled = !modulesEnabledFor(item);
     const navTestId = `nav-${item.to.replace('/app/', '').replace(/\//g, '-')}`;
     const isActive = isPathUnderRoute(location.pathname, item.to);
-    const baseClass = `group flex items-center px-2 py-2 text-sm font-medium rounded-md`;
+    const layoutClass = item.sidebarHint ? 'flex flex-col items-stretch gap-0.5' : 'flex items-center';
+    const baseClass = `group ${layoutClass} px-2 py-2 text-sm font-medium rounded-md`;
     const activeClass = isActive ? 'bg-[#E6ECEA] text-[#1F6F5C]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900';
     const disabledClass = disabled ? 'text-gray-400 cursor-not-allowed hover:bg-gray-50' : '';
+
+    const labelBlock =
+      item.sidebarHint != null && item.sidebarHint !== '' ? (
+        <>
+          <span>{item.label}</span>
+          <span className="text-[11px] font-normal leading-snug text-gray-500">{item.sidebarHint}</span>
+        </>
+      ) : (
+        item.label
+      );
 
     if (disabled) {
       return (
@@ -239,7 +250,7 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
             }
           }}
         >
-          {item.label}
+          {labelBlock}
         </span>
       );
     }
@@ -252,7 +263,7 @@ export function AppSidebar({ onItemClick }: AppSidebarProps) {
         onClick={onItemClick}
         className={`${baseClass} ${activeClass}`}
       >
-        {item.label}
+        {labelBlock}
       </Link>
     );
   };

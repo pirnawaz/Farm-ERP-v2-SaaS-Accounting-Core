@@ -12,6 +12,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
+import { TraceabilityPanel } from '../../components/traceability/TraceabilityPanel';
 
 export default function WorkLogDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -127,6 +128,8 @@ export default function WorkLogDetailPage() {
           ) : undefined
         }
       />
+
+      <TraceabilityPanel traceability={log.traceability} />
 
       <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">

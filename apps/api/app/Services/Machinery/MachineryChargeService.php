@@ -12,7 +12,7 @@ use App\Models\Party;
 use App\Exceptions\Machinery\MissingRateCardException;
 use App\Exceptions\Machinery\AlreadyChargedException;
 use App\Exceptions\Machinery\NoWorkLogsException;
-use App\Exceptions\Machinery\UnsupportedMeterUnitException;
+use App\Services\DuplicateWorkflowGuard;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -20,6 +20,21 @@ class MachineryChargeService
 {
     private const PREFIX = 'MCH-';
     private const PAD_LENGTH = 6;
+
+    private MachineryRateResolver $machineryRateResolver;
+
+    private ?DuplicateWorkflowGuard $duplicateWorkflowGuard = null;
+
+    public function __construct(?MachineryRateResolver $machineryRateResolver = null, ?DuplicateWorkflowGuard $duplicateWorkflowGuard = null)
+    {
+        $this->machineryRateResolver = $machineryRateResolver ?? new MachineryRateResolver;
+        $this->duplicateWorkflowGuard = $duplicateWorkflowGuard;
+    }
+
+    private function duplicateWorkflowGuard(): DuplicateWorkflowGuard
+    {
+        return $this->duplicateWorkflowGuard ?? app(DuplicateWorkflowGuard::class);
+    }
 
     /**
      * Generate draft charge(s) for a project from posted work logs.
@@ -137,6 +152,8 @@ class MachineryChargeService
         $chargeDate = $chargeDate ?? Carbon::now()->format('Y-m-d');
         $chargeNo = $this->generateChargeNo($tenantId);
 
+        $this->duplicateWorkflowGuard()->assertMachineryChargeDraftAllowed($tenantId, $workLogs);
+
         return DB::transaction(function () use (
             $tenantId,
             $project,
@@ -151,15 +168,26 @@ class MachineryChargeService
 
             // Resolve rate card for each work log
             foreach ($workLogs as $workLog) {
-                $rateCard = $this->resolveRateCard($tenantId, $workLog, $workLog->posting_date);
-                
-                if (!$rateCard) {
-                    $missingRateCards[] = $workLog->work_log_no . ' (machine: ' . $workLog->machine->code . ')';
+                if (! $workLog->machine) {
+                    throw new MissingRateCardException("Work log {$workLog->work_log_no} has no associated machine.");
+                }
+                $postingDateStr = $workLog->posting_date instanceof \Carbon\Carbon
+                    ? $workLog->posting_date->format('Y-m-d')
+                    : (string) $workLog->posting_date;
+                $rateCard = $this->machineryRateResolver->resolveRateCardForMachine(
+                    $tenantId,
+                    $workLog->machine,
+                    $postingDateStr,
+                    $workLog->activity?->activity_type_id ?? null
+                );
+
+                if (! $rateCard) {
+                    $missingRateCards[] = $workLog->work_log_no.' (machine: '.$workLog->machine->code.')';
                     continue;
                 }
 
                 // Map machine.meter_unit to charge line unit
-                $unit = $this->mapMeterUnitToChargeUnit($workLog->machine->meter_unit);
+                $unit = $this->machineryRateResolver->mapMeterUnitToChargeUnit($workLog->machine->meter_unit);
                 
                 // Calculate rate (for now use base_rate; COST_PLUS pricing not yet implemented)
                 $rate = (float) $rateCard->base_rate;
@@ -223,100 +251,6 @@ class MachineryChargeService
 
             return $charge->fresh(['lines.workLog.machine', 'lines.rateCard', 'project', 'cropCycle', 'landlordParty']);
         });
-    }
-
-    /**
-     * Resolve rate card for a work log based on posting date.
-     * Priority: machine+activity_type → machine+null → machine_type+activity_type → machine_type+null.
-     */
-    private function resolveRateCard(string $tenantId, MachineWorkLog $workLog, string $postingDate): ?MachineRateCard
-    {
-        $machine = $workLog->machine;
-        
-        // Guard against null machine
-        if (!$machine) {
-            $context = "Work log {$workLog->work_log_no} has no associated machine.";
-            throw new MissingRateCardException($context);
-        }
-        
-        $unit = $this->mapMeterUnitToChargeUnit($machine->meter_unit);
-        $activityTypeId = $workLog->activity?->activity_type_id ?? null;
-
-        $dateRange = function ($q) use ($postingDate) {
-            $q->where('effective_from', '<=', $postingDate)
-              ->where(function ($q2) use ($postingDate) {
-                  $q2->whereNull('effective_to')->orWhere('effective_to', '>=', $postingDate);
-              });
-        };
-
-        // 1. MACHINE + activity_type
-        if ($activityTypeId) {
-            $rateCard = MachineRateCard::where('tenant_id', $tenantId)
-                ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE)
-                ->where('machine_id', $machine->id)
-                ->where('rate_unit', $unit)
-                ->where('activity_type_id', $activityTypeId)
-                ->where('is_active', true)
-                ->where($dateRange)
-                ->orderBy('effective_from', 'desc')
-                ->first();
-            if ($rateCard) {
-                return $rateCard;
-            }
-        }
-
-        // 2. MACHINE + null
-        $rateCard = MachineRateCard::where('tenant_id', $tenantId)
-            ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE)
-            ->where('machine_id', $machine->id)
-            ->where('rate_unit', $unit)
-            ->whereNull('activity_type_id')
-            ->where('is_active', true)
-            ->where($dateRange)
-            ->orderBy('effective_from', 'desc')
-            ->first();
-        if ($rateCard) {
-            return $rateCard;
-        }
-
-        // 3. MACHINE_TYPE + activity_type
-        if ($activityTypeId) {
-            $rateCard = MachineRateCard::where('tenant_id', $tenantId)
-                ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE_TYPE)
-                ->where('machine_type', $machine->machine_type)
-                ->where('rate_unit', $unit)
-                ->where('activity_type_id', $activityTypeId)
-                ->where('is_active', true)
-                ->where($dateRange)
-                ->orderBy('effective_from', 'desc')
-                ->first();
-            if ($rateCard) {
-                return $rateCard;
-            }
-        }
-
-        // 4. MACHINE_TYPE + null
-        return MachineRateCard::where('tenant_id', $tenantId)
-            ->where('applies_to_mode', MachineRateCard::APPLIES_TO_MACHINE_TYPE)
-            ->where('machine_type', $machine->machine_type)
-            ->where('rate_unit', $unit)
-            ->whereNull('activity_type_id')
-            ->where('is_active', true)
-            ->where($dateRange)
-            ->orderBy('effective_from', 'desc')
-            ->first();
-    }
-
-    /**
-     * Map machine meter_unit to charge line unit.
-     */
-    private function mapMeterUnitToChargeUnit(string $meterUnit): string
-    {
-        return match ($meterUnit) {
-            'HOURS' => MachineRateCard::RATE_UNIT_HOUR,
-            'KM' => MachineRateCard::RATE_UNIT_KM,
-            default => throw new UnsupportedMeterUnitException($meterUnit),
-        };
     }
 
     /**

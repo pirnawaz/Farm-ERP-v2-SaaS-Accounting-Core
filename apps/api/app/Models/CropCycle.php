@@ -53,6 +53,11 @@ class CropCycle extends Model
         return $this->hasMany(Project::class);
     }
 
+    public function projectPlans(): HasMany
+    {
+        return $this->hasMany(ProjectPlan::class);
+    }
+
     public function landAllocations(): HasMany
     {
         return $this->hasMany(LandAllocation::class);

@@ -16,6 +16,11 @@ import type {
   LivestockUnitStatusResponse,
   ProductionUnitsProfitabilityResponse,
   ProductionUnitCategoryFilter,
+  ProjectProfitabilityResponse,
+  ProjectForecastResponse,
+  ProjectProjectedProfitResponse,
+  MachineProfitabilityApiRow,
+  HarvestEconomicsDocumentResponse,
 } from '../types';
 
 export function useTrialBalance(params: { as_of: string; project_id?: string; crop_cycle_id?: string; currency_code?: string }) {
@@ -163,5 +168,72 @@ export function useProductionUnitsProfitability(
     enabled,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useProjectProfitability(
+  params: { project_id: string; from?: string; to?: string; crop_cycle_id?: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.project_id;
+  return useQuery<ProjectProfitabilityResponse, Error>({
+    queryKey: ['reports', 'project-profitability', params],
+    queryFn: () => reportsApi.projectProfitability(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useProjectForecast(
+  params: { project_id: string; from?: string; to?: string; crop_cycle_id?: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.project_id;
+  return useQuery<ProjectForecastResponse, Error>({
+    queryKey: ['reports', 'project-forecast', params],
+    queryFn: () => reportsApi.projectForecast(params),
+    enabled,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useProjectProjectedProfit(
+  params: { project_id: string; from?: string; to?: string; crop_cycle_id?: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.project_id;
+  return useQuery<ProjectProjectedProfitResponse, Error>({
+    queryKey: ['reports', 'project-projected-profit', params],
+    queryFn: () => reportsApi.projectProjectedProfit(params),
+    enabled,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useMachineProfitabilityReport(
+  params: { from: string; to: string; project_id?: string; crop_cycle_id?: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled !== false && !!params.from && !!params.to;
+  return useQuery<MachineProfitabilityApiRow[], Error>({
+    queryKey: ['reports', 'machine-profitability', params],
+    queryFn: () => reportsApi.machineProfitability(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useHarvestEconomicsDocument(harvestId: string | undefined, options?: { enabled?: boolean }) {
+  const enabled = options?.enabled !== false && !!harvestId;
+  return useQuery<HarvestEconomicsDocumentResponse, Error>({
+    queryKey: ['reports', 'harvest-economics', harvestId],
+    queryFn: () => reportsApi.harvestEconomicsDocument(harvestId!),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }

@@ -24,10 +24,14 @@ use Carbon\Carbon;
 
 class SettlementService
 {
-    /** Source types that contribute to project profit (operational + reversals; exclude settlement postings). */
+    /**
+     * Source types that contribute to project profit in ledger-based settlement views (operational + reversals).
+     * Must include share-aware harvest postings ({@see PostingGroup} source_type HARVEST) and field operations
+     * (FIELD_JOB) so crop pool / project traces are not silently omitted.
+     */
     private const OPERATIONAL_SOURCE_TYPES = [
         'INVENTORY_ISSUE', 'INVENTORY_GRN', 'LABOUR_WORK_LOG', 'MACHINE_WORK_LOG',
-        'MACHINE_MAINTENANCE_JOB', 'MACHINERY_CHARGE', 'MACHINERY_SERVICE', 'CROP_ACTIVITY', 'OPERATIONAL',
+        'MACHINE_MAINTENANCE_JOB', 'MACHINERY_CHARGE', 'MACHINERY_SERVICE', 'FIELD_JOB', 'CROP_ACTIVITY', 'OPERATIONAL',
         'SALE', 'HARVEST', 'REVERSAL',
     ];
 

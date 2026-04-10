@@ -11,11 +11,13 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankReconciliationController;
 use App\Http\Controllers\CropActivityController;
 use App\Http\Controllers\CropCycleController;
+use App\Http\Controllers\FieldJobController;
 use App\Http\Controllers\CropItemController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FixedAssetDepreciationRunController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\FarmActivityTimelineController;
 use App\Http\Controllers\FxRevaluationRunController;
 use App\Http\Controllers\FixedAssetDisposalController;
 use App\Http\Controllers\Dev\DevE2ESeedController;
@@ -40,6 +42,7 @@ use App\Http\Controllers\LandAllocationController;
 use App\Http\Controllers\LandLeaseAccrualController;
 use App\Http\Controllers\LandParcelController;
 use App\Http\Controllers\LivestockEventController;
+use App\Http\Controllers\AgreementController;
 use App\Http\Controllers\LoanAgreementController;
 use App\Http\Controllers\LoanDrawdownController;
 use App\Http\Controllers\LoanRepaymentController;
@@ -66,6 +69,7 @@ use App\Http\Controllers\PlatformTenantController;
 use App\Http\Controllers\PostingGroupController;
 use App\Http\Controllers\ProductionUnitController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectPlanController;
 use App\Http\Controllers\ProjectRuleController;
 use App\Http\Controllers\ReconciliationController;
 use App\Http\Controllers\ReportController;
@@ -98,6 +102,11 @@ Route::middleware(['role:tenant_admin,accountant,operator'])->group(function () 
     Route::get('dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('tenant/modules', [TenantModuleController::class, 'index']);
     Route::get('tenant/addon-modules', [TenantAddonModulesController::class, 'index']);
+});
+
+// Unified farm activity (read-only; field jobs, harvests, sales — module-filtered in controller)
+Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator'])->group(function () {
+    Route::get('farm-activity/timeline', [FarmActivityTimelineController::class, 'index']);
 });
 
 Route::post('/auth/login', [UnifiedAuthController::class, 'login'])->middleware('throttle:auth.tenant.login');
@@ -249,6 +258,12 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::post('projects/from-allocation', [ProjectController::class, 'fromAllocation']);
     Route::post('projects/{id}/close', [ProjectController::class, 'close']);
     Route::post('projects/{id}/reopen', [ProjectController::class, 'reopen']);
+});
+
+// Project plans (tenant_admin, accountant, operator) — requires projects_crop_cycles
+Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:projects_crop_cycles'])->group(function () {
+    Route::get('plans/project', [ProjectPlanController::class, 'index']);
+    Route::post('plans/project', [ProjectPlanController::class, 'store']);
 });
 
 // Project Rules (tenant_admin, accountant)
@@ -440,14 +455,41 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::patch('activities/{id}', [CropActivityController::class, 'update']);
         Route::post('activities/{id}/post', [CropActivityController::class, 'post'])->middleware('role:tenant_admin,accountant');
         Route::post('activities/{id}/reverse', [CropActivityController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        // Field jobs (DRAFT CRUD; posting in a later phase)
+        Route::get('field-jobs', [FieldJobController::class, 'index']);
+        Route::post('field-jobs', [FieldJobController::class, 'store']);
+        Route::get('field-jobs/{id}', [FieldJobController::class, 'show']);
+        Route::put('field-jobs/{id}', [FieldJobController::class, 'update']);
+        Route::post('field-jobs/{id}/inputs', [FieldJobController::class, 'storeInput']);
+        Route::put('field-jobs/{id}/inputs/{lineId}', [FieldJobController::class, 'updateInput']);
+        Route::delete('field-jobs/{id}/inputs/{lineId}', [FieldJobController::class, 'destroyInput']);
+        Route::post('field-jobs/{id}/labour', [FieldJobController::class, 'storeLabour']);
+        Route::put('field-jobs/{id}/labour/{lineId}', [FieldJobController::class, 'updateLabour']);
+        Route::delete('field-jobs/{id}/labour/{lineId}', [FieldJobController::class, 'destroyLabour']);
+        Route::post('field-jobs/{id}/machines', [FieldJobController::class, 'storeMachine']);
+        Route::put('field-jobs/{id}/machines/{lineId}', [FieldJobController::class, 'updateMachine']);
+        Route::delete('field-jobs/{id}/machines/{lineId}', [FieldJobController::class, 'destroyMachine']);
+        Route::post('field-jobs/{id}/post', [FieldJobController::class, 'post'])->middleware('role:tenant_admin,accountant');
+        Route::post('field-jobs/{id}/reverse', [FieldJobController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
         // Harvests
+        Route::get('agreements', [AgreementController::class, 'index']);
+        Route::post('agreements', [AgreementController::class, 'store']);
+        Route::get('agreements/{id}', [AgreementController::class, 'show']);
+        Route::put('agreements/{id}', [AgreementController::class, 'update']);
         Route::get('harvests', [HarvestController::class, 'index']);
         Route::post('harvests', [HarvestController::class, 'store']);
         Route::get('harvests/{id}', [HarvestController::class, 'show']);
+        Route::get('harvests/{id}/economics', [HarvestController::class, 'economics']);
         Route::put('harvests/{id}', [HarvestController::class, 'update']);
         Route::post('harvests/{id}/lines', [HarvestController::class, 'addLine']);
         Route::put('harvests/{id}/lines/{lineId}', [HarvestController::class, 'updateLine']);
         Route::delete('harvests/{id}/lines/{lineId}', [HarvestController::class, 'deleteLine']);
+        Route::get('harvests/{id}/share-preview', [HarvestController::class, 'sharePreview']);
+        Route::get('harvests/{id}/suggestions', [HarvestController::class, 'suggestions']);
+        Route::post('harvests/{id}/apply-agreements', [HarvestController::class, 'applyAgreements']);
+        Route::post('harvests/{id}/share-lines', [HarvestController::class, 'storeShareLine']);
+        Route::put('harvests/{id}/share-lines/{shareLineId}', [HarvestController::class, 'updateShareLine']);
+        Route::delete('harvests/{id}/share-lines/{shareLineId}', [HarvestController::class, 'destroyShareLine']);
         Route::post('harvests/{id}/post', [HarvestController::class, 'post'])->middleware('role:tenant_admin,accountant');
         Route::post('harvests/{id}/reverse', [HarvestController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
     });
@@ -533,6 +575,11 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:proj
 Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:reports'])->group(function () {
     Route::get('reports/trial-balance', [ReportController::class, 'trialBalance']);
     Route::get('reports/profit-loss/project', [ReportController::class, 'profitLossProject']);
+    Route::get('reports/project-profitability', [ReportController::class, 'projectProfitability']);
+    Route::get('reports/project-forecast', [ReportController::class, 'projectForecast']);
+    Route::get('reports/project-projected-profit', [ReportController::class, 'projectProjectedProfit']);
+    Route::get('reports/machine-profitability', [ReportController::class, 'machineProfitability']);
+    Route::get('reports/harvest-economics', [ReportController::class, 'harvestEconomics']);
     Route::get('reports/profit-loss/crop-cycle', [ReportController::class, 'profitLossCropCycle']);
     Route::get('reports/profit-loss', [ReportController::class, 'profitLoss']);
     Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet']);

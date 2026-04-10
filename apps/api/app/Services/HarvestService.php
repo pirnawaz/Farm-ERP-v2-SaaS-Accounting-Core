@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\Harvest;
 use App\Models\HarvestLine;
+use App\Models\HarvestShareLine;
+use App\Models\FieldJob;
+use App\Models\LabWorkLog;
 use App\Models\CropCycle;
 use App\Models\Project;
 use App\Models\PostingGroup;
@@ -12,7 +15,9 @@ use App\Services\OperationalPostingGuard;
 use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
 use App\Models\InvStockMovement;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class HarvestService
@@ -22,7 +27,9 @@ class HarvestService
         private InventoryStockService $stockService,
         private ReversalService $reversalService,
         private OperationalPostingGuard $guard,
-        private PostingIdempotencyService $postingIdempotency
+        private PostingIdempotencyService $postingIdempotency,
+        private HarvestShareBucketService $shareBucketService,
+        private DuplicateWorkflowGuard $duplicateWorkflowGuard,
     ) {}
 
     /**
@@ -200,75 +207,245 @@ class HarvestService
     }
 
     /**
-     * Calculate NET WIP balance to transfer for a crop cycle up to a posting date.
-     * 
-     * WHY NET BALANCE (not cumulative debits):
-     * - Multiple harvests in the same crop cycle must only transfer remaining WIP.
-     * - If we summed only debits, each harvest would re-transfer the same cost.
-     * - NET = (debits - credits) ensures:
-     *   * Harvest 1 transfers full WIP balance (e.g., 100)
-     *   * Harvest 2 sees remaining balance after Harvest 1 credit (e.g., 0)
-     * - This prevents double-transfer and maintains correct inventory valuation.
-     *
-     * @return float Net WIP balance (debits - credits), clamped to >= 0
+     * Add a share line to a DRAFT harvest (CRUD only; posting in Phase 3C).
      */
-    private function calculateWipCost(string $tenantId, string $cropCycleId, string $postingDate): float
+    public function addShareLine(Harvest $harvest, array $data): Harvest
     {
-        $cropWipAccount = $this->accountService->getByCode($tenantId, 'CROP_WIP');
+        return DB::transaction(function () use ($harvest, $data) {
+            if (! $harvest->isDraft()) {
+                throw ValidationException::withMessages([
+                    'harvest' => ['Share lines can only be modified when the harvest is DRAFT.'],
+                ]);
+            }
 
-        $netBalance = DB::table('ledger_entries')
-            ->join('posting_groups', 'ledger_entries.posting_group_id', '=', 'posting_groups.id')
-            ->where('ledger_entries.tenant_id', $tenantId)
-            ->where('posting_groups.crop_cycle_id', $cropCycleId)
-            ->where('posting_groups.posting_date', '<=', $postingDate)
-            ->where('ledger_entries.account_id', $cropWipAccount->id)
-            ->selectRaw('SUM(ledger_entries.debit_amount - ledger_entries.credit_amount) as net')
-            ->value('net');
+            $this->assertShareLineForeignKeys($harvest, $data);
+            $this->assertRemainderUniqueness($harvest, $data, null);
 
-        // Return net balance, but never negative (if net <= 0, allow posting with 0 cost)
-        return max(0, (float) ($netBalance ?? 0));
+            $normalized = $this->normalizeShareLinePayload($data);
+            $sortOrder = $normalized['sort_order'] ?? null;
+            if ($sortOrder === null) {
+                $max = HarvestShareLine::where('harvest_id', $harvest->id)->max('sort_order');
+                $normalized['sort_order'] = (int) ($max ?? 0) + 1;
+            }
+
+            HarvestShareLine::create(array_merge($normalized, [
+                'tenant_id' => $harvest->tenant_id,
+                'harvest_id' => $harvest->id,
+            ]));
+
+            return $this->freshHarvestWithShareLines($harvest->id, $harvest->tenant_id);
+        });
     }
 
     /**
-     * Allocate cost across harvest lines.
-     *
-     * @return array<int, float> Array of allocated costs indexed by line index
+     * Update a share line (DRAFT harvest only).
      */
-    private function allocateCost(float $totalCost, \Illuminate\Support\Collection $lines): array
+    public function updateShareLine(HarvestShareLine $shareLine, array $data): Harvest
     {
-        $allocated = [];
-        $totalQty = $lines->sum('quantity');
-
-        if ($totalQty > 0) {
-            // Proportional allocation by quantity
-            $allocatedTotal = 0;
-            $lineCount = $lines->count();
-            foreach ($lines as $index => $line) {
-                if ($index === $lineCount - 1) {
-                    // Last line gets remainder to ensure exact total
-                    $allocated[$index] = $totalCost - $allocatedTotal;
-                } else {
-                    $lineAllocation = $totalCost * ((float) $line->quantity / $totalQty);
-                    $allocated[$index] = round($lineAllocation, 2);
-                    $allocatedTotal += $allocated[$index];
-                }
+        return DB::transaction(function () use ($shareLine, $data) {
+            $harvest = $shareLine->harvest;
+            if (! $harvest->isDraft()) {
+                throw ValidationException::withMessages([
+                    'harvest' => ['Share lines can only be modified when the harvest is DRAFT.'],
+                ]);
             }
+
+            $this->assertShareLineForeignKeys($harvest, $data);
+            $this->assertRemainderUniqueness($harvest, $data, $shareLine->id);
+
+            $normalized = $this->normalizeShareLinePayload($data);
+            unset($normalized['tenant_id'], $normalized['harvest_id']);
+
+            $shareLine->update($normalized);
+
+            return $this->freshHarvestWithShareLines($harvest->id, $harvest->tenant_id);
+        });
+    }
+
+    /**
+     * Delete a share line (DRAFT harvest only).
+     */
+    public function deleteShareLine(HarvestShareLine $shareLine): void
+    {
+        if (! $shareLine->harvest->isDraft()) {
+            throw ValidationException::withMessages([
+                'harvest' => ['Share lines can only be modified when the harvest is DRAFT.'],
+            ]);
+        }
+
+        $shareLine->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function normalizeShareLinePayload(array $data): array
+    {
+        $basis = $data['share_basis'];
+        $remainder = (bool) ($data['remainder_bucket'] ?? false);
+
+        $shareValue = $data['share_value'] ?? null;
+        $ratioN = $data['ratio_numerator'] ?? null;
+        $ratioD = $data['ratio_denominator'] ?? null;
+
+        if ($basis === HarvestShareLine::BASIS_REMAINDER) {
+            $shareValue = null;
+            $ratioN = null;
+            $ratioD = null;
+        } elseif ($basis === HarvestShareLine::BASIS_RATIO) {
+            $shareValue = null;
         } else {
-            // Equal allocation by line count
-            $perLine = $totalCost / $lines->count();
-            $allocatedTotal = 0;
-            $lineCount = $lines->count();
-            foreach ($lines as $index => $line) {
-                if ($index === $lineCount - 1) {
-                    $allocated[$index] = $totalCost - $allocatedTotal;
-                } else {
-                    $allocated[$index] = round($perLine, 2);
-                    $allocatedTotal += $allocated[$index];
-                }
+            $ratioN = null;
+            $ratioD = null;
+        }
+
+        if ($basis !== HarvestShareLine::BASIS_REMAINDER) {
+            $remainder = false;
+        }
+
+        return [
+            'harvest_line_id' => $data['harvest_line_id'] ?? null,
+            'recipient_role' => $data['recipient_role'],
+            'settlement_mode' => $data['settlement_mode'],
+            'share_basis' => $basis,
+            'share_value' => $shareValue,
+            'ratio_numerator' => $ratioN,
+            'ratio_denominator' => $ratioD,
+            'remainder_bucket' => $remainder,
+            'beneficiary_party_id' => $data['beneficiary_party_id'] ?? null,
+            'machine_id' => $data['machine_id'] ?? null,
+            'worker_id' => $data['worker_id'] ?? null,
+            'source_field_job_id' => $data['source_field_job_id'] ?? null,
+            'source_lab_work_log_id' => $data['source_lab_work_log_id'] ?? null,
+            'source_machinery_charge_id' => $data['source_machinery_charge_id'] ?? null,
+            'source_settlement_id' => $data['source_settlement_id'] ?? null,
+            'inventory_item_id' => $data['inventory_item_id'] ?? null,
+            'store_id' => $data['store_id'] ?? null,
+            'sort_order' => array_key_exists('sort_order', $data) && $data['sort_order'] !== null
+                ? (int) $data['sort_order']
+                : null,
+            'rule_snapshot' => $data['rule_snapshot'] ?? null,
+            'notes' => $data['notes'] ?? null,
+        ];
+    }
+
+    /**
+     * Tenant-scoped FK checks and harvest linkage (posting preview may add cross-document warnings).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertShareLineForeignKeys(Harvest $harvest, array $data): void
+    {
+        $tenantId = $harvest->tenant_id;
+
+        if (! empty($data['harvest_line_id'])) {
+            HarvestLine::where('id', $data['harvest_line_id'])
+                ->where('harvest_id', $harvest->id)
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+
+        if (! empty($data['beneficiary_party_id'])) {
+            \App\Models\Party::where('id', $data['beneficiary_party_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+
+        if (! empty($data['machine_id'])) {
+            \App\Models\Machine::where('id', $data['machine_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+
+        if (! empty($data['worker_id'])) {
+            \App\Models\LabWorker::where('id', $data['worker_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+
+        if (! empty($data['source_field_job_id'])) {
+            $fj = FieldJob::where('id', $data['source_field_job_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+            // Posting preview: warn if field job project_id differs from harvest project (deferred).
+            if ($harvest->project_id && $fj->project_id && $fj->project_id !== $harvest->project_id) {
+                // Intentionally not enforced here — Phase 3C posting preview.
             }
         }
 
-        return $allocated;
+        if (! empty($data['source_lab_work_log_id'])) {
+            LabWorkLog::where('id', $data['source_lab_work_log_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+            // Posting preview: optional cross-check vs harvest project / worker (deferred).
+        }
+
+        if (! empty($data['source_machinery_charge_id'])) {
+            \App\Models\MachineryCharge::where('id', $data['source_machinery_charge_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+
+        if (! empty($data['source_settlement_id'])) {
+            \App\Models\Settlement::where('id', $data['source_settlement_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+
+        if (! empty($data['inventory_item_id'])) {
+            \App\Models\InvItem::where('id', $data['inventory_item_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+
+        if (! empty($data['store_id'])) {
+            \App\Models\InvStore::where('id', $data['store_id'])
+                ->where('tenant_id', $tenantId)
+                ->firstOrFail();
+        }
+    }
+
+    /**
+     * At most one remainder per (harvest, harvest_line_id) scope; DB enforces when harvest_line_id is set.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertRemainderUniqueness(Harvest $harvest, array $data, ?string $excludeShareLineId): void
+    {
+        $remainder = (bool) ($data['remainder_bucket'] ?? false);
+        if (! $remainder) {
+            return;
+        }
+
+        $q = HarvestShareLine::query()
+            ->where('harvest_id', $harvest->id)
+            ->where('tenant_id', $harvest->tenant_id)
+            ->where('remainder_bucket', true);
+
+        if ($excludeShareLineId !== null) {
+            $q->where('id', '!=', $excludeShareLineId);
+        }
+
+        $lineId = $data['harvest_line_id'] ?? null;
+        if ($lineId) {
+            $q->where('harvest_line_id', $lineId);
+        } else {
+            $q->whereNull('harvest_line_id');
+        }
+
+        if ($q->exists()) {
+            throw ValidationException::withMessages([
+                'remainder_bucket' => ['Only one remainder bucket is allowed for this harvest scope (per harvest line, or one harvest-level remainder when no line is set).'],
+            ]);
+        }
+    }
+
+    private function freshHarvestWithShareLines(string $harvestId, string $tenantId): Harvest
+    {
+        return Harvest::where('id', $harvestId)
+            ->where('tenant_id', $tenantId)
+            ->with(Harvest::detailWithRelations())
+            ->firstOrFail();
     }
 
     /**
@@ -286,7 +463,7 @@ class HarvestService
                 $existingPostingGroup = $resolved['posting_group'];
                 $harvest->refresh();
                 if ($harvest->posting_group_id === $existingPostingGroup->id) {
-                    return $harvest->fresh(['cropCycle', 'postingGroup', 'lines.item', 'lines.store']);
+                    return $harvest->fresh(Harvest::detailWithRelations());
                 }
                 $harvest->update([
                     'status' => 'POSTED',
@@ -295,7 +472,7 @@ class HarvestService
                     'posting_group_id' => $existingPostingGroup->id,
                 ]);
 
-                return $harvest->fresh(['cropCycle', 'postingGroup', 'lines.item', 'lines.store']);
+                return $harvest->fresh(Harvest::detailWithRelations());
             }
             $idempotencyKey = $resolved['effective_key'];
 
@@ -304,8 +481,8 @@ class HarvestService
                 throw new \Exception('Only DRAFT harvests can be posted.');
             }
 
-            // Load relationships
-            $harvest->load(['lines.item', 'lines.store', 'cropCycle']);
+            // Load relationships (share lines required for share-aware posting)
+            $harvest->load(['lines.item', 'lines.store', 'cropCycle', 'shareLines']);
 
             if (!$harvest->project_id) {
                 throw new \Exception('Cannot post harvest: project is required. Update the harvest with a project.');
@@ -344,16 +521,12 @@ class HarvestService
                 throw new \Exception('Posting date is after crop cycle end date.');
             }
 
-            // Calculate total WIP cost to transfer
-            $totalWipCost = $this->calculateWipCost($harvest->tenant_id, $harvest->crop_cycle_id, $postingDateObj);
-
-            // If WIP cost is 0, still allow posting (creates inventory qty with 0 cost)
-            // This is documented in code comment per requirements
-
             // Use harvest's project for allocation rows
             $project = Project::where('id', $harvest->project_id)
                 ->where('tenant_id', $harvest->tenant_id)
                 ->firstOrFail();
+
+            $this->duplicateWorkflowGuard->assertHarvestPostAllowed($harvest);
 
             // Create posting group
             $postingGroup = PostingGroup::create([
@@ -365,70 +538,35 @@ class HarvestService
                 'idempotency_key' => $idempotencyKey,
             ]);
 
-            // Allocate cost across lines
-            $allocatedCosts = $this->allocateCost($totalWipCost, $harvest->lines);
+            $bucketResult = $this->shareBucketService->compute($harvest, $postingDateObj);
+            $totalWipCost = $bucketResult['total_wip_cost'];
+            $buckets = $bucketResult['buckets'];
+            $lines = $bucketResult['lines'];
+            $shareLinesById = $harvest->shareLines->keyBy('id');
 
-            // Get accounts
-            // Use INVENTORY_PRODUCE for harvest output (produce), not INVENTORY_INPUTS (which is for inputs like seed/fert)
             $cropWipAccount = $this->accountService->getByCode($harvest->tenant_id, 'CROP_WIP');
             $inventoryAccount = $this->accountService->getByCode($harvest->tenant_id, 'INVENTORY_PRODUCE');
 
-            // Create allocation rows, ledger entries, and stock movements for each line
-            $totalDebitedToInventory = 0;
-            foreach ($harvest->lines as $index => $line) {
-                $allocatedCost = $allocatedCosts[$index] ?? 0;
-                $quantity = (float) $line->quantity;
-                $unitCost = $quantity > 0 ? $allocatedCost / $quantity : 0;
+            $lineIndexById = [];
+            foreach ($lines as $idx => $hl) {
+                $lineIndexById[$hl->id] = $idx;
+            }
 
-                // Create allocation row
-                // Include harvest_line_id in snapshot for traceability (enables accurate cost-per-unit reporting)
-                AllocationRow::create([
-                    'tenant_id' => $harvest->tenant_id,
-                    'posting_group_id' => $postingGroup->id,
-                    'project_id' => $project->id,
-                    'party_id' => $project->party_id,
-                    'allocation_type' => 'HARVEST_PRODUCTION',
-                    'amount' => (string) round($allocatedCost, 2),
-                    'rule_snapshot' => [
-                        'type' => 'HARVEST',
-                        'harvest_line_id' => $line->id,
-                        'allocation' => $quantity > 0 ? 'quantity_proportional' : 'equal_by_line_count',
-                        'total_wip_transferred' => $totalWipCost,
-                        'line_quantity' => $quantity,
-                        'line_index' => $index,
-                    ],
-                ]);
-
-                // Create ledger entry for inventory (debit)
-                if ($allocatedCost > 0.001) {
-                    LedgerEntry::create([
-                        'tenant_id' => $harvest->tenant_id,
-                        'posting_group_id' => $postingGroup->id,
-                        'account_id' => $inventoryAccount->id,
-                        'debit_amount' => (string) round($allocatedCost, 2),
-                        'credit_amount' => 0,
-                        'currency_code' => 'GBP',
-                    ]);
-                    $totalDebitedToInventory += $allocatedCost;
-                }
-
-                // Create stock movement
-                $this->stockService->applyMovement(
-                    $harvest->tenant_id,
-                    $postingGroup->id,
-                    $line->store_id,
-                    $line->inventory_item_id,
-                    'HARVEST',
-                    (string) $quantity,
-                    (string) round($allocatedCost, 2),
-                    (string) round($unitCost, 6),
+            foreach ($buckets as $bucket) {
+                $this->postHarvestShareBucket(
+                    $harvest,
+                    $postingGroup,
+                    $project,
                     $postingDateObj,
-                    'harvest',
-                    $harvest->id
+                    $bucket,
+                    $lines,
+                    $shareLinesById,
+                    $lineIndexById,
+                    $totalWipCost,
+                    $inventoryAccount
                 );
             }
 
-            // Create ledger entry to credit CROP_WIP
             if ($totalWipCost > 0.001) {
                 LedgerEntry::create([
                     'tenant_id' => $harvest->tenant_id,
@@ -440,7 +578,18 @@ class HarvestService
                 ]);
             }
 
-            // Update harvest
+            foreach ($buckets as $bucket) {
+                $this->postInKindSettlementIfApplicable(
+                    $harvest,
+                    $postingGroup,
+                    $project,
+                    $bucket,
+                    $shareLinesById
+                );
+            }
+
+            $this->persistPostedShareSnapshots($buckets, $shareLinesById, $postingGroup->id);
+
             $harvest->update([
                 'status' => 'POSTED',
                 'posting_date' => $postingDateObj,
@@ -448,9 +597,297 @@ class HarvestService
                 'posting_group_id' => $postingGroup->id,
             ]);
 
-            return $harvest->fresh();
+            return $harvest->fresh(Harvest::detailWithRelations());
             });
         });
+    }
+
+    /**
+     * @param  Collection<string, HarvestShareLine>  $shareLinesById
+     * @param  array<string, int>  $lineIndexById
+     */
+    private function postHarvestShareBucket(
+        Harvest $harvest,
+        PostingGroup $postingGroup,
+        Project $project,
+        string $postingDateObj,
+        array $bucket,
+        Collection $lines,
+        Collection $shareLinesById,
+        array $lineIndexById,
+        float $totalWipCost,
+        \App\Models\Account $inventoryAccount
+    ): void {
+        $shareLine = ! empty($bucket['share_line_id'])
+            ? $shareLinesById->get($bucket['share_line_id'])
+            : null;
+
+        $ctx = $this->resolveMovementContext($bucket, $lines, $shareLine);
+        /** @var HarvestLine $harvestLine */
+        $harvestLine = $ctx['harvest_line'];
+        $storeId = $ctx['store_id'];
+        $itemId = $ctx['item_id'];
+
+        $qty = (float) $bucket['computed_qty'];
+        $allocatedCost = (float) $bucket['provisional_value'];
+        $unitCost = $qty > 0 ? $allocatedCost / $qty : 0.0;
+
+        $partyId = $shareLine?->beneficiary_party_id ?? $project->party_id;
+
+        $lineIndex = isset($bucket['harvest_line_id'])
+            ? ($lineIndexById[$bucket['harvest_line_id']] ?? 0)
+            : 0;
+
+        $ruleSnapshot = [
+            'type' => 'HARVEST',
+            'harvest_line_id' => $bucket['harvest_line_id'] ?? $harvestLine->id,
+            'harvest_id' => $harvest->id,
+            'total_wip_transferred' => $totalWipCost,
+            'line_quantity' => $qty,
+            'line_index' => $lineIndex,
+            'allocation' => 'share_bucket',
+            'recipient_role' => $bucket['recipient_role'],
+            'share_line_id' => $bucket['share_line_id'],
+            'implicit_owner' => (bool) ($bucket['implicit_owner'] ?? false),
+            'valuation_basis' => 'WIP_LAYER',
+        ];
+        if ($shareLine?->worker_id) {
+            $ruleSnapshot['worker_id'] = $shareLine->worker_id;
+        }
+
+        AllocationRow::create([
+            'tenant_id' => $harvest->tenant_id,
+            'posting_group_id' => $postingGroup->id,
+            'project_id' => $project->id,
+            'party_id' => $partyId,
+            'allocation_type' => 'HARVEST_PRODUCTION',
+            'allocation_scope' => 'SHARED',
+            'amount' => (string) round($allocatedCost, 2),
+            'quantity' => (string) round($qty, 3),
+            'unit' => $harvestLine->uom,
+            'machine_id' => $shareLine?->machine_id,
+            'rule_snapshot' => $ruleSnapshot,
+        ]);
+
+        if ($allocatedCost > 0.001) {
+            LedgerEntry::create([
+                'tenant_id' => $harvest->tenant_id,
+                'posting_group_id' => $postingGroup->id,
+                'account_id' => $inventoryAccount->id,
+                'debit_amount' => (string) round($allocatedCost, 2),
+                'credit_amount' => 0,
+                'currency_code' => 'GBP',
+            ]);
+        }
+
+        $this->stockService->applyMovement(
+            $harvest->tenant_id,
+            $postingGroup->id,
+            $storeId,
+            $itemId,
+            'HARVEST',
+            (string) $qty,
+            (string) round($allocatedCost, 2),
+            (string) round($unitCost, 6),
+            $postingDateObj,
+            'harvest',
+            $harvest->id
+        );
+    }
+
+    /**
+     * @param  Collection<string, HarvestShareLine>  $shareLinesById
+     */
+    private function resolveMovementContext(array $bucket, Collection $lines, ?HarvestShareLine $shareLine): array
+    {
+        $firstLine = $lines->firstOrFail();
+        $harvestLine = $firstLine;
+        if (! empty($bucket['harvest_line_id'])) {
+            $found = $lines->firstWhere('id', $bucket['harvest_line_id']);
+            if ($found) {
+                $harvestLine = $found;
+            }
+        }
+
+        $itemId = $shareLine?->inventory_item_id ?? $harvestLine->inventory_item_id;
+        $storeId = $shareLine?->store_id ?? $harvestLine->store_id;
+
+        return [
+            'harvest_line' => $harvestLine,
+            'item_id' => $itemId,
+            'store_id' => $storeId,
+        ];
+    }
+
+    /**
+     * @param  Collection<string, HarvestShareLine>  $shareLinesById
+     */
+    private function postInKindSettlementIfApplicable(
+        Harvest $harvest,
+        PostingGroup $postingGroup,
+        Project $project,
+        array $bucket,
+        Collection $shareLinesById
+    ): void {
+        $role = $bucket['recipient_role'] ?? '';
+        if ($role === HarvestShareLine::RECIPIENT_OWNER) {
+            return;
+        }
+        if (($bucket['settlement_mode'] ?? null) !== HarvestShareLine::SETTLEMENT_IN_KIND) {
+            return;
+        }
+        $v = (float) $bucket['provisional_value'];
+        if ($v <= 0.001) {
+            return;
+        }
+
+        $shareLine = ! empty($bucket['share_line_id'])
+            ? $shareLinesById->get($bucket['share_line_id'])
+            : null;
+
+        $partyId = $shareLine?->beneficiary_party_id ?? $project->party_id;
+
+        $allocationType = match ($role) {
+            HarvestShareLine::RECIPIENT_MACHINE => 'HARVEST_IN_KIND_MACHINE',
+            HarvestShareLine::RECIPIENT_LABOUR => 'HARVEST_IN_KIND_LABOUR',
+            HarvestShareLine::RECIPIENT_LANDLORD => 'HARVEST_IN_KIND_LANDLORD',
+            HarvestShareLine::RECIPIENT_CONTRACTOR => 'HARVEST_IN_KIND_CONTRACTOR',
+            default => null,
+        };
+        if ($allocationType === null) {
+            return;
+        }
+
+        $snap = [
+            'harvest_id' => $harvest->id,
+            'share_line_id' => $bucket['share_line_id'],
+            'recipient_role' => $role,
+            'source_field_job_id' => $shareLine?->source_field_job_id,
+            'source_lab_work_log_id' => $shareLine?->source_lab_work_log_id,
+            'worker_id' => $shareLine?->worker_id,
+        ];
+
+        AllocationRow::create([
+            'tenant_id' => $harvest->tenant_id,
+            'posting_group_id' => $postingGroup->id,
+            'project_id' => $project->id,
+            'party_id' => $partyId,
+            'allocation_type' => $allocationType,
+            'allocation_scope' => 'SHARED',
+            'amount' => (string) round($v, 2),
+            'machine_id' => $shareLine?->machine_id,
+            'rule_snapshot' => $snap,
+        ]);
+
+        $amount = (string) round($v, 2);
+        $tid = $harvest->tenant_id;
+        $pgId = $postingGroup->id;
+
+        match ($role) {
+            HarvestShareLine::RECIPIENT_MACHINE => $this->ledgerDrIncomeCrExpense(
+                $tid,
+                $pgId,
+                'MACHINERY_SERVICE_INCOME',
+                'EXP_SHARED',
+                $amount
+            ),
+            HarvestShareLine::RECIPIENT_LABOUR => $this->ledgerDrLiabilityCrExpense(
+                $tid,
+                $pgId,
+                'WAGES_PAYABLE',
+                'LABOUR_EXPENSE',
+                $amount
+            ),
+            HarvestShareLine::RECIPIENT_LANDLORD => $this->ledgerDrLiabilityCrExpense(
+                $tid,
+                $pgId,
+                'PAYABLE_LANDLORD',
+                'EXP_LANDLORD_ONLY',
+                $amount
+            ),
+            HarvestShareLine::RECIPIENT_CONTRACTOR => $this->ledgerDrLiabilityCrExpense(
+                $tid,
+                $pgId,
+                'AP',
+                'EXP_SHARED',
+                $amount
+            ),
+            default => null,
+        };
+    }
+
+    private function ledgerDrIncomeCrExpense(string $tenantId, string $postingGroupId, string $incomeCode, string $expenseCode, string $amount): void
+    {
+        $income = $this->accountService->getByCode($tenantId, $incomeCode);
+        $exp = $this->accountService->getByCode($tenantId, $expenseCode);
+        LedgerEntry::create([
+            'tenant_id' => $tenantId,
+            'posting_group_id' => $postingGroupId,
+            'account_id' => $income->id,
+            'debit_amount' => $amount,
+            'credit_amount' => 0,
+            'currency_code' => 'GBP',
+        ]);
+        LedgerEntry::create([
+            'tenant_id' => $tenantId,
+            'posting_group_id' => $postingGroupId,
+            'account_id' => $exp->id,
+            'debit_amount' => 0,
+            'credit_amount' => $amount,
+            'currency_code' => 'GBP',
+        ]);
+    }
+
+    private function ledgerDrLiabilityCrExpense(string $tenantId, string $postingGroupId, string $liabilityCode, string $expenseCode, string $amount): void
+    {
+        $liab = $this->accountService->getByCode($tenantId, $liabilityCode);
+        $exp = $this->accountService->getByCode($tenantId, $expenseCode);
+        LedgerEntry::create([
+            'tenant_id' => $tenantId,
+            'posting_group_id' => $postingGroupId,
+            'account_id' => $liab->id,
+            'debit_amount' => $amount,
+            'credit_amount' => 0,
+            'currency_code' => 'GBP',
+        ]);
+        LedgerEntry::create([
+            'tenant_id' => $tenantId,
+            'posting_group_id' => $postingGroupId,
+            'account_id' => $exp->id,
+            'debit_amount' => 0,
+            'credit_amount' => $amount,
+            'currency_code' => 'GBP',
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $buckets
+     * @param  Collection<string, HarvestShareLine>  $shareLinesById
+     */
+    private function persistPostedShareSnapshots(Collection $buckets, Collection $shareLinesById, string $postingGroupId): void
+    {
+        foreach ($buckets as $bucket) {
+            if (empty($bucket['share_line_id'])) {
+                continue;
+            }
+            $sl = $shareLinesById->get($bucket['share_line_id']);
+            if (! $sl) {
+                continue;
+            }
+            $prev = is_array($sl->rule_snapshot) ? $sl->rule_snapshot : [];
+            $sl->update([
+                'computed_qty' => $bucket['computed_qty'],
+                'computed_unit_cost_snapshot' => $bucket['provisional_unit_cost'],
+                'computed_value_snapshot' => $bucket['provisional_value'],
+                'rule_snapshot' => array_merge($prev, [
+                    'posted_snapshot_at' => now()->toIso8601String(),
+                    'valuation_basis' => 'WIP_LAYER',
+                    'harvest_line_id' => $bucket['harvest_line_id'],
+                    'recipient_role' => $bucket['recipient_role'],
+                    'harvest_posting_group_id' => $postingGroupId,
+                ]),
+            ]);
+        }
     }
 
     /**
@@ -508,7 +945,7 @@ class HarvestService
                     'reversed_at' => now(),
                     'reversal_posting_group_id' => $reversalPostingGroup->id,
                 ]);
-                return $harvest->fresh();
+                return $harvest->fresh(Harvest::detailWithRelations());
             }
 
             // Find original stock movements and reverse them
@@ -539,7 +976,7 @@ class HarvestService
                 'reversal_posting_group_id' => $reversalPostingGroup->id,
             ]);
 
-            return $harvest->fresh();
+            return $harvest->fresh(Harvest::detailWithRelations());
             });
         });
     }

@@ -18,6 +18,7 @@ return [
         // Core posting services
         \App\Services\AdvanceService::class,
         \App\Services\CropActivityPostingService::class,
+        \App\Services\FieldJobPostingService::class,
         \App\Services\HarvestService::class,
         \App\Services\InventoryPostingService::class,
         \App\Services\JournalEntryService::class,

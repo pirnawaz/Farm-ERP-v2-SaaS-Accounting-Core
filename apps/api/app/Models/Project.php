@@ -66,4 +66,9 @@ class Project extends Model
     {
         return $this->hasMany(Settlement::class);
     }
+
+    public function projectPlans(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProjectPlan::class);
+    }
 }

@@ -9,6 +9,10 @@ use App\Domains\Reporting\TrialBalanceService;
 use App\Domains\Reporting\GeneralLedgerService;
 use App\Domains\Reporting\ProfitLossService;
 use App\Domains\Reporting\BalanceSheetService;
+use App\Services\ForecastService;
+use App\Services\HarvestEconomicsService;
+use App\Services\MachineProfitabilityService;
+use App\Services\ProjectProfitabilityService;
 use App\Services\SettlementService;
 use App\Services\ReconciliationService;
 use App\Services\SaleARService;
@@ -18,6 +22,8 @@ use App\Services\PartyLedgerService;
 use App\Services\PartySummaryService;
 use App\Services\RoleAgeingService;
 use App\Services\LandlordStatementService;
+use App\Models\CropCycle;
+use App\Models\Harvest;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
 use App\Models\Settlement;
@@ -44,7 +50,11 @@ class ReportController extends Controller
         private TrialBalanceService $trialBalanceService,
         private GeneralLedgerService $generalLedgerService,
         private ProfitLossService $profitLossService,
-        private BalanceSheetService $balanceSheetService
+        private BalanceSheetService $balanceSheetService,
+        private ProjectProfitabilityService $projectProfitabilityService,
+        private MachineProfitabilityService $machineProfitabilityService,
+        private HarvestEconomicsService $harvestEconomicsService,
+        private ForecastService $forecastService
     ) {}
 
     /**
@@ -123,6 +133,279 @@ class ReportController extends Controller
         $filters = ['project_id' => $projectId];
         $data = $this->profitLossService->getProfitLoss($tenantId, $from, $to, $filters);
         return response()->json($data);
+    }
+
+    /**
+     * GET /api/reports/project-profitability
+     * Ledger-based project profitability (sales / machinery / harvest in-kind revenue buckets; cost buckets).
+     * Required: project_id. Optional: from, to (posting_date on posting_groups, inclusive), crop_cycle_id.
+     */
+    public function projectProfitability(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|uuid',
+            'from' => 'nullable|date',
+            'to' => 'nullable|date',
+            'crop_cycle_id' => 'nullable|uuid',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if ($request->filled('from') && $request->filled('to') && $request->input('to') < $request->input('from')) {
+            return response()->json(['errors' => ['to' => ['to must be on or after from.']]], 422);
+        }
+
+        $project = Project::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $request->input('project_id'))
+            ->first();
+        if (! $project) {
+            return response()->json(['errors' => ['project_id' => ['Invalid project.']]], 422);
+        }
+        if ($request->filled('crop_cycle_id')) {
+            $cycle = CropCycle::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('crop_cycle_id'))
+                ->first();
+            if (! $cycle) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Invalid crop cycle.']]], 422);
+            }
+            if ((string) $project->crop_cycle_id !== (string) $request->input('crop_cycle_id')) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Crop cycle does not match this project.']]], 422);
+            }
+        }
+
+        $filters = array_filter([
+            'from' => $request->input('from'),
+            'to' => $request->input('to'),
+            'crop_cycle_id' => $request->input('crop_cycle_id'),
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $data = $this->projectProfitabilityService->getProjectProfitability(
+            (string) $request->input('project_id'),
+            $tenantId,
+            $filters
+        );
+
+        return response()->json($data);
+    }
+
+    /**
+     * GET /api/reports/project-forecast
+     * Planned vs actual profitability for the resolved plan (active, else latest) vs ledger-backed actuals.
+     * Required: project_id. Optional: from, to, crop_cycle_id (same semantics as project-profitability).
+     */
+    public function projectForecast(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $scope = $this->validateProjectForecastScope($request, $tenantId);
+        if ($scope instanceof JsonResponse) {
+            return $scope;
+        }
+
+        $filters = array_filter([
+            'from' => $request->input('from'),
+            'to' => $request->input('to'),
+            'crop_cycle_id' => $request->input('crop_cycle_id'),
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $data = $this->forecastService->getProjectForecast((string) $request->input('project_id'), $filters);
+
+        return response()->json($data);
+    }
+
+    /**
+     * GET /api/reports/project-projected-profit
+     * Pre-harvest snapshot: planned yield value vs costs posted to date (optional date window).
+     * Required: project_id. Optional: from, to, crop_cycle_id.
+     */
+    public function projectProjectedProfit(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $scope = $this->validateProjectForecastScope($request, $tenantId);
+        if ($scope instanceof JsonResponse) {
+            return $scope;
+        }
+
+        $filters = array_filter([
+            'from' => $request->input('from'),
+            'to' => $request->input('to'),
+            'crop_cycle_id' => $request->input('crop_cycle_id'),
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $data = $this->forecastService->getProjectedProfitability((string) $request->input('project_id'), $filters);
+
+        return response()->json($data);
+    }
+
+    /**
+     * Shared validation for project-forecast and project-projected-profit (tenant-safe project scope).
+     *
+     * @return JsonResponse|true JsonResponse on error, true when OK
+     */
+    private function validateProjectForecastScope(Request $request, string $tenantId): JsonResponse|bool
+    {
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|uuid',
+            'from' => 'nullable|date',
+            'to' => 'nullable|date',
+            'crop_cycle_id' => 'nullable|uuid',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if ($request->filled('from') && $request->filled('to') && $request->input('to') < $request->input('from')) {
+            return response()->json(['errors' => ['to' => ['to must be on or after from.']]], 422);
+        }
+
+        $project = Project::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $request->input('project_id'))
+            ->first();
+        if (! $project) {
+            return response()->json(['errors' => ['project_id' => ['Invalid project.']]], 422);
+        }
+        if ($request->filled('crop_cycle_id')) {
+            $cycle = CropCycle::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('crop_cycle_id'))
+                ->first();
+            if (! $cycle) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Invalid crop cycle.']]], 422);
+            }
+            if ((string) $project->crop_cycle_id !== (string) $request->input('crop_cycle_id')) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Crop cycle does not match this project.']]], 422);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * GET /api/reports/machine-profitability
+     * Per-machine revenue, cost, usage hours for a posting window. Optional: project_id, crop_cycle_id.
+     */
+    public function machineProfitability(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+            'project_id' => 'nullable|uuid',
+            'crop_cycle_id' => 'nullable|uuid',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->filled('project_id')) {
+            $project = Project::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('project_id'))
+                ->first();
+            if (! $project) {
+                return response()->json(['errors' => ['project_id' => ['Invalid project.']]], 422);
+            }
+            if ($request->filled('crop_cycle_id') && (string) $project->crop_cycle_id !== (string) $request->input('crop_cycle_id')) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Crop cycle does not match this project.']]], 422);
+            }
+        } elseif ($request->filled('crop_cycle_id')) {
+            $cycle = CropCycle::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('crop_cycle_id'))
+                ->first();
+            if (! $cycle) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Invalid crop cycle.']]], 422);
+            }
+        }
+
+        $filters = [
+            'from' => (string) $request->input('from'),
+            'to' => (string) $request->input('to'),
+            'crop_cycle_id' => $request->input('crop_cycle_id'),
+            'project_id' => $request->input('project_id'),
+        ];
+
+        $rows = $this->machineProfitabilityService->getMachineProfitability($tenantId, $filters);
+
+        return response()->json($rows);
+    }
+
+    /**
+     * GET /api/reports/harvest-economics
+     * Paginated POSTED harvest economics in a posting_date window, or a single harvest when harvest_id is set.
+     */
+    public function harvestEconomics(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        if ($request->filled('harvest_id')) {
+            $validator = Validator::make($request->all(), [
+                'harvest_id' => 'required|uuid',
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+            $harvest = Harvest::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('harvest_id'))
+                ->first();
+            if (! $harvest) {
+                return response()->json(['errors' => ['harvest_id' => ['Invalid harvest.']]], 422);
+            }
+            if (! $harvest->isPosted() || ! $harvest->posting_group_id) {
+                return response()->json(['errors' => ['harvest_id' => ['Harvest must be posted to read economics.']]], 422);
+            }
+
+            return response()->json(
+                $this->harvestEconomicsService->getHarvestEconomicsDocument((string) $harvest->id, $tenantId)
+            );
+        }
+
+        $validator = Validator::make($request->all(), [
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+            'project_id' => 'nullable|uuid',
+            'crop_cycle_id' => 'nullable|uuid',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->filled('project_id')) {
+            $project = Project::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('project_id'))
+                ->first();
+            if (! $project) {
+                return response()->json(['errors' => ['project_id' => ['Invalid project.']]], 422);
+            }
+            if ($request->filled('crop_cycle_id') && (string) $project->crop_cycle_id !== (string) $request->input('crop_cycle_id')) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Crop cycle does not match this project.']]], 422);
+            }
+        } elseif ($request->filled('crop_cycle_id')) {
+            $cycle = CropCycle::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('crop_cycle_id'))
+                ->first();
+            if (! $cycle) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Invalid crop cycle.']]], 422);
+            }
+        }
+
+        $filters = [
+            'from' => (string) $request->input('from'),
+            'to' => (string) $request->input('to'),
+            'project_id' => $request->input('project_id'),
+            'crop_cycle_id' => $request->input('crop_cycle_id'),
+            'per_page' => $request->input('per_page'),
+        ];
+
+        $paginator = $this->harvestEconomicsService->paginateHarvestEconomics($tenantId, $filters);
+
+        return response()->json($paginator);
     }
 
     /**
@@ -887,6 +1170,7 @@ class ReportController extends Controller
                 WHERE ar.tenant_id = :tenant_id
                     AND pg.source_type = 'HARVEST'
                     AND pg.crop_cycle_id = :crop_cycle_id
+                    AND ar.allocation_type = 'HARVEST_PRODUCTION'
             ),
             ranked_harvest_lines AS (
                 SELECT 

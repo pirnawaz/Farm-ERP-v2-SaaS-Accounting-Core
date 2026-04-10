@@ -7,5 +7,6 @@ export const usersApi = {
   create: (payload: CreateUserPayload) => apiClient.post<User>('/api/users', payload),
   update: (id: string, payload: Partial<CreateUserPayload>) => 
     apiClient.patch<User>(`/api/users/${id}`, payload),
+  /** Soft-disables the user (same as tenant user remove); row is kept for audit. */
   delete: (id: string) => apiClient.delete(`/api/users/${id}`),
 };

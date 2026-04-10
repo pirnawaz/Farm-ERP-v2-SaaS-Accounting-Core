@@ -13,6 +13,7 @@ import { Modal } from '../../components/Modal';
 import { FormField } from '../../components/FormField';
 import type { MachineryCharge } from '../../types';
 import { Badge } from '../../components/Badge';
+import { AdvancedWorkflowBanner } from '../../components/workflow/AdvancedWorkflowBanner';
 
 export default function ChargesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -154,6 +155,7 @@ export default function ChargesPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <AdvancedWorkflowBanner />
       <PageHeader
         title="Machinery Charges"
         tooltip="Track costs associated with machine usage and operations."

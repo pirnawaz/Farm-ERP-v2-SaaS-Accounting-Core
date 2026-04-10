@@ -870,6 +870,7 @@ export interface MachineWorkLog {
   posted_at?: string | null;
   posting_group_id?: string | null;
   reversal_posting_group_id?: string | null;
+  machinery_charge_id?: string | null;
   created_at: string;
   updated_at: string;
   machine?: Machine;
@@ -877,7 +878,9 @@ export interface MachineWorkLog {
   crop_cycle?: CropCycle;
   posting_group?: PostingGroup;
   reversal_posting_group?: PostingGroup;
+  machinery_charge?: MachineryCharge | null;
   lines?: MachineWorkLogCostLine[];
+  traceability?: OperationalTraceabilityPayload;
 }
 
 export interface CreateMachinePayload {
@@ -1051,6 +1054,7 @@ export interface MachineryCharge {
   landlord_party?: Party;
   posting_group?: PostingGroup;
   reversal_posting_group?: PostingGroup;
+  traceability?: OperationalTraceabilityPayload;
 }
 
 export interface GenerateChargesPayload {
@@ -1373,6 +1377,220 @@ export interface ReverseCropActivityRequest {
   idempotency_key?: string;
 }
 
+// Field Job (crop-ops operational document)
+export type FieldJobStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+
+export interface FieldJobInputLine {
+  id: string;
+  tenant_id: string;
+  field_job_id: string;
+  store_id: string;
+  item_id: string;
+  qty: string;
+  unit_cost_snapshot?: string | null;
+  line_total?: string | null;
+  created_at: string;
+  updated_at: string;
+  item?: InvItem;
+  store?: InvStore;
+}
+
+export interface FieldJobLabourLine {
+  id: string;
+  tenant_id: string;
+  field_job_id: string;
+  worker_id: string;
+  rate_basis?: string | null;
+  units: string;
+  rate: string;
+  amount?: string | null;
+  created_at: string;
+  updated_at: string;
+  worker?: LabWorker;
+}
+
+export interface FieldJobMachineLine {
+  id: string;
+  tenant_id: string;
+  field_job_id: string;
+  machine_id: string;
+  usage_qty: string;
+  meter_unit_snapshot?: string | null;
+  /** How the financial rate/amount was determined (set when posted or when entered manually). */
+  pricing_basis?: string | null;
+  rate_card_id?: string | null;
+  rate_snapshot?: string | null;
+  amount?: string | null;
+  source_work_log_id?: string | null;
+  source_charge_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  machine?: Machine;
+  /** From API relation sourceWorkLog */
+  source_work_log?: MachineWorkLog | null;
+  /** From API relation sourceCharge (machinery charge document) */
+  source_charge?: Pick<
+    MachineryCharge,
+    'id' | 'charge_no' | 'charge_date' | 'status' | 'tenant_id'
+  > | null;
+}
+
+export interface FieldJob {
+  id: string;
+  tenant_id: string;
+  doc_no?: string | null;
+  status: FieldJobStatus;
+  job_date: string;
+  project_id: string;
+  crop_cycle_id: string;
+  production_unit_id?: string | null;
+  land_parcel_id?: string | null;
+  crop_activity_type_id?: string | null;
+  notes?: string | null;
+  posting_date?: string | null;
+  posting_group_id?: string | null;
+  posted_at?: string | null;
+  reversal_posting_group_id?: string | null;
+  reversed_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  project?: Project;
+  crop_cycle?: CropCycle;
+  production_unit?: ProductionUnit | null;
+  land_parcel?: LandParcel | null;
+  crop_activity_type?: CropActivityType | null;
+  inputs?: FieldJobInputLine[];
+  labour?: FieldJobLabourLine[];
+  machines?: FieldJobMachineLine[];
+  traceability?: OperationalTraceabilityPayload;
+}
+
+export interface CreateFieldJobPayload {
+  doc_no?: string | null;
+  job_date: string;
+  project_id: string;
+  crop_activity_type_id?: string | null;
+  production_unit_id?: string | null;
+  land_parcel_id?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdateFieldJobPayload {
+  doc_no?: string | null;
+  job_date?: string;
+  project_id?: string;
+  crop_activity_type_id?: string | null;
+  production_unit_id?: string | null;
+  land_parcel_id?: string | null;
+  notes?: string | null;
+}
+
+export interface AddFieldJobInputPayload {
+  store_id: string;
+  item_id: string;
+  qty: number;
+}
+
+export interface UpdateFieldJobInputPayload {
+  store_id?: string;
+  item_id?: string;
+  qty?: number;
+}
+
+export interface AddFieldJobLabourPayload {
+  worker_id: string;
+  rate_basis?: string;
+  units: number;
+  rate: number;
+  amount?: number;
+}
+
+export interface UpdateFieldJobLabourPayload {
+  worker_id?: string;
+  rate_basis?: string | null;
+  units?: number;
+  rate?: number;
+  amount?: number | null;
+}
+
+export interface AddFieldJobMachinePayload {
+  machine_id: string;
+  usage_qty: number;
+  meter_unit_snapshot?: string;
+  rate_snapshot?: number;
+  amount?: number;
+}
+
+export interface UpdateFieldJobMachinePayload {
+  machine_id?: string;
+  usage_qty?: number;
+  meter_unit_snapshot?: string | null;
+  rate_snapshot?: number | null;
+  amount?: number | null;
+}
+
+export interface PostFieldJobRequest {
+  posting_date: string;
+  idempotency_key?: string;
+}
+
+export interface ReverseFieldJobRequest {
+  posting_date: string;
+  reason?: string;
+  idempotency_key?: string;
+}
+
+/** GET detail responses (field job, harvest, machinery charge, machine work log) — read-model only. */
+export interface OperationalTraceabilityPayload {
+  linked_harvests?: Array<{
+    id: string;
+    harvest_no?: string | null;
+    harvest_date?: string | null;
+    status: string;
+  }>;
+  machinery_sources?: Array<{
+    field_job_machine_id: string;
+    machine_label?: string;
+    source_work_log?: { id: string; work_log_no?: string | null; work_date?: string | null; status?: string } | null;
+    source_machinery_charge?: {
+      id: string;
+      charge_no?: string | null;
+      charge_date?: string | null;
+      status?: string;
+    } | null;
+  }>;
+  linked_field_jobs?: Array<{
+    id: string;
+    doc_no?: string | null;
+    job_date?: string | null;
+    status: string;
+  }>;
+  share_line_source_ids?: Array<{
+    share_line_id: string;
+    source_field_job_id?: string | null;
+    source_machinery_charge_id?: string | null;
+    source_lab_work_log_id?: string | null;
+  }>;
+  share_lines_count?: number;
+  source_machine_work_logs?: Array<{
+    id: string;
+    work_log_no?: string | null;
+    work_date?: string | null;
+    status?: string;
+  }>;
+  linked_field_job_machines?: Array<{
+    field_job_machine_id: string;
+    field_job: { id: string; doc_no?: string | null; job_date?: string | null; status: string } | null;
+  }>;
+  parent_machinery_charge?: {
+    id: string;
+    charge_no?: string | null;
+    charge_date?: string | null;
+    status: string;
+  } | null;
+}
+
 // Harvest
 export type HarvestStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
 
@@ -1389,6 +1607,111 @@ export interface HarvestLine {
   updated_at: string;
   item?: InvItem;
   store?: InvStore;
+}
+
+export type HarvestRecipientRole = 'OWNER' | 'MACHINE' | 'LABOUR' | 'LANDLORD' | 'CONTRACTOR';
+
+export type HarvestSettlementMode = 'IN_KIND' | 'CASH';
+
+export type HarvestShareBasis = 'FIXED_QTY' | 'PERCENT' | 'RATIO' | 'REMAINDER';
+
+export interface HarvestShareLine {
+  id: string;
+  tenant_id: string;
+  harvest_id: string;
+  harvest_line_id?: string | null;
+  recipient_role: HarvestRecipientRole;
+  settlement_mode: HarvestSettlementMode;
+  share_basis: HarvestShareBasis;
+  share_value?: string | null;
+  ratio_numerator?: string | null;
+  ratio_denominator?: string | null;
+  remainder_bucket: boolean;
+  beneficiary_party_id?: string | null;
+  machine_id?: string | null;
+  worker_id?: string | null;
+  store_id?: string | null;
+  inventory_item_id?: string | null;
+  sort_order?: number | null;
+  notes?: string | null;
+  /** Persisted at post (Phase 3C); absent until posted. */
+  computed_qty?: string | number | null;
+  computed_unit_cost_snapshot?: string | number | null;
+  computed_value_snapshot?: string | number | null;
+  /** Server merge of posting metadata (e.g. harvest_posting_group_id). */
+  rule_snapshot?: Record<string, unknown> | null;
+  machine?: { id: string; name?: string; code?: string } | null;
+  worker?: { id: string; name?: string } | null;
+  beneficiaryParty?: { id: string; name?: string } | null;
+  /** Laravel JSON key for beneficiaryParty relation */
+  beneficiary_party?: { id: string; name?: string } | null;
+  store?: InvStore | null;
+  inventoryItem?: InvItem | null;
+  /** Laravel JSON key for inventoryItem */
+  inventory_item?: InvItem | null;
+  harvestLine?: HarvestLine | null;
+  harvest_line?: HarvestLine | null;
+  source_field_job_id?: string | null;
+  source_lab_work_log_id?: string | null;
+  source_machinery_charge_id?: string | null;
+  source_settlement_id?: string | null;
+  source_field_job?: { id: string; doc_no?: string | null; job_date?: string | null; status?: string } | null;
+}
+
+export interface HarvestShareLinePayload {
+  harvest_line_id?: string | null;
+  recipient_role: HarvestRecipientRole;
+  settlement_mode: HarvestSettlementMode;
+  share_basis: HarvestShareBasis;
+  share_value?: number | null;
+  ratio_numerator?: number | null;
+  ratio_denominator?: number | null;
+  remainder_bucket?: boolean;
+  beneficiary_party_id?: string | null;
+  machine_id?: string | null;
+  worker_id?: string | null;
+  store_id?: string | null;
+  inventory_item_id?: string | null;
+  sort_order?: number | null;
+  notes?: string | null;
+}
+
+/** GET /harvests/{id}/share-preview — draft only; backend-computed. */
+export interface HarvestSharePreviewBucket {
+  share_line_id: string | null;
+  harvest_line_id: string | null;
+  recipient_role: string;
+  settlement_mode: string | null;
+  implicit_owner?: boolean;
+  computed_qty: number;
+  provisional_unit_cost: number;
+  provisional_value: number;
+}
+
+export interface HarvestSharePreviewResponse {
+  harvest_id: string;
+  posting_date_used: string;
+  total_wip_cost: number;
+  warnings: string[];
+  errors: unknown[];
+  harvest_lines: Array<{
+    harvest_line_id: string;
+    quantity: number;
+    allocated_wip_cost: number;
+    provisional_unit_cost: number;
+  }>;
+  share_buckets: HarvestSharePreviewBucket[];
+  owner_retained: {
+    quantity: number;
+    provisional_value: number;
+    includes_implicit_owner: boolean;
+  };
+  totals: {
+    harvest_quantity: number;
+    sum_bucket_quantity: number;
+    sum_bucket_value: number;
+    allocated_wip: number;
+  };
 }
 
 export interface Harvest {
@@ -1411,9 +1734,12 @@ export interface Harvest {
   crop_cycle?: CropCycle;
   project?: Project;
   land_parcel?: LandParcel | null;
+  production_unit?: { id: string; name?: string } | null;
   posting_group?: PostingGroup;
   reversal_posting_group?: PostingGroup;
   lines?: HarvestLine[];
+  share_lines?: HarvestShareLine[];
+  traceability?: OperationalTraceabilityPayload;
 }
 
 export interface CreateHarvestPayload {
@@ -1928,6 +2254,104 @@ export interface CropProfitabilityTotals {
   cost_per_acre: string | null;
   revenue_per_acre: string | null;
   margin_per_acre: string | null;
+}
+
+/** GET /api/reports/project-profitability (ledger buckets for a field cycle) */
+export interface ProjectProfitabilityResponse {
+  revenue: { sales: number; machinery_income: number; in_kind_income: number };
+  costs: { inputs: number; labour: number; machinery: number; landlord: number };
+  totals: { revenue: number; cost: number; profit: number };
+}
+
+/** GET /api/reports/project-forecast */
+export interface ProjectForecastResponse {
+  planned: { cost: number; revenue: number; profit: number };
+  actual: { cost: number; revenue: number; profit: number };
+  variance: { cost: number; revenue: number; profit: number };
+}
+
+/** GET /api/reports/project-projected-profit */
+export interface ProjectProjectedProfitResponse {
+  projected_revenue: number;
+  projected_cost: number;
+  projected_profit: number;
+}
+
+/** GET /api/plans/project, POST /api/plans/project */
+export interface ProjectPlanCostRow {
+  id: string;
+  cost_type: string;
+  expected_quantity: string | null;
+  expected_cost: string | null;
+}
+
+export interface ProjectPlanYieldRow {
+  id: string;
+  expected_quantity: string | null;
+  expected_unit_value: string | null;
+}
+
+export interface ProjectPlanApi {
+  id: string;
+  name: string;
+  status: string;
+  project_id: string;
+  crop_cycle_id: string;
+  project: { id: string; name: string } | null;
+  crop_cycle: { id: string; name: string } | null;
+  costs: ProjectPlanCostRow[];
+  yields: ProjectPlanYieldRow[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CreateProjectPlanPayload {
+  name: string;
+  project_id: string;
+  crop_cycle_id: string;
+  status?: 'DRAFT' | 'ACTIVE';
+  costs?: Array<{
+    cost_type: 'INPUT' | 'LABOUR' | 'MACHINERY';
+    expected_quantity?: number | null;
+    expected_cost?: number | null;
+  }>;
+  yields?: Array<{
+    expected_quantity?: number | null;
+    expected_unit_value?: number | null;
+  }>;
+}
+
+/** GET /api/reports/machine-profitability */
+export interface MachineProfitabilityApiRow {
+  machine_id: string;
+  usage_hours: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+}
+
+/** Nested under harvest economics document */
+export interface HarvestEconomicsSnapshot {
+  total_output_qty: number;
+  total_output_value: number;
+  retained_qty: number;
+  retained_value: number;
+  shared: {
+    machine: { quantity: number; value: number };
+    labour: { quantity: number; value: number };
+    landlord: { quantity: number; value: number };
+    contractor: { quantity: number; value: number };
+  };
+}
+
+/** GET /api/reports/harvest-economics?harvest_id= */
+export interface HarvestEconomicsDocumentResponse {
+  harvest_id: string;
+  harvest_no: string | null;
+  posting_date: string | null;
+  project_id: string | null;
+  crop_cycle_id: string | null;
+  economics: HarvestEconomicsSnapshot;
 }
 
 export interface CropProfitabilityResponse {

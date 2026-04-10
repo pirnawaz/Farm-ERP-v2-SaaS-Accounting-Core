@@ -22,6 +22,13 @@ import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
+import { HarvestOutputSharesPanel } from '../../components/harvests/HarvestOutputSharesPanel';
+import { HarvestSuggestedSharesPanel } from '../../components/harvests/HarvestSuggestedSharesPanel';
+import { TraceabilityPanel } from '../../components/traceability/TraceabilityPanel';
+import { HarvestSharePostedSummaryCard } from '../../components/harvests/HarvestSharePostedSummaryCard';
+import { HarvestEconomicsCard } from '../../components/harvests/HarvestEconomicsCard';
+import { PrimaryWorkflowBanner } from '../../components/workflow/PrimaryWorkflowBanner';
+import { DuplicateWorkflowRiskCallout } from '../../components/workflow/DuplicateWorkflowRiskCallout';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
 
@@ -42,7 +49,7 @@ export default function HarvestDetailPage() {
   const { data: stores } = useInventoryStores();
   const { data: items } = useInventoryItems(true);
   const { hasRole } = useRole();
-  const { formatDate } = useFormatting();
+  const { formatDate, formatDateTime } = useFormatting();
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
@@ -145,8 +152,8 @@ export default function HarvestDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={harvest.harvest_no || `Harvest ${harvest.id.slice(0, 8)}`}
-        description="Quantities harvested against crop and field cycles, with optional store lines."
-        helper="Review lines and status before posting—posting records the harvest in your operations history."
+        description="Quantities harvested against crop and field cycles, with store lines and share splits."
+        helper="Use harvest share lines for who gets what—this replaces manual settlement entries for shared output. Review before posting."
         backTo={backTo}
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -155,6 +162,12 @@ export default function HarvestDetailPage() {
           { label: harvest.harvest_no || 'Detail' },
         ]}
       />
+
+      <PrimaryWorkflowBanner variant="harvest" />
+
+      <TraceabilityPanel traceability={harvest.traceability} />
+
+      <DuplicateWorkflowRiskCallout context="harvest" traceability={harvest.traceability} />
 
       <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -173,6 +186,28 @@ export default function HarvestDetailPage() {
             </div>
           )}
           {harvest.posting_date && <div><dt className="text-sm text-gray-500">Posting Date</dt><dd>{formatDate(harvest.posting_date)}</dd></div>}
+          {harvest.posted_at && (
+            <div>
+              <dt className="text-sm text-gray-500">Posted at</dt>
+              <dd className="tabular-nums">{formatDateTime(harvest.posted_at)}</dd>
+            </div>
+          )}
+          {harvest.status === 'REVERSED' && harvest.reversed_at && (
+            <div>
+              <dt className="text-sm text-gray-500">Reversed at</dt>
+              <dd className="tabular-nums">{formatDateTime(harvest.reversed_at)}</dd>
+            </div>
+          )}
+          {harvest.reversal_posting_group_id && harvest.status === 'REVERSED' && (
+            <div className="md:col-span-2">
+              <dt className="text-sm text-gray-500">Reversal posting group</dt>
+              <dd>
+                <Link to={`/app/posting-groups/${harvest.reversal_posting_group_id}`} className="text-[#1F6F5C]">
+                  {harvest.reversal_posting_group_id}
+                </Link>
+              </dd>
+            </div>
+          )}
           {harvest.notes && <div className="md:col-span-2"><dt className="text-sm text-gray-500">Notes</dt><dd>{harvest.notes}</dd></div>}
         </dl>
       </div>
@@ -211,6 +246,14 @@ export default function HarvestDetailPage() {
         </div>
         <p className="mt-2 font-medium">Total Quantity: {totalQty.toFixed(3)}</p>
       </div>
+
+      {isPosted && id && <HarvestEconomicsCard harvestId={id} />}
+
+      {(isPosted || harvest.status === 'REVERSED') && <HarvestSharePostedSummaryCard harvest={harvest} />}
+
+      {isDraft && <HarvestSuggestedSharesPanel harvest={harvest} harvestId={id!} canEdit={canEdit} />}
+
+      <HarvestOutputSharesPanel harvest={harvest} harvestId={id!} canEdit={canEdit} />
 
       {isDraft && canEdit && (
         <div className="bg-white rounded-lg shadow p-6">

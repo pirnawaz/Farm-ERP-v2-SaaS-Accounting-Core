@@ -41,6 +41,8 @@ export type NavItem = {
   requiredModules?: string[];
   requiresPlatform?: boolean;
   requiresTenant?: boolean;
+  /** Short line under the label in the sidebar (primary-workflow hints). */
+  sidebarHint?: string;
   children?: NavItem[];
   submenuKey?: string;
 };
@@ -98,9 +100,22 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'fields',
     'land',
     'crop-cycles',
+    'project-planning',
     'production-units',
     'land-leases',
     'harvests',
+    'crop-ops-agreements',
+    'crop-ops-field-jobs',
+    'crop-ops-field-work-logs',
+    // Machinery (full list for accounting review; field jobs are primary for operators).
+    'machinery-overview',
+    'machinery-machines',
+    'machinery-work-logs',
+    'machinery-services',
+    'machinery-charges',
+    'machinery-maintenance',
+    'machinery-maintenance-setup',
+    'machinery-rate-cards',
     // Inventory (overview, stock, transactions, setup).
     'inventory-overview',
     'inventory-stock-on-hand',
@@ -125,6 +140,9 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     // Governance (audit/control)
     'farm-integrity',
     'audit-logs',
+
+    // Field planning & forecast (reports + crop)
+    'project-forecast',
   ]);
 
   const operatorAllowItemKeys = new Set<string>([
@@ -137,19 +155,19 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'fields',
     'land',
     'crop-cycles',
+    'project-planning',
     'allocations',
     'land-leases',
     'orchards',
     'livestock',
     'crop-ops-overview',
-    'crop-ops-field-work-logs',
+    'crop-ops-field-jobs',
     'crop-ops-work-types',
     'harvests',
+    'crop-ops-agreements',
     'pending-review',
     'machinery-machines',
-    'machinery-work-logs',
     'machinery-services',
-    'machinery-charges',
     'machinery-maintenance',
     'machinery-maintenance-setup',
     'machinery-rate-cards',
@@ -158,7 +176,6 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'inventory-stock-on-hand',
     'inventory-stock-history',
     'inventory-grns',
-    'inventory-issues',
     'inventory-transfers',
     'inventory-adjustments',
     'inventory-items',
@@ -167,7 +184,6 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'inventory-stores',
     'labour-overview',
     'labour-workers',
-    'labour-work-logs',
     'labour-payables',
     'parties',
 
@@ -178,6 +194,7 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'fixed-assets',
     'exchange-rates',
     'fx-revaluation-runs',
+    'project-forecast',
   ]);
 
   const keepAllFinance = role === 'accountant';
@@ -339,11 +356,19 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
     ],
     analysis: [
       { key: 'crop-profitability', label: 'Crop Profitability', to: '/app/reports/crop-profitability', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+      { key: 'project-profitability', label: 'Field cycle profit', to: '/app/reports/project-profitability', requiredPermission: VIEW, requiredModules: ['reports', 'projects_crop_cycles'] },
+      {
+        key: 'project-forecast',
+        label: 'Field forecast',
+        to: '/app/reports/project-forecast',
+        requiredPermission: VIEW,
+        requiredModules: ['reports', 'projects_crop_cycles'],
+      },
       { key: 'project-pl', label: 'Field Cycle P&L', to: '/app/reports/project-pl', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'crop-cycle-pl', label: 'Crop Cycle P&L', to: '/app/reports/crop-cycle-pl', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'profitability-trend', label: 'Profitability Trend', to: '/app/reports/crop-profitability-trend', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
       { key: 'sales-margin', label: 'Sales Margin', to: '/app/reports/sales-margin', requiredPermission: VIEW, requiredModules: ['reports'] },
-      { key: 'machinery-profitability', label: 'Machinery Profitability', to: '/app/machinery/reports/profitability', requiredPermission: VIEW, requiredModules: ['machinery'] },
+      { key: 'machinery-profitability', label: 'Machine profit', to: '/app/reports/machine-profitability', requiredPermission: VIEW, requiredModules: ['reports'] },
     ],
     receivables: [{ key: 'ar-ageing', label: term('arAgeing'), to: '/app/reports/ar-ageing', requiredPermission: VIEW, requiredModules: ['ar_sales'] }],
     payables: [
@@ -415,6 +440,14 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
       items: [
         { key: 'crop-cycles', label: 'Crop Cycles', to: '/app/crop-cycles', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
         { key: 'fields', label: term('navFields'), to: '/app/projects', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
+        {
+          key: 'project-planning',
+          label: 'Field plan & forecast',
+          to: '/app/planning',
+          requiredPermission: VIEW,
+          requiredModules: ['projects_crop_cycles', 'reports'],
+          sidebarHint: 'Expected costs, yield, and gap vs actuals',
+        },
         ...(showOrchards
           ? [{ key: 'orchards', label: 'Orchards', to: '/app/orchards', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] } as NavItem]
           : []),
@@ -448,7 +481,30 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
       items: [
         { key: 'crop-ops-overview', label: 'Crop Ops Overview', to: '/app/crop-ops', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
         { key: 'crop-ops-field-work-logs', label: 'Field Work Logs', to: '/app/crop-ops/activities', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
-        { key: 'harvests', label: 'Harvests', to: '/app/harvests', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
+        {
+          key: 'crop-ops-field-jobs',
+          label: 'Field Jobs',
+          to: '/app/crop-ops/field-jobs',
+          requiredPermission: VIEW,
+          requiredModules: ['crop_ops'],
+          sidebarHint: 'Use Field Jobs to record work',
+        },
+        {
+          key: 'harvests',
+          label: 'Harvests',
+          to: '/app/harvests',
+          requiredPermission: VIEW,
+          requiredModules: ['crop_ops'],
+          sidebarHint: 'Use Harvest to record output and sharing',
+        },
+        {
+          key: 'crop-ops-agreements',
+          label: 'Agreements',
+          to: '/app/crop-ops/agreements',
+          requiredPermission: VIEW,
+          requiredModules: ['crop_ops'],
+          sidebarHint: 'Output share rules for suggestions',
+        },
         { key: 'crop-ops-work-types', label: 'Work Types', to: '/app/crop-ops/activity-types', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
       ],
     },

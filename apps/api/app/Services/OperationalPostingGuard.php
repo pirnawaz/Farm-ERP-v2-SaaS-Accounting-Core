@@ -6,6 +6,7 @@ use App\Exceptions\CropCycleClosedException;
 use App\Exceptions\ProjectClosedException;
 use App\Models\CropCycle;
 use App\Models\Project;
+use Carbon\Carbon;
 
 class OperationalPostingGuard
 {
@@ -88,5 +89,21 @@ class OperationalPostingGuard
         }
 
         $this->ensureCropCycleOpenForProject($project->id, $tenantId);
+    }
+
+    /**
+     * Validate posting_date falls within the crop cycle window (when cycle dates are set).
+     *
+     * @throws \Exception
+     */
+    public function assertPostingDateWithinCropCycleBounds(CropCycle $cropCycle, string $postingDateYmd): void
+    {
+        $postingDateObj = Carbon::parse($postingDateYmd)->format('Y-m-d');
+        if ($cropCycle->start_date && $postingDateObj < $cropCycle->start_date->format('Y-m-d')) {
+            throw new \Exception('Posting date is before crop cycle start date.');
+        }
+        if ($cropCycle->end_date && $postingDateObj > $cropCycle->end_date->format('Y-m-d')) {
+            throw new \Exception('Posting date is after crop cycle end date.');
+        }
     }
 }

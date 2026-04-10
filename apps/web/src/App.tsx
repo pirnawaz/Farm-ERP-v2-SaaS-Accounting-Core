@@ -36,6 +36,7 @@ import PartyDetailPage from './pages/PartyDetailPage';
 import LandAllocationsPage from './pages/LandAllocationsPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import ProjectPlanningPage from './pages/planning/ProjectPlanningPage';
 import ProjectRulesPage from './pages/ProjectRulesPage';
 import TransactionsPage from './pages/TransactionsPage';
 import TransactionDetailPage from './pages/TransactionDetailPage';
@@ -84,9 +85,15 @@ import ActivityTypesPage from './pages/cropOps/ActivityTypesPage';
 import ActivitiesPage from './pages/cropOps/ActivitiesPage';
 import ActivityFormPage from './pages/cropOps/ActivityFormPage';
 import ActivityDetailPage from './pages/cropOps/ActivityDetailPage';
+import FieldJobsPage from './pages/cropOps/fieldJobs/FieldJobsPage';
+import FieldJobFormPage from './pages/cropOps/fieldJobs/FieldJobFormPage';
+import FieldJobDetailPage from './pages/cropOps/fieldJobs/FieldJobDetailPage';
+import AgreementsPage from './pages/cropOps/agreements/AgreementsPage';
+import AgreementFormPage from './pages/cropOps/agreements/AgreementFormPage';
 import HarvestsPage from './pages/harvests/HarvestsPage';
 import HarvestFormPage from './pages/harvests/HarvestFormPage';
 import HarvestDetailPage from './pages/harvests/HarvestDetailPage';
+import FarmActivityTimelinePage from './pages/FarmActivityTimelinePage';
 import MachinesPage from './pages/machinery/MachinesPage';
 import MaintenanceTypesPage from './pages/machinery/MaintenanceTypesPage';
 import RateCardsPage from './pages/machinery/RateCardsPage';
@@ -112,6 +119,9 @@ import ProjectPLPage from './pages/ProjectPLPage';
 import CropCyclePLPage from './pages/CropCyclePLPage';
 import CropProfitabilityReportPage from './pages/reports/CropProfitabilityReportPage';
 import CropProfitabilityTrendPage from './pages/reports/CropProfitabilityTrendPage';
+import ProjectProfitabilityPage from './pages/reports/ProjectProfitabilityPage';
+import ProjectForecastDashboardPage from './pages/reports/ProjectForecastDashboardPage';
+import MachineProfitabilityReportPage from './pages/reports/MachineProfitabilityReportPage';
 import ProductionUnitsProfitabilityReportPage from './pages/reports/ProductionUnitsProfitabilityReportPage';
 import AccountBalancesPage from './pages/AccountBalancesPage';
 import CashbookPage from './pages/CashbookPage';
@@ -197,6 +207,7 @@ function App() {
         <Route index element={<AppLanding />} />
         <Route path="set-password" element={<SetPasswordPage />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="farm-activity" element={<FarmActivityTimelinePage />} />
         <Route path="farm-pulse" element={<FarmPulsePage />} />
         <Route path="farm-pulse/cash" element={<CashDrilldownPage />} />
         <Route path="farm-pulse/bank" element={<BankDrilldownPage />} />
@@ -227,6 +238,16 @@ function App() {
         <Route path="projects" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProjectsPage /></ModuleProtectedRoute>} />
         <Route path="projects/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProjectDetailPage /></ModuleProtectedRoute>} />
         <Route path="projects/:id/rules" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProjectRulesPage /></ModuleProtectedRoute>} />
+        <Route
+          path="planning"
+          element={
+            <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+              <ModuleProtectedRoute requiredModule="reports">
+                <ProjectPlanningPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
         <Route path="transactions" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><TransactionsPage /></ModuleProtectedRoute>} />
         <Route path="transactions/new" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><TransactionFormPage /></ModuleProtectedRoute>} />
         <Route path="transactions/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><TransactionDetailPage /></ModuleProtectedRoute>} />
@@ -278,6 +299,12 @@ function App() {
         <Route path="crop-ops/activities" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivitiesPage /></ModuleProtectedRoute>} />
         <Route path="crop-ops/activities/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivityFormPage /></ModuleProtectedRoute>} />
         <Route path="crop-ops/activities/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><ActivityDetailPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/field-jobs" element={<ModuleProtectedRoute requiredModule="crop_ops"><FieldJobsPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/field-jobs/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><FieldJobFormPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/field-jobs/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><FieldJobDetailPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/agreements" element={<ModuleProtectedRoute requiredModule="crop_ops"><AgreementsPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/agreements/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><AgreementFormPage /></ModuleProtectedRoute>} />
+        <Route path="crop-ops/agreements/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><AgreementFormPage /></ModuleProtectedRoute>} />
         <Route path="harvests" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestsPage /></ModuleProtectedRoute>} />
         <Route path="harvests/new" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestFormPage /></ModuleProtectedRoute>} />
         <Route path="harvests/:id" element={<ModuleProtectedRoute requiredModule="crop_ops"><HarvestDetailPage /></ModuleProtectedRoute>} />
@@ -309,6 +336,27 @@ function App() {
         <Route path="reports/crop-cycle-pl" element={<ModuleProtectedRoute requiredModule="reports"><CropCyclePLPage /></ModuleProtectedRoute>} />
         <Route path="reports/crop-profitability" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropProfitabilityReportPage /></ModuleProtectedRoute>} />
         <Route path="reports/crop-profitability-trend" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropProfitabilityTrendPage /></ModuleProtectedRoute>} />
+        <Route
+          path="reports/project-profitability"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <ProjectProfitabilityPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/project-forecast"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <ProjectForecastDashboardPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route path="reports/machine-profitability" element={<ModuleProtectedRoute requiredModule="reports"><MachineProfitabilityReportPage /></ModuleProtectedRoute>} />
         <Route path="reports/production-units-profitability" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProductionUnitsProfitabilityReportPage /></ModuleProtectedRoute>} />
         <Route path="reports/account-balances" element={<ModuleProtectedRoute requiredModule="reports"><AccountBalancesPage /></ModuleProtectedRoute>} />
         <Route path="reports/cashbook" element={<ModuleProtectedRoute requiredModule="reports"><CashbookPage /></ModuleProtectedRoute>} />

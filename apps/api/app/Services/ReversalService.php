@@ -104,6 +104,12 @@ class ReversalService
                     ? (string) round(-(float) $originalRow->amount_base, 2)
                     : null;
 
+                // Quantity-only allocations (e.g. MACHINERY_USAGE with amount null): negate quantity to net usage to zero
+                $reversalQuantity = $originalRow->quantity;
+                if ($originalRow->amount === null && $originalRow->quantity !== null && $originalRow->quantity !== '') {
+                    $reversalQuantity = (string) (-(float) $originalRow->quantity);
+                }
+
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $reversalPostingGroup->id,
@@ -116,7 +122,7 @@ class ReversalService
                     'base_currency_code' => $originalRow->base_currency_code,
                     'fx_rate' => $originalRow->fx_rate,
                     'amount_base' => $reversalAmountBase,
-                    'quantity' => $originalRow->quantity,
+                    'quantity' => $reversalQuantity,
                     'unit' => $originalRow->unit,
                     'machine_id' => $originalRow->machine_id,
                     'rule_snapshot' => $reversalSnapshot,

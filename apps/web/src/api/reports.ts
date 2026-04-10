@@ -17,6 +17,11 @@ import type {
   LivestockUnitStatusResponse,
   ProductionUnitsProfitabilityResponse,
   ProductionUnitCategoryFilter,
+  ProjectProfitabilityResponse,
+  ProjectForecastResponse,
+  ProjectProjectedProfitResponse,
+  MachineProfitabilityApiRow,
+  HarvestEconomicsDocumentResponse,
 } from '../types';
 
 export const reportsApi = {
@@ -190,4 +195,65 @@ export const reportsApi = {
     if (params.category) query.append('category', params.category);
     return apiClient.get<ProductionUnitsProfitabilityResponse>(`/api/reports/production-units-profitability?${query.toString()}`);
   },
+
+  projectProfitability: (params: {
+    project_id: string;
+    from?: string;
+    to?: string;
+    crop_cycle_id?: string;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('project_id', params.project_id);
+    if (params.from) query.append('from', params.from);
+    if (params.to) query.append('to', params.to);
+    if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
+    return apiClient.get<ProjectProfitabilityResponse>(`/api/reports/project-profitability?${query.toString()}`);
+  },
+
+  projectForecast: (params: {
+    project_id: string;
+    from?: string;
+    to?: string;
+    crop_cycle_id?: string;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('project_id', params.project_id);
+    if (params.from) query.append('from', params.from);
+    if (params.to) query.append('to', params.to);
+    if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
+    return apiClient.get<ProjectForecastResponse>(`/api/reports/project-forecast?${query.toString()}`);
+  },
+
+  projectProjectedProfit: (params: {
+    project_id: string;
+    from?: string;
+    to?: string;
+    crop_cycle_id?: string;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('project_id', params.project_id);
+    if (params.from) query.append('from', params.from);
+    if (params.to) query.append('to', params.to);
+    if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
+    return apiClient.get<ProjectProjectedProfitResponse>(`/api/reports/project-projected-profit?${query.toString()}`);
+  },
+
+  machineProfitability: (params: {
+    from: string;
+    to: string;
+    project_id?: string;
+    crop_cycle_id?: string;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.project_id) query.append('project_id', params.project_id);
+    if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
+    return apiClient.get<MachineProfitabilityApiRow[]>(`/api/reports/machine-profitability?${query.toString()}`);
+  },
+
+  harvestEconomicsDocument: (harvestId: string) =>
+    apiClient.get<HarvestEconomicsDocumentResponse>(
+      `/api/reports/harvest-economics?${new URLSearchParams({ harvest_id: harvestId }).toString()}`
+    ),
 };

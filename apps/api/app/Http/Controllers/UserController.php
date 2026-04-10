@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domains\Tenant\User\TenantUserManagementService;
 use App\Models\User;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
@@ -59,15 +60,35 @@ class UserController extends Controller
         return response()->json($user);
     }
 
+    /**
+     * Legacy resource route: align with DELETE /api/tenant/users/{id} — soft-remove (disable), do not hard-delete.
+     * Preserves the users row, identity links, and audit history.
+     */
     public function destroy(Request $request, string $id)
     {
         $tenantId = TenantContext::getTenantId($request);
+        $tenant = TenantContext::getTenant($request);
+        if (! $tenantId || ! $tenant) {
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
 
         $user = User::where('id', $id)
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        $user->delete();
+        if ($user->role === 'tenant_admin') {
+            $count = User::where('tenant_id', $tenantId)
+                ->where('role', 'tenant_admin')
+                ->where('is_enabled', true)
+                ->count();
+            if ($count <= 1) {
+                return response()->json([
+                    'message' => 'Cannot disable or change the role of the last enabled tenant admin',
+                ], 422);
+            }
+        }
+
+        app(TenantUserManagementService::class)->removeFromTenant($user, $tenant);
 
         return response()->json(null, 204);
     }

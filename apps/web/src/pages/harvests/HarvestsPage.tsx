@@ -8,6 +8,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Badge } from '../../components/Badge';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { Harvest } from '../../types';
+import { PrimaryWorkflowBanner } from '../../components/workflow/PrimaryWorkflowBanner';
 
 function statusLabel(s: string): string {
   if (s === 'DRAFT') return 'Draft';
@@ -83,8 +84,8 @@ export default function HarvestsPage() {
     <div className="space-y-6 max-w-7xl">
       <PageHeader
         title="Harvests"
-        description="Track harvest activity recorded across your crop operations."
-        helper="Use harvest records to review what was harvested, when, and where."
+        description="Record harvest output and how it is shared—quantities, stores, and share lines in one flow."
+        helper="Harvest share lines replace separate manual settlement for shared crop output; add them on each harvest instead of duplicating elsewhere."
         backTo="/app/crop-ops"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -101,6 +102,8 @@ export default function HarvestsPage() {
           </button>
         }
       />
+
+      <PrimaryWorkflowBanner variant="harvest" />
 
       <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">

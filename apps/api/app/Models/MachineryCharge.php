@@ -83,6 +83,12 @@ class MachineryCharge extends Model
         return $this->hasMany(MachineryChargeLine::class, 'machinery_charge_id');
     }
 
+    /** Field job machine rows that sourced costing from this charge (read-model / traceability). */
+    public function fieldJobMachines(): HasMany
+    {
+        return $this->hasMany(FieldJobMachine::class, 'source_charge_id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === self::STATUS_DRAFT;

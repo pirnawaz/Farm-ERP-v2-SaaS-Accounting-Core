@@ -14,6 +14,7 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { Term } from '../../components/Term';
 import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
+import { TraceabilityPanel } from '../../components/traceability/TraceabilityPanel';
 export default function ChargeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { formatMoney, formatDate } = useFormatting();
@@ -181,6 +182,8 @@ export default function ChargeDetailPage() {
           { label: charge.charge_no || 'Charge' },
         ]}
       />
+
+      <TraceabilityPanel traceability={charge.traceability} />
 
       {/* Header Info */}
       <div className="bg-white rounded-lg shadow p-6">

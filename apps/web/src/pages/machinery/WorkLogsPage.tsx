@@ -17,6 +17,7 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLog } from '../../types';
 import { Badge } from '../../components/Badge';
+import { AdvancedWorkflowBanner } from '../../components/workflow/AdvancedWorkflowBanner';
 
 export default function WorkLogsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -171,6 +172,7 @@ export default function WorkLogsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <AdvancedWorkflowBanner />
       <PageHeader
         title="Machine Usage"
         tooltip="Track how machines are used across work and field activities."

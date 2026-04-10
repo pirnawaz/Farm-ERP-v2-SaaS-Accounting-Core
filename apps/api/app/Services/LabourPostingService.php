@@ -20,7 +20,8 @@ class LabourPostingService
     public function __construct(
         private SystemAccountService $accountService,
         private ReversalService $reversalService,
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private DuplicateWorkflowGuard $duplicateWorkflowGuard,
     ) {}
 
     /**
@@ -42,6 +43,8 @@ class LabourPostingService
 
             $workLog = LabWorkLog::where('id', $workLogId)->where('tenant_id', $tenantId)->where('status', 'DRAFT')->firstOrFail();
             $workLog->load(['worker', 'cropCycle', 'project']);
+
+            $this->duplicateWorkflowGuard->assertLabWorkLogPostAllowed($workLog);
 
             if (!$workLog->crop_cycle_id || !$workLog->project_id) {
                 throw new \Exception('Crop cycle and project are required for posting a work log.');
