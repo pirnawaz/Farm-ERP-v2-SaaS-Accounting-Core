@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Helpers\AuthCookie;
 use App\Helpers\AuthToken;
 use App\Models\Identity;
 use App\Models\Tenant;
@@ -273,5 +274,52 @@ class UnifiedAuthLoginTest extends TestCase
         $response = $this->getJson('/api/platform/tenants');
         $response->assertStatus(401);
         $response->assertJsonPath('error', 'Authentication required');
+    }
+
+    /** @test */
+    public function unified_login_platform_admin_ignores_tenant_cookie_from_prior_session(): void
+    {
+        $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme', 'status' => 'active']);
+        $farmIdentity = Identity::create([
+            'email' => 'farmer@test.test',
+            'password_hash' => Hash::make('x'),
+            'is_enabled' => true,
+            'is_platform_admin' => false,
+            'token_version' => 1,
+        ]);
+        TenantMembership::create([
+            'identity_id' => $farmIdentity->id,
+            'tenant_id' => $tenant->id,
+            'role' => 'tenant_admin',
+            'is_enabled' => true,
+        ]);
+        $farmUser = User::create([
+            'identity_id' => $farmIdentity->id,
+            'tenant_id' => $tenant->id,
+            'name' => 'Farmer',
+            'email' => 'farmer@test.test',
+            'password' => Hash::make('x'),
+            'role' => 'tenant_admin',
+            'is_enabled' => true,
+            'token_version' => 1,
+        ]);
+        $staleSessionCookie = AuthToken::createForIdentity($farmIdentity, $tenant->id, 'tenant_admin', $farmUser->id);
+
+        Identity::create([
+            'email' => 'platform@test.test',
+            'password_hash' => Hash::make('secret'),
+            'is_enabled' => true,
+            'is_platform_admin' => true,
+            'token_version' => 1,
+        ]);
+
+        $response = $this->withCookie(AuthCookie::NAME, $staleSessionCookie)
+            ->postJson('/api/auth/login', [
+                'email' => 'platform@test.test',
+                'password' => 'secret',
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('mode', 'platform');
     }
 }

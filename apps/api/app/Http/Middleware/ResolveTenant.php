@@ -29,9 +29,10 @@ class ResolveTenant
         if ($request->is('api/auth/set-password-with-token') || $request->is('api/auth/accept-invite')) {
             return $next($request);
         }
-        // Unified login and select-tenant: no tenant required unless client sent identifier (legacy or explicit tenant)
+        // Unified login and select-tenant: no tenant required unless client sent identifier (legacy or explicit tenant).
+        // Do not use auth-cookie tenant fallback here — stale cookies would force legacy login and block platform admins.
         if ($request->is('api/auth/login') || $request->is('api/auth/select-tenant')) {
-            $tenant = $this->resolver->resolve($request);
+            $tenant = $this->resolver->resolve($request, false);
             if (!$tenant && $this->hasTenantIdentifier($request)) {
                 return response()->json(['error' => 'Tenant not found'], 404);
             }

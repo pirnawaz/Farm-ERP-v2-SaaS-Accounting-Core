@@ -62,6 +62,14 @@ let checkAuthPromise: Promise<void> | null = null;
 
 const MUST_CHANGE_PASSWORD_KEY = 'farm_erp_must_change_password';
 
+const TENANT_SCOPED_ROLES: UserRole[] = ['tenant_admin', 'accountant', 'operator'];
+
+function notifyFarmErpTenantChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('farm_erp_tenant_changed'));
+  }
+}
+
 function syncStateFromLocalStorage(): {
   role: UserRole | null;
   userId: string | null;
@@ -105,6 +113,7 @@ function writeLocalStorage(payload: {
   } else {
     localStorage.removeItem(AUTH_MODE_KEY);
   }
+  notifyFarmErpTenantChanged();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -126,7 +135,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTenantIdState(stored.tenantId);
         setModeState(stored.mode);
         setMustChangePasswordState(stored.mustChangePassword);
-        setIsLoading(false);
 
         const isPlatformAdminSession =
           stored.mode === 'platform' || (stored.role === 'platform_admin' && !stored.tenantId);
@@ -155,8 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        const needsTenantFromCookie =
+          TENANT_SCOPED_ROLES.includes(stored.role as UserRole) && !stored.tenantId;
         const verifyInDev = import.meta.env.VITE_VERIFY_COOKIE_AUTH_IN_DEV === 'true';
-        if (verifyInDev) {
+        if (verifyInDev || needsTenantFromCookie) {
           try {
             const res = await apiClient.get<AuthMeResponse>('/api/auth/me');
             const role = res.user.role as UserRole;
@@ -165,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserRoleState(role);
             setUserIdState(res.user.id);
             setTenantIdState(tid);
+            setModeState(tid ? 'tenant' : 'platform');
             setMustChangePasswordState(mustChange);
             writeLocalStorage({
               role,
@@ -178,9 +189,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
             }
           } catch {
-            // One attempt only; keep localStorage identity, no retry
+            if (needsTenantFromCookie) {
+              setUserRoleState(null);
+              setUserIdState(null);
+              setTenantIdState(null);
+              setModeState(null);
+              setMustChangePasswordState(false);
+              localStorage.removeItem(USER_ROLE_KEY);
+              localStorage.removeItem(USER_ID_KEY);
+              localStorage.removeItem(TENANT_ID_KEY);
+              localStorage.removeItem(AUTH_MODE_KEY);
+              localStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
+              notifyFarmErpTenantChanged();
+            }
           }
+          setIsLoading(false);
+          return;
         }
+
+        setIsLoading(false);
         return;
       }
 
@@ -311,6 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(TENANT_ID_KEY);
     localStorage.removeItem(AUTH_MODE_KEY);
     localStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
+    notifyFarmErpTenantChanged();
   }, [userRole, tenantId, mode]);
 
   useEffect(() => {

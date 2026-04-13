@@ -20,7 +20,8 @@ class AdvanceService
     public function __construct(
         private SystemAccountService $accountService,
         private PartyAccountService $partyAccountService,
-        private PostValidationService $postValidationService
+        private PostValidationService $postValidationService,
+        private OperationalPostingGuard $guard,
     ) {}
 
     /**

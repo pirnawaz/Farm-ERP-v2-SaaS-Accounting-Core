@@ -42,12 +42,14 @@ async function request<T>(
   const tenantId = getTenantId()
   const userRole = getUserRole()
   
-  // For non-dev, non-platform, and non-auth-unified routes, tenant is required.
+  // For non-dev, non-platform routes, tenant is usually required. All /api/auth/* calls are allowed
+  // without localStorage tenant — the API resolves session from cookie (e.g. /auth/me to heal client state).
   const isDevRoute = endpoint.includes('/api/dev/') || endpoint.includes('api/dev/')
   const isPlatformRoute = endpoint.includes('/api/platform/') || endpoint.includes('api/platform/')
+  const isAuthApiRoute = endpoint.includes('/api/auth/') || endpoint.includes('api/auth/')
   const isAuthUnifiedRoute = endpoint.includes('/api/auth/login') || endpoint.includes('/api/auth/select-tenant')
   const tenantInOptions = getOptionHeader(options, 'X-Tenant-Slug') || getOptionHeader(options, 'X-Tenant-Id')
-  if (!isDevRoute && !isPlatformRoute && !isAuthUnifiedRoute && !tenantId && !tenantInOptions) {
+  if (!isDevRoute && !isPlatformRoute && !isAuthApiRoute && !tenantId && !tenantInOptions) {
     throw new Error('No tenant selected. Please select a tenant.')
   }
   
@@ -82,9 +84,17 @@ async function request<T>(
     }
   }
   
-  // Tenant header: use options (e.g. login form) if present; otherwise use localStorage. Do not send for platform routes.
+  // Tenant header: use options (e.g. legacy tenant login) if present; otherwise use localStorage.
+  // Do not send for platform routes. Do not auto-attach on unified auth routes — that forces legacy
+  // tenant-scoped login (middleware sets tenant_id) and platform admins get 403 "Use platform admin login".
   if (!isPlatformRoute) {
-    if (!headers['X-Tenant-Slug'] && !headers['X-Tenant-Id'] && tenantId && tenantId.trim()) {
+    if (
+      !isAuthUnifiedRoute &&
+      !headers['X-Tenant-Slug'] &&
+      !headers['X-Tenant-Id'] &&
+      tenantId &&
+      tenantId.trim()
+    ) {
       headers['X-Tenant-Id'] = tenantId.trim()
     }
   }
@@ -186,9 +196,8 @@ async function requestBlob(endpoint: string): Promise<Blob> {
 
   const isDevRoute = endpoint.includes('/api/dev/') || endpoint.includes('api/dev/')
   const isPlatformRoute = endpoint.includes('/api/platform/') || endpoint.includes('api/platform/')
-  const isAuthUnifiedRoute =
-    endpoint.includes('/api/auth/login') || endpoint.includes('/api/auth/select-tenant')
-  if (!isDevRoute && !isPlatformRoute && !isAuthUnifiedRoute && !tenantId) {
+  const isAuthApiRoute = endpoint.includes('/api/auth/') || endpoint.includes('api/auth/')
+  if (!isDevRoute && !isPlatformRoute && !isAuthApiRoute && !tenantId) {
     throw new Error('No tenant selected. Please select a tenant.')
   }
 

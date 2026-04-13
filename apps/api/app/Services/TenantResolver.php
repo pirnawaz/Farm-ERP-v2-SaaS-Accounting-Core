@@ -11,10 +11,13 @@ class TenantResolver
 {
     /**
      * Resolve tenant from request.
-     * Order: X-Tenant-Id (UUID) → X-Tenant-Slug → Subdomain (if Host and root domain configured) → auth cookie tenant_id (e.g. impersonation).
+     * Order: X-Tenant-Id (UUID) → X-Tenant-Slug → Subdomain (if Host and root domain configured) → optional auth cookie tenant_id.
      * Does not reject — returns null if missing/invalid; middleware handles 400/404.
+     *
+     * @param  bool  $includeAuthCookieTenant  When false (unified login / select-tenant), ignore tenant_id on the auth cookie so a stale
+     *                                         tenant session does not force legacy tenant-scoped login (403 for platform admins).
      */
-    public function resolve(Request $request): ?Tenant
+    public function resolve(Request $request, bool $includeAuthCookieTenant = true): ?Tenant
     {
         $tenantId = $request->header('X-Tenant-Id');
         if ($tenantId && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $tenantId)) {
@@ -42,6 +45,10 @@ class TenantResolver
         }
 
         // Fallback: tenant from auth cookie (e.g. after impersonation when frontend may not have sent X-Tenant-Id yet)
+        if (! $includeAuthCookieTenant) {
+            return null;
+        }
+
         $token = $request->cookie(AuthCookie::NAME);
         if ($token) {
             $data = AuthToken::parse($token);
