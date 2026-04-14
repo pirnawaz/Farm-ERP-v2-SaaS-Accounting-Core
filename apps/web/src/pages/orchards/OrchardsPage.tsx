@@ -170,10 +170,10 @@ export default function OrchardsPage() {
                   Add harvest
                 </Link>
                 <Link
-                  to={`/app/labour/work-logs/new?production_unit_id=${unit.id}`}
+                  to={`/app/crop-ops/field-jobs/new?production_unit_id=${unit.id}`}
                   className="text-sm text-gray-600 hover:underline"
                 >
-                  Log work
+                  New field job
                 </Link>
               </div>
             </div>

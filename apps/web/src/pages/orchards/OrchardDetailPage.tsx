@@ -94,7 +94,7 @@ export default function OrchardDetailPage() {
       <PageHeader
         title={unit.name}
         description="Long-lived orchard block for tagging work, harvests, and economics by year."
-        helper="Costs and revenue here roll up from activities and sales tagged to this unit."
+        helper="Costs and revenue here roll up from field jobs and sales tagged to this unit."
         backTo="/app/orchards"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -157,16 +157,10 @@ export default function OrchardDetailPage() {
             Add harvest
           </Link>
           <Link
-            to={`/app/labour/work-logs/new?production_unit_id=${id}`}
+            to={`/app/crop-ops/field-jobs/new?production_unit_id=${id}`}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
           >
-            Log work
-          </Link>
-          <Link
-            to={`/app/crop-ops/activities/new?production_unit_id=${id}`}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
-          >
-            Log activity
+            New field job
           </Link>
           <Link
             to={`/app/sales/new?production_unit_id=${id}`}

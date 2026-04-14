@@ -1,3 +1,7 @@
+/**
+ * @deprecated Manual stock-used list UI is de-emphasised (primary: Field Job inputs). InvIssue documents
+ *             remain required for history, machinery in-kind issues, and reversals.
+ */
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useIssues, useInventoryStores } from '../../hooks/useInventory';

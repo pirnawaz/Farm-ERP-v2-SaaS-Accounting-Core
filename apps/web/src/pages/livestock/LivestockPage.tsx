@@ -148,10 +148,10 @@ export default function LivestockPage() {
                   Add event
                 </Link>
                 <Link
-                  to={`/app/crop-ops/activities/new?production_unit_id=${unit.id}`}
+                  to={`/app/crop-ops/field-jobs/new?production_unit_id=${unit.id}`}
                   className="text-sm text-gray-600 hover:underline"
                 >
-                  Log feed/medicine cost
+                  New field job
                 </Link>
               </div>
             </div>

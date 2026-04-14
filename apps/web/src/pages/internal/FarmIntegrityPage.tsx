@@ -75,8 +75,8 @@ export default function FarmIntegrityPage() {
           <IntegrityCard
             title={`${term('activities')} missing orchard/livestock unit`}
             count={data.activities_missing_production_unit}
-            link="/app/crop-ops/activities"
-            linkLabel={`View ${term('activities').toLowerCase()}`}
+            link="/app/crop-ops/field-jobs"
+            linkLabel="View field jobs"
           />
           <IntegrityCard
             title="Harvest without sale"

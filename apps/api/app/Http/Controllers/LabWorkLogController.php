@@ -15,6 +15,11 @@ use App\Services\TenantContext;
 use App\Services\LabourPostingService;
 use Illuminate\Http\Request;
 
+/**
+ * @deprecated Legacy manual labour work log workflow. Primary field labour capture: Field Jobs.
+ *             Retained for historical read, wage accrual history, payables drill-down, and tests.
+ *             Manual create is disabled (403) where Phase 1–2 blocking applies.
+ */
 class LabWorkLogController extends Controller
 {
     public function __construct(

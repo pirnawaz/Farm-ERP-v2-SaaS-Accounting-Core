@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useActivities } from '../hooks/useCropOps';
-import { useWorkLogs } from '../hooks/useLabour';
+import { useFieldJobs } from '../hooks/useFieldJobs';
 import { useHarvests } from '../hooks/useHarvests';
 import { useSales } from '../hooks/useSales';
 import { usePayments } from '../hooks/usePayments';
@@ -33,11 +32,7 @@ export default function TodayPage() {
   const today = useMemo(() => todayDate(), []);
   const { formatDate, formatMoney } = useFormatting();
 
-  const { data: activities = [], isLoading: activitiesLoading } = useActivities({
-    from: today,
-    to: today,
-  });
-  const { data: workLogs = [], isLoading: workLogsLoading } = useWorkLogs({
+  const { data: fieldJobsToday = [], isLoading: fieldJobsLoading } = useFieldJobs({
     from: today,
     to: today,
   });
@@ -73,24 +68,14 @@ export default function TodayPage() {
 
   const items: TodayItem[] = useMemo(() => {
     const list: TodayItem[] = [];
-    activities.forEach((a) => {
+    fieldJobsToday.forEach((j) => {
       list.push({
-        id: a.id,
-        kind: 'activity',
-        label: a.doc_no || 'Field work',
-        sortKey: `${a.activity_date}T${a.created_at || ''}`,
-        link: `/app/crop-ops/activities/${a.id}`,
-        meta: a.type?.name || undefined,
-      });
-    });
-    workLogs.forEach((w) => {
-      list.push({
-        id: w.id,
-        kind: 'work-log',
-        label: w.doc_no || 'Labour',
-        sortKey: `${w.work_date}T${w.created_at || ''}`,
-        link: `/app/labour/work-logs/${w.id}`,
-        meta: w.worker?.name || undefined,
+        id: j.id,
+        kind: 'field-job',
+        label: j.doc_no || 'Field job',
+        sortKey: `${j.job_date}T${j.created_at || ''}`,
+        link: `/app/crop-ops/field-jobs/${j.id}`,
+        meta: j.crop_activity_type?.name || j.project?.name || undefined,
       });
     });
     todayGrns.forEach((g) => {
@@ -146,8 +131,7 @@ export default function TodayPage() {
     list.sort((a, b) => (b.sortKey.localeCompare(a.sortKey)));
     return list;
   }, [
-    activities,
-    workLogs,
+    fieldJobsToday,
     todayGrns,
     todayIssues,
     harvests,
@@ -157,8 +141,7 @@ export default function TodayPage() {
   ]);
 
   const kindLabel: Record<string, string> = {
-    activity: 'Field work',
-    'work-log': 'Labour',
+    'field-job': 'Field job',
     grn: term('grnSingular'),
     issue: term('issueSingular'),
     harvest: 'Harvest',
@@ -167,8 +150,7 @@ export default function TodayPage() {
   };
 
   const isLoading =
-    activitiesLoading ||
-    workLogsLoading ||
+    fieldJobsLoading ||
     harvestsLoading ||
     salesLoading ||
     paymentsLoading ||

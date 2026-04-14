@@ -17,6 +17,11 @@ use App\Services\TenantContext;
 use App\Services\InventoryPostingService;
 use Illuminate\Http\Request;
 
+/**
+ * @deprecated Manual “stock used” entry is de-emphasised (primary: Field Job inputs). This controller
+ *             remains required for inventory issue documents: history, post/reverse, and programmatic
+ *             creation (e.g. machinery in-kind). Manual store may be blocked (403) per product phase.
+ */
 class InvIssueController extends Controller
 {
     public function __construct(

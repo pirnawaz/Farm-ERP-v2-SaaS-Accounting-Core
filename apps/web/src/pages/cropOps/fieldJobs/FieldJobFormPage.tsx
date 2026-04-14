@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateFieldJob } from '../../../hooks/useFieldJobs';
 import { useProjects } from '../../../hooks/useProjects';
 import { useProductionUnits } from '../../../hooks/useProductionUnits';
@@ -11,6 +11,8 @@ import { PrimaryWorkflowBanner } from '../../../components/workflow/PrimaryWorkf
 
 export default function FieldJobFormPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const productionUnitIdFromUrl = searchParams.get('production_unit_id')?.trim() || '';
   const createM = useCreateFieldJob();
   const { data: projects } = useProjects();
   const { data: productionUnits } = useProductionUnits();
@@ -20,10 +22,16 @@ export default function FieldJobFormPage() {
   const [doc_no, setDocNo] = useState('');
   const [job_date, setJobDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [project_id, setProjectId] = useState('');
-  const [production_unit_id, setProductionUnitId] = useState('');
+  const [production_unit_id, setProductionUnitId] = useState(productionUnitIdFromUrl);
   const [land_parcel_id, setLandParcelId] = useState('');
   const [crop_activity_type_id, setCropActivityTypeId] = useState('');
   const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (productionUnitIdFromUrl) {
+      setProductionUnitId(productionUnitIdFromUrl);
+    }
+  }, [productionUnitIdFromUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

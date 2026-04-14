@@ -1,3 +1,7 @@
+/**
+ * @deprecated Legacy labour work logs UI. Primary labour-in-field-work capture: Field Jobs.
+ *             Retained for list/detail, payables context, and history.
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useWorkLogs, useWorkers } from '../../hooks/useLabour';

@@ -213,7 +213,7 @@ export default function LivestockDetailPage() {
       <PageHeader
         title={unit.name}
         description="Herd or flock unit for events, headcount, and tagged costs and sales."
-        helper="Use this view to see current headcount and this year’s economics at a glance."
+        helper="Use this view for headcount, herd events, and this year’s economics. Record feed, medicine, and other costs with field jobs."
         backTo="/app/livestock"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -269,16 +269,10 @@ export default function LivestockDetailPage() {
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Quick actions</h2>
         <div className="flex flex-wrap gap-3">
           <Link
-            to={`/app/crop-ops/activities/new?production_unit_id=${id}`}
+            to={`/app/crop-ops/field-jobs/new?production_unit_id=${id}`}
             className="px-4 py-2 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] text-sm font-medium"
           >
-            Record expense (activity)
-          </Link>
-          <Link
-            to={`/app/inventory/issues/new?production_unit_id=${id}`}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
-          >
-            Record issue (feed/medicine)
+            New field job
           </Link>
           <Link
             to={`/app/sales/new?production_unit_id=${id}`}

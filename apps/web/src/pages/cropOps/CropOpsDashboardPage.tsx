@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
-import { useActivities, useActivityTypes } from '../../hooks/useCropOps';
+import { useActivityTypes } from '../../hooks/useCropOps';
+import { useFieldJobs } from '../../hooks/useFieldJobs';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import type { CropActivity } from '../../types';
+import type { FieldJob } from '../../types';
 
 function KpiCard({
   label,
@@ -61,40 +62,39 @@ export default function CropOpsDashboardPage() {
   }, []);
 
   const { data: activityTypes, isLoading: typesLoading } = useActivityTypes({ is_active: true });
-  const { data: activities, isLoading: activitiesLoading } = useActivities();
+  const { data: fieldJobs, isLoading: jobsLoading } = useFieldJobs();
 
   const workTypeCount = (activityTypes ?? []).filter((t) => t.is_active).length;
-  const allActivities = activities ?? [];
-  const logsLast30 = useMemo(
-    () => allActivities.filter((a) => (a.activity_date || '').slice(0, 10) >= thirtyDaysAgoIso),
-    [allActivities, thirtyDaysAgoIso],
+  const allJobs = fieldJobs ?? [];
+  const jobsLast30 = useMemo(
+    () => allJobs.filter((j) => (j.job_date || '').slice(0, 10) >= thirtyDaysAgoIso),
+    [allJobs, thirtyDaysAgoIso],
   );
 
-  const recentFieldActivity = useMemo(() => {
-    return [...allActivities]
+  const recentFieldJobs = useMemo(() => {
+    return [...allJobs]
       .sort(
         (a, b) =>
-          String(b.activity_date || '').localeCompare(String(a.activity_date || '')) ||
+          String(b.job_date || '').localeCompare(String(a.job_date || '')) ||
           String(b.created_at || '').localeCompare(String(a.created_at || '')),
       )
       .slice(0, 5);
-  }, [allActivities]);
+  }, [allJobs]);
 
-  const describeRow = (a: CropActivity) => {
-    const typeName = a.type?.name || a.activity_type_id;
-    const cycle = a.crop_cycle?.name || a.crop_cycle_id;
-    const proj = a.project?.name || a.project_id;
+  const describeRow = (j: FieldJob) => {
+    const typeName = j.crop_activity_type?.name || j.crop_activity_type_id;
+    const cycle = j.crop_cycle?.name || j.crop_cycle_id;
+    const proj = j.project?.name || j.project_id;
     const bits = [typeName, cycle, proj].filter(Boolean);
     const meta = bits.join(' · ') || '—';
-    const note = (a.notes || '').trim();
-    const short =
-      note.length > 80 ? `${note.slice(0, 77)}…` : note || a.doc_no || meta;
+    const note = (j.notes || '').trim();
+    const short = note.length > 80 ? `${note.slice(0, 77)}…` : note || j.doc_no || meta;
     return { meta, desc: short };
   };
 
-  const hasNoData = workTypeCount === 0 && allActivities.length === 0;
+  const hasNoData = workTypeCount === 0 && allJobs.length === 0;
 
-  if (typesLoading || activitiesLoading) {
+  if (typesLoading || jobsLoading) {
     return (
       <div className="flex justify-center py-12">
         <LoadingSpinner size="lg" />
@@ -107,11 +107,10 @@ export default function CropOpsDashboardPage() {
       <header>
         <h1 className="text-2xl font-bold text-gray-900">Crop Ops Overview</h1>
         <p className="mt-1 text-base text-gray-700 max-w-2xl">
-          Track field work, field activity, and crop operation setup.
+          Set up work types and run field jobs—the primary workflow for field work, inputs, labour, and machinery.
         </p>
         <p className="mt-1 text-sm text-gray-500 max-w-2xl">
-          Use this page to manage field work and related crop operations. This is field and crop activity — for people and
-          payables, use Labour.
+          Use field jobs to capture operations in one place before posting to accounting.
         </p>
       </header>
 
@@ -120,15 +119,15 @@ export default function CropOpsDashboardPage() {
           <div className="text-base font-semibold text-amber-900">Get started with crop ops</div>
           <ol className="mt-2 list-decimal list-inside text-sm text-amber-900/90 space-y-1">
             <li>Add work types</li>
-            <li>Record field work</li>
-            <li>Review field activity</li>
+            <li>Create a field job</li>
+            <li>Add lines and post when ready</li>
           </ol>
           <div className="mt-4 flex flex-wrap gap-2">
             <ActionLink to="/app/crop-ops/activity-types" variant="primary">
               Add work type
             </ActionLink>
-            <ActionLink to="/app/crop-ops/activities/new" variant="secondary">
-              Log field work
+            <ActionLink to="/app/crop-ops/field-jobs/new" variant="secondary">
+              New field job
             </ActionLink>
           </div>
         </section>
@@ -137,18 +136,18 @@ export default function CropOpsDashboardPage() {
       <section aria-label="Crop ops summary">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Work types (active)" value={String(workTypeCount)} to="/app/crop-ops/activity-types" />
-          <KpiCard label="Field work records" value={String(allActivities.length)} hint="All field work documents" to="/app/crop-ops/activities" />
+          <KpiCard label="Field jobs" value={String(allJobs.length)} hint="All field job documents" to="/app/crop-ops/field-jobs" />
           <KpiCard
-            label="Field work logs (30 days)"
-            value={String(logsLast30.length)}
-            hint="Records with work date in the last 30 days"
-            to="/app/crop-ops/activities"
+            label="Field jobs (30 days)"
+            value={String(jobsLast30.length)}
+            hint="Jobs with work date in the last 30 days"
+            to="/app/crop-ops/field-jobs"
           />
           <KpiCard
-            label="Posted field work"
-            value={String(allActivities.filter((a) => a.status === 'POSTED').length)}
-            hint="Posted activities"
-            to="/app/crop-ops/activities"
+            label="Posted field jobs"
+            value={String(allJobs.filter((j) => j.status === 'POSTED').length)}
+            hint="Posted jobs"
+            to="/app/crop-ops/field-jobs"
           />
         </div>
       </section>
@@ -158,15 +157,15 @@ export default function CropOpsDashboardPage() {
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
               <h2 id="crop-ops-recent-heading" className="text-lg font-semibold text-gray-900">
-                Recent field activity
+                Recent field jobs
               </h2>
-              <Link to="/app/crop-ops/activities" className="text-sm font-medium text-[#1F6F5C] hover:underline">
-                View Field Work Logs
+              <Link to="/app/crop-ops/field-jobs" className="text-sm font-medium text-[#1F6F5C] hover:underline">
+                View all field jobs
               </Link>
             </div>
 
-            {recentFieldActivity.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-600">No field work recorded yet.</p>
+            {recentFieldJobs.length === 0 ? (
+              <p className="py-8 text-center text-sm text-gray-600">No field jobs yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-100">
@@ -174,22 +173,22 @@ export default function CropOpsDashboardPage() {
                     <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
                       <th className="py-3 pr-4">Date</th>
                       <th className="py-3 pr-4">Field / cycle / type</th>
-                      <th className="py-3 pr-0">Activity</th>
+                      <th className="py-3 pr-0">Job</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {recentFieldActivity.map((a) => {
-                      const { meta, desc } = describeRow(a);
+                    {recentFieldJobs.map((j) => {
+                      const { meta, desc } = describeRow(j);
                       return (
-                        <tr key={a.id} className="text-sm">
-                          <td className="py-3 pr-4 tabular-nums text-gray-700">{(a.activity_date || '').slice(0, 10)}</td>
+                        <tr key={j.id} className="text-sm">
+                          <td className="py-3 pr-4 tabular-nums text-gray-700">{(j.job_date || '').slice(0, 10)}</td>
                           <td className="py-3 pr-4 text-gray-700">
                             <span className="block max-w-[20rem] truncate" title={meta}>
                               {meta || '—'}
                             </span>
                           </td>
                           <td className="py-3 pr-0 text-gray-700">
-                            <Link to={`/app/crop-ops/activities/${a.id}`} className="text-[#1F6F5C] hover:underline">
+                            <Link to={`/app/crop-ops/field-jobs/${j.id}`} className="text-[#1F6F5C] hover:underline">
                               <span className="block max-w-[24rem] truncate" title={desc}>
                                 {desc}
                               </span>
@@ -213,8 +212,8 @@ export default function CropOpsDashboardPage() {
             <p className="mt-1 text-xs text-gray-500">Shortcuts — full lists are in the sidebar.</p>
 
             <div className="mt-4 flex flex-col gap-2">
-              <ActionLink to="/app/crop-ops/activities/new" variant="primary">
-                Log field work
+              <ActionLink to="/app/crop-ops/field-jobs/new" variant="primary">
+                New field job
               </ActionLink>
               <ActionLink to="/app/crop-ops/activity-types" variant="primary">
                 Add work type
@@ -225,11 +224,11 @@ export default function CropOpsDashboardPage() {
               <ActionLink to="/app/farm-activity" variant="secondary">
                 Farm activity timeline
               </ActionLink>
-              <ActionLink to="/app/crop-ops/activities" variant="secondary">
-                View Field Work Logs
+              <ActionLink to="/app/crop-ops/field-jobs" variant="secondary">
+                View field jobs
               </ActionLink>
               <ActionLink to="/app/crop-ops/activity-types" variant="secondary">
-                View Work Types
+                View work types
               </ActionLink>
             </div>
           </div>

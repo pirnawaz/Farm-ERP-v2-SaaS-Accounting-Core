@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom';
 import { useModules } from '../contexts/ModulesContext';
 
 export type QuickActionId =
-  | 'field-work'
-  | 'log-labour'
+  | 'field-job'
   | 'receive-supplies'
   | 'record-harvest'
   | 'record-sale'
@@ -18,8 +17,7 @@ type QuickAction = {
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'field-work', label: 'Record Field Work', to: '/app/crop-ops/activities/new', requiredModule: 'crop_ops' },
-  { id: 'log-labour', label: 'Log Labour', to: '/app/labour/work-logs/new', requiredModule: 'labour' },
+  { id: 'field-job', label: 'New Field Job', to: '/app/crop-ops/field-jobs/new', requiredModule: 'crop_ops' },
   { id: 'receive-supplies', label: 'Receive Supplies', to: '/app/inventory/grns/new', requiredModule: 'inventory' },
   { id: 'record-harvest', label: 'Record Harvest', to: '/app/harvests/new', requiredModule: 'crop_ops' },
   { id: 'record-sale', label: 'Record Sale', to: '/app/sales/new', requiredModule: 'ar_sales' },

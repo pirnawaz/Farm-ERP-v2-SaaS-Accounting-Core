@@ -20,6 +20,11 @@ use App\Services\TenantContext;
 use App\Services\CropActivityPostingService;
 use Illuminate\Http\Request;
 
+/**
+ * @deprecated Legacy manual crop activity / field work log workflow. Primary workflow: Field Jobs.
+ *             Retained for historical read, post/reverse of existing documents, and regression tests.
+ *             Manual create is disabled (403); list/detail/timeline remain available.
+ */
 class CropActivityController extends Controller
 {
     public function __construct(

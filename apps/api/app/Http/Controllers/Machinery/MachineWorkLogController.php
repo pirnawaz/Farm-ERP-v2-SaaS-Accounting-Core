@@ -17,6 +17,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
+/**
+ * @deprecated Legacy machine usage / machinery work log workflow. Primary machinery capture: Field Jobs
+ *             (and machinery charges / settlement flows). Retained for history, traceability links, and tests.
+ *             Manual create is disabled (403) where Phase 1–2 blocking applies.
+ */
 class MachineWorkLogController extends Controller
 {
     public function __construct(

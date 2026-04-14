@@ -1,3 +1,7 @@
+/**
+ * @deprecated Legacy field work logs UI. Primary workflow: Field Jobs. Retained for list/detail/history;
+ *             normal navigation de-emphasised; API manual create blocked.
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useActivities, useActivityTypes } from '../../hooks/useCropOps';

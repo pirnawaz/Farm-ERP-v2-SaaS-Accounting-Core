@@ -1,3 +1,7 @@
+/**
+ * @deprecated Legacy machine usage / work logs UI. Primary machinery capture: Field Jobs (+ charges).
+ *             Retained for list/detail, project links, and traceability.
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
