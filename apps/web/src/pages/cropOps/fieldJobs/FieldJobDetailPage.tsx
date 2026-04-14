@@ -217,6 +217,16 @@ export default function FieldJobDetailPage() {
 
       <PrimaryWorkflowBanner variant="field-job" />
 
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+        <p className="font-medium">Primary workflow: Field Jobs</p>
+        <p className="mt-1 text-emerald-900/90">
+          Use this Field Job to capture <span className="font-medium">inputs (stock)</span>,{' '}
+          <span className="font-medium">labour</span>, and <span className="font-medium">machinery</span> for normal crop-field
+          work. Avoid recording the same event again as separate Stock Used, Labour Work Logs, Machine Usage, or Field Work
+          Logs.
+        </p>
+      </div>
+
       <TraceabilityPanel traceability={job.traceability} />
 
       <DuplicateWorkflowRiskCallout context="field-job" traceability={job.traceability} />
@@ -404,6 +414,10 @@ export default function FieldJobDetailPage() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-900 mb-3">Inputs used</h2>
+        <p className="mt-1 text-sm text-gray-600 mb-3">
+          Record what was applied/consumed. Stock is consumed when you post the Field Job. Draft costs are estimates only and
+          may be valued on posting if current valuation is not available.
+        </p>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-[#E6ECEA]">
@@ -536,6 +550,10 @@ export default function FieldJobDetailPage() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-900 mb-3">Labour used</h2>
+        <p className="mt-1 text-sm text-gray-600 mb-3">
+          Labour cost is estimated from units × rate unless you enter an explicit amount. Labour is posted only when you post
+          the Field Job.
+        </p>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-[#E6ECEA]">

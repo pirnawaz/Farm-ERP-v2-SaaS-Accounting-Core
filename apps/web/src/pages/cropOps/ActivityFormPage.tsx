@@ -231,6 +231,7 @@ export default function ActivityFormPage() {
 
   const handleSubmit = async () => {
     if (!validate()) return;
+    const manualAck = searchParams.get('manual_exception_ack') === '1';
     const finalDocNo = doc_no.trim() || generateDocNo('ACT');
     const validInputs = inputs
       .filter((l) => l.store_id && l.item_id && parseFloat(l.qty) > 0)
@@ -254,11 +255,20 @@ export default function ActivityFormPage() {
       notes: notes || undefined,
       inputs: validInputs.length ? validInputs : undefined,
       labour: validLabour.length ? validLabour : undefined,
+      manual_exception_acknowledged: manualAck || undefined,
     };
-    const activity = await createM.mutateAsync(payload);
-    setLastSubmit(tenantId || '', 'activity', payload);
-    clearDraft();
-    navigate(`/app/crop-ops/activities/${activity.id}`);
+    try {
+      const activity = await createM.mutateAsync(payload);
+      setLastSubmit(tenantId || '', 'activity', payload);
+      clearDraft();
+      navigate(`/app/crop-ops/activities/${activity.id}`);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        'Unable to create field work log. Use Field Jobs for normal crop-field work.';
+      setErrors((prev) => ({ ...prev, submit: String(msg) }));
+    }
   };
 
   return (
@@ -538,6 +548,7 @@ export default function ActivityFormPage() {
         </FormField>
 
         {errors.lines && <p className="text-sm text-red-600">{errors.lines}</p>}
+        {errors.submit && <p className="text-sm text-red-600">{errors.submit}</p>}
 
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
           <button

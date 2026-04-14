@@ -60,6 +60,7 @@ class InvIssueRequiresCropCycleAndProjectTest extends TestCase
                 'store_id' => $store->id,
                 'doc_date' => '2024-06-15',
                 'lines' => [['item_id' => $item->id, 'qty' => 2]],
+                'manual_exception_acknowledged' => true,
             ]);
 
         $r->assertStatus(422);

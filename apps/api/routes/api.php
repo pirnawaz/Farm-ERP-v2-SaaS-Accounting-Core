@@ -459,6 +459,7 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::get('field-jobs', [FieldJobController::class, 'index']);
         Route::post('field-jobs', [FieldJobController::class, 'store']);
         Route::get('field-jobs/{id}', [FieldJobController::class, 'show']);
+        Route::get('field-jobs/{id}/draft-cost-preview', [FieldJobController::class, 'draftCostPreview']);
         Route::put('field-jobs/{id}', [FieldJobController::class, 'update']);
         Route::post('field-jobs/{id}/inputs', [FieldJobController::class, 'storeInput']);
         Route::put('field-jobs/{id}/inputs/{lineId}', [FieldJobController::class, 'updateInput']);

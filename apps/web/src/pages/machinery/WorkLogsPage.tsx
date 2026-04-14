@@ -55,6 +55,9 @@ export default function WorkLogsPage() {
   const canPost = hasRole(['tenant_admin', 'accountant']);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
 
+  const [showManualCreate, setShowManualCreate] = useState(false);
+  const [manualAck, setManualAck] = useState(false);
+
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (!value) next.delete(key);
@@ -176,21 +179,81 @@ export default function WorkLogsPage() {
       <PageHeader
         title="Machine Usage"
         tooltip="Track how machines are used across work and field activities."
-        description="Track how machines are used across work and field activities."
+        description="Advanced/manual workflow. Kept for history, audit, and non-field exceptions."
+        helper="Use Field Jobs for normal crop-field work. Only use Machine Usage for legacy records or exceptional/manual entries (for example: non-field/admin work or corrections that are not part of a Field Job)."
         backTo="/app/machinery"
         breadcrumbs={[{ label: 'Farm', to: '/app/dashboard' }, { label: 'Machinery Overview', to: '/app/machinery' }, { label: 'Machine Usage' }]}
         right={
           canEdit ? (
-            <button
-              type="button"
-              onClick={() => navigate('/app/machinery/work-logs/new')}
-              className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
-            >
-              New usage entry
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/app/crop-ops/field-jobs/new')}
+                className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
+              >
+                New field job
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualAck(false);
+                  setShowManualCreate(true);
+                }}
+                className="w-full sm:w-auto px-4 py-2 border border-gray-200 bg-white text-gray-800 rounded-md hover:bg-gray-50 text-sm font-medium"
+              >
+                New manual usage entry
+              </button>
+            </div>
           ) : undefined
         }
       />
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <p className="font-medium">Advisory: avoid duplicate crop-work records</p>
+        <p className="mt-1 text-amber-900/90">
+          <span className="font-medium">Use Field Jobs</span> for normal crop-field work. Only create manual Machine Usage
+          entries for legacy records or exceptional/manual cases. Recording the same event in both workflows can create
+          duplicate operational and accounting records.
+        </p>
+      </div>
+
+      <Modal
+        isOpen={showManualCreate}
+        onClose={() => setShowManualCreate(false)}
+        title="Manual / exceptional create path"
+      >
+        <p className="text-sm text-gray-700">
+          For normal crop-field work, record machinery usage on a Field Job so inputs, labour, and machinery post once from
+          one operational document.
+        </p>
+        <label className="mt-4 flex gap-2 text-sm text-gray-800">
+          <input
+            type="checkbox"
+            checked={manualAck}
+            onChange={(e) => setManualAck(e.target.checked)}
+          />
+          I understand this is a manual/exceptional path and may duplicate Field Jobs.
+        </label>
+        <div className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setShowManualCreate(false)}
+            className="px-4 py-2 border border-gray-200 rounded-md text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!manualAck}
+            onClick={() => {
+              setShowManualCreate(false);
+              navigate('/app/machinery/work-logs/new?manual_exception_ack=1');
+            }}
+            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium disabled:opacity-40"
+          >
+            Continue to manual create
+          </button>
+        </div>
+      </Modal>
 
       <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

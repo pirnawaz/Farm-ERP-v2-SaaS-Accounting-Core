@@ -58,6 +58,13 @@ class MachineWorkLogController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
 
+        if (! $request->boolean('manual_exception_acknowledged')) {
+            return response()->json([
+                'message' => 'Manual Machine Usage creation is restricted. Use Field Jobs for normal crop-field work. To proceed with this manual/exceptional create path, set manual_exception_acknowledged=true.',
+                'error_code' => 'MANUAL_EXCEPTION_ACK_REQUIRED',
+            ], 422);
+        }
+
         // If lines are sent, return validation error
         if ($request->has('lines')) {
             abort(422, 'cost lines deprecated; use charges');

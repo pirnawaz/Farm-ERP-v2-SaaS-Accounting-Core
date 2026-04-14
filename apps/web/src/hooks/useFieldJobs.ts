@@ -11,6 +11,7 @@ import type {
   UpdateFieldJobMachinePayload,
   PostFieldJobRequest,
   ReverseFieldJobRequest,
+  FieldJobDraftCostPreview,
 } from '../types';
 import toast from 'react-hot-toast';
 
@@ -41,6 +42,16 @@ export function useFieldJob(id: string) {
     queryKey: ['crop-ops', 'field-jobs', id],
     queryFn: () => fieldJobsApi.get(id),
     enabled: !!id,
+  });
+}
+
+export function useFieldJobDraftCostPreview(id: string, enabled: boolean) {
+  return useQuery<FieldJobDraftCostPreview>({
+    queryKey: ['crop-ops', 'field-jobs', id, 'draft-cost-preview'],
+    queryFn: () => fieldJobsApi.draftCostPreview(id),
+    enabled: !!id && enabled,
+    staleTime: 15 * 1000,
+    gcTime: 2 * 60 * 1000,
   });
 }
 

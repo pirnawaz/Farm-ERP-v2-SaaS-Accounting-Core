@@ -67,6 +67,13 @@ class CropActivityController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
 
+        if (! $request->boolean('manual_exception_acknowledged')) {
+            return response()->json([
+                'message' => 'Manual Field Work Log creation is restricted. Use Field Jobs for normal crop-field work. To proceed with this legacy/manual create path, set manual_exception_acknowledged=true.',
+                'error_code' => 'MANUAL_EXCEPTION_ACK_REQUIRED',
+            ], 422);
+        }
+
         CropActivityType::where('id', $request->activity_type_id)->where('tenant_id', $tenantId)->firstOrFail();
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
         $project = Project::where('id', $request->project_id)->where('tenant_id', $tenantId)->firstOrFail();

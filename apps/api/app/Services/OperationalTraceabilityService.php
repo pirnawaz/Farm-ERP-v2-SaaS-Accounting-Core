@@ -8,6 +8,7 @@ use App\Models\Harvest;
 use App\Models\HarvestShareLine;
 use App\Models\MachineryCharge;
 use App\Models\MachineWorkLog;
+use App\Models\InvStockMovement;
 
 /**
  * Read-model summaries for cross-module links (field jobs, harvests, machinery).
@@ -18,6 +19,13 @@ class OperationalTraceabilityService
     public function summarizeForFieldJob(FieldJob $job): array
     {
         $tenantId = $job->tenant_id;
+
+        $stockMovements = InvStockMovement::query()
+            ->where('tenant_id', $tenantId)
+            ->where('source_type', 'field_job')
+            ->where('source_id', $job->id)
+            ->orderBy('occurred_at', 'asc')
+            ->get(['id', 'movement_type', 'store_id', 'item_id', 'qty_delta', 'unit_cost_snapshot', 'occurred_at', 'posting_group_id']);
 
         $harvestIds = HarvestShareLine::query()
             ->where('tenant_id', $tenantId)
@@ -36,25 +44,72 @@ class OperationalTraceabilityService
                 ->get(['id', 'harvest_no', 'harvest_date', 'status']);
 
         $machinerySources = [];
+        $machineUsageLinkCount = 0;
+        $machineryChargeLinkCount = 0;
         foreach ($job->machines ?? [] as $m) {
             $row = [
                 'field_job_machine_id' => $m->id,
                 'machine_label' => optional($m->machine)->name ?? $m->machine_id,
+                'pricing_basis' => $m->pricing_basis,
+                'rate_card_id' => $m->rate_card_id,
+                'rate_snapshot' => $m->rate_snapshot,
+                'amount' => $m->amount,
             ];
             if ($m->source_work_log_id) {
+                $machineUsageLinkCount++;
                 $wl = $m->relationLoaded('sourceWorkLog') ? $m->sourceWorkLog : null;
                 $row['source_work_log'] = $wl ? $this->workLogSummary($wl) : ['id' => $m->source_work_log_id];
             }
             if ($m->source_charge_id) {
+                $machineryChargeLinkCount++;
                 $ch = $m->relationLoaded('sourceCharge') ? $m->sourceCharge : null;
                 $row['source_machinery_charge'] = $ch ? $this->chargeSummary($ch) : ['id' => $m->source_charge_id];
             }
             $machinerySources[] = $row;
         }
 
+        $labourSummary = [];
+        $labourTotal = 0.0;
+        foreach ($job->labour ?? [] as $l) {
+            $amt = $l->amount !== null ? (float) $l->amount : null;
+            if ($amt !== null) {
+                $labourTotal += $amt;
+            }
+            $labourSummary[] = [
+                'field_job_labour_id' => $l->id,
+                'worker_id' => $l->worker_id,
+                'worker_label' => optional($l->worker)->name ?? $l->worker_id,
+                'amount' => $l->amount,
+            ];
+        }
+
         return [
+            'posting_group_id' => $job->posting_group_id,
+            'reversal_posting_group_id' => $job->reversal_posting_group_id,
+            'overlap_signals' => [
+                'stock_movements_count' => $stockMovements->count(),
+                'machinery_lines_from_machine_usage_count' => $machineUsageLinkCount,
+                'machinery_lines_from_machinery_charge_count' => $machineryChargeLinkCount,
+                'note' => 'Signals are read-only and detect explicit links only (no guessing).',
+            ],
             'linked_harvests' => $linkedHarvests->map(fn (Harvest $h) => $this->harvestSummary($h))->values()->all(),
             'machinery_sources' => $machinerySources,
+            'stock_movements' => $stockMovements->map(function (InvStockMovement $m) {
+                return [
+                    'id' => $m->id,
+                    'posting_group_id' => $m->posting_group_id,
+                    'movement_type' => $m->movement_type,
+                    'store_id' => $m->store_id,
+                    'item_id' => $m->item_id,
+                    'qty_delta' => (string) $m->qty_delta,
+                    'unit_cost_snapshot' => $m->unit_cost_snapshot !== null ? (string) $m->unit_cost_snapshot : null,
+                    'occurred_at' => $m->occurred_at?->format('Y-m-d H:i:s'),
+                ];
+            })->values()->all(),
+            'labour_lines' => $labourSummary,
+            'labour_total' => $job->status === 'POSTED' || $job->status === 'REVERSED'
+                ? (string) round($labourTotal, 2)
+                : null,
         ];
     }
 

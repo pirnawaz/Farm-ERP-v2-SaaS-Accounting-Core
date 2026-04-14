@@ -763,11 +763,355 @@ class FieldJobFoundationTest extends TestCase
         $show->assertStatus(200);
         $show->assertJsonStructure([
             'traceability' => [
+                'posting_group_id',
+                'reversal_posting_group_id',
+                'overlap_signals',
                 'linked_harvests',
                 'machinery_sources',
+                'stock_movements',
+                'labour_lines',
+                'labour_total',
             ],
         ]);
         $this->assertIsArray($show->json('traceability.linked_harvests'));
         $this->assertIsArray($show->json('traceability.machinery_sources'));
+    }
+
+    public function test_draft_cost_preview_computes_estimates_without_posting_or_writes(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+        $tenantId = $s['tenant']->id;
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ]);
+        $fj->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/inputs", [
+            'store_id' => $s['store']->id,
+            'item_id' => $s['item']->id,
+            'qty' => 2,
+        ])->assertStatus(201);
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/labour", [
+            'worker_id' => $s['worker']->id,
+            'units' => 3,
+            'rate' => 10,
+        ])->assertStatus(201);
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/machines", [
+            'machine_id' => $s['machine']->id,
+            'usage_qty' => 4,
+        ])->assertStatus(201);
+
+        $before = [
+            'posting_groups' => PostingGroup::where('tenant_id', $tenantId)->count(),
+            'ledger_entries' => LedgerEntry::where('tenant_id', $tenantId)->count(),
+            'allocation_rows' => AllocationRow::where('tenant_id', $tenantId)->count(),
+            'stock_movements' => InvStockMovement::where('tenant_id', $tenantId)->count(),
+            'stock_balances' => InvStockBalance::where('tenant_id', $tenantId)->count(),
+        ];
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview");
+        $preview->assertStatus(200);
+
+        // Inputs estimate: 2 * 50 (WAC seeded by GRN)
+        $this->assertEquals('100.00', $preview->json('inputs.subtotal_estimate'));
+        $this->assertTrue($preview->json('inputs.all_known'));
+
+        // Labour estimate: 3 * 10
+        $this->assertEquals('30.00', $preview->json('labour.subtotal_estimate'));
+        $this->assertTrue($preview->json('labour.all_known'));
+
+        // Machinery estimate: 4 * 50 (rate card seeded)
+        $this->assertEquals('200.00', $preview->json('machinery.subtotal_estimate'));
+        $this->assertTrue($preview->json('machinery.all_known'));
+
+        $this->assertEquals('330.00', $preview->json('summary.grand_total_estimate'));
+        $this->assertTrue($preview->json('summary.all_known'));
+        $this->assertEquals('330.00', $preview->json('summary.known_total_estimate'));
+        $this->assertEquals(0, (int) $preview->json('summary.unknown_lines_count'));
+
+        $after = [
+            'posting_groups' => PostingGroup::where('tenant_id', $tenantId)->count(),
+            'ledger_entries' => LedgerEntry::where('tenant_id', $tenantId)->count(),
+            'allocation_rows' => AllocationRow::where('tenant_id', $tenantId)->count(),
+            'stock_movements' => InvStockMovement::where('tenant_id', $tenantId)->count(),
+            'stock_balances' => InvStockBalance::where('tenant_id', $tenantId)->count(),
+        ];
+        $this->assertEquals($before, $after, 'Draft cost preview must not write posting/accounting/inventory artifacts.');
+    }
+
+    public function test_draft_cost_preview_labour_explicit_amount_overrides_units_x_rate(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ])->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/labour", [
+            'worker_id' => $s['worker']->id,
+            'units' => 2,
+            'rate' => 10,
+            'amount' => 999,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview")->assertStatus(200);
+        $this->assertEquals('999.00', $preview->json('labour.known_subtotal_estimate'));
+        $this->assertTrue($preview->json('labour.all_known'));
+        $this->assertEquals('999.00', $preview->json('labour.subtotal_estimate'));
+        $this->assertEquals('EXPLICIT_AMOUNT', $preview->json('labour.lines.0.pricing_basis'));
+        $this->assertEquals('999.00', $preview->json('labour.lines.0.amount_estimate'));
+    }
+
+    public function test_draft_cost_preview_labour_zero_explicit_amount_is_preserved_as_zero(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ])->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/labour", [
+            'worker_id' => $s['worker']->id,
+            'units' => 2,
+            'rate' => 10,
+            'amount' => 0,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview")->assertStatus(200);
+        $this->assertEquals('0.00', $preview->json('labour.known_subtotal_estimate'));
+        $this->assertEquals('0.00', $preview->json('labour.subtotal_estimate'));
+        $this->assertEquals('0.00', $preview->json('labour.lines.0.amount_estimate'));
+    }
+
+    public function test_draft_cost_preview_machinery_explicit_amount_overrides_rate_card(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ])->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/machines", [
+            'machine_id' => $s['machine']->id,
+            'usage_qty' => 4,
+            'amount' => 123.45,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview")->assertStatus(200);
+        $this->assertEquals('123.45', $preview->json('machinery.subtotal_estimate'));
+        $this->assertEquals('MANUAL_AMOUNT', $preview->json('machinery.lines.0.pricing_basis'));
+    }
+
+    public function test_draft_cost_preview_machinery_uses_rate_snapshot_when_amount_missing(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ])->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/machines", [
+            'machine_id' => $s['machine']->id,
+            'usage_qty' => 2,
+            'rate_snapshot' => 12.5,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview")->assertStatus(200);
+        $this->assertEquals('25.00', $preview->json('machinery.subtotal_estimate'));
+        $this->assertEquals('RATE_SNAPSHOT_ESTIMATE', $preview->json('machinery.lines.0.pricing_basis'));
+    }
+
+    public function test_draft_cost_preview_mixed_known_unknown_produces_partial_known_total_and_null_grand_total(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+
+        $machineNoRate = Machine::create([
+            'tenant_id' => $s['tenant']->id,
+            'code' => 'M-NR2-'.substr(uniqid(), -6),
+            'name' => 'NoRate2',
+            'machine_type' => 'TRACTOR',
+            'ownership_type' => 'OWNED',
+            'status' => 'ACTIVE',
+            'meter_unit' => 'HR',
+        ]);
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ])->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        // Known machinery via rate snapshot
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/machines", [
+            'machine_id' => $s['machine']->id,
+            'usage_qty' => 2,
+            'rate_snapshot' => 10,
+        ])->assertStatus(201);
+
+        // Unknown machinery (no rate card, no snapshot, no amount)
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/machines", [
+            'machine_id' => $machineNoRate->id,
+            'usage_qty' => 1,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview")->assertStatus(200);
+        $this->assertNull($preview->json('summary.grand_total_estimate'));
+        $this->assertEquals('20.00', $preview->json('summary.known_total_estimate'));
+        $this->assertGreaterThanOrEqual(1, (int) $preview->json('summary.unknown_lines_count'));
+    }
+
+    public function test_draft_cost_preview_inputs_unknown_when_stock_balance_missing(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+        $tenantId = $s['tenant']->id;
+
+        $uom = InvUom::create(['tenant_id' => $tenantId, 'code' => 'U2', 'name' => 'U2']);
+        $cat = InvItemCategory::create(['tenant_id' => $tenantId, 'name' => 'Cat2']);
+        $itemNoBal = InvItem::create([
+            'tenant_id' => $tenantId,
+            'name' => 'NoBalItem',
+            'uom_id' => $uom->id,
+            'category_id' => $cat->id,
+            'valuation_method' => 'WAC',
+            'is_active' => true,
+        ]);
+        $storeNoBal = InvStore::create(['tenant_id' => $tenantId, 'name' => 'NoBalStore', 'type' => 'MAIN', 'is_active' => true]);
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ])->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/inputs", [
+            'store_id' => $storeNoBal->id,
+            'item_id' => $itemNoBal->id,
+            'qty' => 1,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview")->assertStatus(200);
+        $this->assertFalse($preview->json('inputs.all_known'));
+        $this->assertNull($preview->json('inputs.subtotal_estimate'));
+        $this->assertEquals('0.00', $preview->json('inputs.known_subtotal_estimate'));
+        $this->assertEquals(1, (int) $preview->json('inputs.unknown_lines_count'));
+        $this->assertContains('MISSING_STOCK_BALANCE', $preview->json('inputs.lines.0.warnings') ?? []);
+    }
+
+    public function test_draft_cost_preview_partial_labour_only_known(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+        $tenantId = $s['tenant']->id;
+
+        // Inputs unknown: new item/store without balance.
+        $uom = InvUom::create(['tenant_id' => $tenantId, 'code' => 'U3', 'name' => 'U3']);
+        $cat = InvItemCategory::create(['tenant_id' => $tenantId, 'name' => 'Cat3']);
+        $itemNoBal = InvItem::create([
+            'tenant_id' => $tenantId,
+            'name' => 'NoBalItem2',
+            'uom_id' => $uom->id,
+            'category_id' => $cat->id,
+            'valuation_method' => 'WAC',
+            'is_active' => true,
+        ]);
+        $storeNoBal = InvStore::create(['tenant_id' => $tenantId, 'name' => 'NoBalStore2', 'type' => 'MAIN', 'is_active' => true]);
+
+        // Machinery unknown: machine without rate card.
+        $machineNoRate = Machine::create([
+            'tenant_id' => $tenantId,
+            'code' => 'M-NR-LAB-'.substr(uniqid(), -6),
+            'name' => 'NoRateLabOnly',
+            'machine_type' => 'TRACTOR',
+            'ownership_type' => 'OWNED',
+            'status' => 'ACTIVE',
+            'meter_unit' => 'HR',
+        ]);
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ])->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/inputs", [
+            'store_id' => $storeNoBal->id,
+            'item_id' => $itemNoBal->id,
+            'qty' => 1,
+        ])->assertStatus(201);
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/machines", [
+            'machine_id' => $machineNoRate->id,
+            'usage_qty' => 2,
+        ])->assertStatus(201);
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/labour", [
+            'worker_id' => $s['worker']->id,
+            'units' => 2,
+            'rate' => 10,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview")->assertStatus(200);
+        $this->assertEquals('20.00', $preview->json('labour.subtotal_estimate'));
+        $this->assertEquals('20.00', $preview->json('summary.known_total_estimate'));
+        $this->assertNull($preview->json('summary.grand_total_estimate'));
+        $this->assertGreaterThanOrEqual(2, (int) $preview->json('summary.unknown_lines_count'));
+    }
+
+    public function test_draft_cost_preview_returns_unknown_for_machinery_without_rate_card_and_no_manual_amount(): void
+    {
+        $s = $this->seedTenantWithStockProjectWorkerMachine();
+        $h = $s['headers'];
+
+        $machineNoRate = Machine::create([
+            'tenant_id' => $s['tenant']->id,
+            'code' => 'M-NR-'.substr(uniqid(), -6),
+            'name' => 'NoRate',
+            'machine_type' => 'TRACTOR',
+            'ownership_type' => 'OWNED',
+            'status' => 'ACTIVE',
+            'meter_unit' => 'HR',
+        ]);
+
+        $fj = $this->withHeaders($h)->postJson('/api/v1/crop-ops/field-jobs', [
+            'job_date' => '2024-06-15',
+            'project_id' => $s['project']->id,
+        ]);
+        $fj->assertStatus(201);
+        $jobId = $fj->json('id');
+
+        $this->withHeaders($h)->postJson("/api/v1/crop-ops/field-jobs/{$jobId}/machines", [
+            'machine_id' => $machineNoRate->id,
+            'usage_qty' => 1.5,
+        ])->assertStatus(201);
+
+        $preview = $this->withHeaders($h)->getJson("/api/v1/crop-ops/field-jobs/{$jobId}/draft-cost-preview");
+        $preview->assertStatus(200);
+        $this->assertFalse($preview->json('machinery.all_known'));
+        $this->assertNull($preview->json('machinery.subtotal_estimate'));
+        $this->assertNull($preview->json('summary.grand_total_estimate'));
+
+        $line = $preview->json('machinery.lines.0');
+        $this->assertEquals('VALUED_ON_POSTING', $line['pricing_basis']);
+        $this->assertContains('MISSING_RATE_CARD', $line['warnings'] ?? []);
     }
 }

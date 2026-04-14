@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useCreateWorkLog,
   useUpdateWorkLog,
@@ -7,12 +7,10 @@ import {
   useMachinesQuery,
 } from '../../hooks/useMachinery';
 import { useProjects } from '../../hooks/useProjects';
-import { useParties } from '../../hooks/useParties';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { useFormatting } from '../../hooks/useFormatting';
-import type { MachineWorkLogCostCode, MachineWorkLogPoolScope } from '../../types';
+import type { MachineWorkLogPoolScope } from '../../types';
 
 const BENEFICIARY_OPTIONS: { value: MachineWorkLogPoolScope; label: string }[] = [
   { value: 'LANDLORD_ONLY', label: 'My farm' },
@@ -20,30 +18,16 @@ const BENEFICIARY_OPTIONS: { value: MachineWorkLogPoolScope; label: string }[] =
   { value: 'HARI_ONLY', label: 'Hari only' },
 ];
 
-type LineRow = {
-  cost_code: MachineWorkLogCostCode;
-  description: string;
-  amount: string;
-  party_id: string;
-};
-
-const COST_CODES: MachineWorkLogCostCode[] = ['FUEL', 'OPERATOR', 'MAINTENANCE', 'OTHER'];
-
-function emptyLine(): LineRow {
-  return { cost_code: 'FUEL', description: '', amount: '', party_id: '' };
-}
-
 export default function WorkLogFormPage() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id && id !== 'new');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: workLog, isLoading: loadingLog } = useWorkLogQuery(id ?? '');
   const { data: machines } = useMachinesQuery();
   const { data: projects } = useProjects();
-  const { data: parties } = useParties();
   const createM = useCreateWorkLog();
   const updateM = useUpdateWorkLog();
-  const { formatMoney } = useFormatting();
 
   const [machine_id, setMachineId] = useState('');
   const [project_id, setProjectId] = useState('');
@@ -52,7 +36,7 @@ export default function WorkLogFormPage() {
   const [meter_start, setMeterStart] = useState('');
   const [meter_end, setMeterEnd] = useState('');
   const [notes, setNotes] = useState('');
-  const [lines, setLines] = useState<LineRow[]>([emptyLine()]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!workLog || !isEdit) return;
@@ -63,13 +47,7 @@ export default function WorkLogFormPage() {
     setMeterStart(workLog.meter_start ?? '');
     setMeterEnd(workLog.meter_end ?? '');
     setNotes(workLog.notes ?? '');
-    const lns = (workLog.lines ?? []).map((l) => ({
-      cost_code: (l.cost_code as MachineWorkLogCostCode) ?? 'FUEL',
-      description: l.description ?? '',
-      amount: String(l.amount ?? ''),
-      party_id: l.party_id ?? '',
-    }));
-    setLines(lns.length ? lns : [emptyLine()]);
+    // This form is usage-only. Costing flows through rate cards / posting (or downstream charges), not manual cost lines.
   }, [workLog, isEdit]);
 
   const selectedProject = projects?.find((p) => p.id === project_id);
@@ -78,15 +56,6 @@ export default function WorkLogFormPage() {
       ? Math.max(0, parseFloat(meter_end) - parseFloat(meter_start))
       : 0;
 
-  const addLine = () => setLines((l) => [...l, emptyLine()]);
-  const removeLine = (i: number) => setLines((l) => (l.length > 1 ? l.filter((_, idx) => idx !== i) : l));
-  const updateLine = (i: number, f: Partial<LineRow>) =>
-    setLines((l) => l.map((row, idx) => (idx === i ? { ...row, ...f } : row)));
-
-  const validLines = lines.filter(
-    (l) => l.cost_code && parseFloat(l.amount) > 0
-  );
-  const totalAmount = validLines.reduce((s, l) => s + parseFloat(l.amount), 0);
   const meterValid =
     meter_start === '' ||
     meter_end === '' ||
@@ -94,12 +63,11 @@ export default function WorkLogFormPage() {
   const canSubmit =
     machine_id &&
     project_id &&
-    validLines.length >= 1 &&
-    validLines.every((l) => parseFloat(l.amount) > 0) &&
     meterValid;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    const manualAck = searchParams.get('manual_exception_ack') === '1';
     const payload = {
       machine_id,
       project_id,
@@ -108,20 +76,23 @@ export default function WorkLogFormPage() {
       meter_start: meter_start !== '' ? parseFloat(meter_start) : undefined,
       meter_end: meter_end !== '' ? parseFloat(meter_end) : undefined,
       notes: notes || undefined,
-      lines: validLines.map((l) => ({
-        cost_code: l.cost_code,
-        description: l.description || undefined,
-        amount: parseFloat(l.amount),
-        party_id: l.party_id || undefined,
-      })),
+      manual_exception_acknowledged: manualAck || undefined,
     };
 
     if (isEdit && id) {
       await updateM.mutateAsync({ id, payload });
       navigate(`/app/machinery/work-logs/${id}`);
     } else {
-      const created = await createM.mutateAsync(payload);
-      navigate(`/app/machinery/work-logs/${created.id}`);
+      try {
+        const created = await createM.mutateAsync(payload);
+        navigate(`/app/machinery/work-logs/${created.id}`);
+      } catch (e: any) {
+        const msg =
+          e?.response?.data?.message ||
+          e?.message ||
+          'Unable to create machine usage. Use Field Jobs for normal crop-field work.';
+        setSubmitError(String(msg));
+      }
     }
   };
 
@@ -194,6 +165,13 @@ export default function WorkLogFormPage() {
         ]}
       />
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">Usage-only manual entry</p>
+          <p className="mt-1 text-amber-900/90">
+            For normal crop-field work, capture machinery on a Field Job. This form records meter usage only; costing is derived later on posting
+            (for example via rate cards / downstream documents).
+          </p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Machine" required>
             <select
@@ -292,98 +270,12 @@ export default function WorkLogFormPage() {
           </div>
         </div>
 
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-medium">Cost lines</h3>
-            <button
-              type="button"
-              onClick={addLine}
-              className="text-sm text-[#1F6F5C] hover:text-[#1a5a4a]"
-            >
-              + Add line
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full border">
-              <thead className="bg-[#E6ECEA]">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs text-gray-500">Cost code</th>
-                  <th className="px-3 py-2 text-left text-xs text-gray-500">Description</th>
-                  <th className="px-3 py-2 text-left text-xs text-gray-500">Amount</th>
-                  <th className="px-3 py-2 text-left text-xs text-gray-500">Party</th>
-                  <th className="w-10" />
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2">
-                      <select
-                        value={line.cost_code}
-                        onChange={(e) =>
-                          updateLine(i, { cost_code: e.target.value as MachineWorkLogCostCode })
-                        }
-                        className="w-full px-2 py-1 border rounded text-sm"
-                      >
-                        {COST_CODES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        value={line.description}
-                        onChange={(e) => updateLine(i, { description: e.target.value })}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                        placeholder="Optional"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={line.amount}
-                        onChange={(e) => updateLine(i, { amount: e.target.value })}
-                        className="w-28 px-2 py-1 border rounded text-sm"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={line.party_id}
-                        onChange={(e) => updateLine(i, { party_id: e.target.value })}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                      >
-                        <option value="">—</option>
-                        {parties?.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => removeLine(i)}
-                        className="text-red-600 text-sm"
-                      >
-                        Del
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-sm font-medium">
-            Total: <span className="tabular-nums">{formatMoney(totalAmount)}</span>
-          </p>
-        </div>
-
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+          {submitError ? (
+            <p className="w-full text-sm text-red-600" role="alert">
+              {submitError}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={() => navigate(isEdit ? `/app/machinery/work-logs/${id}` : '/app/machinery/work-logs')}

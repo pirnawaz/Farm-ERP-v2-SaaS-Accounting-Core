@@ -74,6 +74,7 @@ class ActivityPostIdempotencyTest extends TestCase
         $cr = $this->withHeader('X-Tenant-Id', $tenant->id)->withHeader('X-User-Role', 'accountant')
             ->postJson('/api/v1/crop-ops/activities', [
                 'doc_no' => 'ACT-1',
+                'manual_exception_acknowledged' => true,
                 'activity_type_id' => $type->id,
                 'activity_date' => '2024-06-15',
                 'crop_cycle_id' => $cc->id,

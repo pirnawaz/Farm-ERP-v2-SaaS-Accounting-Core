@@ -221,7 +221,7 @@ class InventoryIssueAllocationTest extends TestCase
         $allocationRows = AllocationRow::where('posting_group_id', $postingGroup->id)->get();
         $this->assertCount(1, $allocationRows);
         $allocationRow = $allocationRows->first();
-        $this->assertEquals('POOL_SHARE', $allocationRow->allocation_type);
+        $this->assertEquals('LANDLORD_ONLY', $allocationRow->allocation_type);
         $this->assertEquals($this->landlordParty->id, $allocationRow->party_id);
     }
 
@@ -489,6 +489,7 @@ class InventoryIssueAllocationTest extends TestCase
             'project_id' => $this->project->id,
             'doc_date' => '2024-06-15',
             'lines' => [['item_id' => $this->item->id, 'qty' => 2]],
+            'manual_exception_acknowledged' => true,
         ]);
         $r->assertStatus(422);
         $r->assertJsonValidationErrors(['allocation_mode']);
@@ -505,6 +506,7 @@ class InventoryIssueAllocationTest extends TestCase
             'doc_date' => '2024-06-15',
             'lines' => [['item_id' => $this->item->id, 'qty' => 2]],
             'allocation_mode' => 'HARI_ONLY',
+            'manual_exception_acknowledged' => true,
         ]);
         $r->assertStatus(422);
         $r->assertJsonValidationErrors(['hari_id']);

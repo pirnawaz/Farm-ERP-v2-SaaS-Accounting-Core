@@ -10,6 +10,8 @@ import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
 import { term } from '../../config/terminology';
 import { Badge } from '../../components/Badge';
+import { AdvancedWorkflowBanner } from '../../components/workflow/AdvancedWorkflowBanner';
+import { Modal } from '../../components/Modal';
 import type { CropActivity } from '../../types';
 
 function whereSummary(r: CropActivity): string {
@@ -53,6 +55,8 @@ export default function ActivitiesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { formatDate } = useFormatting();
+  const [showManualCreate, setShowManualCreate] = useState(false);
+  const [manualAck, setManualAck] = useState(false);
 
   const hasActiveFilters = useMemo(
     () =>
@@ -163,10 +167,11 @@ export default function ActivitiesPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <AdvancedWorkflowBanner />
       <PageHeader
         title="Field Work Logs"
-        description="Track field activity recorded across crop operations."
-        helper="Use field work logs to record and review operational work done on the farm. This is crop and field activity — not Labour Work Logs (people and pay)."
+        description="Legacy workflow for field activity. Kept for historical records and audit."
+        helper="Use Field Jobs for normal crop-field work (inputs, labour, machinery, and posting). Only use Field Work Logs for legacy records or exceptional/manual cases where a Field Job is not appropriate."
         backTo="/app/crop-ops"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -174,15 +179,74 @@ export default function ActivitiesPage() {
           { label: 'Field Work Logs' },
         ]}
         right={
-          <button
-            type="button"
-            onClick={() => navigate('/app/crop-ops/activities/new')}
-            className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
-          >
-            {term('newActivity')}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/app/crop-ops/field-jobs/new')}
+              className="px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
+            >
+              New field job
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setManualAck(false);
+                setShowManualCreate(true);
+              }}
+              className="px-4 py-2 border border-gray-200 bg-white text-gray-800 rounded-md hover:bg-gray-50 text-sm font-medium"
+            >
+              New manual field work log
+            </button>
+          </div>
         }
       />
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <p className="font-medium">Advisory: avoid duplicate crop-work records</p>
+        <p className="mt-1 text-amber-900/90">
+          <span className="font-medium">Use Field Jobs</span> for normal crop-field work. Only create a Field Work Log for
+          legacy records or exceptional/manual cases. Recording the same real-world event in both workflows can create
+          duplicate operational and accounting records.
+        </p>
+      </div>
+
+      <Modal
+        isOpen={showManualCreate}
+        onClose={() => setShowManualCreate(false)}
+        title="Manual / legacy create path"
+      >
+        <p className="text-sm text-gray-700">
+          Field Work Logs are a legacy/manual workflow. Use a Field Job for normal crop-field work so inputs, labour, and
+          machinery stay in one operational document and post once.
+        </p>
+        <label className="mt-4 flex gap-2 text-sm text-gray-800">
+          <input
+            type="checkbox"
+            checked={manualAck}
+            onChange={(e) => setManualAck(e.target.checked)}
+          />
+          I understand this is a manual/exceptional path and may duplicate Field Jobs.
+        </label>
+        <div className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setShowManualCreate(false)}
+            className="px-4 py-2 border border-gray-200 rounded-md text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!manualAck}
+            onClick={() => {
+              setShowManualCreate(false);
+                navigate('/app/crop-ops/activities/new?manual_exception_ack=1');
+            }}
+            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium disabled:opacity-40"
+          >
+            Continue to manual create
+          </button>
+        </div>
+      </Modal>
 
       <section aria-label="Filters" className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">

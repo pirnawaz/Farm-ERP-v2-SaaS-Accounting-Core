@@ -480,14 +480,21 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
       groupTitle: 'Crop Ops',
       items: [
         { key: 'crop-ops-overview', label: 'Crop Ops Overview', to: '/app/crop-ops', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
-        { key: 'crop-ops-field-work-logs', label: 'Field Work Logs', to: '/app/crop-ops/activities', requiredPermission: VIEW, requiredModules: ['crop_ops'] },
         {
           key: 'crop-ops-field-jobs',
           label: 'Field Jobs',
           to: '/app/crop-ops/field-jobs',
           requiredPermission: VIEW,
           requiredModules: ['crop_ops'],
-          sidebarHint: 'Use Field Jobs to record work',
+          sidebarHint: 'Primary: record field work here',
+        },
+        {
+          key: 'crop-ops-field-work-logs',
+          label: 'Field Work Logs',
+          to: '/app/crop-ops/activities',
+          requiredPermission: VIEW,
+          requiredModules: ['crop_ops'],
+          sidebarHint: 'Legacy/simple workflow (history)',
         },
         {
           key: 'harvests',

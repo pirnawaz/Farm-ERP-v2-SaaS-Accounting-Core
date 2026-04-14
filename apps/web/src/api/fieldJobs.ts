@@ -15,6 +15,7 @@ import type {
   FieldJobLabourLine,
   FieldJobMachineLine,
   PostingGroup,
+  FieldJobDraftCostPreview,
 } from '../types';
 
 const BASE = '/api/v1/crop-ops/field-jobs';
@@ -41,6 +42,7 @@ export const fieldJobsApi = {
   list: (f?: FieldJobFilters) =>
     apiClient.get<FieldJob[]>(`${BASE}${searchParams(f || {})}`),
   get: (id: string) => apiClient.get<FieldJob>(`${BASE}/${id}`),
+  draftCostPreview: (id: string) => apiClient.get<FieldJobDraftCostPreview>(`${BASE}/${id}/draft-cost-preview`),
   create: (payload: CreateFieldJobPayload) => apiClient.post<FieldJob>(`${BASE}`, payload),
   update: (id: string, payload: UpdateFieldJobPayload) =>
     apiClient.put<FieldJob>(`${BASE}/${id}`, payload),

@@ -780,6 +780,8 @@ export interface CreateLabWorkLogPayload {
   units: number;
   rate: number;
   notes?: string;
+  /** Required for new manual/legacy create paths (server-side gating). */
+  manual_exception_acknowledged?: boolean;
 }
 
 export interface UpdateLabWorkLogPayload {
@@ -929,7 +931,9 @@ export interface CreateMachineWorkLogPayload {
   meter_start?: number | null;
   meter_end?: number | null;
   notes?: string | null;
-  lines: MachineWorkLogCostLineInput[];
+  lines?: MachineWorkLogCostLineInput[];
+  /** Required for new manual/legacy create paths (server-side gating). */
+  manual_exception_acknowledged?: boolean;
 }
 
 export interface UpdateMachineWorkLogPayload {
@@ -1352,6 +1356,8 @@ export interface CreateCropActivityPayload {
   notes?: string | null;
   inputs?: { store_id: string; item_id: string; qty: number }[];
   labour?: { worker_id: string; rate_basis?: string; units: number; rate: number }[];
+  /** Required for new manual/legacy create paths (server-side gating). */
+  manual_exception_acknowledged?: boolean;
 }
 
 export interface UpdateCropActivityPayload {
@@ -1466,6 +1472,68 @@ export interface FieldJob {
   traceability?: OperationalTraceabilityPayload;
 }
 
+export type DraftCostValuation = 'WAC_ESTIMATE' | 'VALUED_ON_POSTING';
+
+export interface FieldJobDraftCostPreview {
+  field_job_id: string;
+  status: FieldJobStatus;
+  as_of_date: string | null;
+  inputs: {
+    lines: Array<{
+      field_job_input_id: string;
+      store_id: string;
+      item_id: string;
+      qty: string;
+      unit_cost_estimate: string | null;
+      line_total_estimate: string | null;
+      valuation: DraftCostValuation;
+      warnings: string[];
+    }>;
+    subtotal_estimate: string | null;
+    known_subtotal_estimate: string;
+    unknown_lines_count: number;
+    all_known: boolean;
+  };
+  labour: {
+    lines: Array<{
+      field_job_labour_id: string;
+      worker_id: string;
+      units: string;
+      rate: string;
+      amount_estimate: string | null;
+      pricing_basis: 'EXPLICIT_AMOUNT' | 'UNITS_X_RATE' | 'VALUED_ON_POSTING';
+      warnings: string[];
+    }>;
+    subtotal_estimate: string | null;
+    known_subtotal_estimate: string;
+    unknown_lines_count: number;
+    all_known: boolean;
+  };
+  machinery: {
+    lines: Array<{
+      field_job_machine_id: string;
+      machine_id: string;
+      usage_qty: string;
+      rate_estimate: string | null;
+      amount_estimate: string | null;
+      pricing_basis: 'MANUAL_AMOUNT' | 'RATE_SNAPSHOT_ESTIMATE' | 'RATE_CARD_ESTIMATE' | 'VALUED_ON_POSTING';
+      rate_card_id: string | null;
+      warnings: string[];
+    }>;
+    subtotal_estimate: string | null;
+    known_subtotal_estimate: string;
+    unknown_lines_count: number;
+    all_known: boolean;
+  };
+  summary: {
+    grand_total_estimate: string | null;
+    known_total_estimate: string;
+    unknown_lines_count: number;
+    all_known: boolean;
+  };
+  warnings: Array<Record<string, unknown>>;
+}
+
 export interface CreateFieldJobPayload {
   doc_no?: string | null;
   job_date: string;
@@ -1543,6 +1611,14 @@ export interface ReverseFieldJobRequest {
 
 /** GET detail responses (field job, harvest, machinery charge, machine work log) — read-model only. */
 export interface OperationalTraceabilityPayload {
+  posting_group_id?: string | null;
+  reversal_posting_group_id?: string | null;
+  overlap_signals?: {
+    stock_movements_count: number;
+    machinery_lines_from_machine_usage_count: number;
+    machinery_lines_from_machinery_charge_count: number;
+    note?: string;
+  };
   linked_harvests?: Array<{
     id: string;
     harvest_no?: string | null;
@@ -1552,6 +1628,10 @@ export interface OperationalTraceabilityPayload {
   machinery_sources?: Array<{
     field_job_machine_id: string;
     machine_label?: string;
+    pricing_basis?: string | null;
+    rate_card_id?: string | null;
+    rate_snapshot?: string | null;
+    amount?: string | null;
     source_work_log?: { id: string; work_log_no?: string | null; work_date?: string | null; status?: string } | null;
     source_machinery_charge?: {
       id: string;
@@ -1560,6 +1640,23 @@ export interface OperationalTraceabilityPayload {
       status?: string;
     } | null;
   }>;
+  stock_movements?: Array<{
+    id: string;
+    posting_group_id?: string | null;
+    movement_type: string;
+    store_id: string;
+    item_id: string;
+    qty_delta: string;
+    unit_cost_snapshot?: string | null;
+    occurred_at?: string | null;
+  }>;
+  labour_lines?: Array<{
+    field_job_labour_id: string;
+    worker_id: string;
+    worker_label?: string | null;
+    amount?: string | null;
+  }>;
+  labour_total?: string | null;
   linked_field_jobs?: Array<{
     id: string;
     doc_no?: string | null;
@@ -2741,6 +2838,8 @@ export interface CreateInvIssuePayload {
   activity_id?: string;
   doc_date: string;
   lines: { item_id: string; qty: number | string }[];
+  /** Required for new manual/legacy create paths (server-side gating). */
+  manual_exception_acknowledged?: boolean;
 }
 
 export interface UpdateInvIssuePayload {

@@ -312,6 +312,7 @@ export default function InvIssueFormPage() {
 
   const handleSubmit = async () => {
     if (!validate() || !canEdit) return;
+    const manualAck = searchParams.get('manual_exception_ack') === '1';
     const validLines = lines
       .filter((l) => l.item_id && parseFloat(l.qty) > 0)
       .map((l) => ({ item_id: l.item_id, qty: parseFloat(l.qty) }));
@@ -332,11 +333,20 @@ export default function InvIssueFormPage() {
       ...(allocation_mode === 'SHARED' && (splitSource === '__project__' || splitSource === '__manual__') && landlord_share_pct && hari_share_pct
         ? { landlord_share_pct: parseFloat(landlord_share_pct), hari_share_pct: parseFloat(hari_share_pct) }
         : {}),
+      manual_exception_acknowledged: manualAck || undefined,
     };
-    const issue = await createM.mutateAsync(payload);
-    setLastSubmit(tenantId || '', 'inv-issue', payload);
-    clearDraft();
-    navigate(`/app/inventory/issues/${issue.id}`);
+    try {
+      const issue = await createM.mutateAsync(payload);
+      setLastSubmit(tenantId || '', 'inv-issue', payload);
+      clearDraft();
+      navigate(`/app/inventory/issues/${issue.id}`);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        'Unable to create stock used. Use Field Jobs for normal crop-field work.';
+      setErrors((prev) => ({ ...prev, submit: String(msg) }));
+    }
   };
 
   return (
@@ -588,6 +598,7 @@ export default function InvIssueFormPage() {
             {canEdit && <button type="button" onClick={addLine} className="text-sm font-medium text-[#1F6F5C] hover:underline">+ Add line</button>}
           </div>
           {errors.lines && <p className="text-sm text-red-600">{errors.lines}</p>}
+          {errors.submit && <p className="text-sm text-red-600">{errors.submit}</p>}
           <div className="space-y-3">
             {lines.map((line, i) => (
               <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">

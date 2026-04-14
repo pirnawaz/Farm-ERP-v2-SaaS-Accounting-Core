@@ -13,6 +13,7 @@ use App\Http\Requests\PostFieldJobRequest;
 use App\Http\Requests\ReverseFieldJobRequest;
 use App\Http\Requests\UpdateFieldJobRequest;
 use App\Services\FieldJobPostingService;
+use App\Services\FieldJobDraftCostPreviewService;
 use App\Services\FieldJobService;
 use App\Services\OperationalTraceabilityService;
 use App\Services\TenantContext;
@@ -22,7 +23,8 @@ class FieldJobController extends Controller
 {
     public function __construct(
         private FieldJobService $fieldJobService,
-        private FieldJobPostingService $fieldJobPostingService
+        private FieldJobPostingService $fieldJobPostingService,
+        private FieldJobDraftCostPreviewService $draftCostPreviewService,
     ) {}
 
     public function index(Request $request)
@@ -54,6 +56,16 @@ class FieldJobController extends Controller
         return response()->json(array_merge($job->toArray(), [
             'traceability' => $traceability->summarizeForFieldJob($job),
         ]));
+    }
+
+    public function draftCostPreview(Request $request, string $id)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $job = $this->fieldJobService->show($id, $tenantId);
+
+        return response()->json(
+            $this->draftCostPreviewService->preview($job)
+        );
     }
 
     public function update(UpdateFieldJobRequest $request, string $id)

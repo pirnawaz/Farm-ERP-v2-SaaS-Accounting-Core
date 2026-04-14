@@ -66,7 +66,7 @@ class LabourWorkLogPostingTest extends TestCase
             'tenant_id' => $tenant->id,
             'name' => 'Worker 1',
             'worker_no' => 'W-001',
-            'worker_type' => 'CASUAL',
+            'worker_type' => 'HARI',
             'rate_basis' => 'DAILY',
             'default_rate' => 100,
             'is_active' => true,
@@ -87,6 +87,7 @@ class LabourWorkLogPostingTest extends TestCase
             ->withHeader('X-User-Role', 'accountant')
             ->postJson('/api/v1/labour/work-logs', [
                 'doc_no' => 'WL-001',
+                'manual_exception_acknowledged' => true,
                 'worker_id' => $worker->id,
                 'work_date' => '2024-06-15',
                 'crop_cycle_id' => $cropCycle->id,
@@ -148,7 +149,7 @@ class LabourWorkLogPostingTest extends TestCase
             'tenant_id' => $tenant->id,
             'name' => 'Worker 1',
             'worker_no' => 'W-002',
-            'worker_type' => 'CASUAL',
+            'worker_type' => 'HARI',
             'rate_basis' => 'DAILY',
             'default_rate' => 100,
             'is_active' => true,
@@ -159,6 +160,7 @@ class LabourWorkLogPostingTest extends TestCase
             ->withHeader('X-User-Role', 'accountant')
             ->postJson('/api/v1/labour/work-logs', [
                 'doc_no' => 'WL-002',
+                'manual_exception_acknowledged' => true,
                 'worker_id' => $worker->id,
                 'work_date' => '2024-06-15',
                 'crop_cycle_id' => $cropCycle->id,

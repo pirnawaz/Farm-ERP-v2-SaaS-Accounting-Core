@@ -74,6 +74,7 @@ class WorkLogDraftCreateAndPostCreatesPayableTest extends TestCase
             ->withHeader('X-User-Role', 'accountant')
             ->postJson('/api/v1/labour/work-logs', [
                 'doc_no' => 'WL-001',
+                'manual_exception_acknowledged' => true,
                 'worker_id' => $workerId,
                 'work_date' => '2024-06-15',
                 'crop_cycle_id' => $cropCycle->id,

@@ -70,6 +70,7 @@ export default function WorkLogFormPage() {
   const [units, setUnits] = useState('');
   const [rate, setRate] = useState('');
   const [notes, setNotes] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasOrchardLivestockModule) {
@@ -209,6 +210,7 @@ export default function WorkLogFormPage() {
   const handleSubmit = async () => {
     if (!worker_id || !work_date || !crop_cycle_id || !project_id || !rate_basis || !(u > 0) || !(r >= 0))
       return;
+    const manualAck = searchParams.get('manual_exception_ack') === '1';
     const finalDocNo = doc_no.trim() || generateDocNo('WL');
     const payload = {
       doc_no: finalDocNo,
@@ -223,11 +225,20 @@ export default function WorkLogFormPage() {
       units: u,
       rate: r,
       notes: notes || undefined,
+      manual_exception_acknowledged: manualAck || undefined,
     };
-    const log = await createM.mutateAsync(payload);
-    setLastSubmit(tenantId || '', 'work-log', payload);
-    clearDraft();
-    navigate(`/app/labour/work-logs/${log.id}`);
+    try {
+      const log = await createM.mutateAsync(payload);
+      setLastSubmit(tenantId || '', 'work-log', payload);
+      clearDraft();
+      navigate(`/app/labour/work-logs/${log.id}`);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        'Unable to create labour work log. Use Field Jobs for normal crop-field work.';
+      setSubmitError(String(msg));
+    }
   };
 
   return (
@@ -436,6 +447,11 @@ export default function WorkLogFormPage() {
         </FormField>
 
         <FormActions>
+          {submitError ? (
+            <p className="w-full text-sm text-red-600" role="alert">
+              {submitError}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={() => navigate('/app/labour/work-logs')}

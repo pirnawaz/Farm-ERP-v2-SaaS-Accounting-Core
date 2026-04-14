@@ -125,8 +125,8 @@ describe('getNavDomains', () => {
     expect(work.itemGroups?.map((g) => g.groupTitle)).toEqual(['Crop Ops', 'Other']);
     expect(work.itemGroups?.[0].items.map((i) => i.key)).toEqual([
       'crop-ops-overview',
-      'crop-ops-field-work-logs',
       'crop-ops-field-jobs',
+      'crop-ops-field-work-logs',
       'harvests',
       'crop-ops-agreements',
       'crop-ops-work-types',
