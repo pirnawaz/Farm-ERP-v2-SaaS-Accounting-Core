@@ -4,7 +4,6 @@ import { useIssues, useInventoryStores } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
-import { Modal } from '../../components/Modal';
 import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { term } from '../../config/terminology';
@@ -21,8 +20,6 @@ export default function InvIssuesPage() {
   const location = useLocation();
   const { hasRole } = useRole();
   const { formatDate } = useFormatting();
-  const [showManualCreate, setShowManualCreate] = useState(false);
-  const [manualAck, setManualAck] = useState(false);
 
   const cols: Column<InvIssue>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
@@ -55,16 +52,6 @@ export default function InvIssuesPage() {
             >
               New field job
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setManualAck(false);
-                setShowManualCreate(true);
-              }}
-              className="w-full sm:w-auto px-4 py-2 border border-gray-200 bg-white text-gray-800 rounded-md hover:bg-gray-50 text-sm font-medium"
-            >
-              Record manual stock used
-            </button>
           </div>
         ) : undefined}
       />
@@ -79,44 +66,6 @@ export default function InvIssuesPage() {
         </p>
       </div>
 
-      <Modal
-        isOpen={showManualCreate}
-        onClose={() => setShowManualCreate(false)}
-        title="Manual / exceptional create path"
-      >
-        <p className="text-sm text-gray-700">
-          For normal crop-field work, record inputs on a Field Job so stock consumption is posted once from one operational
-          document.
-        </p>
-        <label className="mt-4 flex gap-2 text-sm text-gray-800">
-          <input
-            type="checkbox"
-            checked={manualAck}
-            onChange={(e) => setManualAck(e.target.checked)}
-          />
-          I understand this is a manual/exceptional path and may duplicate Field Jobs.
-        </label>
-        <div className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setShowManualCreate(false)}
-            className="px-4 py-2 border border-gray-200 rounded-md text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={!manualAck}
-            onClick={() => {
-              setShowManualCreate(false);
-              navigate('/app/inventory/issues/new?manual_exception_ack=1');
-            }}
-            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium disabled:opacity-40"
-          >
-            Continue to manual create
-          </button>
-        </div>
-      </Modal>
       <div className="space-y-4">
         <div className="flex flex-wrap gap-4 items-end">
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 border rounded text-sm">

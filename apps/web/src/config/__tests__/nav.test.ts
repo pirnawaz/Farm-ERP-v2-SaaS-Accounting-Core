@@ -61,7 +61,6 @@ describe('getNavDomains', () => {
     expect(paths.has('/app/admin/audit-logs')).toBe(true);
     expect(paths.has('/app/settings/localisation')).toBe(true);
     expect(paths.has('/app/crop-ops')).toBe(true);
-    expect(paths.has('/app/crop-ops/activities')).toBe(true);
     expect(paths.has('/app/crop-ops/activity-types')).toBe(true);
   });
 
@@ -126,7 +125,6 @@ describe('getNavDomains', () => {
     expect(work.itemGroups?.[0].items.map((i) => i.key)).toEqual([
       'crop-ops-overview',
       'crop-ops-field-jobs',
-      'crop-ops-field-work-logs',
       'harvests',
       'crop-ops-agreements',
       'crop-ops-work-types',
@@ -141,7 +139,7 @@ describe('getNavDomains', () => {
     expect(people.sectionTitle).toBe('People & Workforce');
     expect(people.itemGroups?.map((g) => g.groupTitle)).toEqual(['Workforce', 'Directory']);
     const keys = people.itemGroups?.flatMap((g) => g.items.map((i) => i.key));
-    expect(keys).toEqual(['labour-overview', 'labour-workers', 'labour-work-logs', 'labour-payables', 'parties']);
+    expect(keys).toEqual(['labour-overview', 'labour-workers', 'labour-payables', 'parties']);
   });
 });
 
@@ -181,15 +179,12 @@ describe('navMatch', () => {
     expect(domainHasActivePath('/app/production-units', ops)).toBe(false);
     expect(domainHasActivePath('/app/crop-ops', ops)).toBe(true);
     expect(domainHasActivePath('/app/crop-ops/activities', ops)).toBe(true);
-    expect(domainHasActivePath('/app/crop-ops/activities/new', ops)).toBe(true);
     expect(domainHasActivePath('/app/crop-ops/activity-types', ops)).toBe(true);
     expect(domainHasActivePath('/app/harvests', ops)).toBe(true);
     expect(domainHasActivePath('/app/harvests/new', ops)).toBe(true);
     expect(domainHasActivePath('/app/harvests/abc-123', ops)).toBe(true);
     expect(domainHasActivePath('/app/labour', ops)).toBe(true);
     expect(domainHasActivePath('/app/labour/workers', ops)).toBe(true);
-    expect(domainHasActivePath('/app/labour/work-logs', ops)).toBe(true);
-    expect(domainHasActivePath('/app/labour/work-logs/new', ops)).toBe(true);
     expect(domainHasActivePath('/app/labour/payables', ops)).toBe(true);
     expect(domainHasActivePath('/app/parties/xyz', ops)).toBe(true);
     expect(domainHasActivePath('/app/dashboard', ops)).toBe(false);

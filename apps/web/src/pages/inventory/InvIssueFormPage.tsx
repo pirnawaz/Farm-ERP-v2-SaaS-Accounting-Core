@@ -70,6 +70,39 @@ export default function InvIssueFormPage() {
   const [hari_share_pct, setHariSharePct] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Phase 1+2 legacy workflow cleanup: disable manual/legacy creation.
+  // Keep list/detail access for historical records, but block this create form route.
+  const legacyCreateDisabled = true;
+  if (legacyCreateDisabled) {
+    return (
+      <PageContainer width="form" className="space-y-6">
+        <PageHeader
+          title="Record stock used"
+          description="This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing."
+          backTo="/app/inventory/issues"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Inventory Overview', to: '/app/inventory' },
+            { label: term('issue'), to: '/app/inventory/issues' },
+            { label: 'Record stock used' },
+          ]}
+        />
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+          This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing.
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate('/app/inventory/issues', { replace: true })}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Back to Stock Used
+          </button>
+        </div>
+      </PageContainer>
+    );
+  }
+
   const { data: productionUnits } = useProductionUnits();
   const { data: projectsForCrop } = useProjects(crop_cycle_id || undefined);
   const { data: activities } = useActivities(

@@ -106,11 +106,9 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'harvests',
     'crop-ops-agreements',
     'crop-ops-field-jobs',
-    'crop-ops-field-work-logs',
     // Machinery (full list for accounting review; field jobs are primary for operators).
     'machinery-overview',
     'machinery-machines',
-    'machinery-work-logs',
     'machinery-services',
     'machinery-charges',
     'machinery-maintenance',
@@ -121,7 +119,6 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'inventory-stock-on-hand',
     'inventory-stock-history',
     'inventory-grns',
-    'inventory-issues',
     'inventory-transfers',
     'inventory-adjustments',
     'inventory-items',
@@ -131,7 +128,6 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     // Labour and people balances often drive accruals and payments.
     'labour-overview',
     'labour-workers',
-    'labour-work-logs',
     'labour-payables',
     'parties',
     // Draft entries are useful context for accounting review.
@@ -405,7 +401,6 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
     { key: 'inventory-stock-on-hand', label: 'Current Stock', to: '/app/inventory/stock-on-hand', requiredPermission: VIEW, requiredModules: ['inventory'] },
     { key: 'inventory-stock-history', label: 'Stock History', to: '/app/inventory/stock-movements', requiredPermission: VIEW, requiredModules: ['inventory'] },
     { key: 'inventory-grns', label: 'Goods Received', to: '/app/inventory/grns', requiredPermission: VIEW, requiredModules: ['inventory'] },
-    { key: 'inventory-issues', label: 'Stock Used', to: '/app/inventory/issues', requiredPermission: VIEW, requiredModules: ['inventory'] },
     { key: 'inventory-transfers', label: 'Transfer Stock', to: '/app/inventory/transfers', requiredPermission: VIEW, requiredModules: ['inventory'] },
     { key: 'inventory-adjustments', label: 'Adjust Stock', to: '/app/inventory/adjustments', requiredPermission: VIEW, requiredModules: ['inventory'] },
     { key: 'inventory-items', label: 'Items', to: '/app/inventory/items', requiredPermission: VIEW, requiredModules: ['inventory'] },
@@ -417,7 +412,6 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
   const machineryItems: NavItem[] = [
     { key: 'machinery-overview', label: 'Machinery Overview', to: '/app/machinery', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-machines', label: 'Machines', to: '/app/machinery/machines', requiredPermission: VIEW, requiredModules: ['machinery'] },
-    { key: 'machinery-work-logs', label: 'Machine Usage', to: '/app/machinery/work-logs', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-services', label: 'Service History', to: '/app/machinery/services', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-charges', label: 'Machinery Charges', to: '/app/machinery/charges', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-maintenance', label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs', requiredPermission: VIEW, requiredModules: ['machinery'] },
@@ -489,14 +483,6 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
           sidebarHint: 'Primary: record field work here',
         },
         {
-          key: 'crop-ops-field-work-logs',
-          label: 'Field Work Logs',
-          to: '/app/crop-ops/activities',
-          requiredPermission: VIEW,
-          requiredModules: ['crop_ops'],
-          sidebarHint: 'Legacy/simple workflow (history)',
-        },
-        {
           key: 'harvests',
           label: 'Harvests',
           to: '/app/harvests',
@@ -526,7 +512,6 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
   const labourNavItems: NavItem[] = [
     { key: 'labour-overview', label: 'Labour Overview', to: '/app/labour', requiredPermission: VIEW, requiredModules: ['labour'] },
     { key: 'labour-workers', label: 'Workers', to: '/app/labour/workers', requiredPermission: VIEW, requiredModules: ['labour'] },
-    { key: 'labour-work-logs', label: 'Labour Work Logs', to: '/app/labour/work-logs', requiredPermission: VIEW, requiredModules: ['labour'] },
     { key: 'labour-payables', label: 'Payables', to: '/app/labour/payables', requiredPermission: VIEW, requiredModules: ['labour'] },
   ];
   const partiesNavItem: NavItem = {

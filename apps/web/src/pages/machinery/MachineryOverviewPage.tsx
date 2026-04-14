@@ -130,11 +130,10 @@ export default function MachineryOverviewPage() {
         <section className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-5 py-4 text-amber-950 shadow-sm">
           <h2 className="text-sm font-semibold text-amber-950">Get started with machinery</h2>
           <p className="mt-1 text-sm text-amber-900/90">
-            Add machines, record work logs, then track maintenance jobs.
+            Add machines, then track maintenance jobs.
           </p>
           <ol className="mt-3 list-decimal list-inside space-y-1.5 text-sm text-amber-950">
             <li>Add machines — tractors, harvesters, and other assets.</li>
-            <li>Record work logs — usage and costs for field work.</li>
             <li>Track maintenance jobs — repairs and maintenance work.</li>
           </ol>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -143,12 +142,6 @@ export default function MachineryOverviewPage() {
               className="inline-flex items-center justify-center rounded-lg bg-[#1F6F5C] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#1a5a4a]"
             >
               Add machine
-            </Link>
-            <Link
-              to="/app/machinery/work-logs/new"
-              className="inline-flex items-center justify-center rounded-lg border border-amber-300/80 bg-white px-4 py-2.5 text-sm font-medium text-amber-950 hover:bg-amber-100/50"
-            >
-              New work log
             </Link>
             <Link
               to="/app/machinery/maintenance-jobs/new"
@@ -174,17 +167,6 @@ export default function MachineryOverviewPage() {
             foot={
               <Link to="/app/machinery/machines" className="text-[#1F6F5C] hover:underline font-medium">
                 View machines
-              </Link>
-            }
-          />
-          <KpiCard
-            label="Work logs (30 days)"
-            loading={workLogsLoading}
-            value={workLogsLoading ? null : String(workLogsCount)}
-            hint="Work logs recorded in the last 30 days"
-            foot={
-              <Link to="/app/machinery/work-logs" className="text-[#1F6F5C] hover:underline font-medium">
-                View work logs
               </Link>
             }
           />
@@ -223,12 +205,6 @@ export default function MachineryOverviewPage() {
               </h2>
               <div className="flex flex-wrap gap-2">
                 <Link
-                  to="/app/machinery/work-logs"
-                  className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#1F6F5C] hover:bg-gray-50"
-                >
-                  View usage
-                </Link>
-                <Link
                   to="/app/machinery/maintenance-jobs"
                   className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#1F6F5C] hover:bg-gray-50"
                 >
@@ -243,7 +219,7 @@ export default function MachineryOverviewPage() {
               </div>
             ) : recentActivity.length === 0 ? (
               <p className="py-8 text-center text-sm text-gray-600">
-                No recent machinery activity. Add a usage entry or create a maintenance job to see activity here.
+                No recent machinery activity.
               </p>
             ) : (
               <ul className="divide-y divide-gray-100">
@@ -279,7 +255,6 @@ export default function MachineryOverviewPage() {
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Common tasks</p>
               <div className="flex flex-col gap-2">
                 <ActionLink to="/app/machinery/machines" variant="primary">Add machine</ActionLink>
-                <ActionLink to="/app/machinery/work-logs/new" variant="primary">New usage entry</ActionLink>
                 <ActionLink to="/app/machinery/maintenance-jobs/new" variant="primary">New Maintenance Job</ActionLink>
               </div>
             </div>
@@ -288,7 +263,6 @@ export default function MachineryOverviewPage() {
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Lists</p>
               <div className="flex flex-wrap gap-2">
                 <ActionLink to="/app/machinery/machines" variant="secondary">View Machines</ActionLink>
-                <ActionLink to="/app/machinery/work-logs" variant="secondary">View usage</ActionLink>
                 <ActionLink to="/app/machinery/maintenance-jobs" variant="secondary">View maintenance jobs</ActionLink>
               </div>
             </div>

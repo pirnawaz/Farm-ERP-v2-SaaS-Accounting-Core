@@ -60,7 +60,7 @@ describe('Create-path gating steers to Field Jobs', () => {
     vi.clearAllMocks();
   });
 
-  it('ActivitiesPage: Field Job is primary create CTA and manual create requires acknowledgement', async () => {
+  it('ActivitiesPage: hides legacy manual create CTA', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/app/crop-ops/activities']}>
@@ -69,15 +69,12 @@ describe('Create-path gating steers to Field Jobs', () => {
     );
 
     expect(screen.getByRole('button', { name: /New field job/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /New manual field work log/i }));
-    expect(screen.getByText(/Manual \/ legacy create path/i)).toBeInTheDocument();
-    const continueBtn = screen.getByRole('button', { name: /Continue to manual create/i });
-    expect(continueBtn).toBeDisabled();
-    await user.click(screen.getByRole('checkbox'));
-    expect(continueBtn).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: /New manual field work log/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Continue to manual create/i })).toBeNull();
+    expect(user).toBeDefined();
   });
 
-  it('Machine Usage: Field Job is primary create CTA and manual create requires acknowledgement', async () => {
+  it('Machine Usage: hides legacy manual create CTA', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/app/machinery/work-logs']}>
@@ -86,14 +83,12 @@ describe('Create-path gating steers to Field Jobs', () => {
     );
 
     expect(screen.getByRole('button', { name: /New field job/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /New manual usage entry/i }));
-    const continueBtn = screen.getByRole('button', { name: /Continue to manual create/i });
-    expect(continueBtn).toBeDisabled();
-    await user.click(screen.getByRole('checkbox'));
-    expect(continueBtn).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: /New manual usage entry/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Continue to manual create/i })).toBeNull();
+    expect(user).toBeDefined();
   });
 
-  it('Labour Work Logs: Field Job is primary create CTA and manual create requires acknowledgement', async () => {
+  it('Labour Work Logs: hides legacy manual create CTA', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/app/labour/work-logs']}>
@@ -102,14 +97,12 @@ describe('Create-path gating steers to Field Jobs', () => {
     );
 
     expect(screen.getByRole('button', { name: /New field job/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /New manual labour log/i }));
-    const continueBtn = screen.getByRole('button', { name: /Continue to manual create/i });
-    expect(continueBtn).toBeDisabled();
-    await user.click(screen.getByRole('checkbox'));
-    expect(continueBtn).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: /New manual labour log/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Continue to manual create/i })).toBeNull();
+    expect(user).toBeDefined();
   });
 
-  it('Stock Used: Field Job is primary create CTA and manual create requires acknowledgement', async () => {
+  it('Stock Used: hides legacy manual create CTA', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={['/app/inventory/issues']}>
@@ -118,11 +111,9 @@ describe('Create-path gating steers to Field Jobs', () => {
     );
 
     expect(screen.getByRole('button', { name: /New field job/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Record manual stock used/i }));
-    const continueBtn = screen.getByRole('button', { name: /Continue to manual create/i });
-    expect(continueBtn).toBeDisabled();
-    await user.click(screen.getByRole('checkbox'));
-    expect(continueBtn).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Record manual stock used/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Continue to manual create/i })).toBeNull();
+    expect(user).toBeDefined();
   });
 });
 

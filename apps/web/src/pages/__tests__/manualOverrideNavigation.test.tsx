@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 const navigateMock = vi.fn();
@@ -55,19 +54,16 @@ describe('Manual override navigation wiring', () => {
     navigateMock.mockReset();
   });
 
-  it('adds manual_exception_ack query param when continuing to manual create', async () => {
-    const user = userEvent.setup();
+  it('does not expose legacy manual create CTA', () => {
     render(
       <MemoryRouter>
         <ActivitiesPage />
       </MemoryRouter>
     );
 
-    await user.click(screen.getByRole('button', { name: /New manual field work log/i }));
-    await user.click(screen.getByRole('checkbox', { name: /I understand this is a manual\/exceptional path/i }));
-    await user.click(screen.getByRole('button', { name: /Continue to manual create/i }));
-
-    expect(navigateMock).toHaveBeenCalledWith('/app/crop-ops/activities/new?manual_exception_ack=1');
+    expect(screen.queryByRole('button', { name: /New manual field work log/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Continue to manual create/i })).toBeNull();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 });
 

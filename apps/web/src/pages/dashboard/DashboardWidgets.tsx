@@ -7,7 +7,6 @@ import { useCropCycles } from '../../hooks/useCropCycles';
 import { useOperationalTransactions } from '../../hooks/useOperationalTransactions';
 import { useProjects } from '../../hooks/useProjects';
 import { useStockOnHand } from '../../hooks/useInventory';
-import { useWorkLogs } from '../../hooks/useLabour';
 import { useFormatting } from '../../hooks/useFormatting';
 import { apiClient } from '@farm-erp/shared';
 import type { AccountBalanceRow } from '@farm-erp/shared';
@@ -50,7 +49,7 @@ export function DashboardWidget({ widgetKey, isModuleEnabled }: DashboardWidgetP
       return <InventoryAlertsWidget />;
     case 'work_logs_summary':
       if (!isModuleEnabled('labour')) return null;
-      return <WorkLogsSummaryWidget />;
+      return null;
     case 'setup_status':
       return <SetupStatusWidget />;
     case 'users_count':
@@ -208,20 +207,6 @@ function InventoryAlertsWidget() {
       title={`Low Stock ${term('inventoryItem')}`}
       value={lowStockCount}
       link="/app/inventory/stock-on-hand"
-    />
-  );
-}
-
-function WorkLogsSummaryWidget() {
-  const { data: workLogs, isLoading } = useWorkLogs({ status: 'DRAFT' });
-  const draftLogsCount = (workLogs ?? []).length;
-
-  if (isLoading) return <LoadingSpinner />;
-  return (
-    <StatCard
-      title="Draft Work Logs"
-      value={draftLogsCount}
-      link="/app/labour/work-logs?status=DRAFT"
     />
   );
 }

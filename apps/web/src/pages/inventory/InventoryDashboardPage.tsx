@@ -189,7 +189,7 @@ export default function InventoryDashboardPage() {
               </div>
             ) : recentPreview.length === 0 ? (
               <p className="py-8 text-center text-sm text-gray-600">
-                No movements in the last 30 days. Record goods received or stock used to see activity here.
+                No movements in the last 30 days. Record goods received, transfers, or adjustments to see activity here.
               </p>
             ) : (
               <ul className="divide-y divide-gray-100">
@@ -230,9 +230,6 @@ export default function InventoryDashboardPage() {
               <div className="flex flex-col gap-2">
                 <ActionLink to="/app/inventory/grns" variant="primary">
                   Goods Received
-                </ActionLink>
-                <ActionLink to="/app/inventory/issues" variant="primary">
-                  Stock Used
                 </ActionLink>
                 <ActionLink to="/app/inventory/transfers" variant="primary">
                   Transfer Stock

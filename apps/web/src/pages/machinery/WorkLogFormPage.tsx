@@ -38,6 +38,39 @@ export default function WorkLogFormPage() {
   const [notes, setNotes] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Phase 1+2 legacy workflow cleanup: disable manual/legacy creation.
+  // Keep list/detail access for historical records, but block this create form route.
+  const legacyCreateDisabled = true;
+  if (legacyCreateDisabled && !isEdit) {
+    return (
+      <div className="space-y-6 pb-8">
+        <PageHeader
+          title="New machine usage"
+          description="This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing."
+          backTo="/app/machinery/work-logs"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Machinery Overview', to: '/app/machinery' },
+            { label: 'Machine Usage', to: '/app/machinery/work-logs' },
+            { label: 'New' },
+          ]}
+        />
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+          This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing.
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate('/app/machinery/work-logs', { replace: true })}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Back to Machine Usage
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     if (!workLog || !isEdit) return;
     setMachineId(workLog.machine_id);

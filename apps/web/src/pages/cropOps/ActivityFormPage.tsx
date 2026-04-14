@@ -58,6 +58,39 @@ export default function ActivityFormPage() {
   const { formatMoney } = useFormatting();
   const { hasOrchardLivestockModule } = useOrchardLivestockAddonsEnabled();
 
+  // Phase 1+2 legacy workflow cleanup: disable manual/legacy creation.
+  // Keep list/detail access for historical records, but block this create form route.
+  const legacyCreateDisabled = true;
+  if (legacyCreateDisabled) {
+    return (
+      <PageContainer width="form" className="space-y-6">
+        <PageHeader
+          title={term('newActivity')}
+          description="This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing."
+          backTo="/app/crop-ops/activities"
+          breadcrumbs={[
+            { label: 'Farm', to: '/app/dashboard' },
+            { label: 'Crop Ops Overview', to: '/app/crop-ops' },
+            { label: 'Field Work Logs', to: '/app/crop-ops/activities' },
+            { label: term('newActivity') },
+          ]}
+        />
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+          This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing.
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate('/app/crop-ops/activities', { replace: true })}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Back to Field Work Logs
+          </button>
+        </div>
+      </PageContainer>
+    );
+  }
+
   const [doc_no, setDocNo] = useState('');
   const [activity_type_id, setActivityTypeId] = useState('');
   const [activity_date, setActivityDate] = useState(new Date().toISOString().split('T')[0]);

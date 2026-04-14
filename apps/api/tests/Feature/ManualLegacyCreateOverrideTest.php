@@ -83,8 +83,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'crop_cycle_id' => $cc->id,
                 'project_id' => $project->id,
             ]);
-        $noAck->assertStatus(422);
-        $this->assertEquals('MANUAL_EXCEPTION_ACK_REQUIRED', $noAck->json('error_code'));
+        $noAck->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $noAck->json('error_code'));
 
         $ack = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
@@ -96,7 +96,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'crop_cycle_id' => $cc->id,
                 'project_id' => $project->id,
             ]);
-        $ack->assertStatus(201);
+        $ack->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $ack->json('error_code'));
     }
 
     public function test_labour_work_log_store_requires_manual_override_flag(): void
@@ -118,8 +119,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'units' => 1,
                 'rate' => 100,
             ]);
-        $noAck->assertStatus(422);
-        $this->assertEquals('MANUAL_EXCEPTION_ACK_REQUIRED', $noAck->json('error_code'));
+        $noAck->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $noAck->json('error_code'));
 
         $ack = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
@@ -134,7 +135,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'units' => 1,
                 'rate' => 100,
             ]);
-        $ack->assertStatus(201);
+        $ack->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $ack->json('error_code'));
     }
 
     public function test_inventory_issue_store_requires_manual_override_flag(): void
@@ -166,8 +168,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'allocation_mode' => 'HARI_ONLY',
                 'hari_id' => $party->id,
             ]);
-        $noAck->assertStatus(422);
-        $this->assertEquals('MANUAL_EXCEPTION_ACK_REQUIRED', $noAck->json('error_code'));
+        $noAck->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $noAck->json('error_code'));
 
         $ack = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
@@ -182,7 +184,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'allocation_mode' => 'HARI_ONLY',
                 'hari_id' => $party->id,
             ]);
-        $ack->assertStatus(201);
+        $ack->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $ack->json('error_code'));
     }
 
     public function test_machinery_work_log_store_requires_manual_override_flag(): void
@@ -210,8 +213,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'meter_start' => 10,
                 'meter_end' => 11,
             ]);
-        $noAck->assertStatus(422);
-        $this->assertEquals('MANUAL_EXCEPTION_ACK_REQUIRED', $noAck->json('error_code'));
+        $noAck->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $noAck->json('error_code'));
 
         $ack = $this->withHeader('X-Tenant-Id', $tenant->id)
             ->withHeader('X-User-Role', 'accountant')
@@ -223,7 +226,8 @@ class ManualLegacyCreateOverrideTest extends TestCase
                 'meter_start' => 10,
                 'meter_end' => 11,
             ]);
-        $ack->assertStatus(201);
+        $ack->assertStatus(403);
+        $this->assertEquals('LEGACY_MANUAL_CREATE_DISABLED', $ack->json('error_code'));
     }
 }
 

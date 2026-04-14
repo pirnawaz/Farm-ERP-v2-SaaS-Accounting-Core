@@ -51,14 +51,12 @@ class LabWorkLogController extends Controller
 
     public function store(StoreLabWorkLogRequest $request)
     {
-        $tenantId = TenantContext::getTenantId($request);
+        return response()->json([
+            'message' => 'This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing.',
+            'error_code' => 'LEGACY_MANUAL_CREATE_DISABLED',
+        ], 403);
 
-        if (! $request->boolean('manual_exception_acknowledged')) {
-            return response()->json([
-                'message' => 'Manual Labour Work Log creation is restricted. Use Field Jobs for normal crop-field work. To proceed with this manual/exceptional create path, set manual_exception_acknowledged=true.',
-                'error_code' => 'MANUAL_EXCEPTION_ACK_REQUIRED',
-            ], 422);
-        }
+        $tenantId = TenantContext::getTenantId($request);
 
         LabWorker::where('id', $request->worker_id)->where('tenant_id', $tenantId)->firstOrFail();
         CropCycle::where('id', $request->crop_cycle_id)->where('tenant_id', $tenantId)->firstOrFail();
