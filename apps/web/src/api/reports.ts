@@ -22,6 +22,8 @@ import type {
   ProjectProjectedProfitResponse,
   MachineProfitabilityApiRow,
   HarvestEconomicsDocumentResponse,
+  ProjectResponsibilityReport,
+  ProjectPartyEconomicsReport,
 } from '../types';
 
 export const reportsApi = {
@@ -256,4 +258,26 @@ export const reportsApi = {
     apiClient.get<HarvestEconomicsDocumentResponse>(
       `/api/reports/harvest-economics?${new URLSearchParams({ harvest_id: harvestId }).toString()}`
     ),
+
+  projectResponsibility: (params: {
+    project_id: string;
+    from: string;
+    to: string;
+    crop_cycle_id?: string;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('project_id', params.project_id);
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.crop_cycle_id) query.append('crop_cycle_id', params.crop_cycle_id);
+    return apiClient.get<ProjectResponsibilityReport>(`/api/reports/project-responsibility?${query.toString()}`);
+  },
+
+  projectPartyEconomics: (params: { project_id: string; party_id: string; up_to_date: string }) => {
+    const query = new URLSearchParams();
+    query.append('project_id', params.project_id);
+    query.append('party_id', params.party_id);
+    query.append('up_to_date', params.up_to_date);
+    return apiClient.get<ProjectPartyEconomicsReport>(`/api/reports/project-party-economics?${query.toString()}`);
+  },
 };

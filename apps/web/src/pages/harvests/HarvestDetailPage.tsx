@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import {
   useHarvest,
@@ -29,6 +29,9 @@ import { HarvestSharePostedSummaryCard } from '../../components/harvests/Harvest
 import { HarvestEconomicsCard } from '../../components/harvests/HarvestEconomicsCard';
 import { PrimaryWorkflowBanner } from '../../components/workflow/PrimaryWorkflowBanner';
 import { DuplicateWorkflowRiskCallout } from '../../components/workflow/DuplicateWorkflowRiskCallout';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
 
@@ -88,6 +91,16 @@ export default function HarvestDetailPage() {
   const canPost = hasRole(['tenant_admin', 'accountant']);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
 
+  const harvestLinesPositive = useMemo(() => {
+    const list = harvest?.lines ?? [];
+    return list.some((l) => parseFloat(String(l.quantity ?? 0)) > 0);
+  }, [harvest?.lines]);
+
+  const canOpenHarvestRecord = Boolean(
+    harvest?.status === 'DRAFT' && harvest?.project_id && harvestLinesPositive
+  );
+  const canConfirmHarvestPost = Boolean(canOpenHarvestRecord && postingDate);
+
   const updateLine = (i: number, f: Partial<HarvestLineForm>) => {
     setLines((l) => l.map((row, idx) => (idx === i ? { ...row, ...f } : row)));
     if (isDraft && harvest?.lines?.[i]) {
@@ -131,16 +144,28 @@ export default function HarvestDetailPage() {
   };
 
   const handlePost = async () => {
-    if (!id) return;
-    await postM.mutateAsync({ id, payload: { posting_date: postingDate } });
-    setShowPostModal(false);
+    if (!id || !canConfirmHarvestPost) return;
+    try {
+      await postM.mutateAsync({ id, payload: { posting_date: postingDate } });
+      setShowPostModal(false);
+      postM.reset();
+    } catch {
+      /* OperatorErrorCallout */
+    }
   };
 
+  const canConfirmHarvestReverse = Boolean(id && reversalDate);
+
   const handleReverse = async () => {
-    if (!id) return;
-    await reverseM.mutateAsync({ id, payload: { reversal_date: reversalDate, reason: reverseReason || undefined } });
-    setShowReverseModal(false);
-    setReverseReason('');
+    if (!canConfirmHarvestReverse) return;
+    try {
+      await reverseM.mutateAsync({ id: id!, payload: { reversal_date: reversalDate, reason: reverseReason || undefined } });
+      setShowReverseModal(false);
+      setReverseReason('');
+      reverseM.reset();
+    } catch {
+      /* OperatorErrorCallout */
+    }
   };
 
   const totalQty = (harvest?.lines || []).reduce((s, l) => s + parseFloat(String(l.quantity || 0)), 0);
@@ -322,35 +347,124 @@ export default function HarvestDetailPage() {
             <button type="button" onClick={handleSave} disabled={updateM.isPending} className="w-full sm:w-auto px-4 py-2 bg-[#1F6F5C] text-white rounded">
               Save
             </button>
-            {canPost && <button type="button" onClick={() => setShowPostModal(true)} className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
+            {canPost && (
+              <button
+                type="button"
+                onClick={() => {
+                  postM.reset();
+                  setShowPostModal(true);
+                }}
+                disabled={!canOpenHarvestRecord}
+                title={
+                  !canOpenHarvestRecord
+                    ? 'Set field cycle and add at least one harvest line with quantity before recording.'
+                    : undefined
+                }
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 min-h-[44px]"
+              >
+                Record to accounts
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {isPosted && canPost && (
         <div>
-          <button type="button" onClick={() => setShowReverseModal(true)} className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
+          <button
+            type="button"
+            onClick={() => {
+              reverseM.reset();
+              setShowReverseModal(true);
+            }}
+            className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded min-h-[44px]"
+          >
+            {term('reverseAction')}
+          </button>
         </div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={term('postAction')}>
+      <Modal
+        isOpen={showPostModal}
+        onClose={() => {
+          setShowPostModal(false);
+          postM.reset();
+        }}
+        title="Record harvest to accounts"
+      >
         <div className="space-y-4">
-          <FormField label="Posting Date" required>
-            <input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" />
+          <p className="text-sm text-gray-700 leading-relaxed">
+            This will record harvest quantities and related allocations in the accounts for the posting date below.
+          </p>
+          <PrePostChecklist
+            items={[
+              { ok: Boolean(postingDate), label: 'Posting date chosen' },
+              { ok: Boolean(harvest?.project_id), label: 'Field cycle (project) set' },
+              { ok: harvestLinesPositive, label: 'At least one line with quantity > 0' },
+            ]}
+            blockingHint={!canConfirmHarvestPost ? 'Complete required fields before recording.' : undefined}
+          />
+          <OperatorErrorCallout error={postM.isError ? formatOperatorError(postM.error) : null} />
+          <FormField label="Posting date" required>
+            <input
+              type="date"
+              value={postingDate}
+              onChange={(e) => setPostingDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded min-h-[44px]"
+            />
           </FormField>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
-            <button type="button" onClick={() => setShowPostModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
-            <button type="button" onClick={handlePost} disabled={postM.isPending} className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowPostModal(false);
+                postM.reset();
+              }}
+              className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handlePost}
+              disabled={postM.isPending || !canConfirmHarvestPost}
+              className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 min-h-[44px]"
+            >
+              {postM.isPending ? 'Recording…' : 'Confirm'}
+            </button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={term('reverseAction')}>
+      <Modal
+        isOpen={showReverseModal}
+        onClose={() => {
+          setShowReverseModal(false);
+          setReverseReason('');
+          reverseM.reset();
+        }}
+        title={term('reverseAction')}
+      >
         <div className="space-y-4">
-          <FormField label="Reversal Date" required>
-            <input type="date" value={reversalDate} onChange={(e) => setReversalDate(e.target.value)} className="w-full px-3 py-2 border rounded" />
+          <p className="text-sm text-gray-700 leading-relaxed">
+            This reverses the posted harvest in the accounts as of the reversal date below. Cancel if you are not ready.
+          </p>
+          <PrePostChecklist
+            items={[
+              { ok: Boolean(reversalDate), label: 'Reversal date chosen' },
+            ]}
+            blockingHint={!reversalDate ? 'Choose a reversal date before confirming.' : undefined}
+          />
+          <OperatorErrorCallout error={reverseM.isError ? formatOperatorError(reverseM.error) : null} />
+          <FormField label="Reversal date" required>
+            <input
+              type="date"
+              value={reversalDate}
+              onChange={(e) => setReversalDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded min-h-[44px]"
+            />
           </FormField>
-          <FormField label="Reason">
+          <FormField label="Reason (optional)">
             <textarea
               value={reverseReason}
               onChange={(e) => setReverseReason(e.target.value)}
@@ -360,8 +474,25 @@ export default function HarvestDetailPage() {
             />
           </FormField>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
-            <button type="button" onClick={() => setShowReverseModal(false)} className="w-full sm:w-auto px-4 py-2 border rounded">Cancel</button>
-            <button type="button" onClick={handleReverse} disabled={reverseM.isPending} className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowReverseModal(false);
+                setReverseReason('');
+                reverseM.reset();
+              }}
+              className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleReverse}
+              disabled={reverseM.isPending || !canConfirmHarvestReverse}
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50 min-h-[44px]"
+            >
+              {reverseM.isPending ? term('reverseActionPending') : 'Confirm reverse'}
+            </button>
           </div>
         </div>
       </Modal>

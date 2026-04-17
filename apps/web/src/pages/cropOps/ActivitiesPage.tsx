@@ -155,7 +155,16 @@ export default function ActivitiesPage() {
     [formatDate],
   );
 
-  const rows = (activities ?? []) as CropActivity[];
+  const rows = useMemo(() => {
+    const list = [...(activities ?? [])] as CropActivity[];
+    list.sort((a, b) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      return String(b.activity_date ?? '').localeCompare(String(a.activity_date ?? ''));
+    });
+    return list;
+  }, [activities]);
 
   if (isLoading) {
     return (

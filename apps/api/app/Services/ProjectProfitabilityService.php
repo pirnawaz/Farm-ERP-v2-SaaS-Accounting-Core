@@ -2,33 +2,29 @@
 
 namespace App\Services;
 
-use App\Models\PostingGroup;
-use Illuminate\Database\Query\Builder;
+use App\Domains\Reporting\ProjectPLQueryService;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Read-only project profitability from posted ledger + allocations (Phase 7B.1).
+ * Read-only project profitability from posted ledger + project-scoped allocation rows.
+ *
+ * **Eligibility (Phase 4.5):** Posting groups are included if they have at least one allocation row with
+ * project_id set for this project — the same basis as ProjectPLQueryService / GET /api/reports/project-pl.
+ * Includes project-scoped supplier invoices/bills, inventory, operations, etc.
+ * Cost-center-only bills (no project on allocations) never appear here.
  *
  * Revenue splits:
  * - sales: income from SALE posting groups (effective source, see below).
- * - machinery_income: net MACHINERY_SERVICE_INCOME from FIELD_JOB / MACHINERY_CHARGE / MACHINERY_SERVICE (excludes HARVEST so in-kind machinery netting is not double-counted).
- * - in_kind_income: net income from HARVEST posting groups (settlements + any other income lines on that PG).
+ * - machinery_income: net MACHINERY_SERVICE_INCOME from FIELD_JOB / MACHINERY_CHARGE / MACHINERY_SERVICE.
+ * - in_kind_income: net income from HARVEST posting groups.
  *
- * Costs split by system account code (see bucket constants). Unmapped expense codes fall into inputs.
- *
- * Posting groups are restricted to the same operational source types as {@see SettlementService}
- * plus active-only ({@see PostingGroup::applyActiveOn}) and posted source documents where applicable.
+ * Costs split by system account code (see bucket constants). Unmapped expense codes roll into inputs so bucket sum matches total cost.
  */
 class ProjectProfitabilityService
 {
-    /**
-     * @see SettlementService::OPERATIONAL_SOURCE_TYPES
-     */
-    private const OPERATIONAL_SOURCE_TYPES = [
-        'INVENTORY_ISSUE', 'INVENTORY_GRN', 'LABOUR_WORK_LOG', 'MACHINE_WORK_LOG',
-        'MACHINE_MAINTENANCE_JOB', 'MACHINERY_CHARGE', 'MACHINERY_SERVICE', 'FIELD_JOB', 'CROP_ACTIVITY', 'OPERATIONAL',
-        'SALE', 'HARVEST', 'REVERSAL',
-    ];
+    public function __construct(
+        private ProjectPLQueryService $projectPLQuery
+    ) {}
 
     /** @var list<string> */
     private const INPUT_EXPENSE_CODES = [
@@ -53,7 +49,7 @@ class ProjectProfitabilityService
     ];
 
     /**
-     * @param  array{from?: string, to?: string, crop_cycle_id?: string|null}  $filters  posting_date on posting_groups (inclusive); optional crop_cycle_id narrows posting_groups
+     * @param  array{from?: string, to?: string, crop_cycle_id?: string|null}  $filters  posting_date on posting_groups (inclusive); optional crop_cycle_id matches project row (same as project-pl)
      * @return array{
      *   revenue: array{sales: float, machinery_income: float, in_kind_income: float},
      *   costs: array{inputs: float, labour: float, machinery: float, landlord: float},
@@ -86,7 +82,7 @@ class ProjectProfitabilityService
                     THEN (COALESCE(le.credit_amount_base, le.credit_amount) - COALESCE(le.debit_amount_base, le.debit_amount))
                     ELSE 0 END) AS sales,
                 SUM(CASE WHEN a.type = 'income' AND a.code = 'MACHINERY_SERVICE_INCOME'
-                    AND {$effSourceSql} IN ('FIELD_JOB', 'MACHINERY_CHARGE', 'MACHINERY_SERVICE')
+                    AND {$effSourceSql} IN ('FIELD_JOB', 'MACHINERY_CHARGE', 'MACHINERY_SERVICE', 'MACHINE_WORK_LOG', 'MACHINERY_EXTERNAL_INCOME')
                     THEN (COALESCE(le.credit_amount_base, le.credit_amount) - COALESCE(le.debit_amount_base, le.debit_amount))
                     ELSE 0 END) AS machinery_income,
                 SUM(CASE WHEN a.type = 'income' AND {$effSourceSql} = 'HARVEST'
@@ -168,151 +164,13 @@ class ProjectProfitabilityService
     }
 
     /**
+     * Same posting-group set as {@see ProjectPLQueryService::getEligiblePostingGroupIdsForProject()}.
+     *
      * @return list<string>
      */
     private function eligiblePostingGroupIds(string $projectId, string $tenantId, ?string $from, ?string $to, ?string $cropCycleId = null): array
     {
-        $q = DB::table('posting_groups as pg')
-            ->where('pg.tenant_id', $tenantId)
-            ->whereIn('pg.source_type', self::OPERATIONAL_SOURCE_TYPES)
-            ->whereExists(function ($sub) use ($projectId, $tenantId) {
-                $sub->select(DB::raw(1))
-                    ->from('allocation_rows as ar')
-                    ->whereColumn('ar.posting_group_id', 'pg.id')
-                    ->where('ar.tenant_id', $tenantId)
-                    ->where('ar.project_id', $projectId);
-            });
-
-        if ($cropCycleId !== null && $cropCycleId !== '') {
-            $q->where('pg.crop_cycle_id', $cropCycleId);
-        }
-
-        if ($from !== null && $from !== '') {
-            $q->where('pg.posting_date', '>=', $from);
-        }
-        if ($to !== null && $to !== '') {
-            $q->where('pg.posting_date', '<=', $to);
-        }
-
-        PostingGroup::applyActiveOn($q, 'pg');
-        $this->applyPostedSourceDocumentFilter($q);
-
-        return $q->orderBy('pg.id')->pluck('pg.id')->map(fn ($id) => (string) $id)->all();
-    }
-
-    /**
-     * Only include posting groups whose operational source document is POSTED (Phase 3C / reporting integrity).
-     * Reversal posting groups are always included (they negate an original posted group).
-     */
-    private function applyPostedSourceDocumentFilter(Builder $q): void
-    {
-        $q->where(function ($w) {
-            $w->where('pg.source_type', 'REVERSAL')
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'HARVEST')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('harvests as h')
-                                ->whereColumn('h.posting_group_id', 'pg.id')
-                                ->where('h.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'FIELD_JOB')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('field_jobs as fj')
-                                ->whereColumn('fj.posting_group_id', 'pg.id')
-                                ->where('fj.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'SALE')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('sales as s')
-                                ->whereColumn('s.posting_group_id', 'pg.id')
-                                ->where('s.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'MACHINERY_CHARGE')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('machinery_charges as mc')
-                                ->whereColumn('mc.posting_group_id', 'pg.id')
-                                ->where('mc.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'MACHINERY_SERVICE')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('machinery_services as ms')
-                                ->whereColumn('ms.posting_group_id', 'pg.id')
-                                ->where('ms.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'LABOUR_WORK_LOG')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('lab_work_logs as lw')
-                                ->whereColumn('lw.posting_group_id', 'pg.id')
-                                ->where('lw.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'MACHINE_WORK_LOG')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('machine_work_logs as mwl')
-                                ->whereColumn('mwl.posting_group_id', 'pg.id')
-                                ->where('mwl.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'CROP_ACTIVITY')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('crop_activities as ca')
-                                ->whereColumn('ca.posting_group_id', 'pg.id')
-                                ->where('ca.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'INVENTORY_ISSUE')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('inv_issues as ii')
-                                ->whereColumn('ii.posting_group_id', 'pg.id')
-                                ->where('ii.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'INVENTORY_GRN')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('inv_grns as ig')
-                                ->whereColumn('ig.posting_group_id', 'pg.id')
-                                ->where('ig.status', 'POSTED');
-                        });
-                })
-                ->orWhere(function ($w2) {
-                    $w2->where('pg.source_type', 'MACHINE_MAINTENANCE_JOB')
-                        ->whereExists(function ($sub) {
-                            $sub->select(DB::raw(1))
-                                ->from('machine_maintenance_jobs as mmj')
-                                ->whereColumn('mmj.posting_group_id', 'pg.id')
-                                ->where('mmj.status', 'POSTED');
-                        });
-                })
-                ->orWhereNotIn('pg.source_type', [
-                    'HARVEST', 'FIELD_JOB', 'SALE', 'MACHINERY_CHARGE', 'MACHINERY_SERVICE',
-                    'LABOUR_WORK_LOG', 'MACHINE_WORK_LOG', 'CROP_ACTIVITY', 'INVENTORY_ISSUE', 'INVENTORY_GRN',
-                    'MACHINE_MAINTENANCE_JOB',
-                ]);
-        });
+        return $this->projectPLQuery->getEligiblePostingGroupIdsForProject($tenantId, $projectId, $from, $to, $cropCycleId);
     }
 
     /**

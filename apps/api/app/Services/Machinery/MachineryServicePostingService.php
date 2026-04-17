@@ -9,7 +9,7 @@ use App\Models\PostingGroup;
 use App\Models\CropCycle;
 use App\Models\InvIssue;
 use App\Models\InvIssueLine;
-use App\Models\ProjectRule;
+use App\Services\ProjectSettlementRuleResolver;
 use App\Services\LedgerWriteGuard;
 use App\Services\OperationalPostingGuard;
 use App\Services\ReversalService;
@@ -26,7 +26,8 @@ class MachineryServicePostingService
         private SystemAccountService $accountService,
         private ReversalService $reversalService,
         private OperationalPostingGuard $guard,
-        private InventoryPostingService $inventoryPostingService
+        private InventoryPostingService $inventoryPostingService,
+        private ProjectSettlementRuleResolver $settlementRuleResolver
     ) {}
 
     /**
@@ -150,10 +151,7 @@ class MachineryServicePostingService
                 $resolvedInKindQty = (float) $service->quantity * (float) $service->in_kind_rate_per_unit;
 
                 $project = $service->project;
-                $projectRule = ProjectRule::where('project_id', $project->id)->first();
-                if (!$projectRule) {
-                    throw new \Exception('Project rules not found for in-kind allocation.');
-                }
+                $rule = $this->settlementRuleResolver->resolveSettlementRule($project);
 
                 $issuePayload = [
                     'tenant_id' => $tenantId,
@@ -168,8 +166,8 @@ class MachineryServicePostingService
                 if ($service->allocation_scope === MachineryService::ALLOCATION_SCOPE_HARI_ONLY) {
                     $issuePayload['hari_id'] = $project->party_id;
                 } else {
-                    $issuePayload['landlord_share_pct'] = $projectRule->profit_split_landlord_pct;
-                    $issuePayload['hari_share_pct'] = $projectRule->profit_split_hari_pct;
+                    $issuePayload['landlord_share_pct'] = $rule['profit_split_landlord_pct'];
+                    $issuePayload['hari_share_pct'] = $rule['profit_split_hari_pct'];
                 }
                 $issue = InvIssue::create($issuePayload);
                 InvIssueLine::create([

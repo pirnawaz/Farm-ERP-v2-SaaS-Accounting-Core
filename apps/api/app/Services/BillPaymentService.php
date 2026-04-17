@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Domains\Commercial\Payables\SupplierCreditNote;
 use App\Domains\Commercial\Payables\SupplierInvoice;
 use App\Models\AllocationRow;
 use App\Models\InvGrn;
@@ -138,7 +139,10 @@ class BillPaymentService
     public function getSupplierInvoiceBillTotal(string $supplierInvoiceId, string $tenantId): float
     {
         $inv = SupplierInvoice::where('id', $supplierInvoiceId)->where('tenant_id', $tenantId)->firstOrFail();
-        if ($inv->status !== SupplierInvoice::STATUS_POSTED || ! $inv->posting_group_id) {
+        if (! $inv->posting_group_id) {
+            return 0.0;
+        }
+        if (! in_array($inv->status, [SupplierInvoice::STATUS_POSTED, SupplierInvoice::STATUS_PAID], true)) {
             return 0.0;
         }
 
@@ -146,10 +150,31 @@ class BillPaymentService
     }
 
     /**
-     * Outstanding for a supplier invoice: bill total minus ACTIVE payment allocations.
+     * Posted supplier credits linked to this bill (excludes one credit note id when validating a new post).
      */
-    public function getSupplierInvoiceOutstanding(string $supplierInvoiceId, string $tenantId, ?string $asOfDate = null): float
-    {
+    public function getPostedCreditsLinkedToSupplierInvoice(
+        string $supplierInvoiceId,
+        string $tenantId,
+        ?string $excludeCreditNoteId = null
+    ): float {
+        $q = SupplierCreditNote::where('tenant_id', $tenantId)
+            ->where('supplier_invoice_id', $supplierInvoiceId)
+            ->where('status', SupplierCreditNote::STATUS_POSTED);
+        if ($excludeCreditNoteId) {
+            $q->where('id', '!=', $excludeCreditNoteId);
+        }
+
+        return (float) $q->sum('total_amount');
+    }
+
+    /**
+     * Payable remaining before supplier credit notes: posted bill total minus payment allocations.
+     */
+    public function getSupplierInvoiceOutstandingExcludingCredits(
+        string $supplierInvoiceId,
+        string $tenantId,
+        ?string $asOfDate = null
+    ): float {
         $total = $this->getSupplierInvoiceBillTotal($supplierInvoiceId, $tenantId);
         $query = SupplierPaymentAllocation::where('tenant_id', $tenantId)
             ->where('supplier_invoice_id', $supplierInvoiceId)
@@ -162,6 +187,33 @@ class BillPaymentService
         $allocated = (float) $query->sum('amount');
 
         return max(0, $total - $allocated);
+    }
+
+    /**
+     * Outstanding for a supplier invoice: bill total minus ACTIVE payment allocations minus posted linked credits.
+     */
+    public function getSupplierInvoiceOutstanding(string $supplierInvoiceId, string $tenantId, ?string $asOfDate = null): float
+    {
+        $base = $this->getSupplierInvoiceOutstandingExcludingCredits($supplierInvoiceId, $tenantId, $asOfDate);
+        $credits = $this->getPostedCreditsLinkedToSupplierInvoice($supplierInvoiceId, $tenantId);
+
+        return max(0, round($base - $credits, 2));
+    }
+
+    /**
+     * Posted supplier credit notes for a supplier with no bill link (reduces net AP; not tied to a specific bill line).
+     */
+    public function getSupplierUnlinkedPostedCreditsTotal(string $supplierPartyId, string $tenantId, ?string $asOfDate = null): float
+    {
+        $q = SupplierCreditNote::where('tenant_id', $tenantId)
+            ->where('party_id', $supplierPartyId)
+            ->where('status', SupplierCreditNote::STATUS_POSTED)
+            ->whereNull('supplier_invoice_id');
+        if ($asOfDate) {
+            $q->where('credit_date', '<=', $asOfDate);
+        }
+
+        return (float) $q->sum('total_amount');
     }
 
     /**
@@ -193,13 +245,16 @@ class BillPaymentService
                 })
                 ->when($asOfDate, fn ($q) => $q->where('allocation_date', '<=', $asOfDate))
                 ->sum('amount');
-            $outstanding = max(0, $total - $allocated);
+            $linkedCredits = $this->getPostedCreditsLinkedToSupplierInvoice($inv->id, $tenantId);
+            $outstanding = $this->getSupplierInvoiceOutstanding($inv->id, $tenantId, $asOfDate);
             if ($outstanding <= 0) {
                 continue;
             }
-            $dueDate = $inv->invoice_date
-                ? $inv->invoice_date->format('Y-m-d')
-                : ($inv->posted_at ? $inv->posted_at->format('Y-m-d') : null);
+            $dueDate = $inv->due_date
+                ? $inv->due_date->format('Y-m-d')
+                : ($inv->invoice_date
+                    ? $inv->invoice_date->format('Y-m-d')
+                    : ($inv->posted_at ? $inv->posted_at->format('Y-m-d') : null));
             $open[] = [
                 'supplier_invoice_id' => $inv->id,
                 'reference_no' => $inv->reference_no,
@@ -208,6 +263,7 @@ class BillPaymentService
                 'due_date' => $dueDate,
                 'bill_total' => (string) round($total, 2),
                 'allocated' => (string) round($allocated, 2),
+                'linked_credits' => (string) round($linkedCredits, 2),
                 'outstanding' => (string) round($outstanding, 2),
             ];
         }
@@ -743,5 +799,41 @@ class BillPaymentService
                 $q->where('status', SupplierPaymentAllocation::STATUS_ACTIVE)->orWhereNull('status');
             })
             ->count();
+    }
+
+    /**
+     * Active supplier-invoice payment applications for bill detail / AP visibility (no ledger writes).
+     *
+     * @return list<array{allocation_id: string, amount: string, allocation_date: string, payment_id: string, payment_date: string|null, payment_reference: string|null, payment_status: string|null, payment_amount: string|null}>
+     */
+    public function getSupplierInvoicePaymentApplications(string $supplierInvoiceId, string $tenantId): array
+    {
+        return SupplierPaymentAllocation::where('tenant_id', $tenantId)
+            ->where('supplier_invoice_id', $supplierInvoiceId)
+            ->where(function ($q) {
+                $q->where('status', SupplierPaymentAllocation::STATUS_ACTIVE)->orWhereNull('status');
+            })
+            ->with(['payment' => function ($q) {
+                $q->select('id', 'payment_date', 'reference', 'status', 'amount', 'direction', 'method', 'source_account_id');
+            }])
+            ->orderBy('allocation_date')
+            ->orderBy('id')
+            ->get()
+            ->map(function ($a) {
+                $p = $a->payment;
+
+                return [
+                    'allocation_id' => $a->id,
+                    'amount' => number_format((float) $a->amount, 2, '.', ''),
+                    'allocation_date' => $a->allocation_date->format('Y-m-d'),
+                    'payment_id' => $a->payment_id,
+                    'payment_date' => $p?->payment_date ? $p->payment_date->format('Y-m-d') : null,
+                    'payment_reference' => $p?->reference,
+                    'payment_status' => $p?->status,
+                    'payment_amount' => $p ? number_format((float) $p->amount, 2, '.', '') : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

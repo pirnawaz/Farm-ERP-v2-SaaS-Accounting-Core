@@ -114,6 +114,9 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'machinery-maintenance',
     'machinery-maintenance-setup',
     'machinery-rate-cards',
+    'machinery-work-logs',
+    'machinery-farm-profit',
+    'machinery-external-income',
     // Inventory (overview, stock, transactions, setup).
     'inventory-overview',
     'inventory-stock-on-hand',
@@ -139,6 +142,8 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
 
     // Field planning & forecast (reports + crop)
     'project-forecast',
+    'project-responsibility-report',
+    'party-economics-report',
   ]);
 
   const operatorAllowItemKeys = new Set<string>([
@@ -168,6 +173,9 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'machinery-maintenance-setup',
     'machinery-rate-cards',
     'machinery-overview',
+    'machinery-work-logs',
+    'machinery-farm-profit',
+    'machinery-external-income',
     'inventory-overview',
     'inventory-stock-on-hand',
     'inventory-stock-history',
@@ -191,6 +199,8 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'exchange-rates',
     'fx-revaluation-runs',
     'project-forecast',
+    'project-responsibility-report',
+    'party-economics-report',
   ]);
 
   const keepAllFinance = role === 'accountant';
@@ -312,6 +322,13 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
     ],
     accounting: [
       { key: 'dashboard', label: 'Accounting Overview', to: '/app/dashboard', requiredPermission: VIEW },
+      {
+        key: 'cost-centers',
+        label: 'Cost centers',
+        to: '/app/accounting/cost-centers',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
       { key: 'journals', label: 'General Journal', to: '/app/accounting/journals', requiredPermission: VIEW, requiredModules: ['reports'] },
       {
         key: 'fixed-assets',
@@ -335,6 +352,13 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
         requiredModules: ['reports'],
       },
       { key: 'accounting-periods', label: 'Accounting Periods', to: '/app/accounting/periods', requiredPermission: VIEW, requiredModules: ['reports'] },
+      {
+        key: 'allocation-tools',
+        label: 'Overhead & bill spread',
+        to: '/app/accounting/allocation-tools',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
       { key: 'general-ledger', label: term('generalLedger'), to: '/app/reports/general-ledger', requiredPermission: VIEW, requiredModules: ['reports'] },
     ],
     reports: [
@@ -361,6 +385,22 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
         requiredModules: ['reports', 'projects_crop_cycles'],
       },
       { key: 'project-pl', label: 'Field Cycle P&L', to: '/app/reports/project-pl', requiredPermission: VIEW, requiredModules: ['reports'] },
+      {
+        key: 'project-responsibility-report',
+        label: 'Who bears what (period)',
+        to: '/app/reports/project-responsibility',
+        requiredPermission: VIEW,
+        requiredModules: ['reports', 'projects_crop_cycles'],
+      },
+      {
+        key: 'party-economics-report',
+        label: 'Hari statement',
+        to: '/app/reports/project-party-economics',
+        requiredPermission: VIEW,
+        requiredModules: ['reports', 'projects_crop_cycles'],
+      },
+      { key: 'farm-pnl', label: 'Farm P&L', to: '/app/reports/farm-pnl', requiredPermission: VIEW, requiredModules: ['reports'] },
+      { key: 'overheads', label: 'Overheads', to: '/app/reports/overheads', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'crop-cycle-pl', label: 'Crop Cycle P&L', to: '/app/reports/crop-cycle-pl', requiredPermission: VIEW, requiredModules: ['reports'] },
       { key: 'profitability-trend', label: 'Profitability Trend', to: '/app/reports/crop-profitability-trend', requiredPermission: VIEW, requiredModules: ['projects_crop_cycles'] },
       { key: 'sales-margin', label: 'Sales Margin', to: '/app/reports/sales-margin', requiredPermission: VIEW, requiredModules: ['reports'] },
@@ -369,6 +409,34 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
     receivables: [{ key: 'ar-ageing', label: term('arAgeing'), to: '/app/reports/ar-ageing', requiredPermission: VIEW, requiredModules: ['ar_sales'] }],
     payables: [
       { key: 'ap-ageing', label: 'AP ageing', to: '/app/reports/ap-ageing', requiredPermission: VIEW, requiredModules: ['reports'] },
+      {
+        key: 'ap-supplier-outstanding',
+        label: 'Supplier AP outstanding',
+        to: '/app/reports/ap-supplier-outstanding',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
+      {
+        key: 'supplier-payments-report',
+        label: 'Supplier payments',
+        to: '/app/reports/supplier-payments',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
+      {
+        key: 'treasury-supplier-outflows',
+        label: 'Supplier outflows (treasury)',
+        to: '/app/reports/treasury-supplier-outflows',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
+      {
+        key: 'bills',
+        label: 'Bills',
+        to: '/app/accounting/bills',
+        requiredPermission: VIEW,
+        requiredModules: ['reports'],
+      },
       {
         key: 'supplier-invoices',
         label: 'Supplier invoices',
@@ -411,7 +479,24 @@ export function getNavDomains(term: TermFn, showOrchards: boolean, showLivestock
 
   const machineryItems: NavItem[] = [
     { key: 'machinery-overview', label: 'Machinery Overview', to: '/app/machinery', requiredPermission: VIEW, requiredModules: ['machinery'] },
+    { key: 'machinery-work-logs', label: 'Machine usage', to: '/app/machinery/work-logs', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-machines', label: 'Machines', to: '/app/machinery/machines', requiredPermission: VIEW, requiredModules: ['machinery'] },
+    {
+      key: 'machinery-farm-profit',
+      label: 'Machine profit',
+      to: '/app/machinery/reports/profitability',
+      requiredPermission: VIEW,
+      requiredModules: ['machinery'],
+      sidebarHint: 'Revenue, cost, and profit by machine',
+    },
+    {
+      key: 'machinery-external-income',
+      label: 'Rented out (external)',
+      to: '/app/machinery/external-income',
+      requiredPermission: VIEW,
+      requiredModules: ['machinery'],
+      sidebarHint: 'Record income when a machine is hired out',
+    },
     { key: 'machinery-services', label: 'Service History', to: '/app/machinery/services', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-charges', label: 'Machinery Charges', to: '/app/machinery/charges', requiredPermission: VIEW, requiredModules: ['machinery'] },
     { key: 'machinery-maintenance', label: 'Maintenance Jobs', to: '/app/machinery/maintenance-jobs', requiredPermission: VIEW, requiredModules: ['machinery'] },

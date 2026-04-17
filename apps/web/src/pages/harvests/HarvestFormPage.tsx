@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateHarvest, useAddHarvestLine } from '../../hooks/useHarvests';
 import { useCropCycles } from '../../hooks/useCropCycles';
@@ -18,6 +18,9 @@ import toast from 'react-hot-toast';
 import type { CreateHarvestPayload } from '../../types';
 import { term } from '../../config/terminology';
 import { PrimaryWorkflowBanner } from '../../components/workflow/PrimaryWorkflowBanner';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
 
 type HarvestLineForm = { inventory_item_id: string; store_id: string; quantity: string; uom: string; notes: string };
 
@@ -135,6 +138,17 @@ export default function HarvestFormPage() {
     applySnapshot(last);
   };
   const hasLast = !!tenantId && getLastSubmit(tenantId, 'harvest') != null;
+
+  const validLineCount = useMemo(
+    () => lines.filter((l) => l.inventory_item_id && l.store_id && parseFloat(l.quantity) > 0).length,
+    [lines]
+  );
+
+  const harvestSaveReady = useMemo(
+    () =>
+      Boolean(crop_cycle_id && project_id && harvest_date && validLineCount > 0),
+    [crop_cycle_id, project_id, harvest_date, validLineCount]
+  );
 
   const handleSubmit = async () => {
     // Prepare form data
@@ -388,13 +402,40 @@ export default function HarvestFormPage() {
           />
         </FormField>
 
+        <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-3">
+          <p className="text-sm font-medium text-gray-900">Before you save</p>
+          <p className="text-sm text-gray-700">
+            Saving creates the harvest draft with lines; you can record it to accounts from the harvest detail when ready.
+          </p>
+          <PrePostChecklist
+            items={[
+              { ok: Boolean(crop_cycle_id), label: 'Crop cycle selected' },
+              { ok: Boolean(project_id), label: `${term('fieldCycle')} selected` },
+              { ok: Boolean(harvest_date), label: 'Harvest date set' },
+              { ok: validLineCount > 0, label: 'At least one line with item, store, and quantity greater than 0' },
+            ]}
+            blockingHint={!harvestSaveReady ? 'Complete required fields before saving.' : undefined}
+          />
+        </div>
+
+        <OperatorErrorCallout
+          error={
+            createM.isError
+              ? formatOperatorError(createM.error)
+              : addLineM.isError
+                ? formatOperatorError(addLineM.error)
+                : null
+          }
+        />
+
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
           <button type="button" onClick={() => navigate('/app/harvests')} className="w-full sm:w-auto px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            disabled={createM.isPending || addLineM.isPending}
+            disabled={createM.isPending || addLineM.isPending || !harvestSaveReady}
+            title={!harvestSaveReady ? 'Complete crop cycle, field cycle, date, and at least one valid line.' : undefined}
             className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
           >
             {createM.isPending || addLineM.isPending ? 'Saving…' : 'Save'}

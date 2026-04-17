@@ -21,6 +21,8 @@ import type {
   ProjectProjectedProfitResponse,
   MachineProfitabilityApiRow,
   HarvestEconomicsDocumentResponse,
+  ProjectResponsibilityReport,
+  ProjectPartyEconomicsReport,
 } from '../types';
 
 export function useTrialBalance(params: { as_of: string; project_id?: string; crop_cycle_id?: string; currency_code?: string }) {
@@ -236,4 +238,46 @@ export function useHarvestEconomicsDocument(harvestId: string | undefined, optio
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
+}
+
+export function useProjectResponsibilityReport(
+  params: { project_id: string; from: string; to: string; crop_cycle_id?: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled =
+    options?.enabled !== false && !!params.project_id && !!params.from && !!params.to;
+  const query = useQuery<ProjectResponsibilityReport, Error>({
+    queryKey: ['reports', 'project-responsibility', params],
+    queryFn: () => reportsApi.projectResponsibility(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+  useEffect(() => {
+    if (query.error) {
+      toast.error(getApiErrorMessage(query.error, 'Failed to load who bears what report'));
+    }
+  }, [query.error]);
+  return query;
+}
+
+export function useProjectPartyEconomicsReport(
+  params: { project_id: string; party_id: string; up_to_date: string },
+  options?: { enabled?: boolean }
+) {
+  const enabled =
+    options?.enabled !== false && !!params.project_id && !!params.party_id && !!params.up_to_date;
+  const query = useQuery<ProjectPartyEconomicsReport, Error>({
+    queryKey: ['reports', 'project-party-economics', params],
+    queryFn: () => reportsApi.projectPartyEconomics(params),
+    enabled,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+  useEffect(() => {
+    if (query.error) {
+      toast.error(getApiErrorMessage(query.error, 'Failed to load party economics'));
+    }
+  }, [query.error]);
+  return query;
 }

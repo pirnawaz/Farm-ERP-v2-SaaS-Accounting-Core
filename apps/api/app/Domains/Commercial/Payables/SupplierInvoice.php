@@ -2,6 +2,7 @@
 
 namespace App\Domains\Commercial\Payables;
 
+use App\Models\CostCenter;
 use App\Models\InvGrn;
 use App\Models\Party;
 use App\Models\PostingGroup;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class SupplierInvoice extends Model
 {
@@ -32,9 +34,11 @@ class SupplierInvoice extends Model
         'tenant_id',
         'party_id',
         'project_id',
+        'cost_center_id',
         'grn_id',
         'reference_no',
         'invoice_date',
+        'due_date',
         'currency_code',
         'subtotal_amount',
         'tax_amount',
@@ -49,6 +53,7 @@ class SupplierInvoice extends Model
 
     protected $casts = [
         'invoice_date' => 'date',
+        'due_date' => 'date',
         'subtotal_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
@@ -71,6 +76,11 @@ class SupplierInvoice extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(CostCenter::class, 'cost_center_id');
     }
 
     public function grn(): BelongsTo
@@ -96,5 +106,22 @@ class SupplierInvoice extends Model
     public function supplierPaymentAllocations(): HasMany
     {
         return $this->hasMany(SupplierPaymentAllocation::class, 'supplier_invoice_id');
+    }
+
+    public function supplierCreditNotes(): HasMany
+    {
+        return $this->hasMany(SupplierCreditNote::class, 'supplier_invoice_id');
+    }
+
+    public function lineMatches(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            SupplierInvoiceMatch::class,
+            SupplierInvoiceLine::class,
+            'supplier_invoice_id',
+            'supplier_invoice_line_id',
+            'id',
+            'id'
+        );
     }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useFormatting } from '../../hooks/useFormatting';
@@ -98,6 +98,22 @@ export default function ProjectProfitabilityPage() {
           { label: 'Field cycle profit' },
         ]}
       />
+
+      <p className="text-sm text-gray-600">
+        For <strong>farm-wide</strong> results (projects + overhead), see{' '}
+        <Link to="/app/reports/farm-pnl" className="text-[#1F6F5C] font-medium hover:underline">
+          Farm P&L
+        </Link>{' '}
+        and{' '}
+        <Link to="/app/reports/overheads" className="text-[#1F6F5C] font-medium hover:underline">
+          Overheads
+        </Link>
+        . Multi-project revenue and costs by field cycle are on{' '}
+        <Link to="/app/reports/project-pl" className="text-[#1F6F5C] font-medium hover:underline">
+          Field Cycle P&L
+        </Link>
+        . For one field, totals here use the same posted ledger basis as that report (project-linked costs only; overhead-only bills stay on Overheads).
+      </p>
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <h2 className="text-sm font-semibold text-gray-900">Choose field cycle & dates</h2>

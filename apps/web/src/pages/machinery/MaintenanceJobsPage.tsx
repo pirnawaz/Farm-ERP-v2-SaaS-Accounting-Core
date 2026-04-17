@@ -17,6 +17,10 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import type { MachineMaintenanceJob } from '../../types';
 import { Badge } from '../../components/Badge';
+import { v4 as uuidv4 } from 'uuid';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
 
 export default function MaintenanceJobsPage() {
   const { formatDate } = useFormatting();
@@ -53,20 +57,21 @@ export default function MaintenanceJobsPage() {
   const [reverseReason, setReverseReason] = useState('');
 
   const handlePost = async () => {
-    if (!postingJobId) return;
+    if (!postingJobId || !postingDate) return;
     try {
       await postMutation.mutateAsync({
         id: postingJobId,
-        payload: { posting_date: postingDate },
+        payload: { posting_date: postingDate, idempotency_key: uuidv4() },
       });
       setPostingJobId(null);
+      postMutation.reset();
     } catch {
-      // Error handled by mutation
+      /* OperatorErrorCallout */
     }
   };
 
   const handleReverse = async () => {
-    if (!reversingJobId) return;
+    if (!reversingJobId || !reverseDate) return;
     try {
       await reverseMutation.mutateAsync({
         id: reversingJobId,
@@ -74,8 +79,9 @@ export default function MaintenanceJobsPage() {
       });
       setReversingJobId(null);
       setReverseReason('');
+      reverseMutation.reset();
     } catch {
-      // Error handled by mutation
+      /* OperatorErrorCallout */
     }
   };
 
@@ -104,6 +110,18 @@ export default function MaintenanceJobsPage() {
 
   const jobList = (jobs ?? []) as MachineMaintenanceJob[];
 
+  const sortedJobList = useMemo(() => {
+    const draftFirst = (a: MachineMaintenanceJob, b: MachineMaintenanceJob) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      const dateA = a.job_date ? String(a.job_date).slice(0, 10) : '';
+      const dateB = b.job_date ? String(b.job_date).slice(0, 10) : '';
+      return dateB.localeCompare(dateA);
+    };
+    return [...jobList].sort(draftFirst);
+  }, [jobList]);
+
   const summaryLine = useMemo(() => {
     const n = jobList.length;
     const label = n === 1 ? 'maintenance job' : 'maintenance jobs';
@@ -123,6 +141,9 @@ export default function MaintenanceJobsPage() {
       }
     }
   };
+
+  const canConfirmListPost = Boolean(postingDate && postingJobId);
+  const canConfirmListReverse = Boolean(reverseDate && reversingJobId);
 
   const columns: Column<MachineMaintenanceJob>[] = [
     {
@@ -183,18 +204,19 @@ export default function MaintenanceJobsPage() {
                 }}
                 className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
               >
-                Edit
+                Continue editing
               </button>
               {canPost && (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    postMutation.reset();
                     setPostingJobId(row.id);
                   }}
-                  className="text-green-600 hover:text-green-800"
+                  className="text-green-600 hover:text-green-800 font-medium"
                 >
-                  Post
+                  Record to accounts
                 </button>
               )}
               <button
@@ -212,9 +234,10 @@ export default function MaintenanceJobsPage() {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                reverseMutation.reset();
                 setReversingJobId(row.id);
               }}
-              className="text-red-600 hover:text-red-800"
+              className="text-red-600 hover:text-red-800 font-medium"
             >
               Reverse
             </button>
@@ -357,7 +380,7 @@ export default function MaintenanceJobsPage() {
       ) : (
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
           <DataTable
-            data={jobList}
+            data={sortedJobList}
             columns={columns}
             onRowClick={(row) => navigate(`/app/machinery/maintenance-jobs/${row.id}`)}
             emptyMessage=""
@@ -367,22 +390,40 @@ export default function MaintenanceJobsPage() {
 
       {/* Post Modal */}
       {postingJobId && (
-        <Modal isOpen={!!postingJobId} title="Post Maintenance Job" onClose={() => setPostingJobId(null)}>
+        <Modal
+          isOpen={!!postingJobId}
+          title="Record maintenance job to accounts"
+          onClose={() => {
+            setPostingJobId(null);
+            postMutation.reset();
+          }}
+        >
           <div className="space-y-4">
-            <FormField label="Posting Date" required>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              This will record maintenance costs for this job in the accounts for the posting date below.
+            </p>
+            <PrePostChecklist
+              items={[{ ok: Boolean(postingDate), label: 'Posting date chosen' }]}
+              blockingHint={!postingDate ? 'Choose a posting date before recording.' : undefined}
+            />
+            <OperatorErrorCallout error={postMutation.isError ? formatOperatorError(postMutation.error) : null} />
+            <FormField label="Posting date" required>
               <input
                 type="date"
                 value={postingDate}
                 onChange={(e) => setPostingDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] min-h-[44px]"
                 required
               />
             </FormField>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
                 type="button"
-                onClick={() => setPostingJobId(null)}
-                className="w-full sm:w-auto px-4 py-2 border rounded"
+                onClick={() => {
+                  setPostingJobId(null);
+                  postMutation.reset();
+                }}
+                className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
                 disabled={postMutation.isPending}
               >
                 Cancel
@@ -390,10 +431,10 @@ export default function MaintenanceJobsPage() {
               <button
                 type="button"
                 onClick={handlePost}
-                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                disabled={postMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 min-h-[44px]"
+                disabled={postMutation.isPending || !canConfirmListPost}
               >
-                {postMutation.isPending ? 'Posting...' : 'Post'}
+                {postMutation.isPending ? 'Recording…' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -402,18 +443,34 @@ export default function MaintenanceJobsPage() {
 
       {/* Reverse Modal */}
       {reversingJobId && (
-        <Modal isOpen={!!reversingJobId} title="Reverse Maintenance Job" onClose={() => { setReversingJobId(null); setReverseReason(''); }}>
+        <Modal
+          isOpen={!!reversingJobId}
+          title="Reverse maintenance job"
+          onClose={() => {
+            setReversingJobId(null);
+            setReverseReason('');
+            reverseMutation.reset();
+          }}
+        >
           <div className="space-y-4">
-            <FormField label="Posting Date" required>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              This creates offsetting entries as of the posting date below. Cancel if you are not ready.
+            </p>
+            <PrePostChecklist
+              items={[{ ok: Boolean(reverseDate), label: 'Posting date chosen' }]}
+              blockingHint={!reverseDate ? 'Choose a posting date before reversing.' : undefined}
+            />
+            <OperatorErrorCallout error={reverseMutation.isError ? formatOperatorError(reverseMutation.error) : null} />
+            <FormField label="Posting date" required>
               <input
                 type="date"
                 value={reverseDate}
                 onChange={(e) => setReverseDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] min-h-[44px]"
                 required
               />
             </FormField>
-            <FormField label="Reason">
+            <FormField label="Reason (optional)">
               <textarea
                 value={reverseReason}
                 onChange={(e) => setReverseReason(e.target.value)}
@@ -426,8 +483,12 @@ export default function MaintenanceJobsPage() {
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
                 type="button"
-                onClick={() => { setReversingJobId(null); setReverseReason(''); }}
-                className="w-full sm:w-auto px-4 py-2 border rounded"
+                onClick={() => {
+                  setReversingJobId(null);
+                  setReverseReason('');
+                  reverseMutation.reset();
+                }}
+                className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
                 disabled={reverseMutation.isPending}
               >
                 Cancel
@@ -435,10 +496,10 @@ export default function MaintenanceJobsPage() {
               <button
                 type="button"
                 onClick={handleReverse}
-                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                disabled={reverseMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                disabled={reverseMutation.isPending || !canConfirmListReverse}
               >
-                {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}
+                {reverseMutation.isPending ? 'Reversing…' : 'Confirm reverse'}
               </button>
             </div>
           </div>

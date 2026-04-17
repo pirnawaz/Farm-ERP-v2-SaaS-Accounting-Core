@@ -17,6 +17,8 @@ class Project extends Model
         'crop_cycle_id',
         'land_allocation_id',
         'field_block_id',
+        'agreement_id',
+        'agreement_allocation_id',
         'name',
         'status',
         'closed_at',
@@ -50,6 +52,16 @@ class Project extends Model
     public function fieldBlock(): BelongsTo
     {
         return $this->belongsTo(FieldBlock::class, 'field_block_id');
+    }
+
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(Agreement::class, 'agreement_id');
+    }
+
+    public function agreementAllocation(): BelongsTo
+    {
+        return $this->belongsTo(AgreementAllocation::class, 'agreement_allocation_id');
     }
 
     public function projectRule(): HasOne

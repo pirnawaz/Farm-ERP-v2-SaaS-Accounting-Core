@@ -190,6 +190,12 @@ class DuplicateWorkflowGuard
 
     private function assertWorkLogEligibleForMachineryCharge(string $tenantId, MachineWorkLog $workLog): void
     {
+        if ($workLog->chargeable) {
+            throw ValidationException::withMessages([
+                'duplicate_workflow' => ['This work log uses internal machinery charging; it cannot be included in a machinery charge batch.'],
+            ]);
+        }
+
         $otherFj = FieldJobMachine::query()
             ->where('tenant_id', $tenantId)
             ->where('source_work_log_id', $workLog->id)

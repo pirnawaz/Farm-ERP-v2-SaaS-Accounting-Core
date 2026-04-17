@@ -36,6 +36,8 @@ import type {
   MachineryProfitabilityRow,
   MachineryChargesByMachineRow,
   MachineryCostsByMachineRow,
+  CreateMachineryExternalIncomePayload,
+  MachineryExternalIncomeCreateResult,
 } from '../types';
 
 const BASE = '/api/v1/machinery';
@@ -95,6 +97,8 @@ export interface MachineryServiceFilters {
 export interface ProfitabilityReportFilters {
   from: string;
   to: string;
+  crop_cycle_id?: string;
+  machine_id?: string;
 }
 
 function searchParams(obj: Record<string, string | boolean | undefined> | object): string {
@@ -197,6 +201,10 @@ export const machineryApi = {
       apiClient.get<MachineryChargesByMachineRow[]>(`${BASE}/reports/charges-by-machine${searchParams(f)}`),
     costsByMachine: (f: ProfitabilityReportFilters) =>
       apiClient.get<MachineryCostsByMachineRow[]>(`${BASE}/reports/costs-by-machine${searchParams(f)}`),
+  },
+  externalIncome: {
+    create: (payload: CreateMachineryExternalIncomePayload) =>
+      apiClient.post<MachineryExternalIncomeCreateResult>(`${BASE}/external-income`, payload),
   },
 };
 

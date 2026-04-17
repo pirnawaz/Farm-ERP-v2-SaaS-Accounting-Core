@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateGRN } from '../../hooks/useInventory';
 import { useParties } from '../../hooks/useParties';
@@ -12,6 +12,10 @@ import { generateDocNo, getStored, setStored, formStorageKeys } from '../../util
 import { term } from '../../config/terminology';
 import { FormActions, FormCard, FormSection } from '../../components/FormLayout';
 import type { CreateInvGrnPayload } from '../../types';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
+import { useBlockUnsavedNavigation } from '../../hooks/useBlockUnsavedNavigation';
 
 type Line = { item_id: string; qty: string; unit_cost: string };
 
@@ -30,8 +34,10 @@ export default function InvGrnFormPage() {
   const [doc_date, setDocDate] = useState(new Date().toISOString().split('T')[0]);
   const [lines, setLines] = useState<Line[]>([{ item_id: '', qty: '', unit_cost: '' }]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState(false);
 
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
+  const markTouched = () => setTouched(true);
 
   useEffect(() => {
     if (!doc_no) setDocNo(generateDocNo('GRN'));
@@ -51,13 +57,44 @@ export default function InvGrnFormPage() {
     if (supplier_party_id) setStored(formStorageKeys.last_supplier_party_id, supplier_party_id);
   }, [supplier_party_id]);
 
-  const addLine = () => setLines((l) => [...l, { item_id: '', qty: '', unit_cost: '' }]);
-  const removeLine = (i: number) => setLines((l) => l.filter((_, idx) => idx !== i));
-  const updateLine = (i: number, f: Partial<Line>) =>
+  useEffect(() => {
+    if (!stores?.length || store_id) return;
+    if (stores.length === 1) setStoreId(stores[0].id);
+  }, [stores, store_id]);
+
+  useBlockUnsavedNavigation(Boolean(touched && canEdit));
+
+  const addLine = () => {
+    markTouched();
+    setLines((l) => [...l, { item_id: '', qty: '', unit_cost: '' }]);
+  };
+  const removeLine = (i: number) => {
+    markTouched();
+    setLines((l) => l.filter((_, idx) => idx !== i));
+  };
+  const updateLine = (i: number, f: Partial<Line>) => {
+    markTouched();
     setLines((l) => l.map((row, idx) => (idx === i ? { ...row, ...f } : row)));
+  };
 
   const lineTotals = lines.map((l) => (parseFloat(l.qty) || 0) * (parseFloat(l.unit_cost) || 0));
   const total = lineTotals.reduce((a, b) => a + b, 0);
+
+  const validLines = useMemo(
+    () => lines.filter((l) => l.item_id && parseFloat(l.qty) > 0 && parseFloat(l.unit_cost) >= 0),
+    [lines]
+  );
+
+  const canSaveDraft = Boolean(store_id && doc_date && validLines.length > 0);
+
+  const readinessItems = useMemo(
+    () => [
+      { ok: Boolean(store_id), label: 'Store selected' },
+      { ok: Boolean(doc_date), label: 'Document date set' },
+      { ok: validLines.length > 0, label: 'At least one line with item, quantity > 0, and unit cost' },
+    ],
+    [store_id, doc_date, validLines.length]
+  );
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -70,17 +107,19 @@ export default function InvGrnFormPage() {
   };
 
   const handleSubmit = async () => {
-    if (!validate() || !canEdit) return;
-    const validLines = lines
-      .filter((l) => l.item_id && parseFloat(l.qty) > 0 && parseFloat(l.unit_cost) >= 0)
-      .map((l) => ({ item_id: l.item_id, qty: parseFloat(l.qty), unit_cost: parseFloat(l.unit_cost) }));
+    if (!canSaveDraft || !validate() || !canEdit) return;
+    const validLinesPayload = validLines.map((l) => ({
+      item_id: l.item_id,
+      qty: parseFloat(l.qty),
+      unit_cost: parseFloat(l.unit_cost),
+    }));
     const finalDocNo = doc_no.trim() || generateDocNo('GRN');
     const payload: CreateInvGrnPayload = {
       doc_no: finalDocNo,
       supplier_party_id: supplier_party_id || undefined,
       store_id,
       doc_date,
-      lines: validLines,
+      lines: validLinesPayload,
     };
     const grn = await createM.mutateAsync(payload);
     navigate(`/app/inventory/grns/${grn.id}`);
@@ -91,7 +130,7 @@ export default function InvGrnFormPage() {
       <PageHeader
         title="New goods received"
         description="Record stock arriving into a store from a supplier or inbound source."
-        helper="This is a receipt (not a transfer between stores). Posting increases on-hand stock."
+        helper="This is a receipt (not a transfer between stores). When you record it to the accounts, on-hand stock increases."
         backTo="/app/inventory/grns"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -102,12 +141,24 @@ export default function InvGrnFormPage() {
       />
 
       <FormCard>
+        <p className="text-sm text-gray-600 -mt-1 mb-2">
+          Saving creates a <span className="font-medium text-gray-800">draft</span> receipt. Use <span className="font-medium text-gray-800">Record to accounts</span> on the next screen to move quantities into the store.
+        </p>
+        <PrePostChecklist
+          items={readinessItems}
+          blockingHint={!canSaveDraft ? 'Complete required fields before saving this draft.' : undefined}
+          className="mb-4"
+        />
+        {createM.isError ? <OperatorErrorCallout error={formatOperatorError(createM.error)} className="mb-4" /> : null}
         <FormSection title="Header">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Doc No">
               <input
                 value={doc_no}
-                onChange={(e) => setDocNo(e.target.value)}
+                onChange={(e) => {
+                  markTouched();
+                  setDocNo(e.target.value);
+                }}
                 disabled={!canEdit}
                 placeholder={generateDocNo('GRN')}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-50"
@@ -117,7 +168,10 @@ export default function InvGrnFormPage() {
               <input
                 type="date"
                 value={doc_date}
-                onChange={(e) => setDocDate(e.target.value)}
+                onChange={(e) => {
+                  markTouched();
+                  setDocDate(e.target.value);
+                }}
                 disabled={!canEdit}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-50"
               />
@@ -125,7 +179,10 @@ export default function InvGrnFormPage() {
             <FormField label="Store" required error={errors.store_id}>
               <select
                 value={store_id}
-                onChange={(e) => setStoreId(e.target.value)}
+                onChange={(e) => {
+                  markTouched();
+                  setStoreId(e.target.value);
+                }}
                 disabled={!canEdit}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-50"
               >
@@ -138,7 +195,10 @@ export default function InvGrnFormPage() {
             <FormField label="Supplier (optional)">
               <select
                 value={supplier_party_id}
-                onChange={(e) => setSupplierPartyId(e.target.value)}
+                onChange={(e) => {
+                  markTouched();
+                  setSupplierPartyId(e.target.value);
+                }}
                 disabled={!canEdit}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-50"
               >
@@ -233,8 +293,9 @@ export default function InvGrnFormPage() {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={createM.isPending}
-              className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50"
+              disabled={!canSaveDraft || createM.isPending}
+              title={!canSaveDraft ? 'Complete the checklist above before saving.' : undefined}
+              className="w-full sm:w-auto px-4 py-2.5 bg-[#1F6F5C] text-white rounded-lg hover:bg-[#1a5a4a] disabled:opacity-50 min-h-[44px]"
             >
               {createM.isPending ? 'Saving…' : 'Save'}
             </button>

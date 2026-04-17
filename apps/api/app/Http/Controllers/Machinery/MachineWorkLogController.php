@@ -18,9 +18,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
- * @deprecated Legacy machine usage / machinery work log workflow. Primary machinery capture: Field Jobs
- *             (and machinery charges / settlement flows). Retained for history, traceability links, and tests.
- *             Manual create is disabled (403) where Phase 1–2 blocking applies.
+ * Machine work logs: usage capture; optional internal charge (Phase 5B) posts Dr project expense / Cr machinery income.
+ * Field Jobs and machinery charges remain primary workflows where applicable.
  */
 class MachineWorkLogController extends Controller
 {
@@ -61,14 +60,8 @@ class MachineWorkLogController extends Controller
 
     public function store(Request $request)
     {
-        return response()->json([
-            'message' => 'This legacy/manual create path has been disabled. Use the primary workflow instead. Existing records remain available for history and testing.',
-            'error_code' => 'LEGACY_MANUAL_CREATE_DISABLED',
-        ], 403);
-
         $tenantId = TenantContext::getTenantId($request);
 
-        // If lines are sent, return validation error
         if ($request->has('lines')) {
             abort(422, 'cost lines deprecated; use charges');
         }
@@ -81,7 +74,15 @@ class MachineWorkLogController extends Controller
             'meter_end' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'pool_scope' => ['nullable', 'string', Rule::in([MachineWorkLog::POOL_SCOPE_SHARED, MachineWorkLog::POOL_SCOPE_HARI_ONLY, MachineWorkLog::POOL_SCOPE_LANDLORD_ONLY])],
+            'chargeable' => ['sometimes', 'boolean'],
+            'internal_charge_rate' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        if (! empty($validated['chargeable'])) {
+            $request->validate([
+                'internal_charge_rate' => ['required', 'numeric', 'min:0'],
+            ]);
+        }
 
         if (isset($validated['meter_start']) && isset($validated['meter_end']) && $validated['meter_end'] < $validated['meter_start']) {
             abort(422, 'meter_end must be greater than or equal to meter_start');
@@ -109,6 +110,10 @@ class MachineWorkLogController extends Controller
             'meter_start' => $validated['meter_start'] ?? null,
             'meter_end' => $validated['meter_end'] ?? null,
             'usage_qty' => $usageQty,
+            'chargeable' => (bool) ($validated['chargeable'] ?? false),
+            'internal_charge_rate' => array_key_exists('internal_charge_rate', $validated)
+                ? (string) $validated['internal_charge_rate']
+                : null,
             'notes' => $validated['notes'] ?? null,
             'status' => MachineWorkLog::STATUS_DRAFT,
         ]);
@@ -149,8 +154,16 @@ class MachineWorkLogController extends Controller
             'meter_end' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'pool_scope' => ['nullable', 'string', Rule::in([MachineWorkLog::POOL_SCOPE_SHARED, MachineWorkLog::POOL_SCOPE_HARI_ONLY, MachineWorkLog::POOL_SCOPE_LANDLORD_ONLY])],
+            'chargeable' => ['sometimes', 'boolean'],
+            'internal_charge_rate' => ['nullable', 'numeric', 'min:0'],
         ];
         $validated = $request->validate($rules);
+
+        if (! empty($validated['chargeable'])) {
+            $request->validate([
+                'internal_charge_rate' => ['required', 'numeric', 'min:0'],
+            ]);
+        }
 
         if (isset($validated['meter_start']) && isset($validated['meter_end']) && $validated['meter_end'] < $validated['meter_start']) {
             abort(422, 'meter_end must be greater than or equal to meter_start');
@@ -175,7 +188,7 @@ class MachineWorkLogController extends Controller
             'crop_cycle_id' => $cropCycleId,
             'usage_qty' => $usageQty,
         ];
-        foreach (['machine_id', 'project_id', 'work_date', 'meter_start', 'meter_end', 'notes', 'pool_scope'] as $key) {
+        foreach (['machine_id', 'project_id', 'work_date', 'meter_start', 'meter_end', 'notes', 'pool_scope', 'chargeable', 'internal_charge_rate'] as $key) {
             if (array_key_exists($key, $validated)) {
                 $header[$key] = $validated[$key];
             }
@@ -183,6 +196,10 @@ class MachineWorkLogController extends Controller
 
         if (isset($validated['machine_id'])) {
             Machine::where('id', $validated['machine_id'])->where('tenant_id', $tenantId)->firstOrFail();
+        }
+
+        if (array_key_exists('chargeable', $header) && ! $header['chargeable']) {
+            $header['internal_charge_rate'] = null;
         }
 
         $log->update($header);
@@ -232,7 +249,7 @@ class MachineWorkLogController extends Controller
         );
 
         $workLog = MachineWorkLog::where('id', $id)->where('tenant_id', $tenantId)
-            ->with(['machine', 'project', 'cropCycle', 'postingGroup', 'lines.party'])
+            ->with(['machine', 'project', 'cropCycle', 'postingGroup.allocationRows', 'postingGroup.ledgerEntries.account', 'lines.party'])
             ->firstOrFail();
 
         return response()->json([
@@ -254,7 +271,7 @@ class MachineWorkLogController extends Controller
         );
 
         $workLog = MachineWorkLog::where('id', $id)->where('tenant_id', $tenantId)
-            ->with(['machine', 'project', 'cropCycle', 'postingGroup', 'reversalPostingGroup', 'lines.party'])
+            ->with(['machine', 'project', 'cropCycle', 'postingGroup.allocationRows', 'postingGroup.ledgerEntries.account', 'reversalPostingGroup.allocationRows', 'reversalPostingGroup.ledgerEntries.account', 'lines.party'])
             ->firstOrFail();
 
         return response()->json([

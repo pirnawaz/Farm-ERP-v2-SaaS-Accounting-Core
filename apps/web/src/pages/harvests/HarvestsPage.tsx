@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { Badge } from '../../components/Badge';
 import { useFormatting } from '../../hooks/useFormatting';
+import { useRole } from '../../hooks/useRole';
 import type { Harvest } from '../../types';
 import { PrimaryWorkflowBanner } from '../../components/workflow/PrimaryWorkflowBanner';
 
@@ -33,8 +34,18 @@ export default function HarvestsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { formatDate } = useFormatting();
+  const { hasRole } = useRole();
 
-  const rows = (harvests ?? []) as Harvest[];
+  const rows = useMemo(() => {
+    const list = [...(harvests ?? [])] as Harvest[];
+    list.sort((a, b) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      return String(b.harvest_date ?? '').localeCompare(String(a.harvest_date ?? ''));
+    });
+    return list;
+  }, [harvests]);
   const hasFilters = !!(status || cropCycleId || from || to);
 
   const summaryLine = useMemo(() => {
@@ -55,30 +66,60 @@ export default function HarvestsPage() {
     return (h.lines || []).reduce((s, l) => s + parseFloat(String(l.quantity || 0)), 0);
   };
 
-  const cols: Column<Harvest>[] = [
-    {
-      header: 'Date',
-      accessor: (r) => (
-        <span className="tabular-nums text-gray-900">{formatDate(r.harvest_date, { variant: 'medium' })}</span>
-      ),
-    },
-    { header: 'Harvest no.', accessor: (r) => <span className="tabular-nums text-gray-800">{r.harvest_no || '—'}</span> },
-    { header: 'Crop cycle', accessor: (r) => <span className="text-gray-900">{r.crop_cycle?.name || r.crop_cycle_id}</span> },
-    { header: 'Field cycle', accessor: (r) => <span className="text-gray-800">{r.project?.name ?? '—'}</span> },
-    {
-      header: 'Total qty',
-      accessor: (r) => <span className="tabular-nums text-right block text-gray-900">{totalQty(r).toFixed(3)}</span>,
-      numeric: true,
-    },
-    {
-      header: 'Status',
-      accessor: (r) => (
-        <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
-          {statusLabel(r.status)}
-        </Badge>
-      ),
-    },
-  ];
+  const cols: Column<Harvest>[] = useMemo(
+    () => [
+      {
+        header: 'Date',
+        accessor: (r) => (
+          <span className="tabular-nums text-gray-900">{formatDate(r.harvest_date, { variant: 'medium' })}</span>
+        ),
+      },
+      { header: 'Harvest no.', accessor: (r) => <span className="tabular-nums text-gray-800">{r.harvest_no || '—'}</span> },
+      { header: 'Crop cycle', accessor: (r) => <span className="text-gray-900">{r.crop_cycle?.name || r.crop_cycle_id}</span> },
+      { header: 'Field cycle', accessor: (r) => <span className="text-gray-800">{r.project?.name ?? '—'}</span> },
+      {
+        header: 'Total qty',
+        accessor: (r) => <span className="tabular-nums text-right block text-gray-900">{totalQty(r).toFixed(3)}</span>,
+        numeric: true,
+      },
+      {
+        header: 'Status',
+        accessor: (r) => (
+          <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
+            {statusLabel(r.status)}
+          </Badge>
+        ),
+      },
+      {
+        header: 'Quick actions',
+        accessor: (r) => (
+          <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+            {r.status === 'DRAFT' && hasRole(['tenant_admin', 'accountant', 'operator']) ? (
+              <button
+                type="button"
+                className="text-sm font-medium text-[#1F6F5C] hover:underline"
+                onClick={() =>
+                  navigate(`/app/harvests/${r.id}`, { state: { from: location.pathname + location.search } })
+                }
+              >
+                Continue editing
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="text-sm font-medium text-gray-700 hover:underline"
+              onClick={() =>
+                navigate(`/app/harvests/${r.id}`, { state: { from: location.pathname + location.search } })
+              }
+            >
+              View
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [formatDate, hasRole, navigate, location.pathname, location.search],
+  );
 
   return (
     <div className="space-y-6 max-w-7xl">

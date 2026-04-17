@@ -152,6 +152,25 @@ export interface LandDocument {
   created_at: string;
 }
 
+/** Acreage reserved from a parcel for a formal agreement (commercial scope). */
+export interface AgreementAllocation {
+  id: string;
+  tenant_id: string;
+  agreement_id: string;
+  land_parcel_id: string;
+  allocated_area: string;
+  area_uom?: string | null;
+  starts_on: string;
+  ends_on?: string | null;
+  status: string;
+  label?: string | null;
+  notes?: string | null;
+  legacy_field_id?: string | null;
+  agreement?: { id: string; agreement_type?: string; party_id?: string | null; status?: string };
+  land_parcel?: { id: string; name: string; total_acres?: string };
+  legacy_field?: { id: string; name: string; area?: string } | null;
+}
+
 export interface LandParcelAuditLogEntry {
   id: string;
   land_parcel_id: string;
@@ -178,6 +197,14 @@ export interface LandParcelDetail extends LandParcel {
     allocations: LandAllocation[];
   }[];
   remaining_acres?: string;
+  /** Commercial acreage reservations (agreement_allocations table) */
+  agreement_allocations?: AgreementAllocation[];
+  agreement_allocation_summary?: {
+    as_of: string;
+    active_allocated_area: number;
+    available_area_after_agreement_allocations: number;
+    parcel_total_area: number;
+  };
 }
 
 // Crop Item (tenant-facing crop list for crop cycles)
@@ -387,6 +414,8 @@ export interface Project {
   crop_cycle_id: string;
   land_allocation_id?: string;
   field_block_id?: string | null;
+  agreement_id?: string | null;
+  agreement_allocation_id?: string | null;
   status: ProjectStatus;
   closed_at?: string | null;
   created_at: string;
@@ -394,6 +423,26 @@ export interface Project {
   party?: Party;
   land_allocation?: LandAllocation;
   field_block?: FieldBlock | null;
+  agreement?: { id: string; agreement_type?: string; effective_from?: string; effective_to?: string | null } | null;
+  agreement_allocation?: AgreementAllocation | null;
+  /** Present when loaded from API (snake_case JSON) */
+  project_rule?: ProjectRule;
+  /** Server-computed settlement rule snapshot (ProjectController show). */
+  settlement_resolution?: SettlementResolutionPayload | null;
+}
+
+/** Payload merged onto project show JSON for current settlement resolution. */
+export interface SettlementResolutionPayload {
+  resolution_source: 'agreement' | 'project_rule' | 'unresolved' | string;
+  profit_split_landlord_pct?: string;
+  profit_split_hari_pct?: string;
+  kamdari_pct?: string;
+  kamdar_party_id?: string | null;
+  kamdari_order?: string | null;
+  pool_definition?: string | null;
+  agreement_id?: string | null;
+  project_rule_id?: string | null;
+  message?: string;
 }
 
 // Project Rule
@@ -408,6 +457,10 @@ export interface ProjectRule {
   kamdar_party_id?: string;
   kamdari_order: KamdariOrder;
   pool_definition: PoolDefinition;
+  _meta?: {
+    settlement_terms_primary: 'agreement' | 'project_rule' | 'defaults_template';
+    settlement_terms_hint: string;
+  };
 }
 
 // Operational Transaction
@@ -498,6 +551,76 @@ export interface ExpensesIncluded {
   breakdown: ExpensesIncludedBreakdown;
 }
 
+/** Phase 6 — additive settlement preview explanation (farm-first copy). */
+export interface PartyEconomicsExplanation {
+  summary_lines?: Record<string, number>;
+  recoverability?: {
+    included_in_shared_pool_for_settlement?: number;
+    hari_borne_after_split?: number;
+    owner_borne_not_in_pool?: number;
+    shared_scope_other_amounts?: number;
+    shared_scope_other_note?: string | null;
+  };
+  legacy_unscoped_expense_allocation?: number;
+  legacy_unscoped_note?: string | null;
+  by_effective_responsibility?: Record<string, number>;
+  top_allocation_types?: Array<{ type: string; amount: number }>;
+}
+
+/** GET /api/reports/project-responsibility — settlement_terms snapshot from backend resolver. */
+export interface ProjectResponsibilitySettlementTerms {
+  resolution_source?: string | null;
+  agreement_id?: string | null;
+  project_rule_id?: string | null;
+  profit_split_landlord_pct?: string;
+  profit_split_hari_pct?: string;
+  kamdari_pct?: string;
+  kamdari_order?: string | null;
+  pool_definition?: unknown;
+  resolution_error?: string;
+}
+
+/** Non-empty period responsibility buckets (numeric keys). When no postings match, backend may return `buckets: []`. */
+export interface ProjectResponsibilityBuckets {
+  settlement_shared_pool_costs: number;
+  hari_only_costs: number;
+  landlord_only_costs: number;
+  shared_scope_non_pool_share_positive: number;
+  legacy_unscoped_amount: number;
+}
+
+export interface ProjectResponsibilityReport {
+  project_id: string;
+  from: string;
+  to: string;
+  crop_cycle_id?: string | null;
+  posting_groups_count: number;
+  buckets: ProjectResponsibilityBuckets | [];
+  by_effective_responsibility: Record<string, number>;
+  top_allocation_types: Array<{ type: string; amount: number }>;
+  settlement_terms?: ProjectResponsibilitySettlementTerms;
+}
+
+/** GET /api/reports/project-party-economics — Hari slice when `is_project_hari_party`. */
+export interface HariSettlementPreviewSlice {
+  hari_gross?: string | number | null;
+  hari_only_deductions?: string | number | null;
+  hari_net?: string | number | null;
+  hari_position?: 'PAYABLE' | 'RECEIVABLE' | 'SETTLED' | string | null;
+  kamdari_amount?: string | number | null;
+  landlord_gross?: string | number | null;
+}
+
+export interface ProjectPartyEconomicsReport {
+  project_id: string;
+  party_id: string;
+  up_to_date: string;
+  is_project_hari_party: boolean;
+  party_economics_explanation?: PartyEconomicsExplanation;
+  settlement_terms?: ProjectResponsibilitySettlementTerms;
+  hari_settlement_preview?: HariSettlementPreviewSlice;
+}
+
 export interface SettlementPreview {
   total_revenue: string | number;
   total_expenses: string | number;
@@ -523,6 +646,12 @@ export interface SettlementPreview {
   expenses_included?: ExpensesIncluded;
   has_settlement_adjustments?: boolean;
   adjustments_explainer?: string;
+  /** agreement = terms.settlement on linked agreement; project_rule = project_rules row */
+  settlement_rule_source?: 'agreement' | 'project_rule';
+  settlement_agreement_id?: string | null;
+  settlement_project_rule_id?: string | null;
+  /** Phase 6 — who bears costs / recoverability context (read-only). */
+  party_economics_explanation?: PartyEconomicsExplanation;
 }
 
 export interface PostSettlementRequest {
@@ -628,6 +757,29 @@ export interface SalePaymentAllocation {
   sale?: Sale;
 }
 
+export interface PaymentAllocationSummary {
+  payment_id: string;
+  amount: string;
+  applied_amount: string;
+  applied_to_grns: string;
+  applied_to_supplier_invoices: string;
+  unapplied_amount: string;
+  allocations: Array<{
+    id: string;
+    grn_id: string;
+    doc_no?: string | null;
+    amount: string;
+    allocation_date: string;
+  }>;
+  supplier_invoice_allocations: Array<{
+    id: string;
+    supplier_invoice_id: string;
+    reference_no?: string | null;
+    amount: string;
+    allocation_date: string;
+  }>;
+}
+
 export interface Payment {
   id: string;
   tenant_id: string;
@@ -636,6 +788,7 @@ export interface Payment {
   amount: string;
   payment_date: string;
   method: PaymentMethod;
+  source_account_id?: string | null;
   reference?: string;
   status: PaymentStatus;
   posting_group_id?: string;
@@ -650,7 +803,10 @@ export interface Payment {
   created_at: string;
   party?: Party;
   settlement?: Settlement;
+  source_account?: { id: string; code: string; name: string; type?: string } | null;
   sale_allocations?: SalePaymentAllocation[];
+  /** Present on GET when direction is OUT, posted, and not reversed */
+  allocation_summary?: PaymentAllocationSummary;
 }
 
 export interface ReversePaymentRequest {
@@ -664,6 +820,8 @@ export interface CreatePaymentPayload {
   amount: string;
   payment_date: string;
   method: PaymentMethod;
+  /** When set, posting credits this tenant asset (bank/cash) GL instead of the default CASH/BANK control by method */
+  source_account_id?: string | null;
   reference?: string;
   settlement_id?: string;
   notes?: string;
@@ -867,6 +1025,11 @@ export interface MachineWorkLog {
   meter_start?: string | null;
   meter_end?: string | null;
   usage_qty: string;
+  /** When true, posting creates internal charge: project expense + machinery income (rate × usage). */
+  chargeable?: boolean | null;
+  internal_charge_rate?: string | null;
+  /** Set when a chargeable log is posted. */
+  internal_charge_amount?: string | null;
   notes?: string | null;
   posting_date?: string | null;
   posted_at?: string | null;
@@ -930,6 +1093,8 @@ export interface CreateMachineWorkLogPayload {
   work_date?: string | null;
   meter_start?: number | null;
   meter_end?: number | null;
+  chargeable?: boolean;
+  internal_charge_rate?: number | null;
   notes?: string | null;
   lines?: MachineWorkLogCostLineInput[];
   /** Required for new manual/legacy create paths (server-side gating). */
@@ -943,6 +1108,8 @@ export interface UpdateMachineWorkLogPayload {
   work_date?: string | null;
   meter_start?: number | null;
   meter_end?: number | null;
+  chargeable?: boolean;
+  internal_charge_rate?: number | null;
   notes?: string | null;
   lines?: MachineWorkLogCostLineInput[];
 }
@@ -1252,6 +1419,21 @@ export interface MachineryProfitabilityRow {
   cost_per_unit: string | null;
   charge_per_unit: string | null;
   margin_per_unit: string | null;
+}
+
+/** POST /api/v1/machinery/external-income — matches Laravel validation */
+export interface CreateMachineryExternalIncomePayload {
+  machine_id: string;
+  crop_cycle_id: string;
+  party_id: string;
+  amount: number;
+  posting_date: string;
+  memo?: string | null;
+  idempotency_key?: string;
+}
+
+export interface MachineryExternalIncomeCreateResult {
+  posting_group: PostingGroup;
 }
 
 export interface MachineryChargesByMachineRow {
@@ -2085,10 +2267,13 @@ export interface ARAgeingReport {
 export interface APAgeingReport {
   as_of: string;
   buckets: string[];
+  notes?: string[];
   rows: Array<{
     supplier_party_id: string;
     supplier_name: string;
     total_outstanding: string;
+    posted_unlinked_credits?: string;
+    net_after_unlinked_credits?: string;
     bucket_0_30: string;
     bucket_31_60: string;
     bucket_61_90: string;
@@ -2106,16 +2291,91 @@ export interface APAgeingReport {
   };
 }
 
+/** GET /api/reports/ap-supplier-outstanding */
+export interface SupplierPaymentApplicationRow {
+  allocation_id: string;
+  amount: string;
+  allocation_date: string;
+  payment_id: string;
+  payment_date: string | null;
+  payment_reference: string | null;
+  payment_status: string | null;
+  payment_amount: string | null;
+}
+
+/** GET /api/reports/supplier-payments */
+export interface SupplierPaymentsHistoryReport {
+  from?: string | null;
+  to?: string | null;
+  limit: number;
+  notes: string[];
+  rows: Array<{
+    payment_id: string;
+    party_id: string;
+    supplier_name?: string | null;
+    payment_date: string;
+    amount: string;
+    reference: string | null;
+    status: string;
+    method: string;
+    source_account: { id: string; code: string; name: string } | null;
+    allocation_summary: PaymentAllocationSummary | null;
+  }>;
+}
+
+/** GET /api/reports/treasury-supplier-outflows */
+export interface TreasurySupplierOutflowsReport {
+  from: string;
+  to: string;
+  total_paid: string;
+  by_supplier: Array<{
+    party_id: string;
+    supplier_name: string | null;
+    total_paid: string;
+  }>;
+  notes: string[];
+}
+
+export interface APSupplierOutstandingReport {
+  as_of: string;
+  notes?: string[];
+  rows: Array<{
+    supplier_party_id: string;
+    supplier_name: string;
+    open_grn_outstanding: string;
+    open_supplier_invoice_outstanding: string;
+    documents_open_total: string;
+    posted_credit_notes_total: string;
+    posted_unlinked_credits: string;
+    net_after_unlinked_credits: string;
+  }>;
+}
+
 export type SupplierInvoiceStatus = 'DRAFT' | 'POSTED' | 'PAID';
+
+export type BillingScopeHint = 'farm_overhead' | 'project' | 'unspecified';
+
+export interface CostCenter {
+  id: string;
+  tenant_id: string;
+  name: string;
+  code: string | null;
+  status: 'ACTIVE' | 'INACTIVE';
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface SupplierInvoiceListItem {
   id: string;
   tenant_id: string;
   party_id: string;
   project_id: string | null;
+  cost_center_id?: string | null;
   grn_id: string | null;
   reference_no: string | null;
   invoice_date: string | null;
+  due_date?: string | null;
   currency_code: string;
   subtotal_amount: string | null;
   tax_amount: string | null;
@@ -2127,10 +2387,12 @@ export interface SupplierInvoiceListItem {
   created_at: string | null;
   party?: { id: string; name: string } | null;
   project?: { id: string; name: string } | null;
+  cost_center?: { id: string; name: string; code?: string | null; status?: string } | null;
   posting_group?: { id: string; posting_date: string } | null;
 }
 
 export interface SupplierInvoiceDetail extends SupplierInvoiceListItem {
+  billing_scope?: BillingScopeHint;
   party?: { id: string; name: string; party_types?: string[] } | null;
   lines: Array<{
     id: string;
@@ -2142,6 +2404,21 @@ export interface SupplierInvoiceDetail extends SupplierInvoiceListItem {
     tax_amount: string | null;
   }>;
   grn?: { id: string; doc_no: string | null; posting_date: string | null } | null;
+  cost_center?: { id: string; name: string; code?: string | null; status?: string } | null;
+  outstanding_amount?: string | null;
+  ap_match_summary?: {
+    matched_amount: number;
+    unmatched_amount: number;
+    matches: Array<{
+      id: string;
+      supplier_invoice_line_id: string;
+      grn_line_id: string;
+      matched_qty: string;
+      matched_amount: string;
+      grn?: { id: string; doc_no: string | null } | null;
+    }>;
+  };
+  payment_applications?: SupplierPaymentApplicationRow[];
 }
 
 export interface SupplierStatementLine {
@@ -2625,12 +2902,21 @@ export interface CreateProjectPayload {
   party_id: string;
   crop_cycle_id: string;
   land_allocation_id?: string;
+  agreement_id?: string | null;
+  agreement_allocation_id?: string | null;
   status?: ProjectStatus;
 }
 
 export interface CreateProjectFromAllocationPayload {
   land_allocation_id: string;
   name: string;
+}
+
+export interface CreateProjectFromAgreementAllocationPayload {
+  agreement_allocation_id: string;
+  party_id: string;
+  crop_cycle_id: string;
+  name?: string;
 }
 
 export interface UpdateProjectRulePayload {
@@ -2724,6 +3010,15 @@ export interface InvGrn {
   supplier?: Party;
   lines?: InvGrnLine[];
   posting_group?: PostingGroup;
+  ap_match_summary?: {
+    matched_amount: number;
+    unmatched_receipt_value: number;
+    matched_bills: Array<{
+      supplier_invoice_id: string;
+      reference_no: string | null;
+      matched_amount: string;
+    }>;
+  };
 }
 
 export interface InvIssueLine {

@@ -1,21 +1,41 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '@farm-erp/shared';
 import { PageContainer } from '../components/PageContainer';
 import { PageHeader } from '../components/PageHeader';
 import { useFormatting } from '../hooks/useFormatting';
+import { useRole } from '../hooks/useRole';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import type { SupplierInvoiceDetail, SupplierStatementResponse } from '../types';
+import toast from 'react-hot-toast';
 
 export default function SupplierInvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const { formatMoney, formatDate } = useFormatting();
+  const { hasRole } = useRole();
   const { settings } = useTenantSettings();
+  const [postingDate, setPostingDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const { data: invoice, isLoading, error } = useQuery({
     queryKey: ['supplier-invoice', id],
     queryFn: () => apiClient.get<SupplierInvoiceDetail>(`/api/supplier-invoices/${id}`),
     enabled: !!id,
+  });
+
+  const postM = useMutation({
+    mutationFn: () =>
+      apiClient.post<{ id: string }>(`/api/supplier-invoices/${id}/post`, {
+        posting_date: postingDate,
+        idempotency_key: crypto.randomUUID(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['supplier-invoice', id] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-invoices'] });
+      toast.success('Bill posted');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Post failed'),
   });
 
   const functionalCc = (settings?.currency_code || 'GBP').toUpperCase();
@@ -62,14 +82,23 @@ export default function SupplierInvoiceDetailPage() {
     );
   }
 
+  const isFarmBill = invoice.billing_scope === 'farm_overhead';
+  const detailTitle = invoice.reference_no
+    ? `${isFarmBill ? 'Bill' : 'Supplier invoice'} · ${invoice.reference_no}`
+    : isFarmBill
+      ? 'Bill'
+      : 'Supplier invoice';
+
   return (
     <PageContainer className="space-y-6">
       <PageHeader
-        title={invoice.reference_no ? `Supplier invoice · ${invoice.reference_no}` : 'Supplier invoice'}
-        backTo="/app/accounting/supplier-invoices"
+        title={detailTitle}
+        backTo={isFarmBill ? '/app/accounting/bills' : '/app/accounting/supplier-invoices'}
         breadcrumbs={[
           { label: 'Reports', to: '/app/reports' },
-          { label: 'Supplier invoices', to: '/app/accounting/supplier-invoices' },
+          isFarmBill
+            ? { label: 'Bills', to: '/app/accounting/bills' }
+            : { label: 'Supplier invoices', to: '/app/accounting/supplier-invoices' },
           { label: 'Detail' },
         ]}
       />
@@ -88,6 +117,18 @@ export default function SupplierInvoiceDetailPage() {
         <span>
           Status: <strong className="text-gray-900">{invoice.status}</strong>
         </span>
+        {invoice.billing_scope && (
+          <span>
+            Belongs to:{' '}
+            <strong className="text-gray-900">
+              {invoice.billing_scope === 'farm_overhead'
+                ? 'Cost center (farm overhead)'
+                : invoice.billing_scope === 'project'
+                  ? 'Project'
+                  : 'Not set'}
+            </strong>
+          </span>
+        )}
         {invoice.party && (
           <span>
             Supplier:{' '}
@@ -96,9 +137,23 @@ export default function SupplierInvoiceDetailPage() {
             </Link>
           </span>
         )}
+        {invoice.cost_center && (
+          <span>
+            Cost center:{' '}
+            <strong className="text-gray-900">
+              {invoice.cost_center.name}
+              {invoice.cost_center.code ? ` (${invoice.cost_center.code})` : ''}
+            </strong>
+          </span>
+        )}
         {invoice.project?.name && (
           <span>
             Project: <strong className="text-gray-900">{invoice.project.name}</strong>
+          </span>
+        )}
+        {invoice.due_date && (
+          <span>
+            Due: <strong className="text-gray-900">{formatDate(invoice.due_date)}</strong>
           </span>
         )}
         <span>
@@ -115,7 +170,51 @@ export default function SupplierInvoiceDetailPage() {
             Posted: <strong className="text-gray-900">{formatDate(invoice.posting_group.posting_date)}</strong>
           </span>
         )}
+        {invoice.posting_group_id && (
+          <span>
+            <Link to={`/app/posting-groups/${invoice.posting_group_id}`} className="text-[#1F6F5C] hover:underline">
+              View posting group
+            </Link>
+          </span>
+        )}
       </div>
+
+      {invoice.status === 'DRAFT' && !invoice.grn_id && (
+        <section className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Post to accounts</h2>
+          <p className="text-sm text-gray-600">
+            Posting creates the posting group, allocation rows, and ledger entries. This cannot be undone from the UI.
+          </p>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label htmlFor="post-date" className="block text-xs font-medium text-gray-600 mb-1">
+                Posting date
+              </label>
+              <input
+                id="post-date"
+                type="date"
+                className="rounded border border-gray-300 px-3 py-2 text-sm"
+                value={postingDate}
+                onChange={(e) => setPostingDate(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={postM.isPending}
+              onClick={() => postM.mutate()}
+              className="rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#185647] disabled:opacity-50"
+            >
+              {postM.isPending ? 'Posting…' : 'Post bill'}
+            </button>
+            <Link
+              to={`/app/accounting/bills/${invoice.id}/edit`}
+              className="text-sm text-gray-700 underline hover:text-gray-900"
+            >
+              Edit draft
+            </Link>
+          </div>
+        </section>
+      )}
 
       <section className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold mb-1">Amounts</h2>
@@ -138,6 +237,119 @@ export default function SupplierInvoiceDetailPage() {
           </div>
         </dl>
       </section>
+
+      {invoice.outstanding_amount != null && (invoice.status === 'POSTED' || invoice.status === 'PAID') && (
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-1">Outstanding payable</h2>
+          <p className="text-sm text-gray-600 mb-2">
+            After payment allocations and posted supplier credits linked to this bill (subledger view; GL remains source
+            of truth).
+          </p>
+          <p className="text-xl font-semibold tabular-nums">{formatMoney(invoice.outstanding_amount)}</p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {hasRole(['tenant_admin', 'accountant', 'operator']) && parseFloat(String(invoice.outstanding_amount)) > 0 && (
+              <Link
+                to={`/app/payments/new?partyId=${encodeURIComponent(invoice.party_id)}&direction=OUT&amount=${encodeURIComponent(String(invoice.outstanding_amount))}`}
+                className="text-sm font-medium text-[#1F6F5C] hover:underline"
+              >
+                Record supplier payment
+              </Link>
+            )}
+            {hasRole(['tenant_admin', 'accountant']) && parseFloat(String(invoice.outstanding_amount)) > 0 && (
+              <Link
+                to={`/app/accounting/supplier-credit-notes/new?party_id=${encodeURIComponent(invoice.party_id)}&supplier_invoice_id=${encodeURIComponent(invoice.id)}`}
+                className="text-sm font-medium text-[#1F6F5C] hover:underline"
+              >
+                Record supplier credit
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
+
+      {invoice.payment_applications && invoice.payment_applications.length > 0 && (
+        <section className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-2">Payments applied to this bill</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            Subledger applications only; each payment is posted as its own financial event. Open a payment for allocation
+            detail.
+          </p>
+          <div className="overflow-x-auto border border-gray-100 rounded">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left">Payment</th>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-right">Applied</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.payment_applications.map((row) => (
+                  <tr key={row.allocation_id} className="border-t border-gray-100">
+                    <td className="px-3 py-2">
+                      <Link to={`/app/payments/${row.payment_id}`} className="text-[#1F6F5C] hover:underline font-medium">
+                        {row.payment_reference || row.payment_id.slice(0, 8)}
+                      </Link>
+                      {row.payment_status && (
+                        <span className="text-xs text-gray-500 ml-2">({row.payment_status})</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {row.payment_date ? formatDate(row.payment_date) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">{formatMoney(row.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {invoice.ap_match_summary && (
+        <section className="bg-white rounded-lg shadow p-6 space-y-3">
+          <h2 className="text-lg font-semibold">Receipt ↔ bill matching</h2>
+          <p className="text-sm text-gray-600">
+            Traceability only — does not post additional accounting. Matched to posted goods receipt lines:{' '}
+            <span className="font-medium tabular-nums">{formatMoney(String(invoice.ap_match_summary.matched_amount))}</span>
+            {' · '}
+            Unmatched on this bill:{' '}
+            <span className="font-medium tabular-nums">{formatMoney(String(invoice.ap_match_summary.unmatched_amount))}</span>
+          </p>
+          {invoice.ap_match_summary.matches?.length ? (
+            <div className="overflow-x-auto border border-gray-100 rounded">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left">GRN</th>
+                    <th className="px-3 py-2 text-right">Qty</th>
+                    <th className="px-3 py-2 text-right">Matched amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.ap_match_summary.matches.map((m) => (
+                    <tr key={m.id} className="border-t border-gray-100">
+                      <td className="px-3 py-2">
+                        {m.grn?.id ? (
+                          <Link to={`/app/inventory/grns/${m.grn.id}`} className="text-[#1F6F5C] hover:underline">
+                            {m.grn.doc_no || m.grn.id}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{m.matched_qty}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatMoney(m.matched_amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No GRN line matches recorded for this bill.</p>
+          )}
+        </section>
+      )}
 
       {invoice.grn && (
         <section className="bg-white rounded-lg shadow p-6">

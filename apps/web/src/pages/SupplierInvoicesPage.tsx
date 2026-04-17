@@ -22,7 +22,12 @@ export default function SupplierInvoicesPage() {
         breadcrumbs={[{ label: 'Reports', to: '/app/reports' }, { label: 'Supplier invoices' }]}
       />
       <p className="text-sm text-gray-600 -mt-2">
-        Posted and draft supplier invoices. Outstanding amounts follow the same subledger rules as{' '}
+        Posted and draft supplier invoices (typically <strong>project-linked</strong>). For farm overhead and other
+        non-crop bills, use{' '}
+        <Link to="/app/accounting/bills" className="text-[#1F6F5C] hover:underline">
+          Bills
+        </Link>
+        . Outstanding amounts follow the same subledger rules as{' '}
         <Link to="/app/reports/ap-ageing" className="text-[#1F6F5C] hover:underline">
           AP ageing
         </Link>

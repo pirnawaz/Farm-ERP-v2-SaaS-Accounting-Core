@@ -13,6 +13,9 @@ import { useRole } from '../../hooks/useRole';
 import { useFormatting } from '../../hooks/useFormatting';
 import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
 import { TraceabilityPanel } from '../../components/traceability/TraceabilityPanel';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
 
 export default function WorkLogDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,11 +32,14 @@ export default function WorkLogDetailPage() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reverseDate, setReverseDate] = useState(new Date().toISOString().split('T')[0]);
   const [reverseReason, setReverseReason] = useState('');
 
   useEffect(() => {
     if (log && !showPostModal && !showReverseModal) {
-      setPostingDate(new Date().toISOString().split('T')[0]);
+      const today = new Date().toISOString().split('T')[0];
+      setPostingDate(today);
+      setReverseDate(today);
     }
   }, [log, showPostModal, showReverseModal]);
 
@@ -42,21 +48,40 @@ export default function WorkLogDetailPage() {
   const canPost = hasRole(['tenant_admin', 'accountant']);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
 
+  const usageNum = log ? parseFloat(String(log.usage_qty ?? '')) : NaN;
+  const rateNum = log ? parseFloat(String(log.internal_charge_rate ?? '')) : NaN;
+  const chargeableIncomplete =
+    !!log?.chargeable &&
+    isDraft &&
+    (!log.project_id || !(usageNum > 0) || !(rateNum > 0));
+
+  const canConfirmWorkLogReverse = Boolean(reverseDate && id);
+
   const handlePost = async () => {
     if (!id) return;
-    await postM.mutateAsync({ id, posting_date: postingDate });
-    setShowPostModal(false);
+    try {
+      await postM.mutateAsync({ id, posting_date: postingDate });
+      setShowPostModal(false);
+      postM.reset();
+    } catch {
+      /* OperatorErrorCallout */
+    }
   };
 
   const handleReverse = async () => {
-    if (!id) return;
-    await reverseM.mutateAsync({
-      id,
-      posting_date: postingDate,
-      reason: reverseReason.trim() || undefined,
-    });
-    setShowReverseModal(false);
-    setReverseReason('');
+    if (!id || !canConfirmWorkLogReverse) return;
+    try {
+      await reverseM.mutateAsync({
+        id,
+        posting_date: reverseDate,
+        reason: reverseReason.trim() || undefined,
+      });
+      setShowReverseModal(false);
+      setReverseReason('');
+      reverseM.reset();
+    } catch {
+      /* OperatorErrorCallout */
+    }
   };
 
   if (isLoading) {
@@ -131,6 +156,19 @@ export default function WorkLogDetailPage() {
 
       <TraceabilityPanel traceability={log.traceability} />
 
+      {log.chargeable && log.status === 'POSTED' && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-950">
+          <p className="font-medium">This usage was posted with a project charge</p>
+          <p className="mt-1">
+            The field cycle was charged for machine work, and this machine recorded matching service income
+            {log.internal_charge_amount != null && log.internal_charge_amount !== '' ? (
+              <> ({formatMoney(log.internal_charge_amount)})</>
+            ) : null}
+            .
+          </p>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-6">
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -142,8 +180,8 @@ export default function WorkLogDetailPage() {
             <dd>{log.machine?.name ?? log.machine_id}</dd>
           </div>
           <div>
-            <dt className="text-sm text-gray-500">Field cycle</dt>
-            <dd>{log.project?.name ?? log.project_id}</dd>
+            <dt className="text-sm text-gray-500">Project (field cycle)</dt>
+            <dd>{log.project?.name ?? log.project_id ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-sm text-gray-500">Crop cycle</dt>
@@ -165,6 +203,28 @@ export default function WorkLogDetailPage() {
             <dt className="text-sm text-gray-500">Usage</dt>
             <dd>{log.usage_qty != null ? String(log.usage_qty) : '—'}</dd>
           </div>
+          {log.chargeable && (
+            <>
+              <div>
+                <dt className="text-sm text-gray-500">Charge this job to project</dt>
+                <dd>Yes — internal machine work rate</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Rate (per meter unit)</dt>
+                <dd className="tabular-nums">
+                  {log.internal_charge_rate != null && log.internal_charge_rate !== '' ? String(log.internal_charge_rate) : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Posted charge</dt>
+                <dd className="tabular-nums">
+                  {log.internal_charge_amount != null && log.internal_charge_amount !== ''
+                    ? formatMoney(log.internal_charge_amount)
+                    : '—'}
+                </dd>
+              </div>
+            </>
+          )}
           <div>
             <dt className="text-sm text-gray-500">Status</dt>
             <dd>
@@ -247,11 +307,25 @@ export default function WorkLogDetailPage() {
         <div>
           <button
             type="button"
-            onClick={() => setShowPostModal(true)}
-            className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            onClick={() => {
+              postM.reset();
+              setShowPostModal(true);
+            }}
+            disabled={chargeableIncomplete}
+            title={
+              chargeableIncomplete
+                ? 'Set field cycle, usage quantity, and charge rate before recording a chargeable log.'
+                : undefined
+            }
+            className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
-            Post
+            Record to accounts
           </button>
+          {chargeableIncomplete ? (
+            <p className="mt-2 text-sm text-amber-800 max-w-xl">
+              This log is chargeable but missing project, usage, or rate. Edit the draft before recording to accounts.
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -260,45 +334,79 @@ export default function WorkLogDetailPage() {
           <button
             type="button"
             onClick={() => {
-              setShowReverseModal(true);
+              reverseM.reset();
               setReverseReason('');
+              setShowReverseModal(true);
             }}
-            className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 min-h-[44px]"
           >
-            Reverse
+            Reverse usage
           </button>
         </div>
       )}
 
       <Modal
         isOpen={showPostModal}
-        onClose={() => setShowPostModal(false)}
-        title="Post Work Log"
+        onClose={() => {
+          setShowPostModal(false);
+          postM.reset();
+        }}
+        title="Record machine usage to accounts"
       >
         <div className="space-y-4">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            {log.chargeable
+              ? 'This will record costs and update accounts: the field cycle is charged for the machine work, and this machine shows matching service income.'
+              : 'This will record costs and update accounts for this usage and its cost lines. No field-cycle charge applies for non-chargeable usage.'}
+          </p>
+          <PrePostChecklist
+            items={[
+              { ok: Boolean(postingDate), label: 'Posting date chosen' },
+              {
+                ok: !chargeableIncomplete,
+                label: log.chargeable
+                  ? 'Chargeable rules: field cycle, usage > 0, rate > 0'
+                  : 'No field-cycle charge for this entry',
+              },
+            ]}
+            blockingHint={
+              chargeableIncomplete || !postingDate
+                ? 'Complete required fields before recording.'
+                : undefined
+            }
+          />
+          {chargeableIncomplete ? (
+            <p className="text-sm text-red-700" role="alert">
+              Cannot record: add field cycle, usage quantity, and internal charge rate on the draft first.
+            </p>
+          ) : null}
+          <OperatorErrorCallout error={postM.isError ? formatOperatorError(postM.error) : null} />
           <FormField label="Posting date" required>
             <input
               type="date"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
+              className="w-full px-3 py-2 border rounded min-h-[44px]"
             />
           </FormField>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <button
               type="button"
-              onClick={() => setShowPostModal(false)}
-              className="w-full sm:w-auto px-4 py-2 border rounded"
+              onClick={() => {
+                setShowPostModal(false);
+                postM.reset();
+              }}
+              className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handlePost}
-              disabled={postM.isPending}
-              className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded"
+              disabled={postM.isPending || chargeableIncomplete || !postingDate}
+              className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
-              {postM.isPending ? 'Posting…' : 'Post'}
+              {postM.isPending ? 'Recording…' : 'Confirm'}
             </button>
           </div>
         </div>
@@ -309,16 +417,25 @@ export default function WorkLogDetailPage() {
         onClose={() => {
           setShowReverseModal(false);
           setReverseReason('');
+          reverseM.reset();
         }}
-        title="Reverse Work Log"
+        title="Reverse machine usage"
       >
         <div className="space-y-4">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            This creates offsetting entries as of the posting date below. Cancel if you are not ready.
+          </p>
+          <PrePostChecklist
+            items={[{ ok: Boolean(reverseDate), label: 'Posting date chosen' }]}
+            blockingHint={!reverseDate ? 'Choose a posting date before reversing.' : undefined}
+          />
+          <OperatorErrorCallout error={reverseM.isError ? formatOperatorError(reverseM.error) : null} />
           <FormField label="Posting date" required>
             <input
               type="date"
-              value={postingDate}
-              onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
+              value={reverseDate}
+              onChange={(e) => setReverseDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded min-h-[44px]"
             />
           </FormField>
           <FormField label="Reason (optional)">
@@ -336,18 +453,19 @@ export default function WorkLogDetailPage() {
               onClick={() => {
                 setShowReverseModal(false);
                 setReverseReason('');
+                reverseM.reset();
               }}
-              className="w-full sm:w-auto px-4 py-2 border rounded"
+              className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleReverse}
-              disabled={reverseM.isPending}
-              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded"
+              disabled={reverseM.isPending || !canConfirmWorkLogReverse}
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50 min-h-[44px]"
             >
-              {reverseM.isPending ? 'Reversing…' : 'Reverse'}
+              {reverseM.isPending ? 'Reversing…' : 'Confirm reverse'}
             </button>
           </div>
         </div>

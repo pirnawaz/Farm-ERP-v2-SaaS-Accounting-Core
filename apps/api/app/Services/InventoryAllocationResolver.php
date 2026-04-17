@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Project;
-use App\Models\ProjectRule;
 use App\Models\ShareRule;
 use App\Models\ShareRuleLine;
 use Carbon\Carbon;
@@ -11,7 +10,8 @@ use Carbon\Carbon;
 class InventoryAllocationResolver
 {
     public function __construct(
-        private SystemPartyService $partyService
+        private SystemPartyService $partyService,
+        private ProjectSettlementRuleResolver $settlementRuleResolver
     ) {}
 
     /**
@@ -124,18 +124,17 @@ class InventoryAllocationResolver
             ];
         }
 
-        // Priority 3: Use ProjectRule defaults
-        $projectRule = ProjectRule::where('project_id', $projectId)->first();
+        // Priority 3: Agreement settlement terms (if linked) or ProjectRule defaults
+        $rule = $this->settlementRuleResolver->resolveSettlementRule($project);
 
-        if (!$projectRule) {
-            throw new \Exception("Project does not have a ProjectRule configured. Please provide sharing_rule_id or explicit percentages.");
-        }
+        $landlordPct = (float) $rule['profit_split_landlord_pct'];
+        $hariPct = (float) $rule['profit_split_hari_pct'];
 
-        $landlordPct = (float) $projectRule->profit_split_landlord_pct;
-        $hariPct = (float) $projectRule->profit_split_hari_pct;
-
-        $ruleSnapshot['resolution_method'] = 'project_rule_defaults';
-        $ruleSnapshot['project_rule_id'] = $projectRule->id;
+        $ruleSnapshot['resolution_method'] = $rule['resolution_source'] === 'agreement'
+            ? 'agreement_settlement_terms'
+            : 'project_rule_defaults';
+        $ruleSnapshot['project_rule_id'] = $rule['project_rule_id'];
+        $ruleSnapshot['agreement_id'] = $rule['agreement_id'];
         $ruleSnapshot['landlord_pct'] = $landlordPct;
         $ruleSnapshot['hari_pct'] = $hariPct;
 

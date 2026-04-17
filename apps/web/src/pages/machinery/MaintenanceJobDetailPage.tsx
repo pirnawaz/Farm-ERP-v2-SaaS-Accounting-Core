@@ -14,6 +14,9 @@ import { PageHeader } from '../../components/PageHeader';
 import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../../components/Term';
 import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
 
 export default function MaintenanceJobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -50,8 +53,11 @@ export default function MaintenanceJobDetailPage() {
     }
   }, [job?.lines, isDraft]);
 
+  const canConfirmMaintenancePost = Boolean(postingDate && id);
+  const canConfirmMaintenanceReverse = Boolean(reverseDate && id);
+
   const handlePost = async () => {
-    if (!id) return;
+    if (!id || !canConfirmMaintenancePost) return;
     try {
       await postMutation.mutateAsync({
         id,
@@ -61,13 +67,14 @@ export default function MaintenanceJobDetailPage() {
         },
       });
       setShowPostModal(false);
-    } catch (error) {
-      // Error handled by mutation
+      postMutation.reset();
+    } catch {
+      /* OperatorErrorCallout */
     }
   };
 
   const handleReverse = async () => {
-    if (!id) return;
+    if (!id || !canConfirmMaintenanceReverse) return;
     try {
       await reverseMutation.mutateAsync({
         id,
@@ -78,8 +85,9 @@ export default function MaintenanceJobDetailPage() {
       });
       setShowReverseModal(false);
       setReverseReason('');
-    } catch (error) {
-      // Error handled by mutation
+      reverseMutation.reset();
+    } catch {
+      /* OperatorErrorCallout */
     }
   };
 
@@ -275,10 +283,13 @@ export default function MaintenanceJobDetailPage() {
               {canPost && (
                 <button
                   type="button"
-                  onClick={() => setShowPostModal(true)}
-                  className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  onClick={() => {
+                    postMutation.reset();
+                    setShowPostModal(true);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 min-h-[44px]"
                 >
-                  Post Job
+                  Record to accounts
                 </button>
               )}
             </>
@@ -286,10 +297,13 @@ export default function MaintenanceJobDetailPage() {
           {isPosted && canPost && (
             <button
               type="button"
-              onClick={() => setShowReverseModal(true)}
-              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              onClick={() => {
+                reverseMutation.reset();
+                setShowReverseModal(true);
+              }}
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 min-h-[44px]"
             >
-              Reverse Job
+              Reverse job
             </button>
           )}
         </div>
@@ -297,22 +311,40 @@ export default function MaintenanceJobDetailPage() {
 
       {/* Post Modal */}
       {showPostModal && (
-        <Modal isOpen={showPostModal} title="Post Maintenance Job" onClose={() => setShowPostModal(false)}>
+        <Modal
+          isOpen={showPostModal}
+          title="Record maintenance job to accounts"
+          onClose={() => {
+            setShowPostModal(false);
+            postMutation.reset();
+          }}
+        >
           <div className="space-y-4">
-            <FormField label="Posting Date" required>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              This will record maintenance costs for this job in the accounts for the posting date below.
+            </p>
+            <PrePostChecklist
+              items={[{ ok: Boolean(postingDate), label: 'Posting date chosen' }]}
+              blockingHint={!postingDate ? 'Choose a posting date before recording.' : undefined}
+            />
+            <OperatorErrorCallout error={postMutation.isError ? formatOperatorError(postMutation.error) : null} />
+            <FormField label="Posting date" required>
               <input
                 type="date"
                 value={postingDate}
                 onChange={(e) => setPostingDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] min-h-[44px]"
                 required
               />
             </FormField>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
                 type="button"
-                onClick={() => setShowPostModal(false)}
-                className="w-full sm:w-auto px-4 py-2 border rounded"
+                onClick={() => {
+                  setShowPostModal(false);
+                  postMutation.reset();
+                }}
+                className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
                 disabled={postMutation.isPending}
               >
                 Cancel
@@ -320,10 +352,10 @@ export default function MaintenanceJobDetailPage() {
               <button
                 type="button"
                 onClick={handlePost}
-                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                disabled={postMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 min-h-[44px]"
+                disabled={postMutation.isPending || !canConfirmMaintenancePost}
               >
-                {postMutation.isPending ? 'Posting...' : 'Post'}
+                {postMutation.isPending ? 'Recording…' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -332,18 +364,34 @@ export default function MaintenanceJobDetailPage() {
 
       {/* Reverse Modal */}
       {showReverseModal && (
-        <Modal isOpen={showReverseModal} title="Reverse Maintenance Job" onClose={() => setShowReverseModal(false)}>
+        <Modal
+          isOpen={showReverseModal}
+          title="Reverse maintenance job"
+          onClose={() => {
+            setShowReverseModal(false);
+            setReverseReason('');
+            reverseMutation.reset();
+          }}
+        >
           <div className="space-y-4">
-            <FormField label="Posting Date" required>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              This creates offsetting entries as of the posting date below. Cancel if you are not ready.
+            </p>
+            <PrePostChecklist
+              items={[{ ok: Boolean(reverseDate), label: 'Posting date chosen' }]}
+              blockingHint={!reverseDate ? 'Choose a posting date before reversing.' : undefined}
+            />
+            <OperatorErrorCallout error={reverseMutation.isError ? formatOperatorError(reverseMutation.error) : null} />
+            <FormField label="Posting date" required>
               <input
                 type="date"
                 value={reverseDate}
                 onChange={(e) => setReverseDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] min-h-[44px]"
                 required
               />
             </FormField>
-            <FormField label="Reason">
+            <FormField label="Reason (optional)">
               <textarea
                 value={reverseReason}
                 onChange={(e) => setReverseReason(e.target.value)}
@@ -356,8 +404,12 @@ export default function MaintenanceJobDetailPage() {
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
                 type="button"
-                onClick={() => setShowReverseModal(false)}
-                className="w-full sm:w-auto px-4 py-2 border rounded"
+                onClick={() => {
+                  setShowReverseModal(false);
+                  setReverseReason('');
+                  reverseMutation.reset();
+                }}
+                className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
                 disabled={reverseMutation.isPending}
               >
                 Cancel
@@ -365,10 +417,10 @@ export default function MaintenanceJobDetailPage() {
               <button
                 type="button"
                 onClick={handleReverse}
-                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                disabled={reverseMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                disabled={reverseMutation.isPending || !canConfirmMaintenanceReverse}
               >
-                {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}
+                {reverseMutation.isPending ? 'Reversing…' : 'Confirm reverse'}
               </button>
             </div>
           </div>

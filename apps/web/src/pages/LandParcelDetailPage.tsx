@@ -88,6 +88,9 @@ export default function LandParcelDetailPage() {
     0
   ) || 0;
   const remainingAcres = parseFloat(parcel.total_acres) - totalAllocated;
+  const agrSum = parcel.agreement_allocation_summary;
+  const agreementActive = agrSum?.active_allocated_area ?? 0;
+  const agreementAvail = agrSum?.available_area_after_agreement_allocations;
 
   return (
     <div>
@@ -132,11 +135,29 @@ export default function LandParcelDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Remaining Acres</dt>
+              <dt className="text-sm font-medium text-gray-500">Remaining Acres (crop-cycle allocations)</dt>
               <dd className="text-sm text-gray-900">
                 {formatNumber(remainingAcres, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </dd>
             </div>
+            {agrSum && (
+              <>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Agreement allocations (active, as of {agrSum.as_of})</dt>
+                  <dd className="text-sm text-gray-900">
+                    {formatNumber(agreementActive, { minimumFractionDigits: 0, maximumFractionDigits: 4 })} /{' '}
+                    {formatNumber(agrSum.parcel_total_area, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}{' '}
+                    acres reserved commercially
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Available after agreement reservations</dt>
+                  <dd className="text-sm text-gray-900">
+                    {formatNumber(agreementAvail ?? 0, { minimumFractionDigits: 0, maximumFractionDigits: 4 })}
+                  </dd>
+                </div>
+              </>
+            )}
             {parcel.notes && (
               <div>
                 <dt className="text-sm font-medium text-gray-500">Notes</dt>
@@ -161,6 +182,27 @@ export default function LandParcelDetailPage() {
           )}
         </div>
       </div>
+
+      {parcel.agreement_allocations && parcel.agreement_allocations.length > 0 && (
+        <div className="mt-6 bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Agreement allocations</h2>
+          <ul className="space-y-2 text-sm text-gray-800">
+            {parcel.agreement_allocations.map((row) => (
+              <li key={row.id} className="border border-gray-100 rounded p-3">
+                <span className="font-medium">{row.allocated_area} {row.area_uom || 'ACRE'}</span>
+                {row.agreement?.agreement_type && (
+                  <span className="text-gray-600"> — {row.agreement.agreement_type}</span>
+                )}
+                <span className="text-gray-600"> — {row.starts_on}</span>
+                {row.ends_on ? <span className="text-gray-600"> → {row.ends_on}</span> : <span className="text-gray-600"> (open-ended)</span>}
+                <span className={` ml-2 text-xs px-2 py-0.5 rounded ${row.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                  {row.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Allocations by Crop Cycle */}
       <div className="mt-6 bg-white rounded-lg shadow p-6">

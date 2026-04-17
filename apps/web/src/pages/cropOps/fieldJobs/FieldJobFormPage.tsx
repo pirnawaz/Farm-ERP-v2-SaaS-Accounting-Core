@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateFieldJob } from '../../../hooks/useFieldJobs';
 import { useProjects } from '../../../hooks/useProjects';
@@ -8,6 +8,11 @@ import { useActivityTypes } from '../../../hooks/useCropOps';
 import { FormField } from '../../../components/FormField';
 import { PageHeader } from '../../../components/PageHeader';
 import { PrimaryWorkflowBanner } from '../../../components/workflow/PrimaryWorkflowBanner';
+import { PrePostChecklist } from '../../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../../utils/operatorFriendlyErrors';
+import { getStored, setStored, formStorageKeys } from '../../../utils/formDefaults';
+import { useBlockUnsavedNavigation } from '../../../hooks/useBlockUnsavedNavigation';
 
 export default function FieldJobFormPage() {
   const navigate = useNavigate();
@@ -26,6 +31,8 @@ export default function FieldJobFormPage() {
   const [land_parcel_id, setLandParcelId] = useState('');
   const [crop_activity_type_id, setCropActivityTypeId] = useState('');
   const [notes, setNotes] = useState('');
+  const [touched, setTouched] = useState(false);
+  const markTouched = () => setTouched(true);
 
   useEffect(() => {
     if (productionUnitIdFromUrl) {
@@ -33,9 +40,31 @@ export default function FieldJobFormPage() {
     }
   }, [productionUnitIdFromUrl]);
 
+  useEffect(() => {
+    if (!projects?.length || project_id) return;
+    const last = getStored<string>(formStorageKeys.last_project_id);
+    if (last && projects.some((p) => p.id === last)) {
+      setProjectId(last);
+      return;
+    }
+    if (projects.length === 1) setProjectId(projects[0].id);
+  }, [projects, project_id]);
+
+  useBlockUnsavedNavigation(touched);
+
+  const canCreateDraft = Boolean(job_date && project_id);
+
+  const readinessItems = useMemo(
+    () => [
+      { ok: Boolean(job_date), label: 'Job date set' },
+      { ok: Boolean(project_id), label: 'Field cycle (project) selected' },
+    ],
+    [job_date, project_id],
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!project_id) return;
+    if (!canCreateDraft) return;
     const job = await createM.mutateAsync({
       doc_no: doc_no.trim() || undefined,
       job_date,
@@ -45,14 +74,15 @@ export default function FieldJobFormPage() {
       crop_activity_type_id: crop_activity_type_id || undefined,
       notes: notes.trim() || undefined,
     });
+    setStored(formStorageKeys.last_project_id, project_id);
     navigate(`/app/crop-ops/field-jobs/${job.id}`);
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl pb-8">
       <PageHeader
         title="New field job"
-        description="Create a draft job, then add inputs, labour, and machinery on the next screen before posting."
+        description="Create a draft job, then add inputs, labour, and machinery on the next screen before you record it to accounts."
         backTo="/app/crop-ops/field-jobs"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -65,14 +95,27 @@ export default function FieldJobFormPage() {
       <PrimaryWorkflowBanner variant="field-job" />
 
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+        <p className="text-sm text-gray-600">
+          Saving creates a <span className="font-medium text-gray-800">draft</span>. Nothing is recorded to accounts until you use{' '}
+          <span className="font-medium text-gray-800">Record to accounts</span> on the job detail page.
+        </p>
+        <PrePostChecklist
+          items={readinessItems}
+          blockingHint={!canCreateDraft ? 'Complete required fields before creating this draft.' : undefined}
+        />
+        {createM.isError ? <OperatorErrorCallout error={formatOperatorError(createM.error)} /> : null}
+
         <FormField label="Job date" required>
           <input
             id="fj-job-date"
             type="date"
             required
             value={job_date}
-            onChange={(e) => setJobDate(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            onChange={(e) => {
+              markTouched();
+              setJobDate(e.target.value);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[44px]"
           />
         </FormField>
 
@@ -81,8 +124,11 @@ export default function FieldJobFormPage() {
             id="fj-project"
             required
             value={project_id}
-            onChange={(e) => setProjectId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            onChange={(e) => {
+              markTouched();
+              setProjectId(e.target.value);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[44px]"
           >
             <option value="">Select project…</option>
             {(projects ?? []).map((p) => (
@@ -98,7 +144,10 @@ export default function FieldJobFormPage() {
             id="fj-doc"
             type="text"
             value={doc_no}
-            onChange={(e) => setDocNo(e.target.value)}
+            onChange={(e) => {
+              markTouched();
+              setDocNo(e.target.value);
+            }}
             placeholder="e.g. FJ-2026-001"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             maxLength={100}
@@ -109,8 +158,11 @@ export default function FieldJobFormPage() {
           <select
             id="fj-pu"
             value={production_unit_id}
-            onChange={(e) => setProductionUnitId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            onChange={(e) => {
+              markTouched();
+              setProductionUnitId(e.target.value);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[44px]"
           >
             <option value="">—</option>
             {(productionUnits ?? []).map((u) => (
@@ -125,8 +177,11 @@ export default function FieldJobFormPage() {
           <select
             id="fj-land"
             value={land_parcel_id}
-            onChange={(e) => setLandParcelId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            onChange={(e) => {
+              markTouched();
+              setLandParcelId(e.target.value);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[44px]"
           >
             <option value="">—</option>
             {(landParcels ?? []).map((lp) => (
@@ -141,8 +196,11 @@ export default function FieldJobFormPage() {
           <select
             id="fj-type"
             value={crop_activity_type_id}
-            onChange={(e) => setCropActivityTypeId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            onChange={(e) => {
+              markTouched();
+              setCropActivityTypeId(e.target.value);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[44px]"
           >
             <option value="">—</option>
             {(activityTypes ?? []).map((t) => (
@@ -157,7 +215,10 @@ export default function FieldJobFormPage() {
           <textarea
             id="fj-notes"
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => {
+              markTouched();
+              setNotes(e.target.value);
+            }}
             rows={3}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             placeholder="Operational notes…"
@@ -167,15 +228,16 @@ export default function FieldJobFormPage() {
         <div className="flex flex-wrap gap-3 pt-2">
           <button
             type="submit"
-            disabled={createM.isPending || !project_id}
-            className="rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a] disabled:opacity-50"
+            disabled={createM.isPending || !canCreateDraft}
+            title={!canCreateDraft ? 'Complete the checklist above first.' : undefined}
+            className="rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a] disabled:opacity-50 min-h-[44px]"
           >
             {createM.isPending ? 'Creating…' : 'Create draft & continue'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/app/crop-ops/field-jobs')}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px]"
           >
             Cancel
           </button>

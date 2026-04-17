@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\LandParcel;
 use App\Models\LandDocument;
 use App\Models\LandAllocation;
+use App\Models\AgreementAllocation;
 use App\Models\LandParcelAuditLog;
 use App\Models\CropCycle;
 use App\Http\Requests\StoreLandParcelRequest;
 use App\Http\Requests\UpdateLandParcelRequest;
 use App\Services\TenantContext;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class LandParcelController extends Controller
@@ -75,9 +77,29 @@ class LandParcelController extends Controller
 
         $remainingAcres = $parcel->total_acres - $parcel->landAllocations()->sum('allocated_acres');
 
+        $asOf = Carbon::today();
+        $agreementAllocations = AgreementAllocation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('land_parcel_id', $parcel->id)
+            ->with(['agreement.party', 'legacyField'])
+            ->orderBy('starts_on', 'desc')
+            ->orderBy('id')
+            ->get();
+
+        $activeAgreementAllocated = (float) $agreementAllocations
+            ->filter(fn (AgreementAllocation $a) => $a->isActiveOn($asOf))
+            ->sum('allocated_area');
+
         $parcelData = $parcel->toArray();
         $parcelData['allocation_summary'] = $allocationsByCycle->values();
         $parcelData['remaining_acres'] = $remainingAcres;
+        $parcelData['agreement_allocations'] = $agreementAllocations;
+        $parcelData['agreement_allocation_summary'] = [
+            'as_of' => $asOf->format('Y-m-d'),
+            'active_allocated_area' => $activeAgreementAllocated,
+            'available_area_after_agreement_allocations' => max(0, (float) $parcel->total_acres - $activeAgreementAllocated),
+            'parcel_total_area' => (float) $parcel->total_acres,
+        ];
 
         return response()->json($parcelData);
     }

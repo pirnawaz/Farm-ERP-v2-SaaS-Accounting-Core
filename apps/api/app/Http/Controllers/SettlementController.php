@@ -8,6 +8,7 @@ use App\Models\Settlement;
 use App\Http\Requests\PostSettlementRequest;
 use App\Services\TenantContext;
 use App\Services\SettlementService;
+use App\Services\ProjectResponsibilityReadService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -15,7 +16,8 @@ use Illuminate\Support\Facades\Validator;
 class SettlementController extends Controller
 {
     public function __construct(
-        private SettlementService $settlementService
+        private SettlementService $settlementService,
+        private ProjectResponsibilityReadService $projectResponsibilityReadService,
     ) {}
 
     // Existing project-based settlement methods (for backward compatibility)
@@ -30,6 +32,15 @@ class SettlementController extends Controller
         $upToDate = $request->input('up_to_date');
 
         $preview = $this->settlementService->previewSettlement($id, $tenantId, $upToDate);
+
+        $upToStr = $upToDate
+            ? \Carbon\Carbon::parse($upToDate)->format('Y-m-d')
+            : \Carbon\Carbon::today()->format('Y-m-d');
+        $preview['party_economics_explanation'] = $this->projectResponsibilityReadService->buildForSettlementPreview(
+            $id,
+            $tenantId,
+            $upToStr,
+        );
 
         return response()->json($preview);
     }

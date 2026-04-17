@@ -7,6 +7,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Agreement extends Model
 {
@@ -76,6 +77,11 @@ class Agreement extends Model
     public function worker(): BelongsTo
     {
         return $this->belongsTo(LabWorker::class, 'worker_id');
+    }
+
+    public function agreementAllocations(): HasMany
+    {
+        return $this->hasMany(AgreementAllocation::class, 'agreement_id');
     }
 
     /**

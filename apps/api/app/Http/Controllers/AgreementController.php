@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Agreement;
 use App\Models\Project;
+use App\Services\AgreementSettlementTermsValidator;
 use App\Services\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -11,6 +12,10 @@ use Illuminate\Validation\Rule;
 
 class AgreementController extends Controller
 {
+    public function __construct(
+        private AgreementSettlementTermsValidator $settlementTermsValidator
+    ) {}
+
     public function index(Request $request)
     {
         $tenantId = TenantContext::getTenantId($request);
@@ -36,6 +41,7 @@ class AgreementController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
         $data = $this->validatedPayload($request, $tenantId);
+        $this->validateProjectScopedLandLeaseSettlementTerms($request, $data, null);
         $agreement = Agreement::create(array_merge($data, ['tenant_id' => $tenantId]));
 
         return response()->json($agreement->load(['project', 'cropCycle', 'party', 'machine', 'worker']), 201);
@@ -45,7 +51,7 @@ class AgreementController extends Controller
     {
         $tenantId = TenantContext::getTenantId($request);
         $a = Agreement::where('tenant_id', $tenantId)->where('id', $id)->with([
-            'project', 'cropCycle', 'party', 'machine', 'worker',
+            'project', 'cropCycle', 'party', 'machine', 'worker', 'agreementAllocations.landParcel',
         ])->firstOrFail();
 
         return response()->json($a);
@@ -56,6 +62,7 @@ class AgreementController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         $a = Agreement::where('tenant_id', $tenantId)->where('id', $id)->firstOrFail();
         $data = $this->validatedPayload($request, $tenantId);
+        $this->validateProjectScopedLandLeaseSettlementTerms($request, $data, $a);
         $a->update($data);
 
         return response()->json($a->fresh()->load(['project', 'cropCycle', 'party', 'machine', 'worker']));
@@ -117,5 +124,57 @@ class AgreementController extends Controller
         $data['status'] = $data['status'] ?? Agreement::STATUS_ACTIVE;
 
         return $data;
+    }
+
+    /**
+     * When a land agreement is project-scoped and active, require canonical settlement terms.
+     * Skips validation on partial updates that do not touch type, project, status, or terms (legacy rows keep working).
+     */
+    private function validateProjectScopedLandLeaseSettlementTerms(Request $request, array $data, ?Agreement $existing): void
+    {
+        if ($existing !== null && ! $this->agreementSettlementRelevantFieldsChanged($request, $data, $existing)) {
+            return;
+        }
+
+        $merged = [
+            'agreement_type' => $data['agreement_type'] ?? $existing?->agreement_type,
+            'project_id' => array_key_exists('project_id', $data) ? $data['project_id'] : $existing?->project_id,
+            'status' => $data['status'] ?? $existing?->status ?? Agreement::STATUS_ACTIVE,
+            'terms' => array_key_exists('terms', $data) ? $data['terms'] : ($existing ? $existing->terms : null),
+        ];
+
+        if ($this->settlementTermsValidator->requiresSettlementTerms($merged)) {
+            $this->settlementTermsValidator->assertParseableSettlementTerms(
+                is_array($merged['terms'] ?? null) ? $merged['terms'] : null
+            );
+        }
+    }
+
+    /**
+     * For updates, only enforce settlement validation when commercial-driving fields actually change,
+     * so legacy agreements stay readable/updatable for unrelated fields without mass migration.
+     */
+    private function agreementSettlementRelevantFieldsChanged(Request $request, array $data, Agreement $existing): bool
+    {
+        if ($request->has('agreement_type') && ($data['agreement_type'] ?? null) !== $existing->agreement_type) {
+            return true;
+        }
+        if ($request->has('status') && ($data['status'] ?? null) !== $existing->status) {
+            return true;
+        }
+        if ($request->has('project_id')) {
+            $next = array_key_exists('project_id', $data) ? $data['project_id'] : null;
+            if ((string) ($next ?? '') !== (string) ($existing->project_id ?? '')) {
+                return true;
+            }
+        }
+        if ($request->has('terms')) {
+            $incoming = $data['terms'] ?? null;
+            if (json_encode($incoming) !== json_encode($existing->terms)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

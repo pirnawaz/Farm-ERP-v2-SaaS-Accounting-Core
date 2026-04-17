@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { apiClient } from '@farm-erp/shared';
 import { usePayment, useCreatePayment, useUpdatePayment } from '../hooks/usePayments';
 import { useParties, usePartyBalanceSummary } from '../hooks/useParties';
 import { paymentsApi } from '../api/payments';
@@ -35,11 +36,20 @@ export default function PaymentFormPage() {
     amount: prefilledAmount,
     payment_date: new Date().toISOString().split('T')[0],
     method: 'CASH',
+    source_account_id: undefined,
     reference: '',
     settlement_id: '',
     notes: '',
     purpose: prefilledPurpose === 'WAGES' ? 'WAGES' : 'GENERAL',
   });
+
+  type ChartAccountRow = { id: string; code: string; name: string; type: string };
+  const { data: chartAccounts } = useQuery({
+    queryKey: ['accounts', 'picker'],
+    queryFn: () => apiClient.get<ChartAccountRow[]>('/api/accounts'),
+    enabled: formData.direction === 'OUT' && formData.purpose !== 'WAGES',
+  });
+  const assetAccounts = (chartAccounts ?? []).filter((a) => (a.type || '').toLowerCase() === 'asset');
 
   // Get balances for selected party (for OUT payable validation; skip when purpose=WAGES — labour uses lab_worker_balances)
   const selectedPartyId = formData.party_id || prefilledPartyId || '';
@@ -79,6 +89,7 @@ export default function PaymentFormPage() {
         amount: typeof payment.amount === 'number' ? String(payment.amount) : (payment.amount ?? ''),
         payment_date: payment.payment_date,
         method: payment.method,
+        source_account_id: payment.source_account_id || undefined,
         reference: payment.reference || '',
         settlement_id: payment.settlement_id || '',
         notes: payment.notes || '',
@@ -137,6 +148,7 @@ export default function PaymentFormPage() {
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
         purpose: formData.purpose || 'GENERAL',
+        source_account_id: formData.source_account_id || undefined,
       };
 
       if (isEdit && id) {
@@ -473,6 +485,33 @@ export default function PaymentFormPage() {
               <option value="BANK">BANK</option>
             </select>
           </FormField>
+
+          {formData.direction === 'OUT' && formData.purpose !== 'WAGES' && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pay from (GL)</label>
+              <p className="text-xs text-gray-500 mb-2">
+                Optional. Leave blank to use the default CASH or BANK control account implied by method.
+              </p>
+              <select
+                value={formData.source_account_id || ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    source_account_id: e.target.value || undefined,
+                  })
+                }
+                disabled={!canEdit}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] disabled:bg-gray-100"
+              >
+                <option value="">Default (method control account)</option>
+                {assetAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.code} — {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <FormField label="Reference">
             <input

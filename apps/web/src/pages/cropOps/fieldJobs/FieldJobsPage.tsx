@@ -7,6 +7,7 @@ import { DataTable, type Column } from '../../../components/DataTable';
 import { LoadingSpinner } from '../../../components/LoadingSpinner';
 import { PageHeader } from '../../../components/PageHeader';
 import { useFormatting } from '../../../hooks/useFormatting';
+import { useRole } from '../../../hooks/useRole';
 import { PostingStatusBadge } from '../../../utils/postingStatusDisplay';
 import type { FieldJob } from '../../../types';
 import { PrimaryWorkflowBanner } from '../../../components/workflow/PrimaryWorkflowBanner';
@@ -35,6 +36,18 @@ export default function FieldJobsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { formatDate } = useFormatting();
+  const { hasRole } = useRole();
+
+  const sortedJobs = useMemo(() => {
+    const list = [...(jobs ?? [])];
+    list.sort((a, b) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      return String(b.job_date ?? '').localeCompare(String(a.job_date ?? ''));
+    });
+    return list;
+  }, [jobs]);
 
   const columns: Column<FieldJob>[] = useMemo(
     () => [
@@ -62,8 +75,31 @@ export default function FieldJobsPage() {
         header: 'Status',
         accessor: (r) => <PostingStatusBadge status={r.status} />,
       },
+      {
+        header: 'Actions',
+        accessor: (r) => (
+          <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+            {r.status === 'DRAFT' && hasRole(['tenant_admin', 'accountant', 'operator']) ? (
+              <button
+                type="button"
+                className="text-sm font-medium text-[#1F6F5C] hover:underline"
+                onClick={() => navigate(`/app/crop-ops/field-jobs/${r.id}`, { state: { from: location.pathname } })}
+              >
+                Continue editing
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="text-sm font-medium text-gray-700 hover:underline"
+              onClick={() => navigate(`/app/crop-ops/field-jobs/${r.id}`, { state: { from: location.pathname } })}
+            >
+              View
+            </button>
+          </div>
+        ),
+      },
     ],
-    [formatDate],
+    [formatDate, hasRole, navigate, location.pathname],
   );
 
   const clearFilters = () => {
@@ -181,7 +217,7 @@ export default function FieldJobsPage() {
       ) : (
         <DataTable<FieldJob>
           columns={columns}
-          data={jobs ?? []}
+          data={sortedJobs}
           emptyMessage="No field jobs yet. Create one to get started."
           onRowClick={(r) => navigate(`/app/crop-ops/field-jobs/${r.id}`, { state: { from: location.pathname } })}
         />

@@ -12,6 +12,7 @@ import { useFormatting } from '../hooks/useFormatting';
 import { v4 as uuidv4 } from 'uuid';
 import { Term } from '../components/Term';
 import { term } from '../config/terminology';
+import type { Payment } from '../types';
 
 export default function PaymentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -140,6 +141,14 @@ export default function PaymentDetailPage() {
             <dt className="text-sm font-medium text-gray-500">Method</dt>
             <dd className="text-sm text-gray-900">{payment.method}</dd>
           </div>
+          {(payment as Payment).source_account && (
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Pay from (GL)</dt>
+              <dd className="text-sm text-gray-900">
+                {(payment as Payment).source_account?.code} — {(payment as Payment).source_account?.name}
+              </dd>
+            </div>
+          )}
           {payment.reference && (
             <div>
               <dt className="text-sm font-medium text-gray-500">Reference</dt>
@@ -224,6 +233,48 @@ export default function PaymentDetailPage() {
                     </div>
                   ))}
                 </div>
+              </dd>
+            </div>
+          )}
+          {payment.direction === 'OUT' && (payment as Payment).allocation_summary && (
+            <div className="md:col-span-2">
+              <dt className="text-sm font-medium text-gray-500 mb-2">Application to payables</dt>
+              <dd className="text-sm text-gray-900 space-y-2">
+                <p className="text-xs text-gray-600">
+                  Applied: <span className="tabular-nums font-medium">{formatMoney((payment as Payment).allocation_summary!.applied_amount)}</span>
+                  {' · '}
+                  Unapplied: <span className="tabular-nums font-medium">{formatMoney((payment as Payment).allocation_summary!.unapplied_amount)}</span>
+                </p>
+                {(payment as Payment).allocation_summary!.supplier_invoice_allocations?.length ? (
+                  <div className="border border-gray-100 rounded overflow-hidden">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Supplier bill</th>
+                          <th className="px-3 py-2 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(payment as Payment).allocation_summary!.supplier_invoice_allocations.map((row) => (
+                          <tr key={row.id} className="border-t border-gray-100">
+                            <td className="px-3 py-2">
+                              <Link
+                                to={`/app/accounting/supplier-invoices/${row.supplier_invoice_id}`}
+                                className="text-[#1F6F5C] hover:underline"
+                              >
+                                {row.reference_no || row.supplier_invoice_id}
+                              </Link>
+                              <span className="text-gray-400 text-xs ml-1">({row.allocation_date})</span>
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">No supplier bill allocations yet. Use Apply to bills from the API or a future apply workflow.</p>
+                )}
               </dd>
             </div>
           )}

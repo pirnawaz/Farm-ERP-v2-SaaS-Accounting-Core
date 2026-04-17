@@ -22,6 +22,16 @@ import { useFormatting } from '../../hooks/useFormatting';
 import type { MachineWorkLog } from '../../types';
 import { Badge } from '../../components/Badge';
 import { AdvancedWorkflowBanner } from '../../components/workflow/AdvancedWorkflowBanner';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
+
+function machineUsageRecordBlocked(log: MachineWorkLog): boolean {
+  if (!log.chargeable) return false;
+  const usage = parseFloat(String(log.usage_qty ?? ''));
+  const rate = parseFloat(String(log.internal_charge_rate ?? ''));
+  return !log.project_id || !(usage > 0) || !(rate > 0);
+}
 
 export default function WorkLogsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -59,6 +69,18 @@ export default function WorkLogsPage() {
   const canPost = hasRole(['tenant_admin', 'accountant']);
   const canEdit = hasRole(['tenant_admin', 'accountant', 'operator']);
 
+  const sortedWorkLogs = useMemo(() => {
+    const list = [...(workLogs ?? [])];
+    list.sort((a, b) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      const ad = a.work_date || '';
+      const bd = b.work_date || '';
+      return bd.localeCompare(ad);
+    });
+    return list;
+  }, [workLogs]);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -132,12 +154,19 @@ export default function WorkLogsPage() {
             <button
               type="button"
               onClick={() => {
+                postM.reset();
                 setPostTarget(r);
                 setPostingDate(new Date().toISOString().split('T')[0]);
               }}
-              className="px-2 py-1 text-sm text-green-700 hover:text-green-800"
+              disabled={machineUsageRecordBlocked(r)}
+              title={
+                machineUsageRecordBlocked(r)
+                  ? 'Fix field cycle, usage, and rate on the draft before recording to accounts.'
+                  : 'Opens confirmation — nothing is recorded until you confirm.'
+              }
+              className="px-2 py-1 text-sm text-green-700 hover:text-green-800 disabled:opacity-40 disabled:cursor-not-allowed min-h-[36px]"
             >
-              Post
+              Record
             </button>
           )}
           {r.status === 'POSTED' && canPost && (
@@ -159,9 +188,14 @@ export default function WorkLogsPage() {
   ];
 
   const handlePost = async () => {
-    if (!postTarget) return;
-    await postM.mutateAsync({ id: postTarget.id, posting_date: postingDate });
-    setPostTarget(null);
+    if (!postTarget || machineUsageRecordBlocked(postTarget) || !postingDate) return;
+    try {
+      await postM.mutateAsync({ id: postTarget.id, posting_date: postingDate });
+      setPostTarget(null);
+      postM.reset();
+    } catch {
+      /* OperatorErrorCallout in modal */
+    }
   };
 
   const handleReverse = async () => {
@@ -319,7 +353,7 @@ export default function WorkLogsPage() {
           </div>
         </div>
 
-        <UsageSummary workLogs={workLogs ?? []} status={status} machineId={machineId} from={from} to={to} machines={machines ?? []} />
+        <UsageSummary workLogs={sortedWorkLogs} status={status} machineId={machineId} from={from} to={to} machines={machines ?? []} />
       </section>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">
@@ -329,7 +363,7 @@ export default function WorkLogsPage() {
           </div>
         ) : (
           <DataTable
-            data={(workLogs ?? []) as MachineWorkLog[]}
+            data={sortedWorkLogs as MachineWorkLog[]}
             columns={cols}
             onRowClick={(r) =>
               navigate(`/app/machinery/work-logs/${r.id}`, { state: { from: location.pathname + location.search } })
@@ -341,33 +375,63 @@ export default function WorkLogsPage() {
 
       <Modal
         isOpen={!!postTarget}
-        onClose={() => setPostTarget(null)}
-        title="Post usage entry"
+        onClose={() => {
+          setPostTarget(null);
+          postM.reset();
+        }}
+        title="Record usage entry to accounts"
       >
         <div className="space-y-4">
-          <FormField label="Posting Date" required>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            This will record costs and update accounts for this machine work entry. You can cancel if you are not ready.
+          </p>
+          {postTarget ? (
+            <PrePostChecklist
+              items={[
+                { ok: Boolean(postingDate), label: 'Posting date chosen' },
+                {
+                  ok: !machineUsageRecordBlocked(postTarget),
+                  label: postTarget.chargeable
+                    ? 'Chargeable rules: field cycle, usage > 0, rate > 0'
+                    : 'No field-cycle charge for this entry',
+                },
+              ]}
+              blockingHint={
+                !postingDate || machineUsageRecordBlocked(postTarget)
+                  ? 'Complete required fields before recording.'
+                  : undefined
+              }
+            />
+          ) : null}
+          <OperatorErrorCallout error={postM.isError ? formatOperatorError(postM.error) : null} />
+          <FormField label="Posting date" required>
             <input
               type="date"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
+              className="w-full px-3 py-2 border rounded min-h-[44px]"
             />
           </FormField>
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
             <button
               type="button"
-              onClick={() => setPostTarget(null)}
-              className="px-4 py-2 border rounded"
+              onClick={() => {
+                setPostTarget(null);
+                postM.reset();
+              }}
+              className="px-4 py-2 border rounded min-h-[44px]"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handlePost}
-              disabled={postM.isPending}
-              className="px-4 py-2 bg-green-600 text-white rounded"
+              disabled={
+                postM.isPending || !postTarget || !postingDate || machineUsageRecordBlocked(postTarget)
+              }
+              className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 min-h-[44px]"
             >
-              {postM.isPending ? 'Posting…' : 'Post'}
+              {postM.isPending ? 'Recording…' : 'Confirm'}
             </button>
           </div>
         </div>

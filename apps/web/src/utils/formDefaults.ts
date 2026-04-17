@@ -49,6 +49,11 @@ export const formStorageKeys = {
   last_labour_rate: 'last_labour_rate',
   last_supplier_party_id: 'last_supplier_party_id',
   last_production_unit_id: 'last_production_unit_id',
+  /** Last selections on machinery usage (work entry) form */
+  last_machinery_machine_id: 'last_machinery_machine_id',
+  last_machinery_project_id: 'last_machinery_project_id',
+  last_transfer_from_store_id: 'last_transfer_from_store_id',
+  last_transfer_to_store_id: 'last_transfer_to_store_id',
 } as const;
 
 const LAST_SUBMIT_PREFIX = 'farm_erp_last_submit_';

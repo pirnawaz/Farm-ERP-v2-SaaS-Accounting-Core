@@ -25,6 +25,8 @@ return [
         \App\Services\LabourPostingService::class,
         \App\Services\Machinery\MachineMaintenancePostingService::class,
         \App\Services\Machinery\MachineryChargePostingService::class,
+        \App\Services\Machinery\MachineryExternalIncomePostingService::class,
+        \App\Services\Machinery\MachineryPostingService::class,
         \App\Services\Machinery\MachineryServicePostingService::class,
         \App\Services\PaymentService::class,
         \App\Services\PostingService::class,
@@ -41,6 +43,9 @@ return [
         \App\Domains\Accounting\Loans\LoanRepaymentPostingService::class,
         \App\Domains\Accounting\PeriodClose\PeriodCloseService::class,
         \App\Domains\Commercial\Payables\SupplierInvoicePostingService::class,
+        \App\Domains\Commercial\Payables\SupplierCreditNotePostingService::class,
+        \App\Services\OverheadAllocationService::class,
+        \App\Services\BillRecognitionService::class,
         \App\Domains\Operations\LandLease\LandLeaseAccrualPostingService::class,
         \App\Domains\Accounting\MultiCurrency\FxRevaluationPostingService::class,
 

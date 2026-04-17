@@ -235,10 +235,10 @@ class ReconciliationService
             // be directly linked to parties. We'll check AllocationRows for SUPPLIER_AP
             // and see if we can trace to ledger entries.
             
-            // Get posting groups for this party's SUPPLIER_AP allocations in date range
+            // Posting groups for this party's supplier AP allocations and supplier credit notes (date range)
             $postingGroupIds = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
                 ->where('party_id', $partyId)
-                ->where('allocation_type', 'SUPPLIER_AP')
+                ->whereIn('allocation_type', ['SUPPLIER_AP', 'SUPPLIER_CREDIT'])
                 ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
                 ->where('posting_groups.posting_date', '>=', $fromDate)
                 ->where('posting_groups.posting_date', '<=', $toDate)
@@ -248,6 +248,8 @@ class ReconciliationService
                         ->whereColumn('rev.reversal_of_posting_group_id', 'posting_groups.id');
                 })
                 ->pluck('posting_groups.id')
+                ->unique()
+                ->values()
                 ->toArray();
 
             if (!empty($postingGroupIds)) {

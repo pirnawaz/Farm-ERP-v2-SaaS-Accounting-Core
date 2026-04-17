@@ -43,6 +43,22 @@ export default function APAgeingPage() {
         </span>
       ),
     },
+    {
+      header: 'Unlinked credits',
+      accessor: (row) => (
+        <span className="tabular-nums text-right block text-gray-700">
+          {row.posted_unlinked_credits != null ? formatMoney(row.posted_unlinked_credits) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Net (after unlinked)',
+      accessor: (row) => (
+        <span className="tabular-nums text-right block font-medium">
+          {row.net_after_unlinked_credits != null ? formatMoney(row.net_after_unlinked_credits) : '—'}
+        </span>
+      ),
+    },
     { header: '0–30 days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_0_30)}</span> },
     { header: '31–60 days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_31_60)}</span> },
     { header: '61–90 days', accessor: (row) => <span className="tabular-nums text-right block">{formatMoney(row.bucket_61_90)}</span> },
@@ -54,7 +70,8 @@ export default function APAgeingPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">AP ageing</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Open supplier GRN bills and posted supplier invoices, bucketed by due date
+          Open supplier GRN bills and posted supplier invoices, bucketed by due date. Unlinked posted credits reduce net
+          exposure but are not re-bucketed here — see notes below the table when present.
         </p>
       </div>
 
@@ -81,6 +98,14 @@ export default function APAgeingPage() {
         <div className="bg-white rounded-lg shadow">
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">AP ageing as of {formatDate(report.as_of)}</h2>
+
+            {report.notes && report.notes.length > 0 && (
+              <ul className="text-sm text-gray-600 list-disc pl-5 mb-4 space-y-1">
+                {report.notes.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            )}
 
             {report.reconciliation && (
               <p className="text-sm text-gray-600 mb-4">

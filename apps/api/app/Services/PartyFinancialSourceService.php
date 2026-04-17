@@ -63,8 +63,8 @@ class PartyFinancialSourceService
     }
 
     /**
-     * Get supplier payable from GRN and supplier-invoice postings (AllocationRow SUPPLIER_AP) for a party.
-     * Excludes reversed posting groups.
+     * Net supplier payable from GRN and supplier-invoice postings (SUPPLIER_AP) minus posted supplier credits
+     * (SUPPLIER_CREDIT on SUPPLIER_CREDIT_NOTE posting groups). Excludes reversed posting groups.
      *
      * @param string $partyId
      * @param string $tenantId
@@ -92,7 +92,23 @@ class PartyFinancialSourceService
             $sub->where('posting_groups.posting_date', '<=', $to);
         }
 
-        return (float) $sub->sum('allocation_rows.amount');
+        $gross = (float) $sub->sum('allocation_rows.amount');
+
+        $credits = AllocationRow::where('allocation_rows.tenant_id', $tenantId)
+            ->where('allocation_rows.party_id', $partyId)
+            ->where('allocation_rows.allocation_type', 'SUPPLIER_CREDIT')
+            ->join('posting_groups', 'allocation_rows.posting_group_id', '=', 'posting_groups.id')
+            ->where('posting_groups.source_type', 'SUPPLIER_CREDIT_NOTE');
+        PostingGroup::applyActiveOn($credits, 'posting_groups');
+        if ($from) {
+            $credits->where('posting_groups.posting_date', '>=', $from);
+        }
+        if ($to) {
+            $credits->where('posting_groups.posting_date', '<=', $to);
+        }
+        $creditSum = (float) $credits->sum('allocation_rows.amount');
+
+        return round(max(0, $gross - $creditSum), 2);
     }
 
     /**

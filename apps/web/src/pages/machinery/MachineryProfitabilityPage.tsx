@@ -1,39 +1,89 @@
-import { useState } from 'react';
-import { useMachineryProfitabilityQuery } from '../../hooks/useMachinery';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  useMachineryProfitabilityQuery,
+  useMachinesQuery,
+} from '../../hooks/useMachinery';
+import { useCropCycles } from '../../hooks/useCropCycles';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable, type Column } from '../../components/DataTable';
 import { useFormatting } from '../../hooks/useFormatting';
 import { Modal } from '../../components/Modal';
 import type { MachineryProfitabilityRow, MachineryChargesByMachineRow, MachineryCostsByMachineRow } from '../../types';
-import { machineryApi } from '../../api/machinery';
+import { machineryApi, type ProfitabilityReportFilters } from '../../api/machinery';
 import { useQuery } from '@tanstack/react-query';
 import { ReportEmptyStateCard } from '../../components/report/ReportStates';
 import { EMPTY_COPY } from '../../config/presentation';
 
+function defaultRange(): { from: string; to: string } {
+  const y = new Date().getFullYear();
+  return {
+    from: `${y}-01-01`,
+    to: new Date().toISOString().split('T')[0],
+  };
+}
+
 export default function MachineryProfitabilityPage() {
   const { formatMoney } = useFormatting();
-  const [filters, setFilters] = useState({
-    from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dr = defaultRange();
+
+  const [filters, setFilters] = useState(() => ({
+    from: searchParams.get('from') || dr.from,
+    to: searchParams.get('to') || dr.to,
+    crop_cycle_id: searchParams.get('crop_cycle_id') || '',
+    machine_id: searchParams.get('machine_id') || '',
+  }));
+
+  useEffect(() => {
+    const p = new URLSearchParams();
+    p.set('from', filters.from);
+    p.set('to', filters.to);
+    if (filters.crop_cycle_id) p.set('crop_cycle_id', filters.crop_cycle_id);
+    else p.delete('crop_cycle_id');
+    if (filters.machine_id) p.set('machine_id', filters.machine_id);
+    else p.delete('machine_id');
+    setSearchParams(p, { replace: true });
+  }, [filters, setSearchParams]);
+
+  const { data: machines } = useMachinesQuery();
+  const { data: cropCycles } = useCropCycles();
 
   const [selectedMachine, setSelectedMachine] = useState<MachineryProfitabilityRow | null>(null);
   const [showDrilldown, setShowDrilldown] = useState(false);
 
-  const { data: report, isLoading, error } = useMachineryProfitabilityQuery(filters);
+  const apiFilters: ProfitabilityReportFilters = useMemo(
+    () => ({
+      from: filters.from,
+      to: filters.to,
+      ...(filters.crop_cycle_id ? { crop_cycle_id: filters.crop_cycle_id } : {}),
+      ...(filters.machine_id ? { machine_id: filters.machine_id } : {}),
+    }),
+    [filters.from, filters.to, filters.crop_cycle_id, filters.machine_id]
+  );
+
+  const { data: report, isLoading, error } = useMachineryProfitabilityQuery(apiFilters);
+
+  const drilldownFilters: ProfitabilityReportFilters = useMemo(
+    () => ({
+      ...apiFilters,
+      ...(selectedMachine ? { machine_id: selectedMachine.machine_id } : {}),
+    }),
+    [apiFilters, selectedMachine]
+  );
 
   // Fetch drilldown data when a machine is selected
   const { data: chargesData } = useQuery<MachineryChargesByMachineRow[]>({
-    queryKey: ['machinery', 'reports', 'charges-by-machine', filters, selectedMachine?.machine_id],
-    queryFn: () => machineryApi.reports.chargesByMachine(filters),
+    queryKey: ['machinery', 'reports', 'charges-by-machine', drilldownFilters, selectedMachine?.machine_id],
+    queryFn: () => machineryApi.reports.chargesByMachine(drilldownFilters),
     enabled: showDrilldown && !!selectedMachine,
     select: (data) => data.filter((row) => row.machine_id === selectedMachine?.machine_id),
   });
 
   const { data: costsData } = useQuery<MachineryCostsByMachineRow[]>({
-    queryKey: ['machinery', 'reports', 'costs-by-machine', filters, selectedMachine?.machine_id],
-    queryFn: () => machineryApi.reports.costsByMachine(filters),
+    queryKey: ['machinery', 'reports', 'costs-by-machine', drilldownFilters, selectedMachine?.machine_id],
+    queryFn: () => machineryApi.reports.costsByMachine(drilldownFilters),
     enabled: showDrilldown && !!selectedMachine,
     select: (data) => data.filter((row) => row.machine_id === selectedMachine?.machine_id),
   });
@@ -71,7 +121,7 @@ export default function MachineryProfitabilityPage() {
       ),
     },
     {
-      header: 'Charges',
+      header: 'Machine income',
       accessor: (row) => (
         <span className="text-right block font-semibold tabular-nums">
           {formatMoney(parseFloat(row.charges_total))}
@@ -87,7 +137,7 @@ export default function MachineryProfitabilityPage() {
       ),
     },
     {
-      header: 'Margin',
+      header: 'Profit',
       accessor: (row) => {
         const margin = parseFloat(row.margin);
         return (
@@ -102,7 +152,7 @@ export default function MachineryProfitabilityPage() {
       },
     },
     {
-      header: 'Charge / Unit',
+      header: 'Income / unit',
       accessor: (row) => (
         <span className="text-right block tabular-nums">
           {row.charge_per_unit !== null ? formatMoney(parseFloat(row.charge_per_unit)) : '—'}
@@ -151,12 +201,12 @@ export default function MachineryProfitabilityPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Machinery Profitability Report"
+          title="Machine profit"
           backTo="/app/machinery"
           breadcrumbs={[
             { label: 'Farm', to: '/app/dashboard' },
             { label: 'Machinery', to: '/app/machinery' },
-            { label: 'Profitability' },
+            { label: 'Machine profit' },
           ]}
         />
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -169,22 +219,23 @@ export default function MachineryProfitabilityPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Machinery Profitability Report"
+        title="Machine profit"
         backTo="/app/machinery"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
           { label: 'Machinery', to: '/app/machinery' },
-          { label: 'Profitability' },
+          { label: 'Machine profit' },
         ]}
       />
-      <p className="text-sm text-gray-600">
-        Shows usage, charges, costs, and margins per machine
+      <p className="text-sm text-gray-600 max-w-3xl">
+        Per machine: usage, revenue (machine income from internal charges, services, external hire, and related), costs,
+        and profit. Filters use the same dates, season, and machine as the machinery report API.
       </p>
 
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-wrap gap-4 items-end">
           <div className="flex flex-col gap-1 min-w-[10rem]">
-            <label className="text-sm font-medium text-gray-700">From Date</label>
+            <label className="text-sm font-medium text-gray-700">From date</label>
             <input
               type="date"
               value={filters.from}
@@ -193,13 +244,43 @@ export default function MachineryProfitabilityPage() {
             />
           </div>
           <div className="flex flex-col gap-1 min-w-[10rem]">
-            <label className="text-sm font-medium text-gray-700">To Date</label>
+            <label className="text-sm font-medium text-gray-700">To date</label>
             <input
               type="date"
               value={filters.to}
               onChange={(e) => setFilters({ ...filters, to: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
             />
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Machine (optional)</label>
+            <select
+              value={filters.machine_id}
+              onChange={(e) => setFilters({ ...filters, machine_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All machines</option>
+              {machines?.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.code})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[12rem]">
+            <label className="text-sm font-medium text-gray-700">Season (optional)</label>
+            <select
+              value={filters.crop_cycle_id}
+              onChange={(e) => setFilters({ ...filters, crop_cycle_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+            >
+              <option value="">All seasons</option>
+              {cropCycles?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -229,7 +310,7 @@ export default function MachineryProfitabilityPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Total Charges</div>
+                      <div className="text-sm text-gray-500">Total machine income</div>
                       <div className="text-lg font-semibold tabular-nums">
                         {formatMoney(totals.charges_total.toFixed(2))}
                       </div>
@@ -241,7 +322,7 @@ export default function MachineryProfitabilityPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Total Margin</div>
+                      <div className="text-sm text-gray-500">Total profit</div>
                       <div
                         className={`text-lg font-semibold tabular-nums ${
                           totals.margin >= 0 ? 'text-green-600' : 'text-red-600'
@@ -274,7 +355,7 @@ export default function MachineryProfitabilityPage() {
           <div className="space-y-6">
             {/* Charges Section */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Charges</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Income (charges &amp; billable usage)</h3>
               {chargesData && chargesData.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">

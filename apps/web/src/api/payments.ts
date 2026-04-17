@@ -14,6 +14,7 @@ export interface PaymentFilters {
   party_id?: string;
   date_from?: string;
   date_to?: string;
+  source_account_id?: string;
 }
 
 export const paymentsApi = {
@@ -24,7 +25,8 @@ export const paymentsApi = {
     if (filters?.party_id) params.append('party_id', filters.party_id);
     if (filters?.date_from) params.append('date_from', filters.date_from);
     if (filters?.date_to) params.append('date_to', filters.date_to);
-    
+    if (filters?.source_account_id) params.append('source_account_id', filters.source_account_id);
+
     const query = params.toString() ? `?${params.toString()}` : '';
     return apiClient.get<Payment[]>(`/api/payments${query}`);
   },

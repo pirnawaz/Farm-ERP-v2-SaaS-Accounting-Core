@@ -29,7 +29,7 @@ class PaymentController extends Controller
         $tenantId = TenantContext::getTenantId($request);
         
         $query = TenantScoped::for(Payment::query(), $tenantId)
-            ->with(['party', 'settlement']);
+            ->with(['party', 'settlement', 'sourceAccount:id,code,name,type']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -49,6 +49,10 @@ class PaymentController extends Controller
 
         if ($request->has('date_to')) {
             $query->where('payment_date', '<=', $request->date_to);
+        }
+
+        if ($request->filled('source_account_id')) {
+            $query->where('source_account_id', $request->source_account_id);
         }
 
         $payments = $query->orderBy('payment_date', 'desc')
@@ -77,6 +81,7 @@ class PaymentController extends Controller
             'amount' => $request->amount,
             'payment_date' => $request->payment_date,
             'method' => $request->method,
+            'source_account_id' => $request->input('source_account_id'),
             'reference' => $request->reference,
             'settlement_id' => $request->settlement_id,
             'notes' => $request->notes,
@@ -84,7 +89,7 @@ class PaymentController extends Controller
             'status' => 'DRAFT',
         ]);
 
-        return response()->json($payment->load(['party', 'settlement']), 201);
+        return response()->json($payment->load(['party', 'settlement', 'sourceAccount:id,code,name,type']), 201);
     }
 
     public function show(Request $request, string $id)
@@ -92,10 +97,15 @@ class PaymentController extends Controller
         $tenantId = TenantContext::getTenantId($request);
 
         $payment = TenantScoped::for(Payment::query(), $tenantId)
-            ->with(['party', 'settlement', 'postingGroup', 'saleAllocations.sale'])
+            ->with(['party', 'settlement', 'postingGroup', 'saleAllocations.sale', 'sourceAccount:id,code,name,type'])
             ->findOrFail($id);
 
-        return response()->json($payment);
+        $payload = $payment->toArray();
+        if ($payment->direction === 'OUT' && $payment->status === 'POSTED' && ! $payment->reversal_posting_group_id) {
+            $payload['allocation_summary'] = $this->billPaymentService->getPaymentAllocationSummary($tenantId, $id);
+        }
+
+        return response()->json($payload);
     }
 
     public function update(UpdatePaymentRequest $request, string $id)
@@ -118,7 +128,7 @@ class PaymentController extends Controller
 
         $payment->update($request->validated());
 
-        return response()->json($payment->load(['party', 'settlement']));
+        return response()->json($payment->load(['party', 'settlement', 'sourceAccount:id,code,name,type']));
     }
 
     public function destroy(Request $request, string $id)
@@ -398,7 +408,7 @@ class PaymentController extends Controller
             );
         } catch (\InvalidArgumentException $e) {
             $msg = $e->getMessage();
-            $status = (str_contains($msg, 'Unapply sales allocations') || str_contains($msg, 'Unapply bills')) ? 409 : 422;
+            $status = (str_contains($msg, 'Unapply sales allocations') || str_contains($msg, 'Unapply bills') || str_contains($msg, 'supplier invoices')) ? 409 : 422;
             return response()->json(['message' => $msg], $status);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);

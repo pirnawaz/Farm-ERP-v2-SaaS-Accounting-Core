@@ -237,10 +237,11 @@ class ProjectSettlementCorrectnessTest extends TestCase
         ]);
         $invPosting->postIssue($hariOnlyIssue->id, $this->tenant->id, '2024-06-16', 'issue-hari');
 
-        // Ledger-based: operational posting records full expense for each issue (no netting). FARMER 100 + HARI 50 = 150.
+        // Ledger-based: total expenses include all scopes; pool_profit uses shared pool costs only (see getProjectProfitBreakdownByScope).
         $preview = $settlementService->previewSettlement($this->project->id, $this->tenant->id, '2024-06-30');
         $this->assertEqualsWithDelta(150.00, (float) $preview['total_expenses'], 0.01);
-        $this->assertEqualsWithDelta(-150.00, (float) $preview['pool_profit'], 0.01);
+        $this->assertEqualsWithDelta(0.0, (float) $preview['pool_profit'], 0.01);
+        $this->assertGreaterThan(0.0, (float) $preview['landlord_only_costs'] + (float) $preview['hari_only_deductions']);
     }
 
     public function test_reversal_unwinds_settlement(): void

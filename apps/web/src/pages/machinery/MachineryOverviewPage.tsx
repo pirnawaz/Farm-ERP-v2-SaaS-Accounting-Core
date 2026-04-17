@@ -121,8 +121,28 @@ export default function MachineryOverviewPage() {
       <header>
         <h1 className="text-2xl font-bold text-gray-900">Machinery Overview</h1>
         <p className="mt-1 text-base text-gray-700 max-w-2xl">
-          Track machines, usage, maintenance, and machinery-related costs.
+          Track machines, usage, maintenance, machine profit, and machinery-related costs.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            to="/app/machinery/work-logs/new"
+            className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#1F6F5C] hover:bg-gray-50"
+          >
+            New machine usage
+          </Link>
+          <Link
+            to="/app/machinery/reports/profitability"
+            className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#1F6F5C] hover:bg-gray-50"
+          >
+            Machine profit
+          </Link>
+          <Link
+            to="/app/machinery/external-income"
+            className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#1F6F5C] hover:bg-gray-50"
+          >
+            External machine income
+          </Link>
+        </div>
       </header>
 
       {/* SECTION 5 — GETTING STARTED */ }

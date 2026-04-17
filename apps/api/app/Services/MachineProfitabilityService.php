@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 class MachineProfitabilityService
 {
     /**
-     * @param  array{from: string, to: string, crop_cycle_id?: string|null, project_id?: string|null}  $filters  posting_date inclusive; optional crop_cycle_id and project_id (narrows allocation rows / work logs)
+     * @param  array{from: string, to: string, crop_cycle_id?: string|null, project_id?: string|null, machine_id?: string|null}  $filters  posting_date inclusive; optional crop_cycle_id, project_id, machine_id
      * @return list<array{machine_id: string, usage_hours: float, revenue: float, cost: float, profit: float}>
      */
     public function getMachineProfitability(string $tenantId, array $filters): array
@@ -28,10 +28,11 @@ class MachineProfitabilityService
         $to = $filters['to'];
         $cropCycleId = $filters['crop_cycle_id'] ?? null;
         $projectId = isset($filters['project_id']) && $filters['project_id'] !== '' ? (string) $filters['project_id'] : null;
+        $machineId = isset($filters['machine_id']) && $filters['machine_id'] !== '' ? (string) $filters['machine_id'] : null;
 
-        $revenue = $this->revenueByMachine($tenantId, $from, $to, $cropCycleId, $projectId);
-        $cost = $this->costByMachine($tenantId, $from, $to, $cropCycleId, $projectId);
-        $usageHours = $this->usageHoursByMachine($tenantId, $from, $to, $cropCycleId, $projectId);
+        $revenue = $this->revenueByMachine($tenantId, $from, $to, $cropCycleId, $projectId, $machineId);
+        $cost = $this->costByMachine($tenantId, $from, $to, $cropCycleId, $projectId, $machineId);
+        $usageHours = $this->usageHoursByMachine($tenantId, $from, $to, $cropCycleId, $projectId, $machineId);
 
         $machineIds = collect(array_keys($revenue))
             ->merge(array_keys($cost))
@@ -80,10 +81,29 @@ class MachineProfitabilityService
         return $bindings;
     }
 
-    private function revenueByMachine(string $tenantId, string $from, string $to, ?string $cropCycleId, ?string $projectId = null): array
+    private function machineAllocationClause(?string $machineId): string
+    {
+        if ($machineId === null || $machineId === '') {
+            return '';
+        }
+
+        return 'AND ar.machine_id = ?';
+    }
+
+    private function appendMachineBindings(array $bindings, ?string $machineId): array
+    {
+        if ($machineId !== null && $machineId !== '') {
+            $bindings[] = $machineId;
+        }
+
+        return $bindings;
+    }
+
+    private function revenueByMachine(string $tenantId, string $from, string $to, ?string $cropCycleId, ?string $projectId = null, ?string $machineId = null): array
     {
         $cropClause = $cropCycleId ? 'AND pg.crop_cycle_id = ?' : '';
         $projClause = $this->projectPostingGroupClause($projectId);
+        $machClause = $this->machineAllocationClause($machineId);
 
         $sql = "
             SELECT
@@ -101,17 +121,20 @@ class MachineProfitabilityService
                 AND pg.posting_date BETWEEN ? AND ?
                 {$cropClause}
                 {$projClause}
+                {$machClause}
                 AND NOT EXISTS (
                     SELECT 1 FROM posting_groups pg_rev
                     WHERE pg_rev.reversal_of_posting_group_id = pg.id
                 )
                 AND (
                     (
-                        ar.allocation_type IN ('MACHINERY_SERVICE', 'MACHINERY_CHARGE')
+                        ar.allocation_type IN ('MACHINERY_SERVICE', 'MACHINERY_CHARGE', 'MACHINERY_EXTERNAL_INCOME')
                         AND (
                             (pgo.source_type = 'MACHINERY_SERVICE' AND ms.posting_group_id = pgo.id)
                             OR (pgo.source_type = 'MACHINERY_CHARGE' AND mc.posting_group_id = pgo.id)
                             OR (pgo.source_type = 'FIELD_JOB' AND ar.allocation_type = 'MACHINERY_SERVICE')
+                            OR (pgo.source_type = 'MACHINE_WORK_LOG' AND ar.allocation_type = 'MACHINERY_SERVICE')
+                            OR (pgo.source_type = 'MACHINERY_EXTERNAL_INCOME' AND ar.allocation_type = 'MACHINERY_EXTERNAL_INCOME')
                         )
                     )
                     OR (
@@ -128,6 +151,7 @@ class MachineProfitabilityService
             $bindings[] = $cropCycleId;
         }
         $bindings = $this->appendProjectBindings($bindings, $tenantId, $projectId);
+        $bindings = $this->appendMachineBindings($bindings, $machineId);
 
         $rows = DB::select($sql, $bindings);
 
@@ -145,10 +169,11 @@ class MachineProfitabilityService
      *
      * @return array<string, float>
      */
-    private function costByMachine(string $tenantId, string $from, string $to, ?string $cropCycleId, ?string $projectId = null): array
+    private function costByMachine(string $tenantId, string $from, string $to, ?string $cropCycleId, ?string $projectId = null, ?string $machineId = null): array
     {
         $cropClause = $cropCycleId ? 'AND pg.crop_cycle_id = ?' : '';
         $projClause = $this->projectPostingGroupClause($projectId);
+        $machClause = $this->machineAllocationClause($machineId);
 
         // Base operating costs (excl. revenue allocations & HARVEST_PRODUCTION); incl. MACHINERY_* maintenance, POOL_SHARE with machine_id, etc.
         $baseSql = "
@@ -164,6 +189,7 @@ class MachineProfitabilityService
                 AND pg.posting_date BETWEEN ? AND ?
                 {$cropClause}
                 {$projClause}
+                {$machClause}
                 AND NOT EXISTS (
                     SELECT 1 FROM posting_groups pg_rev
                     WHERE pg_rev.reversal_of_posting_group_id = pg.id
@@ -178,6 +204,7 @@ class MachineProfitabilityService
             $bindings[] = $cropCycleId;
         }
         $bindings = $this->appendProjectBindings($bindings, $tenantId, $projectId);
+        $bindings = $this->appendMachineBindings($bindings, $machineId);
 
         $baseRows = DB::select($baseSql, $bindings);
 
@@ -195,6 +222,7 @@ class MachineProfitabilityService
                 AND pg.posting_date BETWEEN ? AND ?
                 {$cropClause}
                 {$projClause}
+                {$machClause}
                 AND NOT EXISTS (
                     SELECT 1 FROM posting_groups pg_rev
                     WHERE pg_rev.reversal_of_posting_group_id = pg.id
@@ -209,6 +237,7 @@ class MachineProfitabilityService
             $fjBindings[] = $cropCycleId;
         }
         $fjBindings = $this->appendProjectBindings($fjBindings, $tenantId, $projectId);
+        $fjBindings = $this->appendMachineBindings($fjBindings, $machineId);
 
         $fjRows = DB::select($fjSql, $fjBindings);
 
@@ -229,16 +258,20 @@ class MachineProfitabilityService
      *
      * @return array<string, float>
      */
-    private function usageHoursByMachine(string $tenantId, string $from, string $to, ?string $cropCycleId, ?string $projectId = null): array
+    private function usageHoursByMachine(string $tenantId, string $from, string $to, ?string $cropCycleId, ?string $projectId = null, ?string $machineId = null): array
     {
         $cropClause = $cropCycleId ? 'AND mwl.crop_cycle_id = ?' : '';
         $projectClause = $projectId ? 'AND mwl.project_id = ?' : '';
+        $machineClause = $machineId ? 'AND mwl.machine_id = ?' : '';
         $bindings = [$tenantId, $from, $to];
         if ($cropCycleId) {
             $bindings[] = $cropCycleId;
         }
         if ($projectId) {
             $bindings[] = $projectId;
+        }
+        if ($machineId) {
+            $bindings[] = $machineId;
         }
 
         $sql = "
@@ -252,6 +285,7 @@ class MachineProfitabilityService
                 AND mwl.posting_date BETWEEN ? AND ?
                 {$cropClause}
                 {$projectClause}
+                {$machineClause}
                 AND UPPER(COALESCE(m.meter_unit, '')) IN ('HR', 'HOUR', 'HOURS')
             GROUP BY mwl.machine_id
         ";

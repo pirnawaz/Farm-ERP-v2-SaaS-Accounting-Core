@@ -180,10 +180,21 @@ class MachineryReportsController extends Controller
             'from' => ['required', 'date', 'date_format:Y-m-d'],
             'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
             'crop_cycle_id' => ['nullable', 'uuid'],
+            'machine_id' => ['nullable', 'uuid'],
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->filled('machine_id')) {
+            $exists = DB::table('machines')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('machine_id'))
+                ->exists();
+            if (! $exists) {
+                return response()->json(['errors' => ['machine_id' => ['Invalid machine.']]], 422);
+            }
         }
 
         $from = $request->input('from');
@@ -193,6 +204,7 @@ class MachineryReportsController extends Controller
             'from' => $from,
             'to' => $to,
             'crop_cycle_id' => $request->input('crop_cycle_id'),
+            'machine_id' => $request->input('machine_id'),
         ];
 
         $profitability = $this->machineProfitabilityService->getMachineProfitability($tenantId, $filters);
@@ -211,6 +223,7 @@ class MachineryReportsController extends Controller
                 AND mwl.status = 'POSTED'
                 AND mwl.posting_date BETWEEN :from AND :to
                 ".($filters['crop_cycle_id'] ? 'AND mwl.crop_cycle_id = :crop_cycle_id' : '')."
+                ".($filters['machine_id'] ? 'AND mwl.machine_id = :machine_id' : '')."
             GROUP BY m.id, m.code, m.name, m.meter_unit
         ";
 
@@ -221,6 +234,9 @@ class MachineryReportsController extends Controller
         ];
         if ($filters['crop_cycle_id']) {
             $usageBindings['crop_cycle_id'] = $filters['crop_cycle_id'];
+        }
+        if ($filters['machine_id']) {
+            $usageBindings['machine_id'] = $filters['machine_id'];
         }
 
         $usage = DB::select($usageQuery, $usageBindings);

@@ -335,9 +335,25 @@ export const apiClient = {
     from: string
     to: string
     project_id?: string
+    crop_cycle_id?: string
   }) => {
     const query = buildQueryString(params)
     return request<import('./types').ProjectPLRow[]>(`/api/reports/project-pl${query}`)
+  },
+
+  getOverheadsReport: (params: {
+    from: string
+    to: string
+    cost_center_id?: string
+    party_id?: string
+  }) => {
+    const query = buildQueryString(params)
+    return request<import('./types').OverheadsReportResponse>(`/api/reports/overheads${query}`)
+  },
+
+  getFarmPnLSummary: (params: { from: string; to: string; crop_cycle_id?: string }) => {
+    const query = buildQueryString(params)
+    return request<import('./types').FarmPnLSummaryResponse>(`/api/reports/farm-pnl${query}`)
   },
 
   getCropCyclePL: (params: {

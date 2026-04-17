@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import { settlementPackApi } from '../api/settlementPack';
 import { useSettlementPreview, usePostSettlement, useSettlementOffsetPreview } from '../hooks/useSettlement';
@@ -12,9 +12,22 @@ import { settlementPreviewSchema, settlementPostSchema } from '../validation/set
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { SettlementPreview } from '../types';
+import {
+  downloadReportBlob,
+  buildHariStatementExportFilename,
+  buildSettlementReviewExportFilename,
+  projectPartyEconomicsExportPath,
+  projectSettlementReviewExportPath,
+} from '../utils/reportExportDownload';
+
+function yearStart(): string {
+  const d = new Date();
+  return new Date(d.getFullYear(), 0, 1).toISOString().split('T')[0];
+}
 
 export default function SettlementPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: projects } = useProjects();
   const previewMutation = useSettlementPreview();
   const postMutation = usePostSettlement();
@@ -30,6 +43,7 @@ export default function SettlementPage() {
   const [idempotencyKey] = useState(uuidv4());
   const [applyAdvanceOffset, setApplyAdvanceOffset] = useState(false);
   const [advanceOffsetAmount, setAdvanceOffsetAmount] = useState<number | ''>('');
+  const [exportingDocs, setExportingDocs] = useState(false);
 
   // Fetch offset preview when posting date or project changes
   const offsetPreviewQuery = useSettlementOffsetPreview(
@@ -44,6 +58,21 @@ export default function SettlementPage() {
       setAdvanceOffsetAmount(offsetPreviewQuery.data.suggested_offset || '');
     }
   }, [offsetPreviewQuery.data, applyAdvanceOffset]);
+
+  useEffect(() => {
+    const p = searchParams.get('project_id');
+    if (p) setSelectedProjectId(p);
+  }, [searchParams]);
+
+  const selectedProject = projects?.find((p) => p.id === selectedProjectId);
+  const hariPartyId = selectedProject?.party_id;
+
+  const reviewPackResponsibilityPeriod = useMemo(() => {
+    const from =
+      preview?.expenses_included?.from ?? preview?.expenses_considered?.from ?? yearStart();
+    const to = preview?.expenses_included?.to ?? preview?.expenses_considered?.to ?? upToDate;
+    return { from, to };
+  }, [preview, upToDate]);
 
   const handlePreview = async () => {
     try {
@@ -188,12 +217,196 @@ export default function SettlementPage() {
             </button>
           </div>
         </div>
+        {selectedProjectId && (
+          <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50/80 p-4 text-sm space-y-4">
+            <div>
+              <p className="font-medium text-gray-900">Settlement preview &amp; reports</p>
+              <p className="text-xs text-gray-600 mt-1">
+                <strong>Settlement preview</strong> shows the current calculated outcome for the date you pick.
+                <strong> Settlement review pack</strong> is a shareable PDF/CSV of that preview plus period context —
+                not the same as a finalized governance settlement pack.
+              </p>
+            </div>
+            <p className="text-xs text-gray-600">
+              <strong>Who bears what (period)</strong> uses a date range (Field Cycle P&amp;L basis); figures can differ
+              from the preview when ranges differ.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to={`/app/reports/project-responsibility?project_id=${encodeURIComponent(selectedProjectId)}&from=${encodeURIComponent(yearStart())}&to=${encodeURIComponent(upToDate)}`}
+                className="inline-flex items-center px-3 py-2 rounded-md bg-white border border-gray-300 text-[#1F6F5C] font-medium hover:bg-gray-50"
+              >
+                View who bears what (period)
+              </Link>
+              <Link
+                to={`/app/reports/project-party-economics?project_id=${encodeURIComponent(selectedProjectId)}&up_to_date=${encodeURIComponent(upToDate)}`}
+                className="inline-flex items-center px-3 py-2 rounded-md bg-white border border-gray-300 text-[#1F6F5C] font-medium hover:bg-gray-50"
+              >
+                View Hari statement
+              </Link>
+            </div>
+            <p className="text-xs text-gray-500">
+              <strong>Governance settlement pack</strong> (finalize &amp; approve) uses &quot;Generate settlement
+              pack&quot; above — a separate workflow from these read-only exports.
+            </p>
+            <div className="rounded-md border border-slate-200 bg-white/90 p-3 space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-700">Export</h3>
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-xs text-gray-600 shrink-0">Settlement review pack:</span>
+                <button
+                  type="button"
+                  disabled={exportingDocs}
+                  onClick={async () => {
+                    setExportingDocs(true);
+                    try {
+                      const { from: expFrom, to: expTo } = reviewPackResponsibilityPeriod;
+                      await downloadReportBlob(
+                        projectSettlementReviewExportPath('pdf', {
+                          project_id: selectedProjectId,
+                          up_to_date: upToDate,
+                          responsibility_from: expFrom,
+                          responsibility_to: expTo,
+                        }),
+                        buildSettlementReviewExportFilename(
+                          selectedProjectId,
+                          selectedProject?.name,
+                          upToDate,
+                          'pdf'
+                        )
+                      );
+                    } finally {
+                      setExportingDocs(false);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Export PDF
+                </button>
+                <button
+                  type="button"
+                  disabled={exportingDocs}
+                  onClick={async () => {
+                    setExportingDocs(true);
+                    try {
+                      const { from: expFrom, to: expTo } = reviewPackResponsibilityPeriod;
+                      await downloadReportBlob(
+                        projectSettlementReviewExportPath('csv', {
+                          project_id: selectedProjectId,
+                          up_to_date: upToDate,
+                          responsibility_from: expFrom,
+                          responsibility_to: expTo,
+                        }),
+                        buildSettlementReviewExportFilename(
+                          selectedProjectId,
+                          selectedProject?.name,
+                          upToDate,
+                          'csv'
+                        )
+                      );
+                    } finally {
+                      setExportingDocs(false);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Export CSV
+                </button>
+              </div>
+              {hariPartyId && (
+                <div className="flex flex-wrap gap-2 items-center pt-1 border-t border-slate-100">
+                  <span className="text-xs text-gray-600 shrink-0">Hari statement:</span>
+                  <button
+                    type="button"
+                    disabled={exportingDocs}
+                    onClick={async () => {
+                      setExportingDocs(true);
+                      try {
+                        await downloadReportBlob(
+                          projectPartyEconomicsExportPath('pdf', {
+                            project_id: selectedProjectId,
+                            party_id: hariPartyId,
+                            up_to_date: upToDate,
+                          }),
+                          buildHariStatementExportFilename(
+                            selectedProjectId,
+                            selectedProject?.name,
+                            upToDate,
+                            'pdf'
+                          )
+                        );
+                      } finally {
+                        setExportingDocs(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    disabled={exportingDocs}
+                    onClick={async () => {
+                      setExportingDocs(true);
+                      try {
+                        await downloadReportBlob(
+                          projectPartyEconomicsExportPath('csv', {
+                            project_id: selectedProjectId,
+                            party_id: hariPartyId,
+                            up_to_date: upToDate,
+                          }),
+                          buildHariStatementExportFilename(
+                            selectedProjectId,
+                            selectedProject?.name,
+                            upToDate,
+                            'csv'
+                          )
+                        );
+                      } finally {
+                        setExportingDocs(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 pt-1">
+                Exports use the selected project and &quot;Up to date&quot;.
+                {preview
+                  ? ' When a settlement preview is shown below, the review pack uses that preview’s expense dates for the period section inside the export.'
+                  : ' Until you run preview, the period section uses year-start through your Up to date.'}
+              </p>
+              <p className="text-xs text-gray-500">
+                Review pack period slice:{' '}
+                <span className="font-mono tabular-nums">
+                  {reviewPackResponsibilityPeriod.from} → {reviewPackResponsibilityPeriod.to}
+                </span>
+                {preview ? ' (from preview when available)' : ' (defaults until you run preview)'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {preview && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-900">Settlement Preview</h2>
+            <div>
+              <h2 className="text-lg font-medium text-gray-900">Settlement preview</h2>
+              <p className="text-xs text-gray-500 mt-1 max-w-3xl">
+                Figures below are for <strong className="text-gray-700">up to {upToDate}</strong> (settlement-style).
+                For a calendar-range view of who bears costs, use the period report linked above.
+              </p>
+              {preview.settlement_rule_source && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Rule source:{' '}
+                  {preview.settlement_rule_source === 'agreement'
+                    ? 'Agreement (primary)'
+                    : 'Legacy project rules (fallback)'}
+                </p>
+              )}
+            </div>
             {canSettle && (
               <button
                 onClick={() => setShowPostModal(true)}
@@ -336,6 +549,70 @@ export default function SettlementPage() {
                 </div>
               </div>
             </div>
+            {preview.party_economics_explanation && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50/90 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-gray-900">Who bears what</h3>
+                <p className="text-xs text-gray-600">
+                  Shared pool costs reduce profit before the landlord / Hari split. Hari-only costs reduce Hari&apos;s
+                  share after the split. Landlord-only stays with the owner and is not in the shared pool.
+                </p>
+                {preview.party_economics_explanation.recoverability && (
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <dt className="text-gray-500">In shared pool (settlement base)</dt>
+                      <dd className="font-medium tabular-nums">
+                        {formatMoney(String(preview.party_economics_explanation.recoverability.included_in_shared_pool_for_settlement ?? 0))}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-gray-500">Hari-only (after split)</dt>
+                      <dd className="font-medium tabular-nums">
+                        {formatMoney(String(preview.party_economics_explanation.recoverability.hari_borne_after_split ?? 0))}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-gray-500">Landlord / owner-only</dt>
+                      <dd className="font-medium tabular-nums">
+                        {formatMoney(String(preview.party_economics_explanation.recoverability.owner_borne_not_in_pool ?? 0))}
+                      </dd>
+                    </div>
+                    {(preview.party_economics_explanation.recoverability.shared_scope_other_amounts ?? 0) > 0 && (
+                      <div className="sm:col-span-2">
+                        <dt className="text-gray-500">Other shared-scope charges</dt>
+                        <dd className="font-medium tabular-nums">
+                          {formatMoney(String(preview.party_economics_explanation.recoverability.shared_scope_other_amounts ?? 0))}
+                        </dd>
+                        {preview.party_economics_explanation.recoverability.shared_scope_other_note ? (
+                          <p className="text-xs text-gray-600 mt-1">
+                            {preview.party_economics_explanation.recoverability.shared_scope_other_note}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
+                  </dl>
+                )}
+                {preview.party_economics_explanation.legacy_unscoped_note ? (
+                  <p className="text-xs text-amber-800">{preview.party_economics_explanation.legacy_unscoped_note}</p>
+                ) : null}
+                {selectedProjectId && (
+                  <div className="pt-2 border-t border-slate-200 flex flex-wrap gap-2 text-xs">
+                    <Link
+                      to={`/app/reports/project-responsibility?project_id=${encodeURIComponent(selectedProjectId)}&from=${encodeURIComponent((preview.expenses_included ?? preview.expenses_considered)?.from ?? yearStart())}&to=${encodeURIComponent((preview.expenses_included ?? preview.expenses_considered)?.to ?? upToDate)}`}
+                      className="text-[#1F6F5C] font-medium hover:underline"
+                    >
+                      Open period responsibility report →
+                    </Link>
+                    <span className="text-gray-300">|</span>
+                    <Link
+                      to={`/app/reports/project-party-economics?project_id=${encodeURIComponent(selectedProjectId)}&up_to_date=${encodeURIComponent(upToDate)}`}
+                      className="text-[#1F6F5C] font-medium hover:underline"
+                    >
+                      Open party economics →
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Pool Revenue</dt>

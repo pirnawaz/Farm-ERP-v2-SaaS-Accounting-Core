@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Project;
-use App\Models\ProjectRule;
 use App\Models\OperationalTransaction;
 use App\Models\PostingGroup;
 use App\Models\Settlement;
@@ -35,13 +34,24 @@ class SettlementService
         'SALE', 'HARVEST', 'REVERSAL',
     ];
 
+    /**
+     * Single source of truth for ledger-based project settlement / responsibility posting-group filters.
+     *
+     * @return list<string>
+     */
+    public static function operationalPostingSourceTypes(): array
+    {
+        return self::OPERATIONAL_SOURCE_TYPES;
+    }
+
     public function __construct(
         private SystemAccountService $accountService,
         private PartyAccountService $partyAccountService,
         private SystemPartyService $partyService,
         private PartyFinancialSourceService $financialSourceService,
         private PostValidationService $postValidationService,
-        private OperationalPostingGuard $guard
+        private OperationalPostingGuard $guard,
+        private ProjectSettlementRuleResolver $settlementRuleResolver
     ) {}
 
     /**
@@ -55,7 +65,7 @@ class SettlementService
     {
         $pgIds = PostingGroup::where('tenant_id', $tenantId)
             ->where('posting_date', '<=', $upToDate)
-            ->whereIn('source_type', self::OPERATIONAL_SOURCE_TYPES)
+            ->whereIn('source_type', self::operationalPostingSourceTypes())
             ->whereExists(function ($q) use ($projectId) {
                 $q->select(DB::raw(1))
                     ->from('allocation_rows')
@@ -105,7 +115,7 @@ class SettlementService
     {
         $pgIds = PostingGroup::where('tenant_id', $tenantId)
             ->where('posting_date', '<=', $upToDate)
-            ->whereIn('source_type', self::OPERATIONAL_SOURCE_TYPES)
+            ->whereIn('source_type', self::operationalPostingSourceTypes())
             ->whereExists(function ($q) use ($projectId) {
                 $q->select(DB::raw(1))
                     ->from('allocation_rows')
@@ -175,7 +185,7 @@ class SettlementService
     {
         $pgIds = PostingGroup::where('tenant_id', $tenantId)
             ->where('posting_date', '<=', $upToDate)
-            ->whereIn('source_type', self::OPERATIONAL_SOURCE_TYPES)
+            ->whereIn('source_type', self::operationalPostingSourceTypes())
             ->whereExists(function ($q) use ($projectId) {
                 $q->select(DB::raw(1))
                     ->from('allocation_rows')
@@ -233,12 +243,9 @@ class SettlementService
             ->with('party')
             ->firstOrFail();
 
-        $projectRule = ProjectRule::where('project_id', $projectId)->first();
-        if (!$projectRule) {
-            throw new \Exception('Project rules not found');
-        }
+        $rule = $this->settlementRuleResolver->resolveSettlementRule($project);
 
-        $isOwnerOperated = $projectRule->profit_split_hari_pct == 0 ||
+        $isOwnerOperated = (float) $rule['profit_split_hari_pct'] == 0.0 ||
             ($project->party && !in_array('HARI', $project->party->party_types ?? []));
 
         $upToDateStr = $upToDate ? Carbon::parse($upToDate)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
@@ -253,7 +260,7 @@ class SettlementService
         $landlordOnlyCosts = $ledger['landlord_only_costs'];
 
         // Apply Decision D: kamdari first, then split remainder
-        $kamdariAmount = $poolProfit * ($projectRule->kamdari_pct / 100);
+        $kamdariAmount = $poolProfit * (((float) $rule['kamdari_pct']) / 100);
         $remainingPool = $poolProfit - $kamdariAmount;
 
         if ($isOwnerOperated) {
@@ -261,8 +268,8 @@ class SettlementService
             $hariGross = 0.0;
             $hariNet = 0.0;
         } else {
-            $landlordGross = $remainingPool * ($projectRule->profit_split_landlord_pct / 100);
-            $hariGross = $remainingPool * ($projectRule->profit_split_hari_pct / 100);
+            $landlordGross = $remainingPool * (((float) $rule['profit_split_landlord_pct']) / 100);
+            $hariGross = $remainingPool * (((float) $rule['profit_split_hari_pct']) / 100);
             $hariNet = $hariGross - $hariOnlyDeductions;
         }
 
@@ -285,6 +292,9 @@ class SettlementService
             'hari_net' => $hariNet,
             'hari_deficit' => $hariDeficit,
             'hari_position' => $hariPosition,
+            'settlement_rule_source' => $rule['resolution_source'],
+            'settlement_agreement_id' => $rule['agreement_id'],
+            'settlement_project_rule_id' => $rule['project_rule_id'],
         ];
     }
 
@@ -303,11 +313,9 @@ class SettlementService
             ->with('party')
             ->firstOrFail();
 
-        $projectRule = ProjectRule::where('project_id', $projectId)->first();
-        $isOwnerOperated = $projectRule && (
-            $projectRule->profit_split_hari_pct == 0 || 
-            ($project->party && !in_array('HARI', $project->party->party_types ?? []))
-        );
+        $rule = $this->settlementRuleResolver->resolveSettlementRule($project);
+        $isOwnerOperated = (float) $rule['profit_split_hari_pct'] == 0.0 ||
+            ($project->party && !in_array('HARI', $project->party->party_types ?? []));
 
         // For owner-operated projects, return zeros
         if ($isOwnerOperated) {
@@ -390,13 +398,10 @@ class SettlementService
                 ->with('party')
                 ->firstOrFail();
 
-            $projectRule = ProjectRule::where('project_id', $projectId)->first();
-            if (!$projectRule) {
-                throw new \Exception('Project rules not found');
-            }
+            $rule = $this->settlementRuleResolver->resolveSettlementRule($project);
 
             // Check if project is owner-operated (no HARI party or hari_pct is 0)
-            $isOwnerOperated = $projectRule->profit_split_hari_pct == 0 || 
+            $isOwnerOperated = (float) $rule['profit_split_hari_pct'] == 0.0 ||
                               ($project->party && !in_array('HARI', $project->party->party_types ?? []));
 
             $this->guard->ensureCropCycleOpenForProject($projectId, $tenantId);
@@ -454,7 +459,7 @@ class SettlementService
                 $partyControlHari = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'HARI');
             }
             $partyControlKamdar = null;
-            if ($projectRule->kamdar_party_id && $calculations['kamdari_amount'] > 0) {
+            if ($rule['kamdar_party_id'] && $calculations['kamdari_amount'] > 0) {
                 try {
                     $partyControlKamdar = $this->partyAccountService->getPartyControlAccountByRole($tenantId, 'KAMDAR');
                 } catch (\Exception $e) {
@@ -488,11 +493,14 @@ class SettlementService
 
             // Create allocation rows per Decision D
             $ruleSnapshot = [
-                'landlord_pct' => $projectRule->profit_split_landlord_pct,
-                'hari_pct' => $projectRule->profit_split_hari_pct,
-                'kamdari_pct' => $projectRule->kamdari_pct,
-                'pool_definition' => $projectRule->pool_definition,
-                'kamdari_order' => $projectRule->kamdari_order,
+                'landlord_pct' => $rule['profit_split_landlord_pct'],
+                'hari_pct' => $rule['profit_split_hari_pct'],
+                'kamdari_pct' => $rule['kamdari_pct'],
+                'pool_definition' => $rule['pool_definition'],
+                'kamdari_order' => $rule['kamdari_order'],
+                'resolution_source' => $rule['resolution_source'],
+                'agreement_id' => $rule['agreement_id'],
+                'project_rule_id' => $rule['project_rule_id'],
             ];
 
             // Only create allocation rows and ledger entries for non-negative distribution (loss = 0 distribution)
@@ -514,12 +522,12 @@ class SettlementService
             }
 
             // KAMDARI allocation (if applicable)
-            if ($projectRule->kamdar_party_id && $kamdariAmount > 0) {
+            if ($rule['kamdar_party_id'] && $kamdariAmount > 0) {
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
                     'project_id' => $projectId,
-                    'party_id' => $projectRule->kamdar_party_id,
+                    'party_id' => $rule['kamdar_party_id'],
                     'allocation_type' => 'KAMDARI',
                     'amount' => $kamdariAmount,
                     'rule_snapshot' => $ruleSnapshot,
@@ -691,8 +699,9 @@ class SettlementService
         $projectSummaries = [];
 
         foreach ($projects as $project) {
-            $rule = ProjectRule::where('project_id', $project->id)->first();
-            if (!$rule) {
+            try {
+                $rule = $this->settlementRuleResolver->resolveSettlementRule($project);
+            } catch (\Exception $e) {
                 continue;
             }
             $ledger = $this->getProjectProfitFromLedger($project->id, $tenantId, $upToDate);
@@ -700,9 +709,9 @@ class SettlementService
             $totalRevenue += $ledger['total_revenue'];
             $totalExpenses += $ledger['total_expenses'];
 
-            $isOwnerOperated = $rule->profit_split_hari_pct == 0 ||
+            $isOwnerOperated = (float) $rule['profit_split_hari_pct'] == 0.0 ||
                 ($project->party && !in_array('HARI', $project->party->party_types ?? []));
-            $kamdari = $poolProfit * ($rule->kamdari_pct / 100);
+            $kamdari = $poolProfit * (((float) $rule['kamdari_pct']) / 100);
             $remaining = $poolProfit - $kamdari;
             $kamdariAmount += $kamdari;
 
@@ -710,8 +719,8 @@ class SettlementService
                 $landlordGross += $remaining;
                 $projectSummaries[] = ['project_id' => $project->id, 'landlord_gross' => $remaining, 'hari_net' => 0.0, 'kamdari_amount' => $kamdari];
             } else {
-                $lg = $remaining * ($rule->profit_split_landlord_pct / 100);
-                $hn = $remaining * ($rule->profit_split_hari_pct / 100);
+                $lg = $remaining * (((float) $rule['profit_split_landlord_pct']) / 100);
+                $hn = $remaining * (((float) $rule['profit_split_hari_pct']) / 100);
                 $landlordGross += $lg;
                 $hariNet += $hn;
                 $projectSummaries[] = ['project_id' => $project->id, 'landlord_gross' => $lg, 'hari_net' => $hn, 'kamdari_amount' => $kamdari];

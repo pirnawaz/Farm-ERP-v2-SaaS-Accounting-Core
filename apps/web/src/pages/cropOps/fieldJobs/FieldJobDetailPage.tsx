@@ -32,11 +32,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { PostingStatusBadge } from '../../../utils/postingStatusDisplay';
 import { formatItemDisplayName } from '../../../utils/formatItemDisplay';
 import { Term } from '../../../components/Term';
-import { term } from '../../../config/terminology';
 import { FieldJobCostSummary } from '../../../components/fieldJobs/FieldJobCostSummary';
 import { TraceabilityPanel } from '../../../components/traceability/TraceabilityPanel';
 import { PrimaryWorkflowBanner } from '../../../components/workflow/PrimaryWorkflowBanner';
 import { DuplicateWorkflowRiskCallout } from '../../../components/workflow/DuplicateWorkflowRiskCallout';
+import { PrePostChecklist } from '../../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../../utils/operatorFriendlyErrors';
 import type {
   FieldJobInputLine,
   FieldJobLabourLine,
@@ -133,6 +135,13 @@ export default function FieldJobDetailPage() {
   const canEdit = isDraft && hasRole(['tenant_admin', 'accountant', 'operator']);
   const canPostReverse = hasRole(['tenant_admin', 'accountant']);
 
+  const fieldJobLineCount =
+    (job?.inputs?.length ?? 0) + (job?.labour?.length ?? 0) + (job?.machines?.length ?? 0);
+  const canOpenRecordModal = Boolean(
+    job?.status === 'DRAFT' && job?.project_id && fieldJobLineCount > 0
+  );
+  const canConfirmFieldJobPost = Boolean(canOpenRecordModal && postingDate);
+
   const saveHeader = async () => {
     if (!id || !canEdit) return;
     const payload: UpdateFieldJobPayload = {
@@ -148,22 +157,34 @@ export default function FieldJobDetailPage() {
   };
 
   const handlePost = async () => {
-    if (!id) return;
-    await postM.mutateAsync({
-      id,
-      payload: { posting_date: postingDate, idempotency_key: idempotencyKey },
-    });
-    setShowPostModal(false);
+    if (!id || !canConfirmFieldJobPost) return;
+    try {
+      await postM.mutateAsync({
+        id,
+        payload: { posting_date: postingDate, idempotency_key: idempotencyKey },
+      });
+      setShowPostModal(false);
+      postM.reset();
+    } catch {
+      /* OperatorErrorCallout in modal */
+    }
   };
 
+  const canConfirmFieldJobReverse = Boolean(id && reversePostingDate);
+
   const handleReverse = async () => {
-    if (!id) return;
-    await reverseM.mutateAsync({
-      id,
-      payload: { posting_date: reversePostingDate, reason: reverseReason || undefined },
-    });
-    setShowReverseModal(false);
-    setReverseReason('');
+    if (!canConfirmFieldJobReverse) return;
+    try {
+      await reverseM.mutateAsync({
+        id: id!,
+        payload: { posting_date: reversePostingDate, reason: reverseReason || undefined },
+      });
+      setShowReverseModal(false);
+      setReverseReason('');
+      reverseM.reset();
+    } catch {
+      /* OperatorErrorCallout */
+    }
   };
 
   if (isLoading) {
@@ -196,17 +217,29 @@ export default function FieldJobDetailPage() {
             {isDraft && canPostReverse ? (
               <button
                 type="button"
-                onClick={() => setShowPostModal(true)}
-                className="rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a]"
+                onClick={() => {
+                  postM.reset();
+                  setShowPostModal(true);
+                }}
+                disabled={!canOpenRecordModal}
+                title={
+                  !canOpenRecordModal
+                    ? 'Select a field cycle on the header and add at least one input, labour, or machine line before recording.'
+                    : 'Opens confirmation — nothing is recorded until you confirm.'
+                }
+                className="rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a] disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
               >
-                {term('postAction')}
+                Record to accounts
               </button>
             ) : null}
             {isPosted && canPostReverse ? (
               <button
                 type="button"
-                onClick={() => setShowReverseModal(true)}
-                className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                onClick={() => {
+                  reverseM.reset();
+                  setShowReverseModal(true);
+                }}
+                className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 min-h-[44px]"
               >
                 Reverse
               </button>
@@ -872,85 +905,116 @@ export default function FieldJobDetailPage() {
 
       <Modal
         isOpen={showPostModal}
-        onClose={() => setShowPostModal(false)}
-        title={`${term('postAction')} field job`}
+        onClose={() => {
+          setShowPostModal(false);
+          postM.reset();
+        }}
+        title="Record field job to accounts"
         testId="field-job-post-modal"
       >
-        <p className="text-sm text-gray-600 mb-4">
-          Posting records stock movements, labour payables, machinery usage, and machinery cost (from your rate card or
-          optional line amounts) in the ledger. This action only runs when you confirm—nothing is posted automatically.
+        <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+          This will record costs and updates: stock movements, labour payables, machinery usage, and machinery cost (from
+          your rate card or line amounts) for the posting date below. Cancel if you need to edit the draft first.
         </p>
-        <FormField label="Posting date">
+        <PrePostChecklist
+          className="mb-4"
+          items={[
+            { ok: Boolean(postingDate), label: 'Posting date chosen' },
+            { ok: Boolean(job?.project_id), label: 'Field cycle (project) on job' },
+            { ok: fieldJobLineCount > 0, label: 'At least one input, labour, or machine line' },
+          ]}
+          blockingHint={!canConfirmFieldJobPost ? 'Complete required fields before recording.' : undefined}
+        />
+        <OperatorErrorCallout error={postM.isError ? formatOperatorError(postM.error) : null} />
+        <FormField label="Posting date" required>
           <input
             id="fj-post-date"
             type="date"
             value={postingDate}
             onChange={(e) => setPostingDate(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[44px]"
           />
         </FormField>
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <button
             type="button"
-            onClick={() => setShowPostModal(false)}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm"
+            onClick={() => {
+              setShowPostModal(false);
+              postM.reset();
+            }}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm min-h-[44px]"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handlePost}
-            disabled={postM.isPending}
-            className="rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white"
+            disabled={postM.isPending || !canConfirmFieldJobPost}
+            className="rounded-lg bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white disabled:opacity-50 min-h-[44px]"
           >
-            {postM.isPending ? 'Posting…' : 'Confirm post'}
+            {postM.isPending ? 'Recording…' : 'Confirm'}
           </button>
         </div>
       </Modal>
 
       <Modal
         isOpen={showReverseModal}
-        onClose={() => setShowReverseModal(false)}
+        onClose={() => {
+          setShowReverseModal(false);
+          setReverseReason('');
+          reverseM.reset();
+        }}
         title="Reverse field job"
         testId="field-job-reverse-modal"
       >
-        <p className="text-sm text-gray-600 mb-4">
-          Reversal creates offsetting entries. Use a reversal posting date your accounting policy allows.
-        </p>
-        <FormField label="Posting date">
-          <input
-            id="fj-rev-date"
-            type="date"
-            value={reversePostingDate}
-            onChange={(e) => setReversePostingDate(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            Reversal creates offsetting entries as of the posting date below. Use a date your accounting policy allows.
+          </p>
+          <PrePostChecklist
+            items={[{ ok: Boolean(reversePostingDate), label: 'Posting date chosen' }]}
+            blockingHint={!reversePostingDate ? 'Choose a posting date before reversing.' : undefined}
           />
-        </FormField>
-        <FormField label="Reason (optional)">
-          <textarea
-            id="fj-rev-reason"
-            value={reverseReason}
-            onChange={(e) => setReverseReason(e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
-        </FormField>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setShowReverseModal(false)}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleReverse}
-            disabled={reverseM.isPending}
-            className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white"
-          >
-            {reverseM.isPending ? 'Reversing…' : 'Confirm reverse'}
-          </button>
+          <OperatorErrorCallout error={reverseM.isError ? formatOperatorError(reverseM.error) : null} />
+          <FormField label="Posting date" required>
+            <input
+              id="fj-rev-date"
+              type="date"
+              value={reversePostingDate}
+              onChange={(e) => setReversePostingDate(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[44px]"
+            />
+          </FormField>
+          <FormField label="Reason (optional)">
+            <textarea
+              id="fj-rev-reason"
+              value={reverseReason}
+              onChange={(e) => setReverseReason(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </FormField>
+          <div className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowReverseModal(false);
+                setReverseReason('');
+                reverseM.reset();
+              }}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm min-h-[44px]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleReverse}
+              disabled={reverseM.isPending || !canConfirmFieldJobReverse}
+              className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 min-h-[44px]"
+            >
+              {reverseM.isPending ? 'Reversing…' : 'Confirm reverse'}
+            </button>
+          </div>
         </div>
       </Modal>
 

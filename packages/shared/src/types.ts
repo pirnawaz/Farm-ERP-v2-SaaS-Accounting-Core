@@ -152,10 +152,56 @@ export interface GeneralLedgerResponse {
 
 export interface ProjectPLRow {
   project_id: string
+  project_name?: string | null
   currency_code: string
   income: string
   expenses: string
   net_profit: string
+}
+
+/** GET /api/reports/overheads — posted cost-center overhead (P&L), posting_date range. */
+export interface OverheadsCostCenterRow {
+  cost_center_id: string
+  cost_center_name: string | null
+  currency_code: string
+  income: string
+  expenses: string
+  net: string
+}
+
+export interface OverheadsAccountRow {
+  cost_center_id: string
+  cost_center_name: string | null
+  account_id: string
+  account_code: string | null
+  account_name: string | null
+  account_type: string
+  currency_code: string
+  income: string
+  expenses: string
+  net: string
+}
+
+export interface OverheadsReportResponse {
+  period: { from: string; to: string }
+  by_cost_center: OverheadsCostCenterRow[]
+  by_account: OverheadsAccountRow[]
+  grand_totals: { currency_code: string; income: string; expenses: string; net: string }
+}
+
+/** GET /api/reports/farm-pnl — management summary: project P&L + overhead. */
+export interface FarmPnLSummaryResponse {
+  period: { from: string; to: string }
+  crop_cycle_id: string | null
+  projects: {
+    rows: ProjectPLRow[]
+    totals: { currency_code: string; income: string; expenses: string; net_profit: string }
+  }
+  overhead: {
+    by_cost_center: OverheadsCostCenterRow[]
+    grand_totals: { currency_code: string; income: string; expenses: string; net: string }
+  }
+  combined: { currency_code: string; net_farm_operating_result: string }
 }
 
 export interface CropCyclePLRow {

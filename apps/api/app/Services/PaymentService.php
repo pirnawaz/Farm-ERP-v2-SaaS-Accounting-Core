@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\LabWorker;
 use App\Models\LabWorkerBalance;
 use App\Models\Payment;
@@ -168,11 +169,27 @@ class PaymentService
                 }
             }
 
-            // Credit account by method: CASH or BANK
-            $methodCode = strtoupper((string) ($payment->method ?? 'CASH'));
-            $creditAccount = ($methodCode === 'BANK')
-                ? $this->accountService->getByCode($tenantId, 'BANK')
-                : $this->accountService->getByCode($tenantId, 'CASH');
+            if ($payment->direction === 'IN' && $payment->source_account_id) {
+                throw ValidationException::withMessages([
+                    'source_account_id' => ['Treasury source account is only used for outgoing payments.'],
+                ]);
+            }
+
+            // Credit account: explicit tenant bank/cash GL (ASSET), or default CASH/BANK by method.
+            $creditAccount = null;
+            if ($payment->direction === 'OUT' && $payment->source_account_id) {
+                $creditAccount = TenantScoped::for(Account::query(), $tenantId)->findOrFail($payment->source_account_id);
+                if (strtolower((string) $creditAccount->type) !== 'asset') {
+                    throw ValidationException::withMessages([
+                        'source_account_id' => ['Treasury source must be an asset (bank/cash) account.'],
+                    ]);
+                }
+            } else {
+                $methodCode = strtoupper((string) ($payment->method ?? 'CASH'));
+                $creditAccount = ($methodCode === 'BANK')
+                    ? $this->accountService->getByCode($tenantId, 'BANK')
+                    : $this->accountService->getByCode($tenantId, 'CASH');
+            }
 
             $ledgerLines = [
                 ['account_id' => $payableAccount->id],
@@ -288,6 +305,8 @@ class PaymentService
                     'direction' => $payment->direction,
                     'method' => $payment->method,
                     'purpose' => $payment->purpose ?? 'GENERAL',
+                    'source_account_id' => $payment->source_account_id,
+                    'credit_account_id' => $creditAccount->id,
                 ],
             ]);
 
@@ -383,7 +402,7 @@ class PaymentService
             } else {
                 $billPaymentService = app(BillPaymentService::class);
                 if ($billPaymentService->getPaymentActiveAllocationCount($paymentId, $tenantId) > 0) {
-                    throw new \InvalidArgumentException('Payment has applied bill allocations. Unapply bills before reversing.');
+                    throw new \InvalidArgumentException('Payment has applied bill or supplier-invoice allocations. Unapply bills or supplier invoices before reversing.');
                 }
             }
 

@@ -7,6 +7,7 @@ use App\Models\InvGrnLine;
 use App\Models\InvStore;
 use App\Models\InvItem;
 use App\Models\Party;
+use App\Domains\Commercial\Payables\SupplierInvoiceMatchService;
 use App\Http\Requests\StoreInvGrnRequest;
 use App\Http\Requests\UpdateInvGrnRequest;
 use App\Http\Requests\PostInvGrnRequest;
@@ -18,7 +19,8 @@ use Illuminate\Http\Request;
 class InvGrnController extends Controller
 {
     public function __construct(
-        private InventoryPostingService $postingService
+        private InventoryPostingService $postingService,
+        private SupplierInvoiceMatchService $supplierInvoiceMatchService
     ) {}
 
     public function index(Request $request)
@@ -101,7 +103,10 @@ class InvGrnController extends Controller
         $grn = InvGrn::where('id', $id)->where('tenant_id', $tenantId)
             ->with(['store', 'supplier', 'lines.item', 'postingGroup'])
             ->firstOrFail();
-        return response()->json($grn);
+        $payload = $grn->toArray();
+        $payload['ap_match_summary'] = $this->supplierInvoiceMatchService->summarizeForGrn($grn, $tenantId);
+
+        return response()->json($payload);
     }
 
     public function update(UpdateInvGrnRequest $request, string $id)

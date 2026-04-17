@@ -11,6 +11,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { useFormatting } from '../../hooks/useFormatting';
+import { useRole } from '../../hooks/useRole';
 import { Badge } from '../../components/Badge';
 import { AdvancedWorkflowBanner } from '../../components/workflow/AdvancedWorkflowBanner';
 import type { LabWorkLog } from '../../types';
@@ -37,8 +38,19 @@ export default function WorkLogsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { formatDate } = useFormatting();
+  const { hasRole } = useRole();
 
   const logs = workLogs ?? [];
+  const sortedLogs = useMemo(() => {
+    const list = [...logs];
+    list.sort((a, b) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      return String(b.work_date ?? '').localeCompare(String(a.work_date ?? ''));
+    });
+    return list;
+  }, [logs]);
   const hasFilters = !!(status || workerId || cropCycleId || projectId || from || to);
 
   const clearFilters = () => {
@@ -75,7 +87,8 @@ export default function WorkLogsPage() {
     return `${base} · ${filterSummaryBits.join(' · ')}`;
   }, [logs.length, hasFilters, filterSummaryBits]);
 
-  const cols: Column<LabWorkLog>[] = [
+  const cols: Column<LabWorkLog>[] = useMemo(
+    () => [
     {
       header: 'Date',
       accessor: (r) => (
@@ -101,7 +114,36 @@ export default function WorkLogsPage() {
         </Badge>
       ),
     },
-  ];
+    {
+      header: 'Actions',
+      accessor: (r) => (
+        <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+          {r.status === 'DRAFT' && hasRole(['tenant_admin', 'accountant', 'operator']) ? (
+            <button
+              type="button"
+              className="text-sm font-medium text-[#1F6F5C] hover:underline"
+              onClick={() =>
+                navigate(`/app/labour/work-logs/${r.id}/edit`, { state: { from: location.pathname + location.search } })
+              }
+            >
+              Continue editing
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="text-sm font-medium text-gray-700 hover:underline"
+            onClick={() =>
+              navigate(`/app/labour/work-logs/${r.id}`, { state: { from: location.pathname + location.search } })
+            }
+          >
+            View
+          </button>
+        </div>
+      ),
+    },
+  ],
+    [formatDate, hasRole, navigate, location.pathname, location.search],
+  );
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -279,7 +321,7 @@ export default function WorkLogsPage() {
       ) : (
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
           <DataTable
-            data={logs as LabWorkLog[]}
+            data={sortedLogs as LabWorkLog[]}
             columns={cols}
             onRowClick={(r) => navigate(`/app/labour/work-logs/${r.id}`, { state: { from: location.pathname + location.search } })}
             emptyMessage=""

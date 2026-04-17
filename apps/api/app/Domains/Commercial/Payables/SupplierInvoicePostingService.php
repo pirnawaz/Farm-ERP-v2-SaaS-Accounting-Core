@@ -4,6 +4,7 @@ namespace App\Domains\Commercial\Payables;
 
 use App\Domains\Accounting\MultiCurrency\PostingFxService;
 use App\Models\AllocationRow;
+use App\Models\CostCenter;
 use App\Models\InvItem;
 use App\Models\LedgerEntry;
 use App\Models\PostingGroup;
@@ -22,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Posts a supplier invoice: Dr INVENTORY_INPUTS (stock lines) or INPUTS_EXPENSE (non-stock), Cr AP.
- * One posting group; one allocation row per invoice line (project + supplier preserved).
+ * One posting group; one allocation row per invoice line (project or cost center + supplier preserved).
  */
 class SupplierInvoicePostingService
 {
@@ -78,12 +79,6 @@ class SupplierInvoicePostingService
                 ]);
             }
 
-            if (! $invoice->project_id) {
-                throw ValidationException::withMessages([
-                    'project_id' => ['Project is required to post a supplier invoice.'],
-                ]);
-            }
-
             $invoice->load(['lines']);
 
             if ($invoice->lines->isEmpty()) {
@@ -92,16 +87,57 @@ class SupplierInvoicePostingService
                 ]);
             }
 
-            $project = TenantScoped::for(Project::query(), $tenantId)->findOrFail($invoice->project_id);
+            $isGrnLinked = (bool) $invoice->grn_id;
+            $hasProject = (bool) $invoice->project_id;
+            $hasCostCenter = (bool) $invoice->cost_center_id;
 
-            $cropCycleId = $project->crop_cycle_id;
-            if (! $cropCycleId) {
+            if ($isGrnLinked) {
+                if (! $hasProject || $hasCostCenter) {
+                    throw ValidationException::withMessages([
+                        'scope' => ['GRN-linked supplier invoices must be project-scoped (no cost center on the same bill).'],
+                    ]);
+                }
+            } elseif ($hasProject && $hasCostCenter) {
                 throw ValidationException::withMessages([
-                    'project' => ['Project has no crop cycle.'],
+                    'scope' => ['Choose either a project or a cost center, not both.'],
+                ]);
+            } elseif (! $hasProject && ! $hasCostCenter) {
+                throw ValidationException::withMessages([
+                    'scope' => ['Post requires a project (crop-linked) or an active cost center (farm overhead).'],
                 ]);
             }
 
-            $this->operationalPostingGuard->ensureCropCycleOpenForProject($invoice->project_id, $tenantId);
+            $cropCycleId = null;
+            $allocationProjectId = null;
+            $allocationCostCenterId = null;
+            $costCenter = null;
+
+            if ($hasProject) {
+                $project = TenantScoped::for(Project::query(), $tenantId)->findOrFail($invoice->project_id);
+                $cropCycleId = $project->crop_cycle_id;
+                if (! $cropCycleId) {
+                    throw ValidationException::withMessages([
+                        'project' => ['Project has no crop cycle.'],
+                    ]);
+                }
+                $this->operationalPostingGuard->ensureCropCycleOpenForProject($invoice->project_id, $tenantId);
+                $allocationProjectId = $invoice->project_id;
+            } else {
+                $costCenter = TenantScoped::for(CostCenter::query(), $tenantId)->findOrFail($invoice->cost_center_id);
+                if ($costCenter->status !== CostCenter::STATUS_ACTIVE) {
+                    throw ValidationException::withMessages([
+                        'cost_center_id' => ['Cannot post to an inactive cost center.'],
+                    ]);
+                }
+                $allocationCostCenterId = $costCenter->id;
+                foreach ($invoice->lines as $line) {
+                    if ($line->item_id) {
+                        throw ValidationException::withMessages([
+                            'lines' => ['Cost-center (farm overhead) bills cannot include inventory stock lines.'],
+                        ]);
+                    }
+                }
+            }
 
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
             $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
@@ -209,10 +245,21 @@ class SupplierInvoicePostingService
 
             foreach ($invoice->lines as $line) {
                 $lineAmt = round((float) $line->line_total, 2);
+                $snapshot = [
+                    'source_type' => 'SUPPLIER_INVOICE',
+                    'supplier_invoice_id' => $invoice->id,
+                    'supplier_invoice_line_id' => $line->id,
+                ];
+                if ($allocationCostCenterId) {
+                    $snapshot['cost_center_id'] = $allocationCostCenterId;
+                    $snapshot['cost_center_name'] = $costCenter?->name;
+                }
+
                 AllocationRow::create([
                     'tenant_id' => $tenantId,
                     'posting_group_id' => $postingGroup->id,
-                    'project_id' => $invoice->project_id,
+                    'project_id' => $allocationProjectId,
+                    'cost_center_id' => $allocationCostCenterId,
                     'party_id' => $invoice->party_id,
                     'allocation_type' => 'SUPPLIER_AP',
                     'amount' => (string) $lineAmt,
@@ -220,11 +267,7 @@ class SupplierInvoicePostingService
                     'base_currency_code' => $fx->baseCurrencyCode,
                     'fx_rate' => $fx->fxRate,
                     'amount_base' => $fx->amountInBase($lineAmt),
-                    'rule_snapshot' => [
-                        'source_type' => 'SUPPLIER_INVOICE',
-                        'supplier_invoice_id' => $invoice->id,
-                        'supplier_invoice_line_id' => $line->id,
-                    ],
+                    'rule_snapshot' => $snapshot,
                 ]);
             }
 

@@ -16,6 +16,10 @@ import { useFormatting } from '../../hooks/useFormatting';
 import { PageHeader } from '../../components/PageHeader';
 import type { MachineryService } from '../../types';
 import { Badge } from '../../components/Badge';
+import { v4 as uuidv4 } from 'uuid';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
 
 export default function MachineryServicesPage() {
   const { formatMoney, formatDate } = useFormatting();
@@ -54,20 +58,21 @@ export default function MachineryServicesPage() {
   const [reverseReason, setReverseReason] = useState('');
 
   const handlePost = async () => {
-    if (!postingId) return;
+    if (!postingId || !postingDate) return;
     try {
       await postMutation.mutateAsync({
         id: postingId,
-        payload: { posting_date: postingDate },
+        payload: { posting_date: postingDate, idempotency_key: uuidv4() },
       });
       setPostingId(null);
+      postMutation.reset();
     } catch {
-      // Error handled by mutation
+      /* OperatorErrorCallout */
     }
   };
 
   const handleReverse = async () => {
-    if (!reversingId) return;
+    if (!reversingId || !reverseDate) return;
     try {
       await reverseMutation.mutateAsync({
         id: reversingId,
@@ -75,8 +80,9 @@ export default function MachineryServicesPage() {
       });
       setReversingId(null);
       setReverseReason('');
+      reverseMutation.reset();
     } catch {
-      // Error handled by mutation
+      /* OperatorErrorCallout */
     }
   };
 
@@ -106,11 +112,26 @@ export default function MachineryServicesPage() {
 
   const serviceList = (services ?? []) as MachineryService[];
 
+  const sortedServiceList = useMemo(() => {
+    const key = (row: MachineryService) =>
+      String(row.posting_date || row.created_at || '').slice(0, 10);
+    const draftFirst = (a: MachineryService, b: MachineryService) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      return key(b).localeCompare(key(a));
+    };
+    return [...serviceList].sort(draftFirst);
+  }, [serviceList]);
+
   const summaryLine = useMemo(() => {
     const n = serviceList.length;
     const label = n === 1 ? 'service record' : 'service records';
     return hasFilters ? `${n} ${label} (filtered)` : `${n} ${label}`;
   }, [serviceList.length, hasFilters]);
+
+  const canConfirmServiceListPost = Boolean(postingDate && postingId);
+  const canConfirmServiceListReverse = Boolean(reverseDate && reversingId);
 
   const columns: Column<MachineryService>[] = [
     {
@@ -186,18 +207,19 @@ export default function MachineryServicesPage() {
                 }}
                 className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
               >
-                Edit
+                Continue editing
               </button>
               {canPost && (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    postMutation.reset();
                     setPostingId(row.id);
                   }}
-                  className="text-green-600 hover:text-green-800"
+                  className="text-green-600 hover:text-green-800 font-medium"
                 >
-                  Post
+                  Record to accounts
                 </button>
               )}
             </>
@@ -207,9 +229,10 @@ export default function MachineryServicesPage() {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                reverseMutation.reset();
                 setReversingId(row.id);
               }}
-              className="text-red-600 hover:text-red-800"
+              className="text-red-600 hover:text-red-800 font-medium"
             >
               Reverse
             </button>
@@ -352,7 +375,7 @@ export default function MachineryServicesPage() {
       ) : (
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
           <DataTable
-            data={serviceList}
+            data={sortedServiceList}
             columns={columns}
             onRowClick={(row) => navigate(`/app/machinery/services/${row.id}`)}
             emptyMessage=""
@@ -361,26 +384,40 @@ export default function MachineryServicesPage() {
       )}
 
       {postingId && (
-        <Modal isOpen={!!postingId} title="Post Service" onClose={() => setPostingId(null)}>
+        <Modal
+          isOpen={!!postingId}
+          title="Record service to accounts"
+          onClose={() => {
+            setPostingId(null);
+            postMutation.reset();
+          }}
+        >
           <div className="space-y-4">
-            {(() => {
-              const msg = (postMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-              return msg ? <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{msg}</div> : null;
-            })()}
-            <FormField label="Posting Date" required>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              This will record this service in the accounts for the posting date below.
+            </p>
+            <PrePostChecklist
+              items={[{ ok: Boolean(postingDate), label: 'Posting date chosen' }]}
+              blockingHint={!postingDate ? 'Choose a posting date before recording.' : undefined}
+            />
+            <OperatorErrorCallout error={postMutation.isError ? formatOperatorError(postMutation.error) : null} />
+            <FormField label="Posting date" required>
               <input
                 type="date"
                 value={postingDate}
                 onChange={(e) => setPostingDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] min-h-[44px]"
                 required
               />
             </FormField>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-6">
               <button
                 type="button"
-                onClick={() => setPostingId(null)}
-                className="w-full sm:w-auto px-4 py-2 border rounded"
+                onClick={() => {
+                  setPostingId(null);
+                  postMutation.reset();
+                }}
+                className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
                 disabled={postMutation.isPending}
               >
                 Cancel
@@ -388,10 +425,10 @@ export default function MachineryServicesPage() {
               <button
                 type="button"
                 onClick={handlePost}
-                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                disabled={postMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 min-h-[44px]"
+                disabled={postMutation.isPending || !canConfirmServiceListPost}
               >
-                {postMutation.isPending ? 'Posting...' : 'Post'}
+                {postMutation.isPending ? 'Recording…' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -401,27 +438,32 @@ export default function MachineryServicesPage() {
       {reversingId && (
         <Modal
           isOpen={!!reversingId}
-          title="Reverse Service"
+          title="Reverse service"
           onClose={() => {
             setReversingId(null);
             setReverseReason('');
+            reverseMutation.reset();
           }}
         >
           <div className="space-y-4">
-            {(() => {
-              const msg = (reverseMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-              return msg ? <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{msg}</div> : null;
-            })()}
-            <FormField label="Posting Date" required>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              This creates offsetting entries as of the posting date below. Cancel if you are not ready.
+            </p>
+            <PrePostChecklist
+              items={[{ ok: Boolean(reverseDate), label: 'Posting date chosen' }]}
+              blockingHint={!reverseDate ? 'Choose a posting date before reversing.' : undefined}
+            />
+            <OperatorErrorCallout error={reverseMutation.isError ? formatOperatorError(reverseMutation.error) : null} />
+            <FormField label="Posting date" required>
               <input
                 type="date"
                 value={reverseDate}
                 onChange={(e) => setReverseDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C] min-h-[44px]"
                 required
               />
             </FormField>
-            <FormField label="Reason">
+            <FormField label="Reason (optional)">
               <textarea
                 value={reverseReason}
                 onChange={(e) => setReverseReason(e.target.value)}
@@ -437,8 +479,9 @@ export default function MachineryServicesPage() {
                 onClick={() => {
                   setReversingId(null);
                   setReverseReason('');
+                  reverseMutation.reset();
                 }}
-                className="w-full sm:w-auto px-4 py-2 border rounded"
+                className="w-full sm:w-auto px-4 py-2 border rounded min-h-[44px]"
                 disabled={reverseMutation.isPending}
               >
                 Cancel
@@ -446,10 +489,10 @@ export default function MachineryServicesPage() {
               <button
                 type="button"
                 onClick={handleReverse}
-                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                disabled={reverseMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                disabled={reverseMutation.isPending || !canConfirmServiceListReverse}
               >
-                {reverseMutation.isPending ? 'Reversing...' : 'Reverse'}
+                {reverseMutation.isPending ? 'Reversing…' : 'Confirm reverse'}
               </button>
             </div>
           </div>

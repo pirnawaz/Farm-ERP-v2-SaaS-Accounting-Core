@@ -67,6 +67,7 @@ class MachineryChargeService
         // Check if there are any work logs in the range (regardless of charge status)
         $allWorkLogsQuery = MachineWorkLog::where('tenant_id', $tenantId)
             ->where('project_id', $projectId)
+            ->where('chargeable', false)
             ->where('status', MachineWorkLog::STATUS_POSTED)
             ->whereBetween('posting_date', [$fromDate, $toDate]);
 
@@ -79,6 +80,7 @@ class MachineryChargeService
         // Query uncharged work logs
         $workLogsQuery = MachineWorkLog::where('tenant_id', $tenantId)
             ->where('project_id', $projectId)
+            ->where('chargeable', false)
             ->where('status', MachineWorkLog::STATUS_POSTED)
             ->whereBetween('posting_date', [$fromDate, $toDate])
             ->whereNull('machinery_charge_id')

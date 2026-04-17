@@ -9,11 +9,16 @@ use App\Domains\Reporting\TrialBalanceService;
 use App\Domains\Reporting\GeneralLedgerService;
 use App\Domains\Reporting\ProfitLossService;
 use App\Domains\Reporting\BalanceSheetService;
+use App\Domains\Reporting\ProjectPLQueryService;
+use App\Domains\Reporting\FarmOverheadReportingService;
+use App\Domains\Reporting\FarmPnLSummaryReportingService;
 use App\Services\ForecastService;
 use App\Services\HarvestEconomicsService;
 use App\Services\MachineProfitabilityService;
 use App\Services\ProjectProfitabilityService;
 use App\Services\SettlementService;
+use App\Services\ProjectResponsibilityReadService;
+use App\Services\StatementExportService;
 use App\Services\ReconciliationService;
 use App\Services\SaleARService;
 use App\Services\BillPaymentService;
@@ -23,6 +28,7 @@ use App\Services\PartySummaryService;
 use App\Services\RoleAgeingService;
 use App\Services\LandlordStatementService;
 use App\Models\CropCycle;
+use App\Models\Machine;
 use App\Models\Harvest;
 use App\Models\Project;
 use App\Models\OperationalTransaction;
@@ -31,9 +37,11 @@ use App\Models\Payment;
 use App\Models\PostingGroup;
 use App\Models\LedgerEntry;
 use App\Models\Sale;
+use App\Domains\Commercial\Payables\SupplierCreditNote;
 use App\Models\Party;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
@@ -54,7 +62,12 @@ class ReportController extends Controller
         private ProjectProfitabilityService $projectProfitabilityService,
         private MachineProfitabilityService $machineProfitabilityService,
         private HarvestEconomicsService $harvestEconomicsService,
-        private ForecastService $forecastService
+        private ForecastService $forecastService,
+        private ProjectPLQueryService $projectPLQueryService,
+        private FarmOverheadReportingService $farmOverheadReportingService,
+        private FarmPnLSummaryReportingService $farmPnLSummaryReportingService,
+        private ProjectResponsibilityReadService $projectResponsibilityReadService,
+        private StatementExportService $statementExportService,
     ) {}
 
     /**
@@ -188,7 +201,13 @@ class ReportController extends Controller
             $filters
         );
 
-        return response()->json($data);
+        return response()->json(array_merge($data, [
+            '_meta' => [
+                'basis' => 'project_allocation_ledger',
+                'aligned_with' => 'GET /api/reports/project-pl',
+                'note' => 'Posting groups are those with project-scoped allocation rows; totals are income/expense P&L accounts on those groups (same eligibility as Field Cycle P&L).',
+            ],
+        ]));
     }
 
     /**
@@ -284,7 +303,8 @@ class ReportController extends Controller
 
     /**
      * GET /api/reports/machine-profitability
-     * Per-machine revenue, cost, usage hours for a posting window. Optional: project_id, crop_cycle_id.
+     * GET /api/reports/machinery-profitability (alias)
+     * Per-machine revenue, cost, usage hours for a posting window. Optional: project_id, crop_cycle_id, machine_id.
      */
     public function machineProfitability(Request $request): JsonResponse
     {
@@ -294,9 +314,20 @@ class ReportController extends Controller
             'to' => 'required|date|after_or_equal:from',
             'project_id' => 'nullable|uuid',
             'crop_cycle_id' => 'nullable|uuid',
+            'machine_id' => 'nullable|uuid',
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->filled('machine_id')) {
+            $machine = Machine::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $request->input('machine_id'))
+                ->first();
+            if (! $machine) {
+                return response()->json(['errors' => ['machine_id' => ['Invalid machine.']]], 422);
+            }
         }
 
         if ($request->filled('project_id')) {
@@ -325,6 +356,7 @@ class ReportController extends Controller
             'to' => (string) $request->input('to'),
             'crop_cycle_id' => $request->input('crop_cycle_id'),
             'project_id' => $request->input('project_id'),
+            'machine_id' => $request->input('machine_id'),
         ];
 
         $rows = $this->machineProfitabilityService->getMachineProfitability($tenantId, $filters);
@@ -500,79 +532,194 @@ class ReportController extends Controller
     public function projectPL(Request $request): JsonResponse
     {
         $tenantId = TenantContext::getTenantId($request);
-        
+
         $validator = Validator::make($request->all(), [
             'from' => 'required|date',
             'to' => 'required|date|after_or_equal:from',
             'project_id' => 'nullable|uuid',
+            'crop_cycle_id' => 'nullable|uuid',
         ]);
-        
+
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
-        
-        $from = $request->input('from');
-        $to = $request->input('to');
-        $projectId = $request->input('project_id');
-        
-        // CTE avoids duplicating ledger amounts when a posting_group has multiple allocation_rows (same project).
-        // Only income/expense accounts; exclude clearing and party control from P&L.
-        // Exclude allocation_rows with project_id IS NULL (e.g. FARM_OVERHEAD) so they do not appear in project P&L.
-        $query = "
-            WITH project_allocations AS (
-                SELECT DISTINCT posting_group_id, project_id
-                FROM allocation_rows
-                WHERE tenant_id = :tenant_id
-                    AND project_id IS NOT NULL
-            )
-            SELECT
-                pa.project_id,
-                le.currency_code,
-                SUM(CASE WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount) ELSE 0 END) AS income,
-                SUM(CASE WHEN a.type = 'expense' THEN (le.debit_amount - le.credit_amount) ELSE 0 END) AS expenses,
-                SUM(
-                    CASE
-                        WHEN a.type = 'income' THEN (le.credit_amount - le.debit_amount)
-                        WHEN a.type = 'expense' THEN -(le.debit_amount - le.credit_amount)
-                        ELSE 0
-                    END
-                ) AS net_profit
-            FROM ledger_entries le
-            JOIN accounts a ON a.id = le.account_id
-            JOIN posting_groups pg ON pg.id = le.posting_group_id
-            JOIN project_allocations pa ON pa.posting_group_id = pg.id
-            WHERE le.tenant_id = :tenant_id
-                AND pg.posting_date BETWEEN :from AND :to
-                AND a.type IN ('income', 'expense')
-        ";
-        
-        $params = [
-            'tenant_id' => $tenantId,
-            'from' => $from,
-            'to' => $to,
-        ];
-        
-        if ($projectId) {
-            $query .= " AND pa.project_id = :project_id";
-            $params['project_id'] = $projectId;
-        }
-        
-        $query .= " GROUP BY pa.project_id, le.currency_code
-                    ORDER BY pa.project_id";
-        
-        $results = DB::select($query, $params);
-        
-        $rows = array_map(function ($row) {
-            return [
-                'project_id' => $row->project_id,
-                'currency_code' => $row->currency_code,
-                'income' => (string) $row->income,
-                'expenses' => (string) $row->expenses,
-                'net_profit' => (string) $row->net_profit,
-            ];
-        }, $results);
-        
+
+        $from = (string) $request->input('from');
+        $to = (string) $request->input('to');
+        $projectId = $request->filled('project_id') ? (string) $request->input('project_id') : null;
+        $cropCycleId = $request->filled('crop_cycle_id') ? (string) $request->input('crop_cycle_id') : null;
+
+        $rows = $this->projectPLQueryService->getProjectPlRows($tenantId, $from, $to, $projectId, $cropCycleId);
+
         return response()->json($rows);
+    }
+
+    /**
+     * GET /api/reports/project-responsibility
+     * Phase 6 — responsibility / recoverability read model for a project over a date range (project P&amp;L posting-group basis).
+     */
+    public function projectResponsibility(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+            'project_id' => 'required|uuid|exists:projects,id',
+            'crop_cycle_id' => 'nullable|uuid',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $project = Project::where('id', $request->input('project_id'))
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $payload = $this->projectResponsibilityReadService->summarizeForProjectPeriod(
+            $tenantId,
+            $project->id,
+            (string) $request->input('from'),
+            (string) $request->input('to'),
+            $request->filled('crop_cycle_id') ? (string) $request->input('crop_cycle_id') : null,
+        );
+
+        return response()->json($payload);
+    }
+
+    /**
+     * GET /api/reports/project-party-economics
+     * Phase 6 — bounded party-facing read model for project settlement context (Hari party gets preview slice).
+     */
+    public function projectPartyEconomics(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|uuid|exists:projects,id',
+            'party_id' => 'required|uuid|exists:parties,id',
+            'up_to_date' => 'required|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $project = Project::where('id', $request->input('project_id'))
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        $upTo = Carbon::parse((string) $request->input('up_to_date'))->format('Y-m-d');
+        $preview = $this->settlementService->previewSettlement($project->id, $tenantId, $upTo);
+
+        $payload = $this->projectResponsibilityReadService->partyEconomicsReadModel(
+            $tenantId,
+            $project->id,
+            (string) $request->input('party_id'),
+            $upTo,
+            $preview,
+        );
+
+        return response()->json($payload);
+    }
+
+    /**
+     * GET /api/reports/project-responsibility/export?format=pdf|csv
+     * Phase 7 — same read model as project-responsibility; PDF/CSV presentation only.
+     */
+    public function exportProjectResponsibility(Request $request): Response|JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        return $this->statementExportService->exportProjectResponsibility($request, $tenantId);
+    }
+
+    /**
+     * GET /api/reports/project-party-economics/export?format=pdf|csv
+     * Phase 7 — same read model as project-party-economics; PDF/CSV presentation only.
+     */
+    public function exportProjectPartyEconomics(Request $request): Response|JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        return $this->statementExportService->exportProjectPartyEconomics($request, $tenantId);
+    }
+
+    /**
+     * GET /api/reports/project-settlement-review/export?format=pdf|csv
+     * Phase 7 — combined settlement preview + responsibility period + Hari party economics (read models only).
+     */
+    public function exportProjectSettlementReview(Request $request): Response|JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        return $this->statementExportService->exportProjectSettlementReview($request, $tenantId);
+    }
+
+    /**
+     * GET /api/reports/overheads
+     * Posted cost-center overhead (P&amp;L accounts), posting_date range. Optional cost_center_id, party_id.
+     */
+    public function overheads(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+            'cost_center_id' => 'nullable|uuid',
+            'party_id' => 'nullable|uuid',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = $this->farmOverheadReportingService->getOverheads(
+            $tenantId,
+            (string) $request->input('from'),
+            (string) $request->input('to'),
+            $request->filled('cost_center_id') ? (string) $request->input('cost_center_id') : null,
+            $request->filled('party_id') ? (string) $request->input('party_id') : null,
+        );
+
+        return response()->json($data);
+    }
+
+    /**
+     * GET /api/reports/farm-pnl
+     * Management summary: aggregate project P&amp;L + cost-center overhead; net = project net + overhead net.
+     */
+    public function farmPnl(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+            'crop_cycle_id' => 'nullable|uuid',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $cropCycleId = $request->filled('crop_cycle_id') ? (string) $request->input('crop_cycle_id') : null;
+        if ($cropCycleId) {
+            $cycle = CropCycle::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $cropCycleId)
+                ->first();
+            if (! $cycle) {
+                return response()->json(['errors' => ['crop_cycle_id' => ['Invalid crop cycle.']]], 422);
+            }
+        }
+
+        $data = $this->farmPnLSummaryReportingService->getSummary(
+            $tenantId,
+            (string) $request->input('from'),
+            (string) $request->input('to'),
+            $cropCycleId
+        );
+
+        return response()->json($data);
     }
     
     /**
@@ -2386,7 +2533,8 @@ class ReportController extends Controller
         foreach ($suppliers as $supplier) {
             $openBills = $billPaymentService->getSupplierOpenBills($supplier->id, $tenantId, $asOfDate);
             $openSis = $billPaymentService->getSupplierOpenSupplierInvoices($supplier->id, $tenantId, $asOfDate);
-            if (empty($openBills) && empty($openSis)) {
+            $unlinkedCredits = $billPaymentService->getSupplierUnlinkedPostedCreditsTotal($supplier->id, $tenantId, $asOfDate);
+            if (empty($openBills) && empty($openSis) && $unlinkedCredits <= 0) {
                 continue;
             }
 
@@ -2412,11 +2560,15 @@ class ReportController extends Controller
                 $this->addApAgeingOutstanding($outstanding, (string) $dueDate, $asOfDateObj, $supplierTotals);
             }
 
-            if ($supplierTotals['total_outstanding'] > 0) {
+            if ($supplierTotals['total_outstanding'] > 0 || $unlinkedCredits > 0) {
+                $docOpen = $supplierTotals['total_outstanding'];
+                $netAfterUnlinked = max(0, $docOpen - $unlinkedCredits);
                 $rows[] = [
                     'supplier_party_id' => $supplier->id,
                     'supplier_name' => $supplier->name,
                     'total_outstanding' => number_format($supplierTotals['total_outstanding'], 2, '.', ''),
+                    'posted_unlinked_credits' => number_format($unlinkedCredits, 2, '.', ''),
+                    'net_after_unlinked_credits' => number_format($netAfterUnlinked, 2, '.', ''),
                     'bucket_0_30' => number_format($supplierTotals['bucket_0_30'], 2, '.', ''),
                     'bucket_31_60' => number_format($supplierTotals['bucket_31_60'], 2, '.', ''),
                     'bucket_61_90' => number_format($supplierTotals['bucket_61_90'], 2, '.', ''),
@@ -2439,6 +2591,11 @@ class ReportController extends Controller
         return response()->json([
             'as_of' => $asOfDate,
             'buckets' => ['0-30', '31-60', '61-90', '90+'],
+            'notes' => [
+                'Aging buckets are based on open GRN bills and open posted supplier invoices (due date on bill where set).',
+                'Posted supplier credit notes linked to a bill reduce that bill’s outstanding and are reflected in those lines.',
+                'posted_unlinked_credits are on-account credits (no bill link); net_after_unlinked_credits subtracts them from the supplier’s document open total only (buckets are unchanged).',
+            ],
             'rows' => $rows,
             'totals' => [
                 'total_outstanding' => number_format($totals['total_outstanding'], 2, '.', ''),
@@ -2449,6 +2606,59 @@ class ReportController extends Controller
             ],
             'reconciliation' => [
                 'subledger_open_total' => number_format($subledgerCheck, 2, '.', ''),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/ap-supplier-outstanding
+     * Posted-truth supplier AP: open GRN bills, open supplier invoices (net of payments + linked credits), posted credits.
+     */
+    public function apSupplierOutstanding(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $asOfDate = $request->input('as_of', Carbon::today()->format('Y-m-d'));
+        $billPaymentService = app(BillPaymentService::class);
+
+        $suppliers = Party::where('tenant_id', $tenantId)
+            ->whereJsonContains('party_types', 'VENDOR')
+            ->orderBy('name')
+            ->get();
+
+        $rows = [];
+        foreach ($suppliers as $supplier) {
+            $openGrn = $billPaymentService->getSupplierOpenBillsTotal($supplier->id, $tenantId, $asOfDate);
+            $openSi = $billPaymentService->getSupplierOpenSupplierInvoicesTotal($supplier->id, $tenantId, $asOfDate);
+            $unlinked = $billPaymentService->getSupplierUnlinkedPostedCreditsTotal($supplier->id, $tenantId, $asOfDate);
+            $postedCreditsAll = (float) SupplierCreditNote::where('tenant_id', $tenantId)
+                ->where('party_id', $supplier->id)
+                ->where('status', SupplierCreditNote::STATUS_POSTED)
+                ->when($asOfDate, fn ($q) => $q->where('credit_date', '<=', $asOfDate))
+                ->sum('total_amount');
+
+            if ($openGrn <= 0 && $openSi <= 0 && $postedCreditsAll <= 0) {
+                continue;
+            }
+
+            $rows[] = [
+                'supplier_party_id' => $supplier->id,
+                'supplier_name' => $supplier->name,
+                'open_grn_outstanding' => number_format($openGrn, 2, '.', ''),
+                'open_supplier_invoice_outstanding' => number_format($openSi, 2, '.', ''),
+                'documents_open_total' => number_format($openGrn + $openSi, 2, '.', ''),
+                'posted_credit_notes_total' => number_format($postedCreditsAll, 2, '.', ''),
+                'posted_unlinked_credits' => number_format($unlinked, 2, '.', ''),
+                'net_after_unlinked_credits' => number_format(max(0, $openGrn + $openSi - $unlinked), 2, '.', ''),
+            ];
+        }
+
+        return response()->json([
+            'as_of' => $asOfDate,
+            'rows' => $rows,
+            'notes' => [
+                'open_supplier_invoice_outstanding includes posted linked credits (reduces per-bill exposure).',
+                'posted_credit_notes_total is all posted credits for the supplier as of as_of.',
+                'net_after_unlinked_credits = open GRN + open supplier invoices − posted_unlinked_credits.',
             ],
         ]);
     }
@@ -3857,6 +4067,170 @@ class ReportController extends Controller
                 'category' => $r->category,
                 'acres' => number_format((float) $r->acres, 2, '.', ''),
             ]),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/supplier-payments
+     * Bounded supplier payment history (OUT, vendor, non-wage, cash/bank method), with allocation summary when posted.
+     */
+    public function supplierPaymentsHistory(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'from' => ['nullable', 'date', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'party_id' => ['nullable', 'uuid'],
+            'status' => ['nullable', 'string', 'in:DRAFT,POSTED'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $limit = (int) $request->input('limit', 200);
+        $billPaymentService = app(BillPaymentService::class);
+
+        $q = Payment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('direction', 'OUT')
+            ->whereIn('method', ['CASH', 'BANK'])
+            ->where(function ($q2) {
+                $q2->whereNull('purpose')->orWhere('purpose', '<>', 'WAGES');
+            })
+            ->whereNull('reversal_posting_group_id')
+            ->whereNull('reversed_at')
+            ->whereHas('party', function ($q3) {
+                $q3->whereJsonContains('party_types', 'VENDOR');
+            })
+            ->with(['party:id,name', 'sourceAccount:id,code,name,type']);
+
+        if ($from) {
+            $q->where('payment_date', '>=', $from);
+        }
+        if ($to) {
+            $q->where('payment_date', '<=', $to);
+        }
+        if ($request->filled('party_id')) {
+            $q->where('party_id', $request->input('party_id'));
+        }
+        if ($request->filled('status')) {
+            $q->where('status', $request->input('status'));
+        }
+        if ($request->filled('source_account_id')) {
+            $q->where('source_account_id', $request->input('source_account_id'));
+        }
+
+        $payments = $q->orderByDesc('payment_date')->orderByDesc('created_at')->limit($limit)->get();
+
+        $rows = [];
+        foreach ($payments as $p) {
+            $summary = null;
+            if ($p->status === 'POSTED') {
+                $summary = $billPaymentService->getPaymentAllocationSummary($tenantId, $p->id);
+            }
+            $rows[] = [
+                'payment_id' => $p->id,
+                'party_id' => $p->party_id,
+                'supplier_name' => $p->party?->name,
+                'payment_date' => $p->payment_date->format('Y-m-d'),
+                'amount' => number_format((float) $p->amount, 2, '.', ''),
+                'reference' => $p->reference,
+                'status' => $p->status,
+                'method' => $p->method,
+                'source_account' => $p->sourceAccount ? [
+                    'id' => $p->sourceAccount->id,
+                    'code' => $p->sourceAccount->code,
+                    'name' => $p->sourceAccount->name,
+                ] : null,
+                'allocation_summary' => $summary,
+            ];
+        }
+
+        return response()->json([
+            'from' => $from,
+            'to' => $to,
+            'limit' => $limit,
+            'notes' => [
+                'Includes outgoing cash/bank payments to suppliers (VENDOR) excluding wage purpose.',
+                'Synthetic CREDIT_NOTE-method payments are excluded.',
+                'allocation_summary is present when status is POSTED.',
+            ],
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * GET /api/reports/treasury-supplier-outflows
+     * Posted supplier payment totals for a date range (bounded treasury visibility).
+     */
+    public function treasurySupplierOutflows(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $validator = Validator::make($request->all(), [
+            'from' => ['required', 'date', 'date_format:Y-m-d'],
+            'to' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'party_id' => ['nullable', 'uuid'],
+            'source_account_id' => ['nullable', 'uuid'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        $q = Payment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('direction', 'OUT')
+            ->where('status', 'POSTED')
+            ->whereIn('method', ['CASH', 'BANK'])
+            ->where(function ($q2) {
+                $q2->whereNull('purpose')->orWhere('purpose', '<>', 'WAGES');
+            })
+            ->whereNull('reversal_posting_group_id')
+            ->whereNull('reversed_at')
+            ->whereBetween('payment_date', [$from, $to])
+            ->whereHas('party', function ($q3) {
+                $q3->whereJsonContains('party_types', 'VENDOR');
+            });
+
+        if ($request->filled('party_id')) {
+            $q->where('party_id', $request->input('party_id'));
+        }
+        if ($request->filled('source_account_id')) {
+            $q->where('source_account_id', $request->input('source_account_id'));
+        }
+
+        $totalPaid = (float) (clone $q)->sum('amount');
+
+        $bySupplier = (clone $q)
+            ->selectRaw('party_id, SUM(amount) as total')
+            ->groupBy('party_id')
+            ->get();
+
+        $partyNames = Party::where('tenant_id', $tenantId)
+            ->whereIn('id', $bySupplier->pluck('party_id'))
+            ->pluck('name', 'id');
+
+        $rows = $bySupplier->map(function ($r) use ($partyNames) {
+            return [
+                'party_id' => $r->party_id,
+                'supplier_name' => $partyNames[$r->party_id] ?? null,
+                'total_paid' => number_format((float) $r->total, 2, '.', ''),
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'from' => $from,
+            'to' => $to,
+            'total_paid' => number_format($totalPaid, 2, '.', ''),
+            'by_supplier' => $rows,
+            'notes' => [
+                'Totals are posted outgoing supplier payments (VENDOR, non-wage) in the date range.',
+                'Optional filters: party_id, source_account_id.',
+            ],
         ]);
     }
 

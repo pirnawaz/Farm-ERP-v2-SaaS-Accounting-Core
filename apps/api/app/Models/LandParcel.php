@@ -41,4 +41,9 @@ class LandParcel extends Model
     {
         return $this->hasMany(LandAllocation::class);
     }
+
+    public function agreementAllocations(): HasMany
+    {
+        return $this->hasMany(AgreementAllocation::class, 'land_parcel_id');
+    }
 }

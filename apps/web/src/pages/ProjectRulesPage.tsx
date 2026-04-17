@@ -107,6 +107,15 @@ export default function ProjectRulesPage() {
         <h1 className="text-2xl font-bold text-gray-900 mt-2">{term('fieldCycle')} Rules</h1>
       </div>
 
+      {rule?._meta?.settlement_terms_hint && (
+        <div
+          className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="status"
+        >
+          {rule._meta.settlement_terms_hint}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

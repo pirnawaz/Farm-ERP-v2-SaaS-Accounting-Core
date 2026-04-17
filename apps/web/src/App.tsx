@@ -107,6 +107,7 @@ import MachineryWorkLogsPage from './pages/machinery/WorkLogsPage';
 import MachineryWorkLogFormPage from './pages/machinery/WorkLogFormPage';
 import MachineryWorkLogDetailPage from './pages/machinery/WorkLogDetailPage';
 import MachineryProfitabilityPage from './pages/machinery/MachineryProfitabilityPage';
+import MachineryExternalIncomePage from './pages/machinery/MachineryExternalIncomePage';
 import MachineryServicesPage from './pages/machinery/MachineryServicesPage';
 import MachineryServiceFormPage from './pages/machinery/MachineryServiceFormPage';
 import MachineryServiceDetailPage from './pages/machinery/MachineryServiceDetailPage';
@@ -120,15 +121,26 @@ import CropCyclePLPage from './pages/CropCyclePLPage';
 import CropProfitabilityReportPage from './pages/reports/CropProfitabilityReportPage';
 import CropProfitabilityTrendPage from './pages/reports/CropProfitabilityTrendPage';
 import ProjectProfitabilityPage from './pages/reports/ProjectProfitabilityPage';
+import FarmPnLSummaryPage from './pages/reports/FarmPnLSummaryPage';
+import OverheadsReportPage from './pages/reports/OverheadsReportPage';
 import ProjectForecastDashboardPage from './pages/reports/ProjectForecastDashboardPage';
+import ProjectResponsibilityReportPage from './pages/reports/ProjectResponsibilityReportPage';
+import ProjectPartyEconomicsPage from './pages/reports/ProjectPartyEconomicsPage';
 import MachineProfitabilityReportPage from './pages/reports/MachineProfitabilityReportPage';
 import ProductionUnitsProfitabilityReportPage from './pages/reports/ProductionUnitsProfitabilityReportPage';
 import AccountBalancesPage from './pages/AccountBalancesPage';
 import CashbookPage from './pages/CashbookPage';
 import ARAgeingPage from './pages/ARAgeingPage';
 import APAgeingPage from './pages/APAgeingPage';
+import APSupplierOutstandingPage from './pages/APSupplierOutstandingPage';
+import SupplierPaymentsReportPage from './pages/SupplierPaymentsReportPage';
+import TreasurySupplierOutflowsPage from './pages/TreasurySupplierOutflowsPage';
+import SupplierCreditNoteNewPage from './pages/SupplierCreditNoteNewPage';
 import SupplierInvoicesPage from './pages/SupplierInvoicesPage';
 import SupplierInvoiceDetailPage from './pages/SupplierInvoiceDetailPage';
+import BillsPage from './pages/accounting/BillsPage';
+import BillFormPage from './pages/accounting/BillFormPage';
+import CostCentersPage from './pages/accounting/CostCentersPage';
 import SalesMarginPage from './pages/SalesMarginPage';
 import PartyLedgerPage from './pages/PartyLedgerPage';
 import PartySummaryPage from './pages/PartySummaryPage';
@@ -140,6 +152,7 @@ import JournalsPage from './pages/accounting/JournalsPage';
 import JournalFormPage from './pages/accounting/JournalFormPage';
 import JournalDetailPage from './pages/accounting/JournalDetailPage';
 import AccountingPeriodsPage from './pages/accounting/AccountingPeriodsPage';
+import AccountingAllocationToolsPage from './pages/accounting/AccountingAllocationToolsPage';
 import FixedAssetsPage from './pages/accounting/fixed-assets/FixedAssetsPage';
 import FixedAssetFormPage from './pages/accounting/fixed-assets/FixedAssetFormPage';
 import FixedAssetDetailPage from './pages/accounting/fixed-assets/FixedAssetDetailPage';
@@ -327,12 +340,15 @@ function App() {
         <Route path="machinery/maintenance-jobs/:id" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceJobDetailPage /></ModuleProtectedRoute>} />
         <Route path="machinery/maintenance-jobs/:id/edit" element={<ModuleProtectedRoute requiredModule="machinery"><MaintenanceJobFormPage /></ModuleProtectedRoute>} />
         <Route path="machinery/reports/profitability" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryProfitabilityPage /></ModuleProtectedRoute>} />
+        <Route path="machinery/external-income" element={<ModuleProtectedRoute requiredModule="machinery"><MachineryExternalIncomePage /></ModuleProtectedRoute>} />
         <Route path="reports" element={<ModuleProtectedRoute requiredModule="reports"><ReportsPage /></ModuleProtectedRoute>} />
         <Route path="reports/trial-balance" element={<ModuleProtectedRoute requiredModule="reports"><TrialBalancePage /></ModuleProtectedRoute>} />
         <Route path="reports/profit-loss" element={<ModuleProtectedRoute requiredModule="reports"><ProfitLossPage /></ModuleProtectedRoute>} />
         <Route path="reports/balance-sheet" element={<ModuleProtectedRoute requiredModule="reports"><BalanceSheetPage /></ModuleProtectedRoute>} />
         <Route path="reports/general-ledger" element={<ModuleProtectedRoute requiredModule="reports"><GeneralLedgerPage /></ModuleProtectedRoute>} />
         <Route path="reports/project-pl" element={<ModuleProtectedRoute requiredModule="reports"><ProjectPLPage /></ModuleProtectedRoute>} />
+        <Route path="reports/overheads" element={<ModuleProtectedRoute requiredModule="reports"><OverheadsReportPage /></ModuleProtectedRoute>} />
+        <Route path="reports/farm-pnl" element={<ModuleProtectedRoute requiredModule="reports"><FarmPnLSummaryPage /></ModuleProtectedRoute>} />
         <Route path="reports/crop-cycle-pl" element={<ModuleProtectedRoute requiredModule="reports"><CropCyclePLPage /></ModuleProtectedRoute>} />
         <Route path="reports/crop-profitability" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropProfitabilityReportPage /></ModuleProtectedRoute>} />
         <Route path="reports/crop-profitability-trend" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><CropProfitabilityTrendPage /></ModuleProtectedRoute>} />
@@ -356,12 +372,56 @@ function App() {
             </ModuleProtectedRoute>
           }
         />
+        <Route
+          path="reports/project-responsibility"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <ProjectResponsibilityReportPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/project-party-economics"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <ProjectPartyEconomicsPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
         <Route path="reports/machine-profitability" element={<ModuleProtectedRoute requiredModule="reports"><MachineProfitabilityReportPage /></ModuleProtectedRoute>} />
         <Route path="reports/production-units-profitability" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProductionUnitsProfitabilityReportPage /></ModuleProtectedRoute>} />
         <Route path="reports/account-balances" element={<ModuleProtectedRoute requiredModule="reports"><AccountBalancesPage /></ModuleProtectedRoute>} />
         <Route path="reports/cashbook" element={<ModuleProtectedRoute requiredModule="reports"><CashbookPage /></ModuleProtectedRoute>} />
         <Route path="reports/ar-ageing" element={<ModuleProtectedRoute requiredModule="ar_sales"><ARAgeingPage /></ModuleProtectedRoute>} />
         <Route path="reports/ap-ageing" element={<ModuleProtectedRoute requiredModule="reports"><APAgeingPage /></ModuleProtectedRoute>} />
+        <Route
+          path="reports/ap-supplier-outstanding"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <APSupplierOutstandingPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/supplier-payments"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <SupplierPaymentsReportPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/treasury-supplier-outflows"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <TreasurySupplierOutflowsPage />
+            </ModuleProtectedRoute>
+          }
+        />
         <Route path="reports/sales-margin" element={<ModuleProtectedRoute requiredModule="reports"><SalesMarginPage /></ModuleProtectedRoute>} />
         <Route path="reports/party-ledger" element={<ModuleProtectedRoute requiredModule="reports"><PartyLedgerPage /></ModuleProtectedRoute>} />
         <Route path="reports/landlord-statement" element={<ModuleProtectedRoute requiredModule="land_leases"><LandlordStatementPage /></ModuleProtectedRoute>} />
@@ -399,6 +459,14 @@ function App() {
           }
         />
         <Route path="accounting/periods" element={<ModuleProtectedRoute requiredModule="reports"><AccountingPeriodsPage /></ModuleProtectedRoute>} />
+        <Route
+          path="accounting/allocation-tools"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <AccountingAllocationToolsPage />
+            </ModuleProtectedRoute>
+          }
+        />
         <Route
           path="accounting/fixed-assets/depreciation-runs/:id"
           element={
@@ -440,6 +508,38 @@ function App() {
           }
         />
         <Route
+          path="accounting/bills/new"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <BillFormPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/bills/:id/edit"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <BillFormPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/bills"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <BillsPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/cost-centers"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <CostCentersPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
           path="accounting/supplier-invoices"
           element={
             <ModuleProtectedRoute requiredModule="reports">
@@ -452,6 +552,14 @@ function App() {
           element={
             <ModuleProtectedRoute requiredModule="reports">
               <SupplierInvoiceDetailPage />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/supplier-credit-notes/new"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <SupplierCreditNoteNewPage />
             </ModuleProtectedRoute>
           }
         />

@@ -43,6 +43,7 @@ use App\Http\Controllers\LandLeaseAccrualController;
 use App\Http\Controllers\LandParcelController;
 use App\Http\Controllers\LivestockEventController;
 use App\Http\Controllers\AgreementController;
+use App\Http\Controllers\AgreementAllocationController;
 use App\Http\Controllers\LoanAgreementController;
 use App\Http\Controllers\LoanDrawdownController;
 use App\Http\Controllers\LoanRepaymentController;
@@ -51,6 +52,7 @@ use App\Http\Controllers\Machinery\MachineMaintenanceJobController;
 use App\Http\Controllers\Machinery\MachineMaintenanceTypeController;
 use App\Http\Controllers\Machinery\MachineRateCardController;
 use App\Http\Controllers\Machinery\MachineryChargeController;
+use App\Http\Controllers\Machinery\MachineryExternalIncomeController;
 use App\Http\Controllers\Machinery\MachineryReportsController;
 use App\Http\Controllers\Machinery\MachineryServiceController;
 use App\Http\Controllers\Machinery\MachineWorkLogController;
@@ -76,7 +78,12 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SettlementController;
+use App\Http\Controllers\CostCenterController;
 use App\Http\Controllers\SupplierInvoiceController;
+use App\Http\Controllers\SupplierCreditNoteController;
+use App\Http\Controllers\OverheadAllocationController;
+use App\Http\Controllers\BillRecognitionScheduleController;
+use App\Http\Controllers\BillRecognitionScheduleLineController;
 use App\Http\Controllers\SettlementPackController;
 use App\Http\Controllers\ShareRuleController;
 use App\Http\Controllers\Tenant\TenantAddonModulesController;
@@ -256,6 +263,7 @@ Route::middleware(['role:tenant_admin', 'require_module:land_leases'])->group(fu
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::apiResource('projects', ProjectController::class);
     Route::post('projects/from-allocation', [ProjectController::class, 'fromAllocation']);
+    Route::post('projects/from-agreement-allocation', [ProjectController::class, 'fromAgreementAllocation']);
     Route::post('projects/{id}/close', [ProjectController::class, 'close']);
     Route::post('projects/{id}/reopen', [ProjectController::class, 'reopen']);
 });
@@ -477,6 +485,10 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::post('agreements', [AgreementController::class, 'store']);
         Route::get('agreements/{id}', [AgreementController::class, 'show']);
         Route::put('agreements/{id}', [AgreementController::class, 'update']);
+        Route::get('agreement-allocations', [AgreementAllocationController::class, 'index']);
+        Route::post('agreement-allocations', [AgreementAllocationController::class, 'store'])->middleware('role:tenant_admin,accountant');
+        Route::get('agreement-allocations/{id}', [AgreementAllocationController::class, 'show']);
+        Route::put('agreement-allocations/{id}', [AgreementAllocationController::class, 'update'])->middleware('role:tenant_admin,accountant');
         Route::get('harvests', [HarvestController::class, 'index']);
         Route::post('harvests', [HarvestController::class, 'store']);
         Route::get('harvests/{id}', [HarvestController::class, 'show']);
@@ -517,6 +529,7 @@ Route::prefix('v1')->middleware(['role:tenant_admin,accountant,operator', 'requi
         Route::delete('work-logs/{id}', [MachineWorkLogController::class, 'destroy']);
         Route::post('work-logs/{id}/post', [MachineWorkLogController::class, 'post'])->middleware('role:tenant_admin,accountant');
         Route::post('work-logs/{id}/reverse', [MachineWorkLogController::class, 'reverse'])->middleware('role:tenant_admin,accountant');
+        Route::post('external-income', [MachineryExternalIncomeController::class, 'store'])->middleware('role:tenant_admin,accountant');
         // Rate Cards
         Route::get('rate-cards', [MachineRateCardController::class, 'index']);
         Route::post('rate-cards', [MachineRateCardController::class, 'store']);
@@ -580,6 +593,7 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/project-forecast', [ReportController::class, 'projectForecast']);
     Route::get('reports/project-projected-profit', [ReportController::class, 'projectProjectedProfit']);
     Route::get('reports/machine-profitability', [ReportController::class, 'machineProfitability']);
+    Route::get('reports/machinery-profitability', [ReportController::class, 'machineProfitability']);
     Route::get('reports/harvest-economics', [ReportController::class, 'harvestEconomics']);
     Route::get('reports/profit-loss/crop-cycle', [ReportController::class, 'profitLossCropCycle']);
     Route::get('reports/profit-loss', [ReportController::class, 'profitLoss']);
@@ -587,6 +601,13 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/general-ledger', [ReportController::class, 'generalLedger']);
     Route::get('reports/project-statement', [ReportController::class, 'projectStatement']);
     Route::get('reports/project-pl', [ReportController::class, 'projectPL']);
+    Route::get('reports/project-responsibility', [ReportController::class, 'projectResponsibility']);
+    Route::get('reports/project-responsibility/export', [ReportController::class, 'exportProjectResponsibility']);
+    Route::get('reports/project-party-economics', [ReportController::class, 'projectPartyEconomics']);
+    Route::get('reports/project-party-economics/export', [ReportController::class, 'exportProjectPartyEconomics']);
+    Route::get('reports/project-settlement-review/export', [ReportController::class, 'exportProjectSettlementReview']);
+    Route::get('reports/overheads', [ReportController::class, 'overheads']);
+    Route::get('reports/farm-pnl', [ReportController::class, 'farmPnl']);
     Route::get('reports/crop-cycle-pl', [ReportController::class, 'cropCyclePL']);
     Route::get('reports/account-balances', [ReportController::class, 'accountBalances']);
     Route::get('reports/cashbook', [ReportController::class, 'cashbook']);
@@ -609,6 +630,9 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/customer-balances', [ReportController::class, 'customerBalances']);
     Route::get('reports/customer-balance-detail', [ReportController::class, 'customerBalanceDetail']);
     Route::get('reports/ap-ageing', [ReportController::class, 'apAgeing']);
+    Route::get('reports/ap-supplier-outstanding', [ReportController::class, 'apSupplierOutstanding']);
+    Route::get('reports/supplier-payments', [ReportController::class, 'supplierPaymentsHistory']);
+    Route::get('reports/treasury-supplier-outflows', [ReportController::class, 'treasurySupplierOutflows']);
     Route::get('reports/ap-control-reconciliation', [ReportController::class, 'apControlReconciliation']);
     Route::get('reports/supplier-balances', [ReportController::class, 'supplierBalances']);
     Route::get('reports/supplier-balance-detail', [ReportController::class, 'supplierBalanceDetail']);
@@ -676,9 +700,40 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
 
 // General Journal (tenant_admin, accountant) — manual GL entries
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
+    Route::get('cost-centers', [CostCenterController::class, 'index']);
+    Route::post('cost-centers', [CostCenterController::class, 'store']);
+    Route::get('cost-centers/{id}', [CostCenterController::class, 'show']);
+    Route::put('cost-centers/{id}', [CostCenterController::class, 'update']);
+
     Route::get('supplier-invoices', [SupplierInvoiceController::class, 'index']);
+    Route::post('supplier-invoices', [SupplierInvoiceController::class, 'store']);
     Route::get('supplier-invoices/{id}', [SupplierInvoiceController::class, 'show']);
+    Route::put('supplier-invoices/{id}', [SupplierInvoiceController::class, 'update']);
+    Route::delete('supplier-invoices/{id}', [SupplierInvoiceController::class, 'destroy']);
     Route::post('supplier-invoices/{id}/post', [SupplierInvoiceController::class, 'post']);
+    Route::put('supplier-invoices/{id}/matches', [SupplierInvoiceController::class, 'syncMatches']);
+
+    Route::get('supplier-credit-notes', [SupplierCreditNoteController::class, 'index']);
+    Route::post('supplier-credit-notes', [SupplierCreditNoteController::class, 'store']);
+    Route::get('supplier-credit-notes/{id}', [SupplierCreditNoteController::class, 'show']);
+    Route::put('supplier-credit-notes/{id}', [SupplierCreditNoteController::class, 'update']);
+    Route::delete('supplier-credit-notes/{id}', [SupplierCreditNoteController::class, 'destroy']);
+    Route::post('supplier-credit-notes/{id}/post', [SupplierCreditNoteController::class, 'post']);
+
+    Route::get('overhead-allocations/available', [OverheadAllocationController::class, 'available']);
+    Route::get('overhead-allocations', [OverheadAllocationController::class, 'index']);
+    Route::post('overhead-allocations', [OverheadAllocationController::class, 'store']);
+    Route::get('overhead-allocations/{id}', [OverheadAllocationController::class, 'show']);
+    Route::patch('overhead-allocations/{id}', [OverheadAllocationController::class, 'update']);
+    Route::delete('overhead-allocations/{id}', [OverheadAllocationController::class, 'destroy']);
+    Route::post('overhead-allocations/{id}/post', [OverheadAllocationController::class, 'post']);
+
+    Route::get('bill-recognition-schedules', [BillRecognitionScheduleController::class, 'index']);
+    Route::post('bill-recognition-schedules', [BillRecognitionScheduleController::class, 'store']);
+    Route::get('bill-recognition-schedules/{id}', [BillRecognitionScheduleController::class, 'show']);
+    Route::post('bill-recognition-schedules/{id}/post-deferral', [BillRecognitionScheduleController::class, 'postDeferral']);
+    Route::post('bill-recognition-schedule-lines/{id}/post-recognition', [BillRecognitionScheduleLineController::class, 'postRecognition']);
+
     Route::post('journals', [JournalEntryController::class, 'store']);
     Route::get('journals', [JournalEntryController::class, 'index']);
     Route::get('journals/{id}', [JournalEntryController::class, 'show']);

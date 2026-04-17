@@ -21,6 +21,14 @@ const AGREEMENT_TYPES = [
   { value: 'LAND_LEASE', label: 'Land lease (landlord)' },
 ] as const;
 
+type AgreementAllocationRow = {
+  id: string;
+  allocated_area: string;
+  land_parcel?: { name: string };
+  status: string;
+  starts_on: string;
+};
+
 function errMessage(e: unknown): string {
   return (
     (e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data?.message ||
@@ -124,11 +132,16 @@ export default function AgreementFormPage() {
     );
   }
 
+  const landAgreementAllocations =
+    existing && agreement_type === 'LAND_LEASE'
+      ? (existing as unknown as { agreement_allocations?: AgreementAllocationRow[] }).agreement_allocations
+      : undefined;
+
   return (
     <div className="space-y-6 max-w-3xl">
       <PageHeader
         title={isEdit ? 'Edit agreement' : 'New agreement'}
-        description="Terms are stored as JSON (e.g. percent share). The server resolves which agreement applies per harvest."
+        description="Parties and commercial terms live on the agreement. For field-cycle projects, define distribution and deductions under JSON — use a settlement block (profit splits, optional deductions) when this agreement drives project settlement."
         backTo="/app/crop-ops/agreements"
         breadcrumbs={[
           { label: 'Farm', to: '/app/dashboard' },
@@ -284,8 +297,16 @@ export default function AgreementFormPage() {
           </FormField>
         </div>
 
-        <FormField label="Terms (JSON)">
-          <p className="text-xs text-gray-500 mb-1">Harvest share terms (percent, ratio, fixed). Parsed server-side.</p>
+        <FormField label="Terms (JSON) — include settlement for project-linked land agreements">
+          <p className="text-xs text-gray-500 mb-1">
+            Active land agreements scoped to a field-cycle project must include a parseable{' '}
+            <code className="bg-gray-100 px-1 rounded">settlement</code> object:{' '}
+            <code className="bg-gray-100 px-1 rounded">profit_split_landlord_pct</code>,{' '}
+            <code className="bg-gray-100 px-1 rounded">profit_split_hari_pct</code> (sum 100), optional{' '}
+            <code className="bg-gray-100 px-1 rounded">kamdari_pct</code> and{' '}
+            <code className="bg-gray-100 px-1 rounded">kamdar_party_id</code>. Harvest share lines may use other keys in
+            the same JSON.
+          </p>
           <textarea
             value={termsJson}
             onChange={(e) => setTermsJson(e.target.value)}
@@ -293,6 +314,24 @@ export default function AgreementFormPage() {
             className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono"
           />
         </FormField>
+
+        {isEdit &&
+          id &&
+          agreement_type === 'LAND_LEASE' &&
+          existing &&
+          Array.isArray(landAgreementAllocations) &&
+          landAgreementAllocations.length > 0 && (
+            <div className="rounded border border-gray-200 bg-[#F7FAF9] p-4">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Parcel allocations</h3>
+              <ul className="text-sm text-gray-700 space-y-1">
+                {landAgreementAllocations.map((a) => (
+                  <li key={a.id}>
+                    {a.land_parcel?.name ?? 'Parcel'}: {a.allocated_area} acres — {a.status} (from {a.starts_on})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
         <div className="flex flex-wrap gap-2 pt-2">
           <button

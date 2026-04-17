@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   useMachinesQuery,
   useCreateMachine,
@@ -90,27 +91,35 @@ export default function MachinesPage() {
     {
       header: 'Actions',
       accessor: (r) => (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditingMachine(r);
-            setForm({
-              code: r.code,
-              name: r.name,
-              machine_type: r.machine_type,
-              ownership_type: r.ownership_type,
-              is_active: r.is_active ?? true,
-              meter_unit: r.meter_unit,
-              opening_meter: r.opening_meter != null && r.opening_meter !== '' ? String(r.opening_meter) : '',
-              notes: r.notes || null,
-            });
-            setShowModal(true);
-          }}
-          className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
-        >
-          Edit
-        </button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Link
+            to={`/app/machinery/reports/profitability?machine_id=${encodeURIComponent(r.id)}`}
+            className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+          >
+            View profit
+          </Link>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingMachine(r);
+              setForm({
+                code: r.code,
+                name: r.name,
+                machine_type: r.machine_type,
+                ownership_type: r.ownership_type,
+                is_active: r.is_active ?? true,
+                meter_unit: r.meter_unit,
+                opening_meter: r.opening_meter != null && r.opening_meter !== '' ? String(r.opening_meter) : '',
+                notes: r.notes || null,
+              });
+              setShowModal(true);
+            }}
+            className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+          >
+            Edit
+          </button>
+        </div>
       ),
     },
   ];

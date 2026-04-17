@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdjustments, useInventoryStores } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
@@ -27,6 +27,17 @@ export default function InvAdjustmentsPage() {
   const { hasRole } = useRole();
   const { formatDate } = useFormatting();
 
+  const sortedAdjustments = useMemo(() => {
+    const g = [...(adjustments ?? [])];
+    g.sort((a, b) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      return String(b.doc_date ?? '').localeCompare(String(a.doc_date ?? ''));
+    });
+    return g;
+  }, [adjustments]);
+
   const cols: Column<InvAdjustment>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'Store', accessor: (r) => r.store?.name || r.store_id },
@@ -36,8 +47,31 @@ export default function InvAdjustmentsPage() {
       header: 'Status',
       accessor: (r) => (
         <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
-          {r.status}
+          {r.status === 'DRAFT' ? 'Draft' : r.status === 'POSTED' ? 'Posted' : r.status}
         </Badge>
+      ),
+    },
+    {
+      header: 'Quick actions',
+      accessor: (r) => (
+        <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+          {r.status === 'DRAFT' && hasRole(['tenant_admin', 'accountant', 'operator']) ? (
+            <button
+              type="button"
+              className="text-sm font-medium text-[#1F6F5C] hover:underline"
+              onClick={() => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })}
+            >
+              Continue editing
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="text-sm font-medium text-gray-700 hover:underline"
+            onClick={() => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })}
+          >
+            View
+          </button>
+        </div>
       ),
     },
   ];
@@ -73,7 +107,7 @@ export default function InvAdjustmentsPage() {
           {isLoading ? (
             <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
           ) : (
-            <DataTable data={(adjustments ?? []) as InvAdjustment[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No stock adjustments yet. Use adjustments for loss, damage, or count differences." />
+            <DataTable data={sortedAdjustments as InvAdjustment[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/adjustments/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No stock adjustments yet. Use adjustments for loss, damage, or count differences." />
           )}
         </div>
       </div>

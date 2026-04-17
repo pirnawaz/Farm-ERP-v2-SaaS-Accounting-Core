@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTransfers, useInventoryStores } from '../../hooks/useInventory';
 import { DataTable, type Column } from '../../components/DataTable';
@@ -25,6 +25,17 @@ export default function InvTransfersPage() {
   const { hasRole } = useRole();
   const { formatDate } = useFormatting();
 
+  const sortedTransfers = useMemo(() => {
+    const g = [...(transfers ?? [])];
+    g.sort((a, b) => {
+      const da = a.status === 'DRAFT' ? 0 : 1;
+      const db = b.status === 'DRAFT' ? 0 : 1;
+      if (da !== db) return da - db;
+      return String(b.doc_date ?? '').localeCompare(String(a.doc_date ?? ''));
+    });
+    return g;
+  }, [transfers]);
+
   const cols: Column<InvTransfer>[] = [
     { header: 'Doc No', accessor: 'doc_no' },
     { header: 'From', accessor: (r) => r.from_store?.name || r.from_store_id },
@@ -34,8 +45,31 @@ export default function InvTransfersPage() {
       header: 'Status',
       accessor: (r) => (
         <Badge variant={r.status === 'DRAFT' ? 'warning' : r.status === 'POSTED' ? 'success' : 'neutral'}>
-          {r.status}
+          {r.status === 'DRAFT' ? 'Draft' : r.status === 'POSTED' ? 'Posted' : r.status}
         </Badge>
+      ),
+    },
+    {
+      header: 'Quick actions',
+      accessor: (r) => (
+        <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+          {r.status === 'DRAFT' && hasRole(['tenant_admin', 'accountant', 'operator']) ? (
+            <button
+              type="button"
+              className="text-sm font-medium text-[#1F6F5C] hover:underline"
+              onClick={() => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })}
+            >
+              Continue editing
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="text-sm font-medium text-gray-700 hover:underline"
+            onClick={() => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })}
+          >
+            View
+          </button>
+        </div>
       ),
     },
   ];
@@ -71,7 +105,7 @@ export default function InvTransfersPage() {
           {isLoading ? (
             <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
           ) : (
-            <DataTable data={(transfers ?? []) as InvTransfer[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No stock transfers yet. Move stock between storage locations when you relocate items." />
+            <DataTable data={sortedTransfers as InvTransfer[]} columns={cols} onRowClick={(r) => navigate(`/app/inventory/transfers/${r.id}`, { state: { from: location.pathname + location.search } })} emptyMessage="No stock transfers yet. Move stock between storage locations when you relocate items." />
           )}
         </div>
       </div>

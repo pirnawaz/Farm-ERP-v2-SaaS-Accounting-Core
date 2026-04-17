@@ -6,6 +6,7 @@ import { metaReportingPeriodLabel } from '../utils/reportPresentation'
 import { useFormatting } from '../hooks/useFormatting'
 import { useLocalisation } from '../hooks/useLocalisation'
 import { useTenantSettings } from '../hooks/useTenantSettings'
+import { useCropCycles } from '../hooks/useCropCycles'
 import { EMPTY_COPY, REPORT_LABELS } from '../config/presentation'
 import { PrintableReport } from '../components/print/PrintableReport'
 import { ReportMetadataBlock } from '../components/report/ReportMetadataBlock'
@@ -28,7 +29,9 @@ function ProjectPLPage() {
     from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0],
     project_id: '',
+    crop_cycle_id: '',
   })
+  const { data: cropCycles = [] } = useCropCycles()
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -54,6 +57,7 @@ function ProjectPLPage() {
           from: filters.from,
           to: filters.to,
           project_id: filters.project_id || undefined,
+          crop_cycle_id: filters.crop_cycle_id || undefined,
         })
         setData(result)
       } catch (err) {
@@ -122,7 +126,7 @@ function ProjectPLPage() {
 
       <FilterBar className="no-print">
         <div className="bg-white p-4 rounded-lg shadow">
-          <FilterGrid className="xl:grid-cols-3">
+          <FilterGrid className="xl:grid-cols-4">
             <FilterField label="From Date">
               <input
                 type="date"
@@ -136,6 +140,19 @@ function ProjectPLPage() {
                 value={filters.to}
                 onChange={(e) => setFilters({ ...filters, to: e.target.value })}
               />
+            </FilterField>
+            <FilterField label="Crop cycle">
+              <select
+                value={filters.crop_cycle_id}
+                onChange={(e) => setFilters({ ...filters, crop_cycle_id: e.target.value })}
+              >
+                <option value="">All seasons</option>
+                {cropCycles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </FilterField>
             <FilterField label={term('fieldCycle')}>
               <select
@@ -197,10 +214,11 @@ function ProjectPLPage() {
                     <>
                       {data.map((row) => {
                         const project = projects.find(p => p.id === row.project_id)
+                        const label = row.project_name ?? project?.name ?? (row.project_id ? row.project_id.substring(0, 8) + '...' : 'N/A')
                         return (
                           <tr key={`${row.project_id}-${row.currency_code}`}>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-normal break-words text-sm font-medium text-gray-900">
-                              {project?.name || (row.project_id ? row.project_id.substring(0, 8) + '...' : 'N/A')}
+                              {label}
                             </td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                               {row.currency_code}
@@ -276,10 +294,11 @@ function ProjectPLPage() {
                   <>
                     {data.map((row) => {
                       const project = projects.find(p => p.id === row.project_id)
+                      const printLabel = row.project_name ?? project?.name ?? (row.project_id ? row.project_id.substring(0, 8) + '...' : 'N/A')
                       return (
                         <tr key={`${row.project_id}-${row.currency_code}`}>
                           <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                            {project?.name || (row.project_id ? row.project_id.substring(0, 8) + '...' : 'N/A')}
+                            {printLabel}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {row.currency_code}

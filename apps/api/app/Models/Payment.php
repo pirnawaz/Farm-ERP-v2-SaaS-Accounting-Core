@@ -20,6 +20,7 @@ class Payment extends Model
         'amount',
         'payment_date',
         'method',
+        'source_account_id',
         'reference',
         'status',
         'posting_group_id',
@@ -54,6 +55,11 @@ class Payment extends Model
     public function postingGroup(): BelongsTo
     {
         return $this->belongsTo(PostingGroup::class);
+    }
+
+    public function sourceAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'source_account_id');
     }
 
     public function reversalPostingGroup(): BelongsTo

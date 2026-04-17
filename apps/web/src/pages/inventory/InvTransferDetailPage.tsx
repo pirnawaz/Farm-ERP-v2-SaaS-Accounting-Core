@@ -21,6 +21,9 @@ import { Term } from '../../components/Term';
 import { term } from '../../config/terminology';
 import { formatItemDisplayName } from '../../utils/formatItemDisplay';
 import { PostingStatusBadge } from '../../utils/postingStatusDisplay';
+import { PrePostChecklist } from '../../components/operator/PrePostChecklist';
+import { OperatorErrorCallout } from '../../components/operator/OperatorErrorCallout';
+import { formatOperatorError } from '../../utils/operatorFriendlyErrors';
 
 type Line = { item_id: string; qty: string };
 
@@ -42,6 +45,7 @@ export default function InvTransferDetailPage() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showReverseModal, setShowReverseModal] = useState(false);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reversePostingDate, setReversePostingDate] = useState(new Date().toISOString().split('T')[0]);
   const [idempotencyKey] = useState(uuidv4());
   const [reverseReason, setReverseReason] = useState('');
 
@@ -58,7 +62,11 @@ export default function InvTransferDetailPage() {
       setToStoreId(transfer.to_store_id);
       setDocDate(transfer.doc_date);
       setLines((transfer.lines || []).map((l) => ({ item_id: l.item_id, qty: String(l.qty) })));
-      if (!showPostModal && !showReverseModal) setPostingDate(new Date().toISOString().split('T')[0]);
+      if (!showPostModal && !showReverseModal) {
+        const today = new Date().toISOString().split('T')[0];
+        setPostingDate(today);
+        setReversePostingDate(today);
+      }
     }
   }, [transfer, showPostModal, showReverseModal]);
 
@@ -85,16 +93,28 @@ export default function InvTransferDetailPage() {
   };
 
   const handlePost = async () => {
-    if (!id) return;
-    await postM.mutateAsync({ id, payload: { posting_date: postingDate, idempotency_key: idempotencyKey } });
-    setShowPostModal(false);
+    if (!id || !postingDate) return;
+    try {
+      await postM.mutateAsync({ id, payload: { posting_date: postingDate, idempotency_key: idempotencyKey } });
+      setShowPostModal(false);
+      postM.reset();
+    } catch {
+      /* shown in modal */
+    }
   };
 
+  const canConfirmTransferReverse = Boolean(id && reversePostingDate && reverseReason.trim());
+
   const handleReverse = async () => {
-    if (!id || !reverseReason.trim()) return;
-    await reverseM.mutateAsync({ id, payload: { posting_date: postingDate, reason: reverseReason } });
-    setShowReverseModal(false);
-    setReverseReason('');
+    if (!canConfirmTransferReverse) return;
+    try {
+      await reverseM.mutateAsync({ id: id!, payload: { posting_date: reversePostingDate, reason: reverseReason } });
+      setShowReverseModal(false);
+      setReverseReason('');
+      reverseM.reset();
+    } catch {
+      /* OperatorErrorCallout */
+    }
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
@@ -172,7 +192,18 @@ export default function InvTransferDetailPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={updateM.isPending} className="px-4 py-2 bg-[#1F6F5C] text-white rounded">Save</button>
-            {canPost && <button onClick={() => setShowPostModal(true)} className="px-4 py-2 bg-green-600 text-white rounded">{term('postAction')}</button>}
+            {canPost && (
+              <button
+                type="button"
+                onClick={() => {
+                  postM.reset();
+                  setShowPostModal(true);
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded min-h-[44px]"
+              >
+                Record to accounts
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -193,27 +224,116 @@ export default function InvTransferDetailPage() {
       )}
 
       {isPosted && canPost && (
-        <div className="mb-6"><button onClick={() => setShowReverseModal(true)} className="px-4 py-2 bg-red-600 text-white rounded">{term('reverseAction')}</button></div>
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              reverseM.reset();
+              setShowReverseModal(true);
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded min-h-[44px]"
+          >
+            {term('reverseAction')}
+          </button>
+        </div>
       )}
 
-      <Modal isOpen={showPostModal} onClose={() => setShowPostModal(false)} title={`${term('postAction')}: ${term('transfer')}`}>
+      <Modal
+        isOpen={showPostModal}
+        onClose={() => {
+          setShowPostModal(false);
+          postM.reset();
+        }}
+        title={`Record to accounts: ${term('transfer')}`}
+      >
         <div className="space-y-4">
-          <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            This will move stock quantities between your stores for the posting date below. Cancel if you need to adjust the draft first.
+          </p>
+          <PrePostChecklist
+            items={[{ ok: Boolean(postingDate), label: 'Posting date chosen' }]}
+            blockingHint={!postingDate ? 'Choose a posting date before recording.' : undefined}
+          />
+          <OperatorErrorCallout error={postM.isError ? formatOperatorError(postM.error) : null} />
+          <FormField label="Posting date" required>
+            <input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded min-h-[44px]" />
+          </FormField>
           <FormField label="Idempotency Key"><input value={idempotencyKey} readOnly className="w-full px-3 py-2 border rounded bg-gray-100 text-xs" /></FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowPostModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handlePost} disabled={postM.isPending} className="px-4 py-2 bg-green-600 text-white rounded">{postM.isPending ? term('postActionPending') : term('postAction')}</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowPostModal(false);
+                postM.reset();
+              }}
+              className="px-4 py-2 border rounded min-h-[44px]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handlePost}
+              disabled={postM.isPending || !postingDate}
+              className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 min-h-[44px]"
+            >
+              {postM.isPending ? term('postActionPending') : 'Confirm'}
+            </button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReverseModal} onClose={() => setShowReverseModal(false)} title={`${term('reverseAction')}: ${term('transfer')}`}>
+      <Modal
+        isOpen={showReverseModal}
+        onClose={() => {
+          setShowReverseModal(false);
+          setReverseReason('');
+          reverseM.reset();
+        }}
+        title={`${term('reverseAction')}: ${term('transfer')}`}
+      >
         <div className="space-y-4">
-          <FormField label="Posting Date" required><input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} className="w-full px-3 py-2 border rounded" /></FormField>
-          <FormField label="Reason" required><textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} /></FormField>
-          <div className="flex gap-2 pt-4">
-            <button onClick={() => setShowReverseModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-            <button onClick={handleReverse} disabled={!reverseReason.trim() || reverseM.isPending} className="px-4 py-2 bg-red-600 text-white rounded">{reverseM.isPending ? term('reverseActionPending') : term('reverseAction')}</button>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            This creates offsetting stock movements as of the posting date below. Cancel if you are not ready.
+          </p>
+          <PrePostChecklist
+            items={[
+              { ok: Boolean(reversePostingDate), label: 'Posting date chosen' },
+              { ok: Boolean(reverseReason.trim()), label: 'Reason entered' },
+            ]}
+            blockingHint={!canConfirmTransferReverse ? 'Choose a posting date and enter a reason before reversing.' : undefined}
+          />
+          <OperatorErrorCallout error={reverseM.isError ? formatOperatorError(reverseM.error) : null} />
+          <FormField label="Posting date" required>
+            <input
+              type="date"
+              value={reversePostingDate}
+              onChange={(e) => setReversePostingDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded min-h-[44px]"
+            />
+          </FormField>
+          <FormField label="Reason" required>
+            <textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="w-full px-3 py-2 border rounded" rows={2} />
+          </FormField>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowReverseModal(false);
+                setReverseReason('');
+                reverseM.reset();
+              }}
+              className="px-4 py-2 border rounded min-h-[44px]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleReverse}
+              disabled={!canConfirmTransferReverse || reverseM.isPending}
+              className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50 min-h-[44px]"
+            >
+              {reverseM.isPending ? term('reverseActionPending') : 'Confirm reverse'}
+            </button>
           </div>
         </div>
       </Modal>

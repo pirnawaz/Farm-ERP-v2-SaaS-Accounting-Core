@@ -34,6 +34,7 @@ import type {
   UpdateMachineryServicePayload,
   PostMachineryServiceRequest,
   ReverseMachineryServiceRequest,
+  CreateMachineryExternalIncomePayload,
 } from '../types';
 import toast from 'react-hot-toast';
 
@@ -531,5 +532,20 @@ export function useMachineryProfitabilityQuery(f: ProfitabilityReportFilters) {
     enabled: !!f.from && !!f.to,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000,
+  });
+}
+
+/** Third-party machinery income (Dr receivable, Cr machine income). Accountant/tenant_admin API. */
+export function useCreateMachineryExternalIncome() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateMachineryExternalIncomePayload) =>
+      machineryApi.externalIncome.create(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['machinery', 'reports'] });
+      qc.invalidateQueries({ queryKey: ['posting-groups'] });
+      toast.success('External machinery income recorded');
+    },
+    onError: (e: unknown) => toast.error(err(e) || 'Failed to record external machinery income'),
   });
 }

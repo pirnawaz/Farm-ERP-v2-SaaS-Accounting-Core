@@ -14,6 +14,7 @@ class AllocationRow extends Model
         'tenant_id',
         'posting_group_id',
         'project_id',
+        'cost_center_id',
         'party_id',
         'allocation_type',
         'allocation_scope',
@@ -69,6 +70,11 @@ class AllocationRow extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(CostCenter::class, 'cost_center_id');
     }
 
     public function party(): BelongsTo
