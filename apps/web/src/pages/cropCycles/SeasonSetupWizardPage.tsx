@@ -9,15 +9,26 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { term } from '../../config/terminology';
 import toast from 'react-hot-toast';
 import type { CreateCropCyclePayload } from '../../types';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@farm-erp/shared';
+import { SetupStatusBadge } from '../../components/SetupStatusBadge';
 
 type Step = 1 | 2;
 
-export type BlockRow = { tenant_crop_item_id: string; name: string; area: string };
+export type BlockRow = {
+  tenant_crop_item_id: string;
+  name: string;
+  area: string;
+  agreement_id?: string;
+  agreement_allocation_id?: string;
+};
 
 const initialBlockRow = (): BlockRow => ({
   tenant_crop_item_id: '',
   name: '',
   area: '',
+  agreement_id: '',
+  agreement_allocation_id: '',
 });
 
 const initialCycleForm: CreateCropCyclePayload = {
@@ -40,6 +51,11 @@ export default function SeasonSetupWizardPage() {
 
   const { data: cropItems, isLoading: cropItemsLoading } = useCropItems();
   const { data: landParcels, isLoading: parcelsLoading } = useLandParcels();
+
+  const { data: agreements } = useQuery({
+    queryKey: ['crop-ops', 'agreements', 'land-lease', 'active'],
+    queryFn: () => apiClient.get<any[]>(`/api/v1/crop-ops/agreements?agreement_type=LAND_LEASE&status=ACTIVE`),
+  });
 
   const canProceedStep1 =
     cycleForm.name.trim() &&
@@ -78,12 +94,15 @@ export default function SeasonSetupWizardPage() {
         .map((b) => ({
           tenant_crop_item_id: b.tenant_crop_item_id,
           ...(b.name?.trim() && { name: b.name.trim() }),
-          ...(b.area && !Number.isNaN(Number(b.area)) && Number(b.area) > 0 && { area: Number(b.area) }),
+          area: Number(b.area),
+          ...(b.agreement_id?.trim() && { agreement_id: b.agreement_id.trim() }),
+          ...(b.agreement_allocation_id?.trim() && { agreement_allocation_id: b.agreement_allocation_id.trim() }),
         }));
-      if (blocks.length > 0) payload.push({ land_parcel_id: p.id, blocks });
+      const hasInvalidArea = blocks.some((b) => Number.isNaN(Number(b.area)) || Number(b.area) <= 0);
+      if (blocks.length > 0 && !hasInvalidArea) payload.push({ land_parcel_id: p.id, blocks });
     }
     if (payload.length === 0) {
-      toast.error('Select at least one field and choose a crop for each block.');
+      toast.error('Select at least one field, choose a crop, and enter a positive area for each block.');
       return;
     }
     setSubmitting(true);
@@ -280,7 +299,7 @@ export default function SeasonSetupWizardPage() {
                           {(advancedMode ? rows : [rows[0] ?? initialBlockRow()]).map((block, blockIdx) => (
                             <div
                               key={blockIdx}
-                              className="flex flex-wrap items-center gap-2"
+                      className="flex flex-wrap items-center gap-2"
                             >
                               <select
                                 value={block.tenant_crop_item_id}
@@ -320,7 +339,7 @@ export default function SeasonSetupWizardPage() {
                                 type="number"
                                 min="0.01"
                                 step="0.01"
-                                placeholder="Area (optional)"
+                        placeholder="Area (required)"
                                 value={block.area}
                                 onChange={(e) =>
                                   setAssignments((prev) => {
@@ -332,6 +351,47 @@ export default function SeasonSetupWizardPage() {
                                 }
                                 className="w-24 rounded border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#1F6F5C]"
                               />
+
+                      <select
+                        value={block.agreement_id ?? ''}
+                        onChange={(e) =>
+                          setAssignments((prev) => {
+                            const list = [...(prev[parcel.id] ?? [initialBlockRow()])];
+                            const idx = advancedMode ? blockIdx : 0;
+                            list[idx] = { ...list[idx], agreement_id: e.target.value, agreement_allocation_id: '' };
+                            return { ...prev, [parcel.id]: list };
+                          })
+                        }
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#1F6F5C] min-w-[180px]"
+                      >
+                        <option value="">No agreement</option>
+                        {(agreements ?? []).map((a: any) => (
+                          <option key={a.id} value={a.id}>
+                            {(a.party?.name ? `${a.party.name} — ` : '') + (a.effective_from ?? a.id)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <AgreementAllocationSelect
+                        parcelId={parcel.id}
+                        agreementId={block.agreement_id ?? ''}
+                        value={block.agreement_allocation_id ?? ''}
+                        onChange={(next) =>
+                          setAssignments((prev) => {
+                            const list = [...(prev[parcel.id] ?? [initialBlockRow()])];
+                            const idx = advancedMode ? blockIdx : 0;
+                            list[idx] = { ...list[idx], agreement_allocation_id: next };
+                            return { ...prev, [parcel.id]: list };
+                          })
+                        }
+                      />
+
+                      <SetupStatusBadge
+                        present={!!block.agreement_id}
+                        presentLabel="Agreement"
+                        missingLabel="No agreement"
+                        size="sm"
+                      />
                               {advancedMode && rows.length > 1 && (
                                 <button
                                   type="button"
@@ -396,5 +456,41 @@ export default function SeasonSetupWizardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AgreementAllocationSelect(props: {
+  parcelId: string;
+  agreementId: string;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const { parcelId, agreementId, value, onChange } = props;
+  const { data, isLoading } = useQuery({
+    queryKey: ['crop-ops', 'agreement-allocations', agreementId, parcelId],
+    queryFn: async () => {
+      if (!agreementId) return [];
+      const qp = new URLSearchParams();
+      qp.set('agreement_id', agreementId);
+      if (parcelId) qp.set('land_parcel_id', parcelId);
+      return apiClient.get<any[]>(`/api/v1/crop-ops/agreement-allocations?${qp.toString()}`);
+    },
+    enabled: !!agreementId,
+  });
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={!agreementId || isLoading}
+      className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#1F6F5C] min-w-[210px]"
+    >
+      <option value="">{agreementId ? 'No agreement allocation' : 'Select agreement first'}</option>
+      {(data ?? []).map((aa: any) => (
+        <option key={aa.id} value={aa.id}>
+          {(aa.land_parcel?.name ?? 'Parcel') + ': ' + aa.allocated_area + ' ' + (aa.area_uom ?? 'ACRE')}
+        </option>
+      ))}
+    </select>
   );
 }

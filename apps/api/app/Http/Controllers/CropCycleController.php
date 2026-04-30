@@ -9,6 +9,7 @@ use App\Models\LandAllocation;
 use App\Models\LandParcel;
 use App\Models\Project;
 use App\Models\TenantCropItem;
+use App\Domains\Operations\FieldCycleSetupService;
 use App\Services\CropCycleCloseService;
 use App\Services\SystemPartyService;
 use App\Services\TenantContext;
@@ -23,7 +24,8 @@ class CropCycleController extends Controller
     public function __construct(
         private CropCycleCloseService $closeService,
         private PeriodCloseService $periodCloseService,
-        private SystemPartyService $systemPartyService
+        private SystemPartyService $systemPartyService,
+        private FieldCycleSetupService $fieldCycleSetupService
     ) {}
     public function index(Request $request)
     {
@@ -260,92 +262,114 @@ class CropCycleController extends Controller
             'assignments.*.blocks' => ['required', 'array', 'min:1'],
             'assignments.*.blocks.*.tenant_crop_item_id' => ['required', 'uuid', Rule::exists('tenant_crop_items', 'id')->where('tenant_id', $tenantId)],
             'assignments.*.blocks.*.name' => ['nullable', 'string', 'max:255'],
-            'assignments.*.blocks.*.area' => ['nullable', 'numeric', 'min:0.01'],
+            'assignments.*.blocks.*.area' => ['required', 'numeric', 'gt:0'],
+            'assignments.*.blocks.*.agreement_id' => ['nullable', 'uuid', Rule::exists('agreements', 'id')->where('tenant_id', $tenantId)],
+            'assignments.*.blocks.*.agreement_allocation_id' => ['nullable', 'uuid', Rule::exists('agreement_allocations', 'id')->where('tenant_id', $tenantId)],
         ]);
 
         $landlord = $this->systemPartyService->ensureSystemLandlordParty($tenantId);
+        $results = [];
         $created = [];
         $fieldBlocksCount = 0;
 
-        DB::transaction(function () use ($tenantId, $cycle, $request, $landlord, &$created, &$fieldBlocksCount) {
-            foreach ($request->input('assignments') as $assignment) {
-                $parcel = LandParcel::where('id', $assignment['land_parcel_id'])
-                    ->where('tenant_id', $tenantId)
-                    ->firstOrFail();
+        foreach ($request->input('assignments') as $assignmentIdx => $assignment) {
+            $parcelId = (string) $assignment['land_parcel_id'];
+            try {
+                $rowResult = DB::transaction(function () use ($tenantId, $cycle, $assignment, $parcelId, &$created, &$fieldBlocksCount) {
+                    $parcel = $this->fieldCycleSetupService->loadParcel($tenantId, $parcelId);
 
-                $allocatedAcres = max(0.01, (float) ($parcel->total_acres ?? 0));
-                $allocation = LandAllocation::firstOrCreate(
-                    [
-                        'tenant_id' => $tenantId,
-                        'crop_cycle_id' => $cycle->id,
-                        'land_parcel_id' => $parcel->id,
-                        'party_id' => null,
-                    ],
-                    ['allocated_acres' => $allocatedAcres]
-                );
-
-                $blocks = $this->normalizeBlockNamesForIdempotency($assignment['blocks']);
-                foreach ($blocks as $block) {
-                    $cropItem = TenantCropItem::where('id', $block['tenant_crop_item_id'])
-                        ->where('tenant_id', $tenantId)
-                        ->with('cropCatalogItem')
-                        ->firstOrFail();
-                    $cropName = $cropItem->resolved_display_name ?: 'Crop';
-                    $blockName = isset($block['name']) && (string) $block['name'] !== '' ? (string) $block['name'] : null;
-                    $blockArea = isset($block['area']) && $block['area'] > 0 ? (float) $block['area'] : null;
-
-                    $fieldBlock = FieldBlock::firstOrCreate(
-                        [
-                            'tenant_id' => $tenantId,
-                            'crop_cycle_id' => $cycle->id,
-                            'land_parcel_id' => $parcel->id,
-                            'tenant_crop_item_id' => $block['tenant_crop_item_id'],
-                            'name' => $blockName,
-                        ],
-                        ['area' => $blockArea]
-                    );
-                    if ($fieldBlock->wasRecentlyCreated) {
-                        $fieldBlocksCount++;
-                    }
-                    if ($fieldBlock->area !== $blockArea && $blockArea !== null) {
-                        $fieldBlock->update(['area' => $blockArea]);
+                    $blocks = $this->normalizeBlockNamesForIdempotency($assignment['blocks']);
+                    $totalAllocated = 0.0;
+                    foreach ($blocks as $b) {
+                        $totalAllocated += (float) $b['area'];
                     }
 
-                    $projectName = $parcel->name . ' – ' . $cropName . ($blockName ? ' (' . $blockName . ')' : '');
-                    $project = Project::firstOrCreate(
-                        [
+                    $allocation = $this->fieldCycleSetupService->ensureOwnerAllocation($tenantId, $cycle, $parcel, $totalAllocated);
+
+                    $blockResults = [];
+                    foreach ($blocks as $blockIdx => $block) {
+                        $blockName = isset($block['name']) && (string) $block['name'] !== '' ? (string) $block['name'] : null;
+                        $blockArea = (float) $block['area'];
+
+                        $links = $this->fieldCycleSetupService->validateAgreementLinks(
+                            $tenantId,
+                            $cycle,
+                            $parcel,
+                            $block['agreement_id'] ?? null,
+                            $block['agreement_allocation_id'] ?? null
+                        );
+
+                        $fieldBlock = $this->fieldCycleSetupService->ensureFieldBlock(
+                            $tenantId,
+                            $cycle,
+                            $parcel,
+                            (string) $block['tenant_crop_item_id'],
+                            $blockName,
+                            $blockArea
+                        );
+
+                        $cropItem = TenantCropItem::where('id', $block['tenant_crop_item_id'])
+                            ->where('tenant_id', $tenantId)
+                            ->with('cropCatalogItem')
+                            ->firstOrFail();
+                        $cropName = $cropItem->resolved_display_name ?: 'Crop';
+                        $projectName = $parcel->name . ' – ' . $cropName . ($blockName ? ' (' . $blockName . ')' : '');
+
+                        $project = $this->fieldCycleSetupService->ensureProjectForFieldBlock(
+                            $tenantId,
+                            $cycle,
+                            $allocation,
+                            $fieldBlock,
+                            $projectName,
+                            $links['agreementId'],
+                            $links['agreementAllocationId']
+                        );
+
+                        if ($fieldBlock->wasRecentlyCreated) {
+                            $fieldBlocksCount++;
+                        }
+
+                        $created[] = [
                             'field_block_id' => $fieldBlock->id,
-                        ],
-                        [
-                            'tenant_id' => $tenantId,
-                            'name' => $projectName,
-                            'party_id' => $landlord->id,
-                            'crop_cycle_id' => $cycle->id,
+                            'project_id' => $project->id,
+                            'name' => $project->name,
+                            'land_parcel_id' => $parcel->id,
                             'land_allocation_id' => $allocation->id,
-                            'status' => 'ACTIVE',
-                        ]
-                    );
-                    if (!$project->wasRecentlyCreated && $project->name !== $projectName) {
-                        $project->update(['name' => $projectName]);
+                        ];
+
+                        $blockResults[] = [
+                            'index' => $blockIdx,
+                            'field_block_id' => $fieldBlock->id,
+                            'project_id' => $project->id,
+                            'status' => 'ok',
+                        ];
                     }
 
-                    $created[] = [
-                        'field_block_id' => $fieldBlock->id,
-                        'project_id' => $project->id,
-                        'name' => $project->name,
+                    return [
                         'land_parcel_id' => $parcel->id,
                         'land_allocation_id' => $allocation->id,
+                        'total_allocated_acres' => $totalAllocated,
+                        'blocks' => $blockResults,
                     ];
-                }
+                });
+                $results[] = array_merge(['index' => $assignmentIdx, 'status' => 'ok'], $rowResult);
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'index' => $assignmentIdx,
+                    'status' => 'error',
+                    'land_parcel_id' => $parcelId,
+                    'message' => $e instanceof ValidationException ? $e->getMessage() : 'Failed to set up parcel.',
+                ];
             }
-        });
+        }
 
         return response()->json([
             'crop_cycle_id' => $cycle->id,
             'field_blocks_created' => $fieldBlocksCount,
             'projects_created' => count($created),
             'projects' => $created,
-        ], 201);
+            'results' => $results,
+        ], 200);
     }
 
     /**

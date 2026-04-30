@@ -3,7 +3,13 @@ import type { CropCycle, CreateCropCyclePayload, CropCycleClosePreview } from '.
 
 export interface SeasonSetupAssignment {
   land_parcel_id: string;
-  blocks: { tenant_crop_item_id: string; name?: string; area?: number }[];
+  blocks: {
+    tenant_crop_item_id: string;
+    name?: string;
+    area: number;
+    agreement_id?: string | null;
+    agreement_allocation_id?: string | null;
+  }[];
 }
 
 export interface SeasonSetupPayload {
@@ -21,6 +27,14 @@ export interface SeasonSetupResponse {
     land_parcel_id: string;
     land_allocation_id: string;
   }[];
+  results?: Array<{
+    index: number;
+    status: 'ok' | 'error';
+    land_parcel_id: string;
+    land_allocation_id?: string;
+    total_allocated_acres?: number;
+    message?: string;
+  }>;
 }
 
 export const cropCyclesApi = {

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../api/projects';
-import type { CreateProjectPayload, CreateProjectFromAllocationPayload } from '../types';
+import type { CreateProjectPayload, CreateProjectFromAllocationPayload, FieldCycleSetupPayload } from '../types';
 
 export function useProjects(cropCycleId?: string) {
   return useQuery({
@@ -38,6 +38,18 @@ export function useCreateProjectFromAllocation() {
       projectsApi.createFromAllocation(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['land-allocations'] });
+    },
+  });
+}
+
+export function useFieldCycleSetup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: FieldCycleSetupPayload) => projectsApi.fieldCycleSetup(payload),
+    onSuccess: (project) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', project.id] });
       queryClient.invalidateQueries({ queryKey: ['land-allocations'] });
     },
   });

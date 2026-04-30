@@ -72,6 +72,7 @@ class SupplierInvoiceController extends Controller
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date'],
             'currency_code' => ['nullable', 'string', 'size:3'],
+            'payment_terms' => ['nullable', 'string', 'in:CASH,CREDIT'],
             'subtotal_amount' => ['nullable', 'numeric'],
             'tax_amount' => ['nullable', 'numeric'],
             'total_amount' => ['required', 'numeric', 'min:0.01'],
@@ -81,10 +82,15 @@ class SupplierInvoiceController extends Controller
             'lines.*.item_id' => ['nullable', 'uuid'],
             'lines.*.qty' => ['nullable', 'numeric'],
             'lines.*.unit_price' => ['nullable', 'numeric'],
+            'lines.*.cash_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.credit_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.selected_unit_price' => ['nullable', 'numeric', 'min:0'],
             'lines.*.line_total' => ['required', 'numeric', 'min:0.01'],
             'lines.*.tax_amount' => ['nullable', 'numeric'],
             'lines.*.line_no' => ['nullable', 'integer', 'min:1'],
             'lines.*.grn_line_id' => ['nullable', 'uuid'],
+            'lines.*.base_cash_amount' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.credit_premium_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $invoice = $this->draftService->create(
@@ -173,6 +179,7 @@ class SupplierInvoiceController extends Controller
             'invoice_date' => ['sometimes', 'date'],
             'due_date' => ['nullable', 'date'],
             'currency_code' => ['nullable', 'string', 'size:3'],
+            'payment_terms' => ['nullable', 'string', 'in:CASH,CREDIT'],
             'subtotal_amount' => ['nullable', 'numeric'],
             'tax_amount' => ['nullable', 'numeric'],
             'total_amount' => ['sometimes', 'numeric', 'min:0.01'],
@@ -182,10 +189,15 @@ class SupplierInvoiceController extends Controller
             'lines.*.item_id' => ['nullable', 'uuid'],
             'lines.*.qty' => ['nullable', 'numeric'],
             'lines.*.unit_price' => ['nullable', 'numeric'],
+            'lines.*.cash_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.credit_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.selected_unit_price' => ['nullable', 'numeric', 'min:0'],
             'lines.*.line_total' => ['required', 'numeric', 'min:0.01'],
             'lines.*.tax_amount' => ['nullable', 'numeric'],
             'lines.*.line_no' => ['nullable', 'integer', 'min:1'],
             'lines.*.grn_line_id' => ['nullable', 'uuid'],
+            'lines.*.base_cash_amount' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.credit_premium_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $invoice = $this->draftService->update($invoice, $validated, $validated['lines']);

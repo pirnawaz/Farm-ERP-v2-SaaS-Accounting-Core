@@ -40,6 +40,7 @@ class SupplierInvoice extends Model
         'invoice_date',
         'due_date',
         'currency_code',
+        'payment_terms',
         'subtotal_amount',
         'tax_amount',
         'total_amount',

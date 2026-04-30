@@ -1,5 +1,11 @@
 import { apiClient } from '@farm-erp/shared';
-import type { Project, CreateProjectPayload, CreateProjectFromAllocationPayload, CreateProjectFromAgreementAllocationPayload } from '../types';
+import type {
+  Project,
+  CreateProjectPayload,
+  CreateProjectFromAllocationPayload,
+  CreateProjectFromAgreementAllocationPayload,
+  FieldCycleSetupPayload,
+} from '../types';
 
 export const projectsApi = {
   list: (cropCycleId?: string) => {
@@ -15,6 +21,8 @@ export const projectsApi = {
     apiClient.post<Project>('/api/projects/from-allocation', payload),
   createFromAgreementAllocation: (payload: CreateProjectFromAgreementAllocationPayload) =>
     apiClient.post<Project>('/api/projects/from-agreement-allocation', payload),
+  fieldCycleSetup: (payload: FieldCycleSetupPayload) =>
+    apiClient.post<Project>('/api/projects/field-cycle-setup', payload),
   close: (id: string) => apiClient.post<Project>(`/api/projects/${id}/close`, {}),
   reopen: (id: string) => apiClient.post<Project>(`/api/projects/${id}/reopen`, {}),
 };

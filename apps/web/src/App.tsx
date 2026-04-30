@@ -36,6 +36,7 @@ import PartyDetailPage from './pages/PartyDetailPage';
 import LandAllocationsPage from './pages/LandAllocationsPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import FieldCycleSetupPage from './pages/projects/FieldCycleSetupPage';
 import ProjectPlanningPage from './pages/planning/ProjectPlanningPage';
 import ProjectRulesPage from './pages/ProjectRulesPage';
 import TransactionsPage from './pages/TransactionsPage';
@@ -124,6 +125,10 @@ import ProjectProfitabilityPage from './pages/reports/ProjectProfitabilityPage';
 import FarmPnLSummaryPage from './pages/reports/FarmPnLSummaryPage';
 import OverheadsReportPage from './pages/reports/OverheadsReportPage';
 import ProjectForecastDashboardPage from './pages/reports/ProjectForecastDashboardPage';
+import ProjectBudgetVsActualReportPage from './pages/reports/ProjectBudgetVsActualReportPage';
+import CropCycleBudgetVsActualReportPage from './pages/reports/CropCycleBudgetVsActualReportPage';
+import SettlementPackProjectReportPage from './pages/reports/SettlementPackProjectReportPage';
+import SettlementPackCropCycleReportPage from './pages/reports/SettlementPackCropCycleReportPage';
 import ProjectResponsibilityReportPage from './pages/reports/ProjectResponsibilityReportPage';
 import ProjectPartyEconomicsPage from './pages/reports/ProjectPartyEconomicsPage';
 import MachineProfitabilityReportPage from './pages/reports/MachineProfitabilityReportPage';
@@ -139,7 +144,7 @@ import SupplierCreditNoteNewPage from './pages/SupplierCreditNoteNewPage';
 import SupplierInvoicesPage from './pages/SupplierInvoicesPage';
 import SupplierInvoiceDetailPage from './pages/SupplierInvoiceDetailPage';
 import BillsPage from './pages/accounting/BillsPage';
-import BillFormPage from './pages/accounting/BillFormPage';
+import { BillFormEditRoute, BillFormNewRoute } from './pages/accounting/BillFormRoute';
 import CostCentersPage from './pages/accounting/CostCentersPage';
 import SalesMarginPage from './pages/SalesMarginPage';
 import PartyLedgerPage from './pages/PartyLedgerPage';
@@ -174,6 +179,19 @@ import PlatformTenantDetailPage from './pages/platform/PlatformTenantDetailPage'
 import PlatformAuditLogsPage from './pages/platform/PlatformAuditLogsPage';
 import SetPasswordPage from './pages/SetPasswordPage';
 import PostingGroupDetailPage from './pages/PostingGroupDetailPage';
+import SuppliersPage from './pages/procurement/SuppliersPage';
+import SupplierFormPage from './pages/procurement/SupplierFormPage';
+import SupplierBillsPage from './pages/procurement/SupplierBillsPage';
+import SupplierBillFormPage from './pages/procurement/SupplierBillFormPage';
+import SupplierBillDetailPage from './pages/procurement/SupplierBillDetailPage';
+import PurchaseOrdersPage from './pages/procurement/PurchaseOrdersPage';
+import PurchaseOrderFormPage from './pages/procurement/PurchaseOrderFormPage';
+import PurchaseOrderDetailPage from './pages/procurement/PurchaseOrderDetailPage';
+import { ApReportsIndexPage } from './pages/procurement/reports/ApReportsIndexPage';
+import { SupplierLedgerReportPage } from './pages/procurement/reports/SupplierLedgerReportPage';
+import { UnpaidBillsReportPage } from './pages/procurement/reports/UnpaidBillsReportPage';
+import { ApAgingReportPage } from './pages/procurement/reports/ApAgingReportPage';
+import { CreditPremiumByProjectReportPage } from './pages/procurement/reports/CreditPremiumByProjectReportPage';
 import { ModulesProvider } from './contexts/ModulesContext';
 import { PlatformLayout } from './components/PlatformLayout';
 import { PlatformAdminRoute } from './components/PlatformAdminRoute';
@@ -249,6 +267,7 @@ function App() {
         <Route path="parties/:id" element={<PartyDetailPage />} />
         <Route path="allocations" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><LandAllocationsPage /></ModuleProtectedRoute>} />
         <Route path="projects" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProjectsPage /></ModuleProtectedRoute>} />
+        <Route path="projects/setup" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><FieldCycleSetupPage /></ModuleProtectedRoute>} />
         <Route path="projects/:id" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProjectDetailPage /></ModuleProtectedRoute>} />
         <Route path="projects/:id/rules" element={<ModuleProtectedRoute requiredModule="projects_crop_cycles"><ProjectRulesPage /></ModuleProtectedRoute>} />
         <Route
@@ -368,6 +387,46 @@ function App() {
             <ModuleProtectedRoute requiredModule="reports">
               <ModuleProtectedRoute requiredModule="projects_crop_cycles">
                 <ProjectForecastDashboardPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/budget-vs-actual/project"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <ProjectBudgetVsActualReportPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/budget-vs-actual/crop-cycle"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <CropCycleBudgetVsActualReportPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/settlement-pack/project"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <SettlementPackProjectReportPage />
+              </ModuleProtectedRoute>
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="reports/settlement-pack/crop-cycle"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <ModuleProtectedRoute requiredModule="projects_crop_cycles">
+                <SettlementPackCropCycleReportPage />
               </ModuleProtectedRoute>
             </ModuleProtectedRoute>
           }
@@ -511,7 +570,7 @@ function App() {
           path="accounting/bills/new"
           element={
             <ModuleProtectedRoute requiredModule="reports">
-              <BillFormPage />
+              <BillFormNewRoute mode="overhead" />
             </ModuleProtectedRoute>
           }
         />
@@ -519,7 +578,7 @@ function App() {
           path="accounting/bills/:id/edit"
           element={
             <ModuleProtectedRoute requiredModule="reports">
-              <BillFormPage />
+              <BillFormEditRoute mode="overhead" />
             </ModuleProtectedRoute>
           }
         />
@@ -548,6 +607,22 @@ function App() {
           }
         />
         <Route
+          path="accounting/supplier-invoices/new"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <BillFormNewRoute mode="supplier" />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting/supplier-invoices/:id/edit"
+          element={
+            <ModuleProtectedRoute requiredModule="reports">
+              <BillFormEditRoute mode="supplier" />
+            </ModuleProtectedRoute>
+          }
+        />
+        <Route
           path="accounting/supplier-invoices/:id"
           element={
             <ModuleProtectedRoute requiredModule="reports">
@@ -564,6 +639,22 @@ function App() {
           }
         />
         <Route path="posting-groups/:id" element={<PostingGroupDetailPage />} />
+        <Route path="procurement/suppliers" element={<SuppliersPage />} />
+        <Route path="procurement/suppliers/new" element={<SupplierFormPage />} />
+        <Route path="procurement/suppliers/:id" element={<SupplierFormPage />} />
+        <Route path="procurement/supplier-bills" element={<SupplierBillsPage />} />
+        <Route path="procurement/supplier-bills/new" element={<SupplierBillFormPage />} />
+        <Route path="procurement/supplier-bills/:id" element={<SupplierBillDetailPage />} />
+        <Route path="procurement/supplier-bills/:id/edit" element={<SupplierBillFormPage />} />
+        <Route path="procurement/purchase-orders" element={<PurchaseOrdersPage />} />
+        <Route path="procurement/purchase-orders/new" element={<PurchaseOrderFormPage />} />
+        <Route path="procurement/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+        <Route path="procurement/purchase-orders/:id/edit" element={<PurchaseOrderFormPage />} />
+        <Route path="procurement/reports" element={<ApReportsIndexPage />} />
+        <Route path="procurement/reports/supplier-ledger" element={<SupplierLedgerReportPage />} />
+        <Route path="procurement/reports/unpaid-bills" element={<UnpaidBillsReportPage />} />
+        <Route path="procurement/reports/ap-aging" element={<ApAgingReportPage />} />
+        <Route path="procurement/reports/credit-premium" element={<CreditPremiumByProjectReportPage />} />
         <Route path="settings/localisation" element={<LocalisationSettingsPage />} />
         <Route path="admin/farm" element={<AdminFarmProfilePage />} />
         <Route path="admin/users" element={<AdminUsersPage />} />

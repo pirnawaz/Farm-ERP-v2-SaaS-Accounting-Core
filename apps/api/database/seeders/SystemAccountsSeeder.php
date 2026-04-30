@@ -75,6 +75,7 @@ class SystemAccountsSeeder extends Seeder
             ['code' => 'INVENTORY_PRODUCE', 'name' => 'Produce Inventory', 'type' => 'asset'],
             ['code' => 'CROP_WIP', 'name' => 'Crop Work-In-Progress', 'type' => 'asset'],
             ['code' => 'INPUTS_EXPENSE', 'name' => 'Inputs Expense', 'type' => 'expense'],
+            ['code' => 'CREDIT_PURCHASE_PREMIUM_EXPENSE', 'name' => 'Credit Purchase Premium Expense', 'type' => 'expense'],
             ['code' => 'STOCK_VARIANCE', 'name' => 'Stock Variance / Shrinkage', 'type' => 'expense'],
             ['code' => 'LABOUR_EXPENSE', 'name' => 'Labour Expense', 'type' => 'expense'],
             ['code' => 'WAGES_PAYABLE', 'name' => 'Wages Payable', 'type' => 'liability'],

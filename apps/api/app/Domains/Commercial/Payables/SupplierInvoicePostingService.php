@@ -142,6 +142,9 @@ class SupplierInvoicePostingService
             $postingDateObj = Carbon::parse($postingDate)->format('Y-m-d');
             $this->postingDateGuard->assertPostingDateAllowed($tenantId, Carbon::parse($postingDateObj));
 
+            $terms = $invoice->payment_terms ? strtoupper((string) $invoice->payment_terms) : null;
+            $isCreditInvoice = $terms === 'CREDIT';
+
             $lineSum = 0.0;
             foreach ($invoice->lines as $line) {
                 $amt = (float) $line->line_total;
@@ -176,11 +179,44 @@ class SupplierInvoicePostingService
                 $inventoryAccount->id => 0.0,
                 $expenseAccount->id => 0.0,
             ];
+            $premiumTotal = 0.0;
 
-            foreach ($invoice->lines as $line) {
-                $amt = round((float) $line->line_total, 2);
-                $debitAccount = $line->item_id ? $inventoryAccount : $expenseAccount;
-                $debitBuckets[$debitAccount->id] = ($debitBuckets[$debitAccount->id] ?? 0) + $amt;
+            if (! $isCreditInvoice) {
+                // Legacy / CASH behavior (unchanged): debit line_total by stock/non-stock classification.
+                foreach ($invoice->lines as $line) {
+                    $amt = round((float) $line->line_total, 2);
+                    $debitAccount = $line->item_id ? $inventoryAccount : $expenseAccount;
+                    $debitBuckets[$debitAccount->id] = ($debitBuckets[$debitAccount->id] ?? 0) + $amt;
+                }
+            } else {
+                // CREDIT: split each line into base cash amount + premium amount.
+                $premiumExpense = $this->accountService->getByCode($tenantId, 'CREDIT_PURCHASE_PREMIUM_EXPENSE');
+                foreach ($invoice->lines as $line) {
+                    $base = $line->base_cash_amount;
+                    $prem = $line->credit_premium_amount;
+                    if ($base === null || $prem === null) {
+                        throw ValidationException::withMessages([
+                            'lines' => ["Line {$line->line_no} is missing base_cash_amount or credit_premium_amount for CREDIT invoice posting."],
+                        ]);
+                    }
+                    $baseAmt = round((float) $base, 2);
+                    $premAmt = round((float) $prem, 2);
+                    if ($baseAmt < 0 || $premAmt < 0) {
+                        throw ValidationException::withMessages([
+                            'lines' => ["Line {$line->line_no} base_cash_amount and credit_premium_amount must be non-negative."],
+                        ]);
+                    }
+                    $lineTotal = round((float) $line->line_total, 2);
+                    if (abs(($baseAmt + $premAmt) - $lineTotal) > 0.02) {
+                        throw ValidationException::withMessages([
+                            'lines' => ["Line {$line->line_no} base_cash_amount + credit_premium_amount must equal line_total."],
+                        ]);
+                    }
+
+                    $debitAccount = $line->item_id ? $inventoryAccount : $expenseAccount;
+                    $debitBuckets[$debitAccount->id] = ($debitBuckets[$debitAccount->id] ?? 0) + $baseAmt;
+                    $premiumTotal += $premAmt;
+                }
             }
 
             $ledgerLines = [];
@@ -191,6 +227,15 @@ class SupplierInvoicePostingService
                 $ledgerLines[] = [
                     'account_id' => $accountId,
                     'debit_amount' => round($sum, 2),
+                    'credit_amount' => 0,
+                ];
+            }
+            if ($premiumTotal > 0.00001) {
+                // Only reachable for CREDIT invoices.
+                $premiumExpense = $this->accountService->getByCode($tenantId, 'CREDIT_PURCHASE_PREMIUM_EXPENSE');
+                $ledgerLines[] = [
+                    'account_id' => $premiumExpense->id,
+                    'debit_amount' => round($premiumTotal, 2),
                     'credit_amount' => 0,
                 ];
             }
@@ -269,6 +314,29 @@ class SupplierInvoicePostingService
                     'amount_base' => $fx->amountInBase($lineAmt),
                     'rule_snapshot' => $snapshot,
                 ]);
+
+                if ($isCreditInvoice) {
+                    $prem = $line->credit_premium_amount;
+                    $premAmt = $prem === null ? 0.0 : round((float) $prem, 2);
+                    if ($premAmt > 0.00001) {
+                        AllocationRow::create([
+                            'tenant_id' => $tenantId,
+                            'posting_group_id' => $postingGroup->id,
+                            'project_id' => $allocationProjectId,
+                            'cost_center_id' => $allocationCostCenterId,
+                            'party_id' => $invoice->party_id,
+                            'allocation_type' => 'SUPPLIER_INVOICE_CREDIT_PREMIUM',
+                            'amount' => (string) $premAmt,
+                            'currency_code' => $fx->transactionCurrencyCode,
+                            'base_currency_code' => $fx->baseCurrencyCode,
+                            'fx_rate' => $fx->fxRate,
+                            'amount_base' => $fx->amountInBase($premAmt),
+                            'rule_snapshot' => array_merge($snapshot, [
+                                'credit_premium_amount' => (string) $premAmt,
+                            ]),
+                        ]);
+                    }
+                }
             }
 
             $invoice->update([

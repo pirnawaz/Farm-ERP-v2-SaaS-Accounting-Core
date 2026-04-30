@@ -17,13 +17,13 @@ export default function SupplierInvoicesPage() {
   return (
     <PageContainer className="space-y-6">
       <PageHeader
-        title="Supplier invoices"
+        title="Supplier bills / invoices"
         backTo="/app/reports"
-        breadcrumbs={[{ label: 'Reports', to: '/app/reports' }, { label: 'Supplier invoices' }]}
+        breadcrumbs={[{ label: 'Reports', to: '/app/reports' }, { label: 'Supplier bills / invoices' }]}
       />
       <p className="text-sm text-gray-600 -mt-2">
-        Posted and draft supplier invoices (typically <strong>project-linked</strong>). For farm overhead and other
-        non-crop bills, use{' '}
+        Canonical AP documents (draft + posted). Use this for both <strong>project-linked</strong> and{' '}
+        <strong>farm overhead</strong> supplier bills. For cost-center setup and management, see{' '}
         <Link to="/app/accounting/bills" className="text-[#1F6F5C] hover:underline">
           Bills
         </Link>

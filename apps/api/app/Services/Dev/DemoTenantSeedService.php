@@ -5,7 +5,13 @@ namespace App\Services\Dev;
 use App\Domains\Operations\LandLease\LandLease;
 use App\Domains\Operations\LandLease\LandLeaseAccrual;
 use App\Domains\Operations\LandLease\LandLeaseAccrualPostingService;
+use App\Domains\Commercial\Payables\SupplierInvoice as CanonicalSupplierInvoice;
+use App\Domains\Commercial\Payables\SupplierInvoiceDraftService;
+use App\Domains\Commercial\Payables\SupplierInvoicePostingService;
+use App\Domains\Commercial\Procurement\PurchaseOrderService;
+use App\Domains\Commercial\Procurement\SupplierInvoicePoMatchService;
 use App\Models\Account;
+use App\Models\AllocationRow;
 use App\Models\Advance;
 use App\Models\CropActivity;
 use App\Models\CropActivityInput;
@@ -44,8 +50,13 @@ use App\Models\OperationalTransaction;
 use App\Models\Party;
 use App\Models\Payment;
 use App\Models\PostingGroup;
+use App\Models\ProjectPlan;
+use App\Models\ProjectPlanCost;
+use App\Models\ProjectPlanYield;
 use App\Models\Project;
 use App\Models\ProjectRule;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
 use App\Models\Sale;
 use App\Models\SaleLine;
 use App\Models\Settlement;
@@ -53,6 +64,7 @@ use App\Models\SettlementPack;
 use App\Models\SettlementPackApproval;
 use App\Models\ShareRule;
 use App\Models\ShareRuleLine;
+use App\Models\SupplierPaymentAllocation;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\TenantModule;
@@ -74,6 +86,7 @@ use App\Services\HarvestService;
 use App\Services\InventoryPostingService;
 use App\Services\LabourPostingService;
 use App\Services\Machinery\MachineryPostingService;
+use App\Services\BillPaymentService;
 use App\Services\PaymentService;
 use App\Services\PostingService;
 use App\Services\SaleCOGSService;
@@ -118,6 +131,11 @@ class DemoTenantSeedService
         private TrialBalanceService $trialBalanceService,
         private ProfitLossService $profitLossService,
         private BalanceSheetService $balanceSheetService,
+        private PurchaseOrderService $purchaseOrderService,
+        private SupplierInvoiceDraftService $supplierInvoiceDraftService,
+        private SupplierInvoicePostingService $supplierInvoicePostingService,
+        private SupplierInvoicePoMatchService $supplierInvoicePoMatchService,
+        private BillPaymentService $billPaymentService,
     ) {}
 
     /**
@@ -136,6 +154,7 @@ class DemoTenantSeedService
         return DB::transaction(function () use ($tenantName, $tenantSlug, $resetPasswords, $demoPassword) {
             $tenant = $this->ensureTenant($tenantName, $tenantSlug);
             $tenantId = $tenant->id;
+            $warnings = [];
 
             $this->markOnboardingCompleted($tenant);
             $this->enableNonCoreModules($tenantId);
@@ -158,6 +177,13 @@ class DemoTenantSeedService
             $machine = $this->ensureMachine($tenantId);
             $this->ensureMachineRateCard($tenantId, $machine);
 
+            $this->seedProjectPlan($tenantId, $openCycle->id, $projects['alpha']);
+            $supplier = $this->ensureSupplierForParty($tenantId, $parties['supplier']);
+            $po = $this->seedPurchaseOrder($tenantId, $supplier, $inv['item_input']);
+            $si = $this->seedSupplierInvoiceCreditWithPremiumAndPost($tenantId, $openCycle->id, $projects['alpha'], $parties['supplier'], $inv['item_input']);
+            $this->seedSupplierInvoicePoLink($tenantId, $si, $po);
+            $this->seedSupplierInvoicePaymentAllocation($tenantId, $openCycle->id, $si, $parties['supplier']);
+
             $this->seedOperationalTransactions($tenantId, $openCycle->id, $projects['alpha']->id);
             $this->seedOperationalReversalDemo($tenantId, $openCycle->id, $projects['alpha']->id);
             $this->seedInventoryFlows($tenantId, $openCycle, $projects['alpha'], $inv, $parties['supplier']->id, $parties['hari']->id);
@@ -168,7 +194,7 @@ class DemoTenantSeedService
             $this->seedLandLease($tenantId, $openCycle, $projects['beta'], $parties, $parcels['south'], $tenantAdminUserId);
 
             $this->seedFieldJobs($tenantId, $openCycle, $projects['alpha'], $inv, $machine, $parties['hari']->id);
-            $this->seedHarvest($tenantId, $openCycle, $projects['alpha'], $inv);
+            $this->seedHarvest($tenantId, $openCycle, $projects['alpha'], $inv, $warnings);
             $this->seedLoanDrawdown($tenantId, $projects['beta'], $parties);
             $this->seedFixedAsset($tenantId, $projects['alpha'], $tenantAdminUserId);
             $this->seedSettlementPackWorkflow($tenantId, $projects['alpha']->id, $userIds);
@@ -221,6 +247,7 @@ class DemoTenantSeedService
                 'draft_counts' => $draftCounts,
                 'closed_crop_cycle_id' => $closedCycle->id,
                 'user_ids' => $userIds,
+                'seed_warnings' => $warnings,
                 'settlement_preview_project_pool_profit' => is_array($previewProject) ? ($previewProject['pool_profit'] ?? null) : null,
                 'settlement_preview_sales_ok' => is_array($salesSettlementPreview) && ! isset($salesSettlementPreview['error']),
                 'module_matrix' => $this->buildModuleMatrix($tenantId, $openCycle->id),
@@ -229,6 +256,250 @@ class DemoTenantSeedService
                 'known_gaps' => $this->buildKnownGaps(),
             ];
         });
+    }
+
+    private function ensureSupplierForParty(string $tenantId, Party $party): Supplier
+    {
+        return Supplier::firstOrCreate(
+            ['tenant_id' => $tenantId, 'party_id' => $party->id],
+            [
+                'name' => $party->name,
+                'status' => 'ACTIVE',
+                'phone' => null,
+                'email' => null,
+                'address' => null,
+                'notes' => 'Demo supplier seeded for purchase orders',
+                'created_by' => null,
+            ]
+        );
+    }
+
+    private function seedProjectPlan(string $tenantId, string $cropCycleId, Project $project): ProjectPlan
+    {
+        $plan = ProjectPlan::where('tenant_id', $tenantId)
+            ->where('project_id', $project->id)
+            ->where('crop_cycle_id', $cropCycleId)
+            ->where('name', 'Demo Plan 2026')
+            ->first();
+
+        if (! $plan) {
+            $plan = ProjectPlan::create([
+                'tenant_id' => $tenantId,
+                'project_id' => $project->id,
+                'crop_cycle_id' => $cropCycleId,
+                'name' => 'Demo Plan 2026',
+                'status' => ProjectPlan::STATUS_ACTIVE,
+            ]);
+        } else {
+            if ($plan->status !== ProjectPlan::STATUS_ACTIVE) {
+                $plan->update(['status' => ProjectPlan::STATUS_ACTIVE]);
+            }
+        }
+
+        ProjectPlanCost::firstOrCreate(
+            ['project_plan_id' => $plan->id, 'cost_type' => ProjectPlanCost::COST_TYPE_INPUT],
+            ['expected_quantity' => 1, 'expected_cost' => 2500.00]
+        );
+        ProjectPlanCost::firstOrCreate(
+            ['project_plan_id' => $plan->id, 'cost_type' => ProjectPlanCost::COST_TYPE_LABOUR],
+            ['expected_quantity' => 1, 'expected_cost' => 1800.00]
+        );
+        ProjectPlanCost::firstOrCreate(
+            ['project_plan_id' => $plan->id, 'cost_type' => ProjectPlanCost::COST_TYPE_MACHINERY],
+            ['expected_quantity' => 1, 'expected_cost' => 1200.00]
+        );
+        ProjectPlanYield::firstOrCreate(
+            ['project_plan_id' => $plan->id],
+            ['expected_quantity' => 500.0000, 'expected_unit_value' => 50.0000]
+        );
+
+        return $plan->fresh(['costs', 'yields']);
+    }
+
+    private function seedPurchaseOrder(string $tenantId, Supplier $supplier, InvItem $itemInput): PurchaseOrder
+    {
+        $existing = PurchaseOrder::where('tenant_id', $tenantId)->where('po_no', 'DEMO-PO-01')->first();
+        if ($existing) {
+            if ($existing->status !== PurchaseOrder::STATUS_APPROVED) {
+                $existing->update(['status' => PurchaseOrder::STATUS_APPROVED, 'approved_at' => $existing->approved_at ?? now()]);
+            }
+            return $existing->fresh(['lines']);
+        }
+
+        $po = $this->purchaseOrderService->create($tenantId, [
+            'supplier_id' => $supplier->id,
+            'po_no' => 'DEMO-PO-01',
+            'po_date' => '2026-02-05',
+            'notes' => 'Demo PO for canonical invoice linking',
+            'lines' => [
+                [
+                    'line_no' => 1,
+                    'item_id' => $itemInput->id,
+                    'description' => 'Demo Urea (Bag)',
+                    'qty_ordered' => 10,
+                    'qty_overbill_tolerance' => 0,
+                    'expected_unit_cost' => 110,
+                ],
+            ],
+        ], null);
+
+        return $this->purchaseOrderService->approve($po, $tenantId, null);
+    }
+
+    private function seedSupplierInvoiceCreditWithPremiumAndPost(
+        string $tenantId,
+        string $cropCycleId,
+        Project $project,
+        Party $supplierParty,
+        InvItem $itemInput
+    ): CanonicalSupplierInvoice {
+        $invoice = CanonicalSupplierInvoice::where('tenant_id', $tenantId)
+            ->where('reference_no', 'DEMO-SI-CREDIT-01')
+            ->first();
+
+        if (! $invoice) {
+            $qty = 10.0;
+            $cashUnit = 100.0;
+            $creditUnit = 110.0;
+            $baseCash = round($qty * $cashUnit, 2);
+            $total = round($qty * $creditUnit, 2);
+            $premium = round($total - $baseCash, 2);
+
+            $invoice = $this->supplierInvoiceDraftService->create($tenantId, [
+                'party_id' => $supplierParty->id,
+                'project_id' => $project->id,
+                'cost_center_id' => null,
+                'grn_id' => null,
+                'reference_no' => 'DEMO-SI-CREDIT-01',
+                'invoice_date' => '2026-02-20',
+                'due_date' => '2026-03-20',
+                'currency_code' => 'PKR',
+                'payment_terms' => 'CREDIT',
+                'subtotal_amount' => $total,
+                'tax_amount' => 0,
+                'total_amount' => $total,
+                'notes' => 'Demo canonical CREDIT supplier invoice with premium',
+            ], [
+                [
+                    'line_no' => 1,
+                    'description' => 'Demo urea (credit)',
+                    'item_id' => $itemInput->id,
+                    'qty' => $qty,
+                    'cash_unit_price' => $cashUnit,
+                    'credit_unit_price' => $creditUnit,
+                    'selected_unit_price' => $creditUnit,
+                    'base_cash_amount' => $baseCash,
+                    'credit_premium_amount' => $premium,
+                    'line_total' => $total,
+                    'tax_amount' => 0,
+                ],
+            ], null);
+        }
+
+        $invoice = $invoice->fresh(['lines']);
+        if ($invoice->status === CanonicalSupplierInvoice::STATUS_DRAFT) {
+            $this->supplierInvoicePostingService->post(
+                $invoice->id,
+                $tenantId,
+                '2026-02-22',
+                'demo_seed:supplier_invoice:credit:01'
+            );
+        }
+
+        // Ensure premium allocation exists after posting.
+        $hasPremiumAlloc = AllocationRow::where('tenant_id', $tenantId)
+            ->where('allocation_type', 'SUPPLIER_INVOICE_CREDIT_PREMIUM')
+            ->where('project_id', $project->id)
+            ->exists();
+        if (! $hasPremiumAlloc) {
+            throw new \RuntimeException('Demo seed expected SUPPLIER_INVOICE_CREDIT_PREMIUM allocation to exist after posting supplier invoice.');
+        }
+
+        return $invoice->fresh(['lines', 'postingGroup']);
+    }
+
+    private function seedSupplierInvoicePoLink(string $tenantId, CanonicalSupplierInvoice $invoice, PurchaseOrder $po): void
+    {
+        $invoice->loadMissing(['lines']);
+        $po = $po->fresh(['lines']);
+        $invLine = $invoice->lines->first();
+        $poLine = $po->lines->first();
+        if (! $invLine || ! $poLine) {
+            return;
+        }
+
+        $existing = DB::table('supplier_invoice_line_po_matches')
+            ->where('tenant_id', $tenantId)
+            ->where('supplier_invoice_line_id', $invLine->id)
+            ->where('purchase_order_line_id', $poLine->id)
+            ->count();
+        if ($existing > 0) {
+            return;
+        }
+
+        $this->supplierInvoicePoMatchService->syncMatches($invoice, [[
+            'supplier_invoice_line_id' => $invLine->id,
+            'purchase_order_line_id' => $poLine->id,
+            'matched_qty' => (float) ($invLine->qty ?? 10),
+            'matched_amount' => (float) $invLine->line_total,
+        ]], $tenantId);
+    }
+
+    private function seedSupplierInvoicePaymentAllocation(
+        string $tenantId,
+        string $cropCycleId,
+        CanonicalSupplierInvoice $invoice,
+        Party $supplierParty
+    ): void {
+        $invoice = $invoice->fresh();
+        if (! in_array($invoice->status, [CanonicalSupplierInvoice::STATUS_POSTED, CanonicalSupplierInvoice::STATUS_PAID], true)) {
+            return;
+        }
+
+        $payment = Payment::firstOrCreate(
+            [
+                'tenant_id' => $tenantId,
+                'party_id' => $supplierParty->id,
+                'reference' => 'DEMO-PAY-SI-01',
+                'direction' => 'OUT',
+            ],
+            [
+                'amount' => (float) $invoice->total_amount,
+                'payment_date' => '2026-02-25',
+                'method' => 'CASH',
+                'status' => 'DRAFT',
+                'purpose' => 'GENERAL',
+                'notes' => 'Demo payment applied to canonical supplier invoice',
+            ]
+        );
+
+        if ($payment->status === 'DRAFT') {
+            $this->paymentService->postPayment(
+                $payment->id,
+                $tenantId,
+                '2026-02-25',
+                'demo_seed:payment:supplier_invoice:1',
+                $cropCycleId,
+                'accountant',
+                null,
+                null
+            );
+        }
+
+        $payment = $payment->fresh();
+        $already = SupplierPaymentAllocation::where('tenant_id', $tenantId)
+            ->where('payment_id', $payment->id)
+            ->where('supplier_invoice_id', $invoice->id)
+            ->where('status', SupplierPaymentAllocation::STATUS_ACTIVE)
+            ->exists();
+        if ($already) {
+            return;
+        }
+
+        $this->billPaymentService->applyPaymentToSupplierInvoices($tenantId, $payment->id, 'MANUAL', [[
+            'supplier_invoice_id' => $invoice->id,
+            'amount' => (float) $invoice->total_amount,
+        ]], '2026-02-25', null);
     }
 
     private function ensureTenant(string $name, string $slug): Tenant
@@ -1256,7 +1527,7 @@ class DemoTenantSeedService
     /**
      * @param array<string, mixed> $inv
      */
-    private function seedHarvest(string $tenantId, CropCycle $openCycle, Project $project, array $inv): void
+    private function seedHarvest(string $tenantId, CropCycle $openCycle, Project $project, array $inv, array &$warnings): void
     {
         $h = Harvest::firstOrCreate(
             ['tenant_id' => $tenantId, 'harvest_no' => 'DEMO-HRV-01'],
@@ -1285,9 +1556,22 @@ class DemoTenantSeedService
                     'posting_date' => '2026-04-02',
                     'idempotency_key' => 'demo_seed:harvest:01',
                 ]);
-            } catch (\Throwable) {
-                // Harvest posting depends on crop-ops invariants; demo continues without failing the whole seed.
+            } catch (\Throwable $e) {
+                $warnings[] = [
+                    'key' => 'harvest_post_failed',
+                    'message' => 'Harvest posting failed; demo will continue without posted harvest economics data.',
+                    'error' => $e->getMessage(),
+                ];
             }
+        }
+
+        $h = $h->fresh();
+        if ($h->status === 'DRAFT') {
+            $warnings[] = [
+                'key' => 'harvest_not_posted',
+                'message' => 'Harvest remains DRAFT after seeding; Harvest Economics, Budget vs Actual yield actuals, and Settlement Pack harvest production may be empty.',
+                'harvest_no' => $h->harvest_no,
+            ];
         }
     }
 

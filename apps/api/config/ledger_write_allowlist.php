@@ -44,6 +44,8 @@ return [
         \App\Domains\Accounting\PeriodClose\PeriodCloseService::class,
         \App\Domains\Commercial\Payables\SupplierInvoicePostingService::class,
         \App\Domains\Commercial\Payables\SupplierCreditNotePostingService::class,
+        \App\Domains\Commercial\AccountsPayable\SupplierBillPostingService::class,
+        \App\Domains\Commercial\AccountsPayable\SupplierPaymentPostingService::class,
         \App\Services\OverheadAllocationService::class,
         \App\Services\BillRecognitionService::class,
         \App\Domains\Operations\LandLease\LandLeaseAccrualPostingService::class,

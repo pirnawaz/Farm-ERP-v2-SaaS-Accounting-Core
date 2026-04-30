@@ -23,9 +23,6 @@ export function TenantAreaRoute({ children }: TenantAreaRouteProps) {
 
   const tenantRoles = ['tenant_admin', 'accountant', 'operator'];
   const isTenantRole = userRole != null && tenantRoles.includes(userRole);
-  if (isTenantRole && !tenantId) {
-    return <Navigate to="/login" replace state={{ needsTenantSelection: true }} />;
-  }
 
   useEffect(() => {
     if (isPlatformAdminWithoutTenant && isImpersonating && impersonationStatus?.tenant?.id) {
@@ -33,6 +30,10 @@ export function TenantAreaRoute({ children }: TenantAreaRouteProps) {
       checkAuth();
     }
   }, [isPlatformAdminWithoutTenant, isImpersonating, impersonationStatus?.tenant?.id, setTenantIdFromImpersonation, checkAuth]);
+
+  if (isTenantRole && !tenantId) {
+    return <Navigate to="/login" replace state={{ needsTenantSelection: true }} />;
+  }
 
   if (userRole === 'platform_admin' && !tenantId) {
     if (statusLoading) {

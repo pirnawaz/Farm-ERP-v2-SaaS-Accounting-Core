@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { useProject } from '../hooks/useProjects';
 import { useModules } from '../contexts/ModulesContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { SetupStatusCard } from '../components/SetupStatusCard';
+import { isSetupComplete } from '../components/setupSemantics';
 import {
   buildHariStatementExportFilename,
   buildSettlementReviewExportFilename,
@@ -42,6 +44,24 @@ export default function ProjectDetailPage() {
     return <div>Project not found</div>;
   }
 
+  const allocation = project.land_allocation;
+  const agreementAllocation = project.agreement_allocation;
+  const inferredParcel =
+    allocation?.land_parcel ??
+    agreementAllocation?.land_parcel ??
+    null;
+  const allocatedArea =
+    allocation?.allocated_acres ??
+    agreementAllocation?.allocated_area ??
+    null;
+  const areaUom = agreementAllocation?.area_uom || 'ACRE';
+
+  const hasLandAllocation = !!(project.land_allocation_id || project.land_allocation);
+  const hasFieldBlock = !!(project.field_block_id || project.field_block);
+  const hasAgreement = !!(project.agreement_id || project.agreement);
+  const hasAgreementAllocation = !!(project.agreement_allocation_id || project.agreement_allocation);
+  const setupComplete = isSetupComplete(project);
+
   return (
     <div>
       <div className="mb-6">
@@ -49,6 +69,40 @@ export default function ProjectDetailPage() {
           ← Back to Projects
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">{project.name}</h1>
+      </div>
+
+      <div className="mb-6">
+        <SetupStatusCard
+          title="Setup status"
+          subtitle="Quick view of the Field Cycle setup chain."
+          actions={
+            !setupComplete ? (
+              <Link
+                to={`/app/projects/setup?project_id=${encodeURIComponent(project.id)}`}
+                className="inline-flex items-center justify-center rounded-md bg-[#1F6F5C] px-3 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a]"
+              >
+                Complete setup
+              </Link>
+            ) : null
+          }
+          rows={[
+            { label: 'Crop cycle', value: project.crop_cycle?.name || '—' },
+            { label: 'Parcel', value: inferredParcel?.name || '—' },
+            {
+              label: 'Allocated area',
+              value: allocatedArea ? `${allocatedArea} ${allocation ? 'acres' : areaUom}` : '—',
+            },
+            { label: 'Land allocation', present: hasLandAllocation, presentLabel: 'Present', missingLabel: 'Missing' },
+            { label: 'Field block', present: hasFieldBlock, presentLabel: 'Present', missingLabel: 'Missing' },
+            { label: 'Agreement', present: hasAgreement, presentLabel: 'Present', missingLabel: 'Missing' },
+            {
+              label: 'Agreement allocation',
+              present: hasAgreementAllocation,
+              presentLabel: 'Present',
+              missingLabel: 'Missing',
+            },
+          ]}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

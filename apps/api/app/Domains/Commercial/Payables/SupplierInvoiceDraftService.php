@@ -14,6 +14,63 @@ use Illuminate\Validation\ValidationException;
  */
 class SupplierInvoiceDraftService
 {
+    private function normalizeTerms(?string $terms): ?string
+    {
+        if ($terms === null || trim($terms) === '') {
+            return null;
+        }
+        return strtoupper(trim($terms));
+    }
+
+    /**
+     * M1: Store-only validation for cash/credit premium fields (posting remains unchanged).
+     *
+     * - If payment_terms is null: treat as legacy; do not require/validate credit fields.
+     * - If CASH: allow credit fields but require premium to be zero when provided.
+     * - If CREDIT: require cash_unit_price and credit_unit_price when provided and enforce credit >= cash.
+     *
+     * @param list<array<string, mixed>> $lines
+     */
+    private function assertCreditPremiumFields(?string $paymentTerms, array $lines): void
+    {
+        $terms = $this->normalizeTerms($paymentTerms);
+        if ($terms === null) {
+            return;
+        }
+        if (! in_array($terms, ['CASH', 'CREDIT'], true)) {
+            throw ValidationException::withMessages([
+                'payment_terms' => ['payment_terms must be CASH or CREDIT (or null for legacy invoices).'],
+            ]);
+        }
+
+        foreach ($lines as $i => $line) {
+            $cash = $line['cash_unit_price'] ?? null;
+            $credit = $line['credit_unit_price'] ?? null;
+            $premium = $line['credit_premium_amount'] ?? null;
+
+            if ($terms === 'CASH') {
+                if ($premium !== null && abs((float) $premium) > 0.00001) {
+                    throw ValidationException::withMessages([
+                        "lines.{$i}.credit_premium_amount" => ['For CASH invoices, credit_premium_amount must be 0 (or null).'],
+                    ]);
+                }
+                continue;
+            }
+
+            // CREDIT
+            if ($cash === null || $credit === null) {
+                // We allow legacy lines to omit these; but if payment_terms is explicitly CREDIT, require both.
+                throw ValidationException::withMessages([
+                    "lines.{$i}" => ['For CREDIT invoices, cash_unit_price and credit_unit_price are required on each line.'],
+                ]);
+            }
+            if ((float) $credit + 1e-9 < (float) $cash) {
+                throw ValidationException::withMessages([
+                    "lines.{$i}.credit_unit_price" => ['credit_unit_price must be >= cash_unit_price for CREDIT invoices.'],
+                ]);
+            }
+        }
+    }
     public function assertValidBillingScope(?string $grnId, ?string $projectId, ?string $costCenterId): void
     {
         if ($grnId) {
@@ -115,6 +172,7 @@ class SupplierInvoiceDraftService
 
         $isCc = (bool) $costCenterId && ! $projectId;
         $this->assertLinesMatchScopeAndTotals($tenantId, $lines, $isCc, (float) $data['total_amount']);
+        $this->assertCreditPremiumFields($data['payment_terms'] ?? null, $lines);
 
         return DB::transaction(function () use ($tenantId, $data, $lines, $userId) {
             $invoice = SupplierInvoice::create([
@@ -127,6 +185,7 @@ class SupplierInvoiceDraftService
                 'invoice_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'] ?? null,
                 'currency_code' => strtoupper((string) ($data['currency_code'] ?? 'GBP')),
+                'payment_terms' => $this->normalizeTerms($data['payment_terms'] ?? null),
                 'subtotal_amount' => $data['subtotal_amount'] ?? $data['total_amount'],
                 'tax_amount' => $data['tax_amount'] ?? 0,
                 'total_amount' => $data['total_amount'],
@@ -171,6 +230,8 @@ class SupplierInvoiceDraftService
         $isCc = (bool) $costCenterId && ! $projectId;
         $total = (float) ($data['total_amount'] ?? $invoice->total_amount);
         $this->assertLinesMatchScopeAndTotals($tenantId, $lines, $isCc, $total);
+        $nextTerms = array_key_exists('payment_terms', $data) ? $data['payment_terms'] : $invoice->payment_terms;
+        $this->assertCreditPremiumFields($nextTerms, $lines);
 
         return DB::transaction(function () use ($invoice, $data, $lines, $tenantId) {
             $invoice->update([
@@ -182,6 +243,7 @@ class SupplierInvoiceDraftService
                 'invoice_date' => $data['invoice_date'] ?? $invoice->invoice_date,
                 'due_date' => array_key_exists('due_date', $data) ? $data['due_date'] : $invoice->due_date,
                 'currency_code' => isset($data['currency_code']) ? strtoupper((string) $data['currency_code']) : $invoice->currency_code,
+                'payment_terms' => array_key_exists('payment_terms', $data) ? $this->normalizeTerms($data['payment_terms']) : $invoice->payment_terms,
                 'subtotal_amount' => $data['subtotal_amount'] ?? $invoice->subtotal_amount,
                 'tax_amount' => $data['tax_amount'] ?? $invoice->tax_amount,
                 'total_amount' => $data['total_amount'] ?? $invoice->total_amount,
@@ -210,9 +272,14 @@ class SupplierInvoiceDraftService
                 'item_id' => $line['item_id'] ?? null,
                 'qty' => $line['qty'] ?? null,
                 'unit_price' => $line['unit_price'] ?? null,
+                'cash_unit_price' => $line['cash_unit_price'] ?? null,
+                'credit_unit_price' => $line['credit_unit_price'] ?? null,
+                'selected_unit_price' => $line['selected_unit_price'] ?? null,
                 'line_total' => $line['line_total'],
                 'tax_amount' => $line['tax_amount'] ?? 0,
                 'grn_line_id' => $line['grn_line_id'] ?? null,
+                'base_cash_amount' => $line['base_cash_amount'] ?? null,
+                'credit_premium_amount' => $line['credit_premium_amount'] ?? null,
             ]);
             $n++;
         }

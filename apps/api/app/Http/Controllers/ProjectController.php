@@ -7,6 +7,8 @@ use App\Models\LandAllocation;
 use App\Models\AgreementAllocation;
 use App\Models\CropCycle;
 use App\Models\Party;
+use App\Http\Requests\FieldCycleSetupRequest;
+use App\Domains\Operations\SetupFieldCycleAction;
 use Carbon\Carbon;
 use App\Services\ProjectSettlementRuleResolver;
 use App\Services\TenantContext;
@@ -317,6 +319,35 @@ class ProjectController extends Controller
         } catch (\RuntimeException $e) {
             abort(422, $e->getMessage());
         }
+    }
+
+    public function fieldCycleSetup(FieldCycleSetupRequest $request, SetupFieldCycleAction $action)
+    {
+        $tenantId = TenantContext::getTenantId($request);
+
+        $project = $action->execute($tenantId, $request->validated());
+        $project = $project->load([
+            'cropCycle',
+            'party',
+            'landAllocation',
+            'projectRule',
+            'agreement',
+            'agreementAllocation.landParcel',
+            'agreementAllocation.agreement',
+        ]);
+
+        try {
+            $settlementResolution = $this->settlementRuleResolver->resolveSettlementRule($project);
+        } catch (\RuntimeException $e) {
+            $settlementResolution = [
+                'resolution_source' => 'unresolved',
+                'message' => $e->getMessage(),
+            ];
+        }
+
+        return response()->json(array_merge($project->toArray(), [
+            'settlement_resolution' => $settlementResolution,
+        ]), 201);
     }
 
     public function close(Request $request, string $id)

@@ -144,6 +144,8 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'project-forecast',
     'project-responsibility-report',
     'party-economics-report',
+    'settlement-pack-project-report',
+    'settlement-pack-crop-cycle-report',
   ]);
 
   const operatorAllowItemKeys = new Set<string>([
@@ -201,6 +203,8 @@ export function pruneDomainsForRole(domains: NavDomain[], userRole: string | nul
     'project-forecast',
     'project-responsibility-report',
     'party-economics-report',
+    'settlement-pack-project-report',
+    'settlement-pack-crop-cycle-report',
   ]);
 
   const keepAllFinance = role === 'accountant';
@@ -384,6 +388,20 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
         requiredPermission: VIEW,
         requiredModules: ['reports', 'projects_crop_cycles'],
       },
+      {
+        key: 'settlement-pack-project-report',
+        label: 'Settlement pack (project)',
+        to: '/app/reports/settlement-pack/project',
+        requiredPermission: VIEW,
+        requiredModules: ['reports', 'projects_crop_cycles'],
+      },
+      {
+        key: 'settlement-pack-crop-cycle-report',
+        label: 'Settlement pack (crop cycle)',
+        to: '/app/reports/settlement-pack/crop-cycle',
+        requiredPermission: VIEW,
+        requiredModules: ['reports', 'projects_crop_cycles'],
+      },
       { key: 'project-pl', label: 'Field Cycle P&L', to: '/app/reports/project-pl', requiredPermission: VIEW, requiredModules: ['reports'] },
       {
         key: 'project-responsibility-report',
@@ -432,17 +450,19 @@ function financeSectionItems(term: TermFn, VIEW: PermissionKey): {
       },
       {
         key: 'bills',
-        label: 'Bills',
+        label: 'Farm overhead bills',
         to: '/app/accounting/bills',
         requiredPermission: VIEW,
         requiredModules: ['reports'],
+        sidebarHint: 'Utilities, rent, insurance, admin',
       },
       {
         key: 'supplier-invoices',
-        label: 'Supplier invoices',
+        label: 'Supplier bills / invoices',
         to: '/app/accounting/supplier-invoices',
         requiredPermission: VIEW,
         requiredModules: ['reports'],
+        sidebarHint: 'Canonical supplier AP (project + overhead)',
       },
     ],
     reconciliation: [

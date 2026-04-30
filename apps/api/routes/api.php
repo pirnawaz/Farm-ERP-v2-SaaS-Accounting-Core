@@ -80,11 +80,20 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SettlementController;
 use App\Http\Controllers\CostCenterController;
 use App\Http\Controllers\SupplierInvoiceController;
+use App\Http\Controllers\SupplierInvoicePoMatchesController;
 use App\Http\Controllers\SupplierCreditNoteController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierBillController;
+use App\Http\Controllers\SupplierBillMatchesController;
+use App\Http\Controllers\SupplierPaymentController;
+use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PurchaseOrderMatchingController;
+use App\Http\Controllers\ApReportsController;
 use App\Http\Controllers\OverheadAllocationController;
 use App\Http\Controllers\BillRecognitionScheduleController;
 use App\Http\Controllers\BillRecognitionScheduleLineController;
 use App\Http\Controllers\SettlementPackController;
+use App\Http\Controllers\SettlementPackPhase1ReportController;
 use App\Http\Controllers\ShareRuleController;
 use App\Http\Controllers\Tenant\TenantAddonModulesController;
 use App\Http\Controllers\Tenant\TenantAuditLogController;
@@ -262,6 +271,7 @@ Route::middleware(['role:tenant_admin', 'require_module:land_leases'])->group(fu
 // Projects (tenant_admin, accountant)
 Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::apiResource('projects', ProjectController::class);
+    Route::post('projects/field-cycle-setup', [ProjectController::class, 'fieldCycleSetup']);
     Route::post('projects/from-allocation', [ProjectController::class, 'fromAllocation']);
     Route::post('projects/from-agreement-allocation', [ProjectController::class, 'fromAgreementAllocation']);
     Route::post('projects/{id}/close', [ProjectController::class, 'close']);
@@ -592,6 +602,18 @@ Route::middleware(['role:tenant_admin,accountant,operator', 'require_module:repo
     Route::get('reports/project-profitability', [ReportController::class, 'projectProfitability']);
     Route::get('reports/project-forecast', [ReportController::class, 'projectForecast']);
     Route::get('reports/project-projected-profit', [ReportController::class, 'projectProjectedProfit']);
+    Route::get('reports/budget-vs-actual/project', [ReportController::class, 'projectBudgetVsActual']);
+    Route::get('reports/budget-vs-actual/crop-cycle', [ReportController::class, 'cropCycleBudgetVsActual']);
+    Route::get('reports/settlement-pack/project', [SettlementPackPhase1ReportController::class, 'project']);
+    Route::get('reports/settlement-pack/crop-cycle', [SettlementPackPhase1ReportController::class, 'cropCycle']);
+    Route::get('reports/settlement-pack/project/export/summary.csv', [SettlementPackPhase1ReportController::class, 'exportProjectSummaryCsv']);
+    Route::get('reports/settlement-pack/project/export/allocation-register.csv', [SettlementPackPhase1ReportController::class, 'exportProjectAllocationRegisterCsv']);
+    Route::get('reports/settlement-pack/project/export/ledger-audit-register.csv', [SettlementPackPhase1ReportController::class, 'exportProjectLedgerAuditRegisterCsv']);
+    Route::get('reports/settlement-pack/project/export/pack.pdf', [SettlementPackPhase1ReportController::class, 'exportProjectPdf']);
+    Route::get('reports/settlement-pack/crop-cycle/export/summary.csv', [SettlementPackPhase1ReportController::class, 'exportCropCycleSummaryCsv']);
+    Route::get('reports/settlement-pack/crop-cycle/export/allocation-register.csv', [SettlementPackPhase1ReportController::class, 'exportCropCycleAllocationRegisterCsv']);
+    Route::get('reports/settlement-pack/crop-cycle/export/ledger-audit-register.csv', [SettlementPackPhase1ReportController::class, 'exportCropCycleLedgerAuditRegisterCsv']);
+    Route::get('reports/settlement-pack/crop-cycle/export/pack.pdf', [SettlementPackPhase1ReportController::class, 'exportCropCyclePdf']);
     Route::get('reports/machine-profitability', [ReportController::class, 'machineProfitability']);
     Route::get('reports/machinery-profitability', [ReportController::class, 'machineProfitability']);
     Route::get('reports/harvest-economics', [ReportController::class, 'harvestEconomics']);
@@ -712,6 +734,8 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::delete('supplier-invoices/{id}', [SupplierInvoiceController::class, 'destroy']);
     Route::post('supplier-invoices/{id}/post', [SupplierInvoiceController::class, 'post']);
     Route::put('supplier-invoices/{id}/matches', [SupplierInvoiceController::class, 'syncMatches']);
+    Route::get('supplier-invoices/{id}/po-matches', [SupplierInvoicePoMatchesController::class, 'show']);
+    Route::put('supplier-invoices/{id}/po-matches', [SupplierInvoicePoMatchesController::class, 'sync']);
 
     Route::get('supplier-credit-notes', [SupplierCreditNoteController::class, 'index']);
     Route::post('supplier-credit-notes', [SupplierCreditNoteController::class, 'store']);
@@ -719,6 +743,27 @@ Route::middleware(['role:tenant_admin,accountant'])->group(function () {
     Route::put('supplier-credit-notes/{id}', [SupplierCreditNoteController::class, 'update']);
     Route::delete('supplier-credit-notes/{id}', [SupplierCreditNoteController::class, 'destroy']);
     Route::post('supplier-credit-notes/{id}/post', [SupplierCreditNoteController::class, 'post']);
+
+    // AP-1 (Draft-only operational records; no posting groups/ledger entries created)
+    Route::apiResource('suppliers', SupplierController::class);
+    Route::apiResource('supplier-bills', SupplierBillController::class);
+    Route::post('supplier-bills/{id}/post', [SupplierBillController::class, 'post']);
+    Route::get('supplier-bills/{id}/matches', [SupplierBillMatchesController::class, 'show']);
+    Route::put('supplier-bills/{id}/matches', [SupplierBillMatchesController::class, 'sync']);
+    Route::apiResource('supplier-payments', SupplierPaymentController::class);
+    Route::post('supplier-payments/{id}/post', [SupplierPaymentController::class, 'post']);
+
+    // AP-5 Purchase Orders (operational only; no automatic posting)
+    Route::apiResource('purchase-orders', PurchaseOrderController::class);
+    Route::post('purchase-orders/{id}/approve', [PurchaseOrderController::class, 'approve']);
+    Route::get('purchase-orders/{id}/matching', [PurchaseOrderMatchingController::class, 'show']);
+    Route::get('purchase-orders/{id}/prepare-invoice', [PurchaseOrderController::class, 'prepareInvoice']);
+
+    // AP-4 reports (read-only)
+    Route::get('ap-reports/supplier-ledger', [ApReportsController::class, 'supplierLedger']);
+    Route::get('ap-reports/unpaid-bills', [ApReportsController::class, 'unpaidBills']);
+    Route::get('ap-reports/aging', [ApReportsController::class, 'apAging']);
+    Route::get('ap-reports/credit-premium-by-project', [ApReportsController::class, 'creditPremiumByProject']);
 
     Route::get('overhead-allocations/available', [OverheadAllocationController::class, 'available']);
     Route::get('overhead-allocations', [OverheadAllocationController::class, 'index']);

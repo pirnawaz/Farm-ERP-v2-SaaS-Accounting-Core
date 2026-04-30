@@ -24,16 +24,26 @@ class SupplierInvoiceLine extends Model
         'item_id',
         'qty',
         'unit_price',
+        'cash_unit_price',
+        'credit_unit_price',
+        'selected_unit_price',
         'line_total',
         'tax_amount',
         'grn_line_id',
+        'base_cash_amount',
+        'credit_premium_amount',
     ];
 
     protected $casts = [
         'qty' => 'decimal:6',
         'unit_price' => 'decimal:6',
+        'cash_unit_price' => 'decimal:6',
+        'credit_unit_price' => 'decimal:6',
+        'selected_unit_price' => 'decimal:6',
         'line_total' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'base_cash_amount' => 'decimal:2',
+        'credit_premium_amount' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

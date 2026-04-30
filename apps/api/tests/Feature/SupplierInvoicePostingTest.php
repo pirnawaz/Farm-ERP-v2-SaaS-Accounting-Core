@@ -134,6 +134,82 @@ class SupplierInvoicePostingTest extends TestCase
         $this->assertEqualsWithDelta(1000.0, $ap, 0.02);
     }
 
+    public function test_post_supplier_invoice_credit_terms_posts_base_and_premium_separately(): void
+    {
+        TenantContext::clear();
+        (new ModulesSeeder)->run();
+        $tenant = Tenant::create(['name' => 'T', 'status' => 'active', 'currency_code' => 'GBP']);
+        SystemAccountsSeeder::runForTenant($tenant->id);
+
+        // Minimal crop/project to satisfy posting guards (project-scoped).
+        $cycle = CropCycle::create([
+            'tenant_id' => $tenant->id,
+            'name' => '2026',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'OPEN',
+        ]);
+        $party = Party::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Supplier Party',
+            'party_types' => ['SUPPLIER'],
+        ]);
+        $project = Project::create([
+            'tenant_id' => $tenant->id,
+            'party_id' => $party->id,
+            'crop_cycle_id' => $cycle->id,
+            'name' => 'P',
+            'status' => 'ACTIVE',
+        ]);
+
+        $create = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson('/api/supplier-invoices', [
+                'party_id' => $party->id,
+                'project_id' => $project->id,
+                'invoice_date' => '2026-04-01',
+                'currency_code' => 'GBP',
+                'payment_terms' => 'CREDIT',
+                'total_amount' => 120,
+                'lines' => [
+                    [
+                        'description' => 'Credit purchase',
+                        'qty' => 1,
+                        'unit_price' => 120,
+                        'line_total' => 120,
+                        'cash_unit_price' => 100,
+                        'credit_unit_price' => 120,
+                        'selected_unit_price' => 120,
+                        'base_cash_amount' => 100,
+                        'credit_premium_amount' => 20,
+                    ],
+                ],
+            ]);
+        $create->assertStatus(201);
+        $invId = $create->json('id');
+
+        $post = $this->withHeader('X-Tenant-Id', $tenant->id)
+            ->withHeader('X-User-Role', 'accountant')
+            ->postJson("/api/supplier-invoices/{$invId}/post", [
+                'posting_date' => '2026-04-01',
+                'idempotency_key' => 'inv-credit-1',
+            ]);
+        $post->assertStatus(201);
+        $pgId = $post->json('id');
+
+        $this->assertNotNull($pgId);
+        $entries = LedgerEntry::where('posting_group_id', $pgId)->get();
+        $this->assertGreaterThanOrEqual(3, $entries->count(), 'Expected base + premium + AP lines');
+
+        $sumDr = (float) $entries->sum('debit_amount');
+        $sumCr = (float) $entries->sum('credit_amount');
+        $this->assertTrue(abs($sumDr - $sumCr) < 0.02);
+        $this->assertTrue(abs($sumCr - 120.0) < 0.02);
+
+        $allocs = AllocationRow::where('posting_group_id', $pgId)->get();
+        $this->assertTrue($allocs->where('allocation_type', 'SUPPLIER_INVOICE_CREDIT_PREMIUM')->count() >= 1);
+    }
+
     public function test_post_is_idempotent_by_idempotency_key(): void
     {
         (new ModulesSeeder)->run();

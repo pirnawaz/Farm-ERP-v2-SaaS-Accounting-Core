@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '@farm-erp/shared';
@@ -9,6 +9,8 @@ import { useRole } from '../hooks/useRole';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import type { SupplierInvoiceDetail, SupplierStatementResponse } from '../types';
 import toast from 'react-hot-toast';
+import { supplierInvoicePoMatchesApi, type SupplierInvoiceLinePoMatch } from '../lib/api/procurement/supplierInvoicePoMatches';
+import { purchaseOrdersApi, type PurchaseOrderMatchingLine } from '../lib/api/procurement/purchaseOrders';
 
 export default function SupplierInvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,6 +46,32 @@ export default function SupplierInvoiceDetailPage() {
 
   const partyId = invoice?.party_id;
 
+  const [poId, setPoId] = useState('');
+  const [poLines, setPoLines] = useState<PurchaseOrderMatchingLine[]>([]);
+  const [poLoading, setPoLoading] = useState(false);
+  const [poMatches, setPoMatches] = useState<SupplierInvoiceLinePoMatch[]>([]);
+  const [poMatchDraft, setPoMatchDraft] = useState<Record<string, { purchase_order_line_id: string; matched_qty: string; matched_amount: string }>>({});
+
+  const { data: poMatchesRes } = useQuery({
+    queryKey: ['supplier-invoice-po-matches', id],
+    queryFn: () => supplierInvoicePoMatchesApi.get(id!),
+    enabled: !!id,
+  });
+
+  useEffect(() => {
+    if (!poMatchesRes) return;
+    setPoMatches(poMatchesRes.matches || []);
+    const next: Record<string, { purchase_order_line_id: string; matched_qty: string; matched_amount: string }> = {};
+    (poMatchesRes.matches || []).forEach((m) => {
+      next[m.supplier_invoice_line_id] = {
+        purchase_order_line_id: m.purchase_order_line_id,
+        matched_qty: String(m.matched_qty),
+        matched_amount: String(m.matched_amount),
+      };
+    });
+    setPoMatchDraft(next);
+  }, [poMatchesRes]);
+
   const { data: statement } = useQuery({
     queryKey: ['supplier-statement', partyId, id],
     queryFn: () => {
@@ -75,7 +103,7 @@ export default function SupplierInvoiceDetailPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-800">{error instanceof Error ? error.message : 'Not found'}</p>
           <Link to="/app/accounting/supplier-invoices" className="text-[#1F6F5C] hover:underline mt-2 inline-block">
-            ← Back to supplier invoices
+            ← Back to supplier bills / invoices
           </Link>
         </div>
       </PageContainer>
@@ -84,10 +112,10 @@ export default function SupplierInvoiceDetailPage() {
 
   const isFarmBill = invoice.billing_scope === 'farm_overhead';
   const detailTitle = invoice.reference_no
-    ? `${isFarmBill ? 'Bill' : 'Supplier invoice'} · ${invoice.reference_no}`
+    ? `${isFarmBill ? 'Bill' : 'Supplier bill / invoice'} · ${invoice.reference_no}`
     : isFarmBill
       ? 'Bill'
-      : 'Supplier invoice';
+      : 'Supplier bill / invoice';
 
   return (
     <PageContainer className="space-y-6">
@@ -98,7 +126,7 @@ export default function SupplierInvoiceDetailPage() {
           { label: 'Reports', to: '/app/reports' },
           isFarmBill
             ? { label: 'Bills', to: '/app/accounting/bills' }
-            : { label: 'Supplier invoices', to: '/app/accounting/supplier-invoices' },
+            : { label: 'Supplier bills / invoices', to: '/app/accounting/supplier-invoices' },
           { label: 'Detail' },
         ]}
       />
@@ -156,6 +184,11 @@ export default function SupplierInvoiceDetailPage() {
             Due: <strong className="text-gray-900">{formatDate(invoice.due_date)}</strong>
           </span>
         )}
+        {invoice.payment_terms && (
+          <span>
+            Terms: <strong className="text-gray-900">{invoice.payment_terms}</strong>
+          </span>
+        )}
         <span>
           Transaction currency: <strong className="text-gray-900">{txCc}</strong>
         </span>
@@ -207,7 +240,11 @@ export default function SupplierInvoiceDetailPage() {
               {postM.isPending ? 'Posting…' : 'Post bill'}
             </button>
             <Link
-              to={`/app/accounting/bills/${invoice.id}/edit`}
+              to={
+                isFarmBill
+                  ? `/app/accounting/bills/${invoice.id}/edit`
+                  : `/app/accounting/supplier-invoices/${invoice.id}/edit`
+              }
               className="text-sm text-gray-700 underline hover:text-gray-900"
             >
               Edit draft
@@ -222,20 +259,51 @@ export default function SupplierInvoiceDetailPage() {
           Figures below are in <strong>{txCc}</strong> (document / transaction currency). Posted ledger entries also
           carry <strong>{functionalCc}</strong> base amounts for reporting.
         </p>
-        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-          <div>
-            <dt className="text-gray-500">Subtotal</dt>
-            <dd className="mt-1 font-medium tabular-nums">{invoice.subtotal_amount != null ? formatMoney(invoice.subtotal_amount) : '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Tax</dt>
-            <dd className="mt-1 font-medium tabular-nums">{invoice.tax_amount != null ? formatMoney(invoice.tax_amount) : '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Total</dt>
-            <dd className="mt-1 font-semibold tabular-nums">{invoice.total_amount != null ? formatMoney(invoice.total_amount) : '—'}</dd>
-          </div>
-        </dl>
+        {invoice.payment_terms === 'CREDIT' ? (
+          <dl className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
+            <div>
+              <dt className="text-gray-500">Cash amount (base)</dt>
+              <dd className="mt-1 font-medium tabular-nums">
+                {(() => {
+                  const v = (invoice.lines || []).reduce((acc, l) => acc + (parseFloat(String(l.base_cash_amount ?? 0)) || 0), 0);
+                  return formatMoney(v.toFixed(2));
+                })()}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Credit premium</dt>
+              <dd className="mt-1 font-semibold tabular-nums text-amber-900">
+                {(() => {
+                  const v = (invoice.lines || []).reduce((acc, l) => acc + (parseFloat(String(l.credit_premium_amount ?? 0)) || 0), 0);
+                  return formatMoney(v.toFixed(2));
+                })()}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Tax</dt>
+              <dd className="mt-1 font-medium tabular-nums">{invoice.tax_amount != null ? formatMoney(invoice.tax_amount) : '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Total payable</dt>
+              <dd className="mt-1 font-semibold tabular-nums">{invoice.total_amount != null ? formatMoney(invoice.total_amount) : '—'}</dd>
+            </div>
+          </dl>
+        ) : (
+          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <div>
+              <dt className="text-gray-500">Subtotal</dt>
+              <dd className="mt-1 font-medium tabular-nums">{invoice.subtotal_amount != null ? formatMoney(invoice.subtotal_amount) : '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Tax</dt>
+              <dd className="mt-1 font-medium tabular-nums">{invoice.tax_amount != null ? formatMoney(invoice.tax_amount) : '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500">Total</dt>
+              <dd className="mt-1 font-semibold tabular-nums">{invoice.total_amount != null ? formatMoney(invoice.total_amount) : '—'}</dd>
+            </div>
+          </dl>
+        )}
       </section>
 
       {invoice.outstanding_amount != null && (invoice.status === 'POSTED' || invoice.status === 'PAID') && (
@@ -350,6 +418,166 @@ export default function SupplierInvoiceDetailPage() {
           )}
         </section>
       )}
+
+      <section className="bg-white rounded-lg shadow p-6 space-y-3">
+        <h2 className="text-lg font-semibold">Purchase order ↔ invoice matching</h2>
+        <p className="text-sm text-gray-600">
+          Traceability only — does not post additional accounting. PO rollups count matches only when the invoice is
+          <strong> POSTED</strong> or <strong>PAID</strong>.
+        </p>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Purchase order ID</label>
+            <input
+              className="rounded border border-gray-300 px-3 py-2 text-sm w-[28rem] max-w-full"
+              value={poId}
+              onChange={(e) => setPoId(e.target.value)}
+              placeholder="Paste PO id…"
+              disabled={invoice.status !== 'DRAFT'}
+            />
+          </div>
+          <button
+            type="button"
+            className="rounded bg-[#1F6F5C] px-3 py-2 text-sm text-white disabled:opacity-50"
+            disabled={invoice.status !== 'DRAFT' || !poId.trim() || poLoading}
+            onClick={async () => {
+              setPoLoading(true);
+              try {
+                const res = await purchaseOrdersApi.matching(poId.trim());
+                setPoLines(res.lines || []);
+                toast.success('PO loaded');
+              } catch (e: any) {
+                toast.error(e?.message ?? 'Failed to load PO');
+              } finally {
+                setPoLoading(false);
+              }
+            }}
+          >
+            {poLoading ? 'Loading…' : 'Load PO lines'}
+          </button>
+        </div>
+
+        {invoice.status !== 'DRAFT' && (
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            This invoice is {invoice.status}. PO matches are view-only.
+          </div>
+        )}
+
+        <div className="overflow-x-auto border border-gray-100 rounded">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left">Invoice line</th>
+                <th className="px-3 py-2 text-left">PO line</th>
+                <th className="px-3 py-2 text-right">Matched qty</th>
+                <th className="px-3 py-2 text-right">Matched amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.lines?.map((l) => {
+                const draft = poMatchDraft[l.id] || { purchase_order_line_id: '', matched_qty: '', matched_amount: '' };
+                return (
+                  <tr key={l.id} className="border-t border-gray-100">
+                    <td className="px-3 py-2">
+                      <div className="font-medium">#{l.line_no ?? '—'}</div>
+                      <div className="text-gray-600">{l.description ?? '—'}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        className="rounded border border-gray-300 px-2 py-1 text-sm w-[26rem] max-w-full"
+                        value={draft.purchase_order_line_id}
+                        disabled={invoice.status !== 'DRAFT'}
+                        onChange={(e) =>
+                          setPoMatchDraft((s) => ({
+                            ...s,
+                            [l.id]: { ...draft, purchase_order_line_id: e.target.value },
+                          }))
+                        }
+                      >
+                        <option value="">—</option>
+                        {poLines.map((pl) => (
+                          <option key={pl.purchase_order_line_id} value={pl.purchase_order_line_id}>
+                            Line {pl.line_no} · {pl.description || pl.item_name || ''} · remaining {pl.qty_remaining_to_bill}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <input
+                        className="w-28 rounded border border-gray-300 px-2 py-1 text-sm text-right tabular-nums"
+                        value={draft.matched_qty}
+                        disabled={invoice.status !== 'DRAFT'}
+                        onChange={(e) =>
+                          setPoMatchDraft((s) => ({
+                            ...s,
+                            [l.id]: { ...draft, matched_qty: e.target.value },
+                          }))
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <input
+                        className="w-32 rounded border border-gray-300 px-2 py-1 text-sm text-right tabular-nums"
+                        value={draft.matched_amount}
+                        disabled={invoice.status !== 'DRAFT'}
+                        onChange={(e) =>
+                          setPoMatchDraft((s) => ({
+                            ...s,
+                            [l.id]: { ...draft, matched_amount: e.target.value },
+                          }))
+                        }
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+              {!invoice.lines?.length ? (
+                <tr>
+                  <td className="px-3 py-6 text-gray-500" colSpan={4}>
+                    No lines.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        {invoice.status === 'DRAFT' && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="rounded bg-[#1F6F5C] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={!id}
+              onClick={async () => {
+                try {
+                  const payload = Object.entries(poMatchDraft)
+                    .map(([supplier_invoice_line_id, row]) => ({
+                      supplier_invoice_line_id,
+                      purchase_order_line_id: row.purchase_order_line_id,
+                      matched_qty: parseFloat(row.matched_qty || '0'),
+                      matched_amount: parseFloat(row.matched_amount || '0'),
+                    }))
+                    .filter((r) => r.purchase_order_line_id && r.matched_qty > 0);
+
+                  await supplierInvoicePoMatchesApi.sync(id!, { matches: payload });
+                  const refreshed = await supplierInvoicePoMatchesApi.get(id!);
+                  setPoMatches(refreshed.matches || []);
+                  toast.success('PO matches saved');
+                } catch (e: any) {
+                  toast.error(e?.message ?? 'Save failed');
+                }
+              }}
+            >
+              Save PO matches
+            </button>
+          </div>
+        )}
+
+        {invoice.status !== 'DRAFT' && poMatches.length > 0 && (
+          <p className="text-xs text-gray-500">Matches: {poMatches.length}</p>
+        )}
+      </section>
 
       {invoice.grn && (
         <section className="bg-white rounded-lg shadow p-6">

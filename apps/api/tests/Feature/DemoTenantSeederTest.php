@@ -3,13 +3,20 @@
 namespace Tests\Feature;
 
 use App\Domains\Accounting\Loans\LoanDrawdown;
+use App\Domains\Commercial\Payables\SupplierInvoice;
+use App\Models\AllocationRow;
 use App\Models\LedgerEntry;
+use App\Models\Project;
+use App\Models\ProjectPlan;
 use App\Models\PostingGroup;
+use App\Models\PurchaseOrder;
 use App\Models\SettlementPack;
+use App\Models\SupplierPaymentAllocation;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 use Tests\Traits\MakesAuthenticatedRequests;
 
@@ -106,6 +113,55 @@ class DemoTenantSeederTest extends TestCase
         $tenant = Tenant::where('slug', 'pack-loan-demo')->firstOrFail();
         $this->assertGreaterThan(0, LoanDrawdown::where('tenant_id', $tenant->id)->where('status', LoanDrawdown::STATUS_POSTED)->count());
         $this->assertGreaterThan(0, SettlementPack::where('tenant_id', $tenant->id)->count());
+    }
+
+    public function test_demo_seed_includes_canonical_procurement_ap_and_reports(): void
+    {
+        Artisan::call('demo:seed-tenant', ['--tenant-name' => 'Canonical Demo', '--tenant-slug' => 'canonical-demo']);
+        Artisan::call('demo:seed-tenant', ['--tenant-name' => 'Canonical Demo', '--tenant-slug' => 'canonical-demo']); // idempotency
+
+        $tenant = Tenant::where('slug', 'canonical-demo')->firstOrFail();
+
+        $this->assertGreaterThanOrEqual(1, ProjectPlan::where('tenant_id', $tenant->id)->where('status', ProjectPlan::STATUS_ACTIVE)->count());
+        $this->assertGreaterThanOrEqual(1, PurchaseOrder::where('tenant_id', $tenant->id)->where('status', PurchaseOrder::STATUS_APPROVED)->count());
+
+        $this->assertGreaterThanOrEqual(1, SupplierInvoice::where('tenant_id', $tenant->id)
+            ->where('payment_terms', 'CREDIT')
+            ->whereIn('status', [SupplierInvoice::STATUS_POSTED, SupplierInvoice::STATUS_PAID])
+            ->count());
+
+        $this->assertGreaterThanOrEqual(1, AllocationRow::where('tenant_id', $tenant->id)
+            ->where('allocation_type', 'SUPPLIER_INVOICE_CREDIT_PREMIUM')
+            ->count());
+
+        $this->assertGreaterThanOrEqual(1, SupplierPaymentAllocation::where('tenant_id', $tenant->id)->count());
+
+        // Deprecated paths must not be used by demo seed.
+        $this->assertSame(0, DB::table('supplier_bills')->where('tenant_id', $tenant->id)->count());
+        $this->assertSame(0, DB::table('supplier_payments')->where('tenant_id', $tenant->id)->count());
+        $this->assertSame(0, DB::table('supplier_bill_line_matches')->where('tenant_id', $tenant->id)->count());
+
+        $alpha = Project::where('tenant_id', $tenant->id)->where('name', 'Demo Project Alpha')->firstOrFail();
+
+        $login = $this->postJson('/api/auth/login', [
+            'email' => 'demo.admin@terrava.local',
+            'password' => 'Demo@12345',
+        ]);
+        $login->assertStatus(200);
+
+        $bva = $this->withAuthCookieFrom($login)
+            ->withHeader('X-Tenant-Id', $tenant->id)
+            ->getJson('/api/reports/budget-vs-actual/project?project_id=' . $alpha->id . '&from=2026-01-01&to=2026-12-31&bucket=month');
+        $bva->assertStatus(200);
+        $this->assertNotNull($bva->json('totals.planned.planned_total_cost'));
+        $this->assertNotNull($bva->json('totals.actual.actual_total_cost'));
+        $this->assertNotNull($bva->json('totals.actual.actual_credit_premium_cost'));
+
+        $settle = $this->withAuthCookieFrom($login)
+            ->withHeader('X-Tenant-Id', $tenant->id)
+            ->getJson('/api/reports/settlement-pack/project?project_id=' . $alpha->id . '&from=2026-01-01&to=2026-12-31');
+        $settle->assertStatus(200);
+        $this->assertNotNull($settle->json('summary.costs.credit_premium'));
     }
 
     public function test_operator_cannot_access_settlement_packs(): void

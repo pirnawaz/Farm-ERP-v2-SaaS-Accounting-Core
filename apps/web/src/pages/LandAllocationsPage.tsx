@@ -9,8 +9,15 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
 import { useRole } from '../hooks/useRole';
+import { SetupStatusBadge } from '../components/SetupStatusBadge';
+import { getSetupCompleteness } from '../components/setupSemantics';
 import toast from 'react-hot-toast';
 import type { LandAllocation, CreateLandAllocationPayload } from '../types';
+
+function projectSetupIncomplete(p?: { land_allocation_id?: string | null; field_block_id?: string | null; agreement_id?: string | null; agreement_allocation_id?: string | null } | null): boolean {
+  if (!p) return false;
+  return getSetupCompleteness(p as any) !== 'COMPLETE';
+}
 
 export default function LandAllocationsPage() {
   const { hasRole } = useRole();
@@ -136,8 +143,21 @@ export default function LandAllocationsPage() {
     {
       header: 'Land parcel',
       accessor: (row) => (
-        <span className="font-medium text-gray-900">{row.land_parcel?.name || '—'}</span>
+        row.land_parcel?.id ? (
+          <Link
+            to={`/app/land/${row.land_parcel.id}`}
+            className="font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+          >
+            {row.land_parcel?.name || '—'}
+          </Link>
+        ) : (
+          <span className="font-medium text-gray-900">{row.land_parcel?.name || '—'}</span>
+        )
       ),
+    },
+    {
+      header: 'Crop cycle',
+      accessor: (row) => <span className="text-gray-800">{row.crop_cycle?.name ?? '—'}</span>,
     },
     {
       header: 'Assignee',
@@ -157,15 +177,47 @@ export default function LandAllocationsPage() {
       header: 'Field cycle',
       accessor: (row) =>
         row.project ? (
-          <Link
-            to={`/app/projects/${row.project.id}`}
-            className="font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
-          >
-            {row.project.name}
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/app/projects/${row.project.id}`}
+              className="font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+            >
+              {row.project.name}
+            </Link>
+            {projectSetupIncomplete(row.project) && (
+              <Link
+                to={`/app/projects/setup?project_id=${encodeURIComponent(row.project.id)}&allocation_id=${encodeURIComponent(row.id)}&crop_cycle_id=${encodeURIComponent(row.crop_cycle_id)}&parcel_id=${encodeURIComponent(row.land_parcel_id)}`}
+                className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+              >
+                Complete setup
+              </Link>
+            )}
+          </div>
         ) : (
-          <span className="text-gray-500">—</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-gray-500">Not created</span>
+            <Link
+              to={`/app/projects/setup?allocation_id=${encodeURIComponent(row.id)}&crop_cycle_id=${encodeURIComponent(row.crop_cycle_id)}&parcel_id=${encodeURIComponent(row.land_parcel_id)}`}
+              className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+            >
+              Create field cycle
+            </Link>
+          </div>
         ),
+    },
+    {
+      header: 'Agreement allocation',
+      accessor: (row) => {
+        const hasAgreementAllocation = !!(row.project?.agreement_allocation_id || row.project?.agreement_allocation);
+        return (
+          <SetupStatusBadge
+            present={hasAgreementAllocation}
+            presentLabel="Present"
+            missingLabel="Missing"
+            size="sm"
+          />
+        );
+      },
     },
     ...(canCreate
       ? [

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { term } from '../config/terminology';
 import { useCropCycles, useCreateCropCycle, useCloseCropCycle, useOpenCropCycle } from '../hooks/useCropCycles';
 import { useCropItems, useCreateCropItem } from '../hooks/useCropItems';
 import { DataTable, type Column } from '../components/DataTable';
@@ -189,11 +188,10 @@ export default function CropCyclesPage() {
         {canCreate && (
           <div className="flex flex-col sm:flex-row gap-2 shrink-0">
             <Link
-              to="/app/crop-cycles/season-setup"
-              data-testid="season-setup-cta"
+              to="/app/projects/setup"
               className="inline-flex justify-center px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
-              {term('assignFieldsToSeason')}
+              Add field cycle
             </Link>
             <button
               data-testid="new-crop-cycle"
@@ -201,7 +199,7 @@ export default function CropCyclesPage() {
               onClick={() => setShowCreateModal(true)}
               className="inline-flex justify-center px-4 py-2 border border-gray-300 text-gray-800 rounded-md hover:bg-gray-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F6F5C]"
             >
-              New crop cycle (without fields)
+              Create crop cycle
             </button>
           </div>
         )}
@@ -218,17 +216,17 @@ export default function CropCyclesPage() {
           {canCreate ? (
             <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
               <Link
-                to="/app/crop-cycles/season-setup"
+                to="/app/projects/setup"
                 className="inline-flex justify-center px-4 py-2 bg-[#1F6F5C] text-white rounded-md hover:bg-[#1a5a4a] text-sm font-medium"
               >
-                {term('assignFieldsToSeason')}
+                Add field cycle
               </Link>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(true)}
                 className="inline-flex justify-center px-4 py-2 border border-gray-300 text-gray-800 rounded-md hover:bg-gray-50 text-sm font-medium"
               >
-                New crop cycle (without fields)
+                Create crop cycle
               </button>
             </div>
           ) : null}
@@ -261,13 +259,21 @@ export default function CropCyclesPage() {
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1F6F5C]"
                 disabled={cropItemsLoading}
               >
-                <option value="">Select crop</option>
-                {(cropItems ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.display_name}
-                    {item.source === 'custom' ? ' (custom)' : ''}
+                <option value="">{cropItemsLoading ? 'Loading crops…' : 'Select crop'}</option>
+                {(cropItems ?? []).length === 0 && !cropItemsLoading ? (
+                  <option value="" disabled>
+                    No crops available — add a crop first
                   </option>
-                ))}
+                ) : null}
+                {(cropItems ?? []).map((item) => {
+                  const label = item.display_name || item.custom_name || item.catalog_code || item.id;
+                  return (
+                    <option key={item.id} value={item.id}>
+                      {label}
+                      {item.source === 'custom' ? ' (custom)' : ''}
+                    </option>
+                  );
+                })}
               </select>
               {canAddCrop && (
                 <button

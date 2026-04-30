@@ -31,6 +31,9 @@ use App\Models\CropCycle;
 use App\Models\Machine;
 use App\Models\Harvest;
 use App\Models\Project;
+use App\Models\ProjectPlan;
+use App\Models\ProjectPlanCost;
+use App\Models\ProjectPlanYield;
 use App\Models\OperationalTransaction;
 use App\Models\Settlement;
 use App\Models\Payment;
@@ -259,6 +262,511 @@ class ReportController extends Controller
     }
 
     /**
+     * GET /api/reports/budget-vs-actual/project
+     *
+     * Read-only monthly planned vs actual cost (plus separate credit premium) for a project.
+     * Planned comes from latest ACTIVE project plan; actuals are ledger/allocation-backed posted truth only.
+     *
+     * Required: project_id, from, to, bucket=month.
+     */
+    public function projectBudgetVsActual(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $scope = $this->validateProjectBudgetVsActualScope($request, $tenantId);
+        if ($scope instanceof JsonResponse) {
+            return $scope;
+        }
+
+        $projectId = (string) $request->input('project_id');
+        $from = (string) $request->input('from');
+        $to = (string) $request->input('to');
+
+        /** @var Project $project */
+        $project = Project::query()->where('tenant_id', $tenantId)->where('id', $projectId)->firstOrFail();
+
+        /** @var ProjectPlan|null $plan */
+        $plan = ProjectPlan::query()
+            ->where('tenant_id', $tenantId)
+            ->where('project_id', $projectId)
+            ->where('status', ProjectPlan::STATUS_ACTIVE)
+            ->orderByDesc('updated_at')
+            ->first();
+
+        $cropCycleId = (string) ($plan?->crop_cycle_id ?? $project->crop_cycle_id);
+        $currencyCode = (string) (DB::table('tenants')->where('id', $tenantId)->value('currency_code') ?: 'GBP');
+
+        $months = $this->monthsInRange($from, $to);
+        $monthCount = max(1, count($months));
+
+        $plannedTotals = $this->plannedTotalsForPlan($plan);
+        // With current planning schema, costs are not time-phased. Phase 1 distributes totals evenly over months in range.
+        $plannedPerMonth = [
+            'inputs' => round($plannedTotals['inputs'] / $monthCount, 2),
+            'labour' => round($plannedTotals['labour'] / $monthCount, 2),
+            'machinery' => round($plannedTotals['machinery'] / $monthCount, 2),
+            'total_cost' => round($plannedTotals['total_cost'] / $monthCount, 2),
+            'yield_qty' => $plannedTotals['yield_qty'] / $monthCount,
+            'yield_value' => round($plannedTotals['yield_value'] / $monthCount, 2),
+        ];
+
+        $series = [];
+        $totals = [
+            'planned' => $this->formatPlannedActualVarianceRow([
+                'inputs' => $plannedTotals['inputs'],
+                'labour' => $plannedTotals['labour'],
+                'machinery' => $plannedTotals['machinery'],
+                'total_cost' => $plannedTotals['total_cost'],
+                'credit_premium' => 0.0,
+                'yield_qty' => $plannedTotals['yield_qty'],
+                'yield_value' => $plannedTotals['yield_value'],
+            ])['planned'],
+            'actual' => $this->formatPlannedActualVarianceRow([
+                'inputs' => 0.0,
+                'labour' => 0.0,
+                'machinery' => 0.0,
+                'total_cost' => 0.0,
+                'credit_premium' => 0.0,
+                'yield_qty' => null,
+                'yield_value' => null,
+            ])['actual'],
+            'variance' => $this->formatPlannedActualVarianceRow([
+                'inputs' => 0.0,
+                'labour' => 0.0,
+                'machinery' => 0.0,
+                'total_cost' => 0.0,
+                'credit_premium' => 0.0,
+                'yield_qty' => null,
+                'yield_value' => null,
+            ])['variance'],
+        ];
+
+        $actualTotalsInputs = 0.0;
+        $actualTotalsLabour = 0.0;
+        $actualTotalsMachinery = 0.0;
+        $actualTotalsPremium = 0.0;
+
+        foreach ($months as $m) {
+            $monthFrom = max($from, $m['from']);
+            $monthTo = min($to, $m['to']);
+
+            $profit = $this->projectProfitabilityService->getProjectProfitability($projectId, $tenantId, [
+                'from' => $monthFrom,
+                'to' => $monthTo,
+                'crop_cycle_id' => $cropCycleId,
+            ]);
+
+            $actInputs = (float) ($profit['costs']['inputs'] ?? 0);
+            $actLabour = (float) ($profit['costs']['labour'] ?? 0);
+            $actMachinery = (float) ($profit['costs']['machinery'] ?? 0);
+            $actTotalExPremium = round($actInputs + $actLabour + $actMachinery, 2);
+
+            $premium = $this->creditPremiumForProjectInWindow($tenantId, $projectId, $monthFrom, $monthTo, $cropCycleId);
+            $actTotal = round($actTotalExPremium + $premium, 2);
+
+            $actualTotalsInputs += $actInputs;
+            $actualTotalsLabour += $actLabour;
+            $actualTotalsMachinery += $actMachinery;
+            $actualTotalsPremium += $premium;
+
+            $yieldAgg = $this->harvestEconomicsService->monthlyActualYieldByScope($tenantId, [
+                'from' => $monthFrom,
+                'to' => $monthTo,
+                'project_id' => $projectId,
+                'crop_cycle_id' => $cropCycleId,
+            ]);
+            $yieldTotals = $yieldAgg['totals'] ?? ['actual_yield_qty' => 0.0, 'actual_yield_value' => 0.0];
+            $hasYield = ((float) ($yieldTotals['actual_yield_qty'] ?? 0)) > 0.000001 || ((float) ($yieldTotals['actual_yield_value'] ?? 0)) > 0.000001;
+            $actYieldQty = $hasYield ? (float) ($yieldTotals['actual_yield_qty'] ?? 0) : null;
+            $actYieldVal = $hasYield ? (float) ($yieldTotals['actual_yield_value'] ?? 0) : null;
+
+            $row = $this->formatPlannedActualVarianceRow([
+                'inputs' => $plannedPerMonth['inputs'],
+                'labour' => $plannedPerMonth['labour'],
+                'machinery' => $plannedPerMonth['machinery'],
+                'total_cost' => $plannedPerMonth['total_cost'],
+                'credit_premium' => 0.0,
+                'yield_qty' => $plannedPerMonth['yield_qty'],
+                'yield_value' => $plannedPerMonth['yield_value'],
+            ], [
+                'inputs' => $actInputs,
+                'labour' => $actLabour,
+                'machinery' => $actMachinery,
+                'total_cost' => $actTotalExPremium,
+                'credit_premium' => $premium,
+                'yield_qty' => $actYieldQty,
+                'yield_value' => $actYieldVal,
+            ]);
+
+            // Override actual total to include premium (while keeping premium separate field).
+            $row['actual']['actual_total_cost'] = number_format($actTotal, 2, '.', '');
+            $row['variance']['variance_total_cost'] = number_format($actTotal - (float) $row['planned']['planned_total_cost'], 2, '.', '');
+
+            $series[] = array_merge(['month' => $m['month']], $row);
+        }
+
+        $actualTotalsExPremium = round($actualTotalsInputs + $actualTotalsLabour + $actualTotalsMachinery, 2);
+        $actualTotals = round($actualTotalsExPremium + $actualTotalsPremium, 2);
+
+        $totalsRow = $this->formatPlannedActualVarianceRow([
+            'inputs' => $plannedTotals['inputs'],
+            'labour' => $plannedTotals['labour'],
+            'machinery' => $plannedTotals['machinery'],
+            'total_cost' => $plannedTotals['total_cost'],
+            'credit_premium' => 0.0,
+            'yield_qty' => $plannedTotals['yield_qty'],
+            'yield_value' => $plannedTotals['yield_value'],
+        ], [
+            'inputs' => $actualTotalsInputs,
+            'labour' => $actualTotalsLabour,
+            'machinery' => $actualTotalsMachinery,
+            'total_cost' => $actualTotalsExPremium,
+            'credit_premium' => $actualTotalsPremium,
+            'yield_qty' => null,
+            'yield_value' => null,
+        ]);
+        $totalsRow['actual']['actual_total_cost'] = number_format($actualTotals, 2, '.', '');
+        $totalsRow['variance']['variance_total_cost'] = number_format($actualTotals - (float) $totalsRow['planned']['planned_total_cost'], 2, '.', '');
+        $yieldAggAll = $this->harvestEconomicsService->monthlyActualYieldByScope($tenantId, [
+            'from' => $from,
+            'to' => $to,
+            'project_id' => $projectId,
+            'crop_cycle_id' => $cropCycleId,
+        ]);
+        $yieldAllTotals = $yieldAggAll['totals'] ?? ['actual_yield_qty' => 0.0, 'actual_yield_value' => 0.0];
+        $hasYieldAll = ((float) ($yieldAllTotals['actual_yield_qty'] ?? 0)) > 0.000001 || ((float) ($yieldAllTotals['actual_yield_value'] ?? 0)) > 0.000001;
+
+        $totalsRow['actual']['actual_yield_qty'] = $hasYieldAll ? number_format((float) ($yieldAllTotals['actual_yield_qty'] ?? 0), 3, '.', '') : null;
+        $totalsRow['actual']['actual_yield_value'] = $hasYieldAll ? number_format((float) ($yieldAllTotals['actual_yield_value'] ?? 0), 2, '.', '') : null;
+        $totalsRow['variance']['variance_yield_qty'] = ($hasYieldAll && $totalsRow['planned']['planned_yield_qty'] !== null)
+            ? number_format(((float) ($yieldAllTotals['actual_yield_qty'] ?? 0)) - (float) $totalsRow['planned']['planned_yield_qty'], 3, '.', '')
+            : null;
+        $totalsRow['variance']['variance_yield_value'] = ($hasYieldAll && $totalsRow['planned']['planned_yield_value'] !== null)
+            ? number_format(((float) ($yieldAllTotals['actual_yield_value'] ?? 0)) - (float) $totalsRow['planned']['planned_yield_value'], 2, '.', '')
+            : null;
+
+        $totals = $totalsRow;
+
+        return response()->json([
+            'scope' => [
+                'tenant_id' => $tenantId,
+                'project_id' => $projectId,
+                'crop_cycle_id' => $cropCycleId,
+            ],
+            'plan' => $plan ? [
+                'plan_id' => $plan->id,
+                'plan_name' => $plan->name,
+                'status' => $plan->status,
+                'updated_at' => $plan->updated_at?->toIso8601String(),
+            ] : null,
+            'currency_code' => strtoupper($currencyCode),
+            'period' => [
+                'from' => $from,
+                'to' => $to,
+                'bucket' => 'month',
+            ],
+            'series' => $series,
+            'totals' => $totals,
+            '_meta' => [
+                'planned_monthly_distribution' => 'even_by_month',
+                'planned_yield_distribution' => 'even_by_month',
+                'actual_yield_basis' => 'HarvestEconomicsService::monthlyActualYieldByScope (HARVEST_PRODUCTION allocation snapshots; posting_date axis)',
+                'actual_cost_basis' => 'ProjectProfitabilityService (ledger-backed eligible posting groups via allocation_rows)',
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/reports/budget-vs-actual/crop-cycle
+     *
+     * Read-only monthly planned vs actual cost (plus separate credit premium) rolled up across
+     * all projects in the crop cycle. Includes per-project totals for variance hotspots.
+     *
+     * Required: crop_cycle_id. Optional: from, to, bucket=month (default).
+     */
+    public function cropCycleBudgetVsActual(Request $request): JsonResponse
+    {
+        $tenantId = TenantContext::getTenantId($request);
+        $scope = $this->validateCropCycleBudgetVsActualScope($request, $tenantId);
+        if ($scope instanceof JsonResponse) {
+            return $scope;
+        }
+
+        $cropCycleId = (string) $request->input('crop_cycle_id');
+        /** @var CropCycle $cycle */
+        $cycle = CropCycle::query()->where('tenant_id', $tenantId)->where('id', $cropCycleId)->firstOrFail();
+
+        $from = (string) ($request->input('from') ?: $cycle->start_date?->toDateString() ?: now()->startOfYear()->toDateString());
+        $to = (string) ($request->input('to') ?: now()->toDateString());
+        $currencyCode = (string) (DB::table('tenants')->where('id', $tenantId)->value('currency_code') ?: 'GBP');
+
+        $months = $this->monthsInRange($from, $to);
+        $monthCount = max(1, count($months));
+
+        $projects = Project::query()
+            ->where('tenant_id', $tenantId)
+            ->where('crop_cycle_id', $cropCycleId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'crop_cycle_id']);
+
+        $projectTotals = [];
+
+        // Accumulators keyed by month.
+        $plannedByMonth = [];
+        $actualByMonth = [];
+        $premiumByMonth = [];
+
+        $plannedTotals = ['inputs' => 0.0, 'labour' => 0.0, 'machinery' => 0.0, 'total_cost' => 0.0, 'yield_qty' => 0.0, 'yield_value' => 0.0];
+        $actualTotals = ['inputs' => 0.0, 'labour' => 0.0, 'machinery' => 0.0, 'total_cost_ex_premium' => 0.0, 'credit_premium' => 0.0];
+
+        foreach ($months as $m) {
+            $plannedByMonth[$m['month']] = ['inputs' => 0.0, 'labour' => 0.0, 'machinery' => 0.0, 'total_cost' => 0.0, 'yield_qty' => 0.0, 'yield_value' => 0.0];
+            $actualByMonth[$m['month']] = ['inputs' => 0.0, 'labour' => 0.0, 'machinery' => 0.0, 'total_cost_ex_premium' => 0.0];
+            $premiumByMonth[$m['month']] = 0.0;
+        }
+
+        foreach ($projects as $project) {
+            $plan = ProjectPlan::query()
+                ->where('tenant_id', $tenantId)
+                ->where('project_id', $project->id)
+                ->where('status', ProjectPlan::STATUS_ACTIVE)
+                ->orderByDesc('updated_at')
+                ->first();
+
+            $pTotals = $this->plannedTotalsForPlan($plan);
+            $plannedTotals['inputs'] += $pTotals['inputs'];
+            $plannedTotals['labour'] += $pTotals['labour'];
+            $plannedTotals['machinery'] += $pTotals['machinery'];
+            $plannedTotals['total_cost'] += $pTotals['total_cost'];
+            $plannedTotals['yield_qty'] += $pTotals['yield_qty'];
+            $plannedTotals['yield_value'] += $pTotals['yield_value'];
+
+            $pPlannedPerMonth = [
+                'inputs' => round($pTotals['inputs'] / $monthCount, 2),
+                'labour' => round($pTotals['labour'] / $monthCount, 2),
+                'machinery' => round($pTotals['machinery'] / $monthCount, 2),
+                'total_cost' => round($pTotals['total_cost'] / $monthCount, 2),
+                'yield_qty' => round($pTotals['yield_qty'] / $monthCount, 3),
+                'yield_value' => round($pTotals['yield_value'] / $monthCount, 2),
+            ];
+
+            $pActualInputs = 0.0;
+            $pActualLabour = 0.0;
+            $pActualMachinery = 0.0;
+            $pActualPremium = 0.0;
+
+            foreach ($months as $m) {
+                $monthFrom = max($from, $m['from']);
+                $monthTo = min($to, $m['to']);
+
+                $profit = $this->projectProfitabilityService->getProjectProfitability((string) $project->id, $tenantId, [
+                    'from' => $monthFrom,
+                    'to' => $monthTo,
+                    'crop_cycle_id' => $cropCycleId,
+                ]);
+                $actInputs = (float) ($profit['costs']['inputs'] ?? 0);
+                $actLabour = (float) ($profit['costs']['labour'] ?? 0);
+                $actMachinery = (float) ($profit['costs']['machinery'] ?? 0);
+                $actTotalExPremium = round($actInputs + $actLabour + $actMachinery, 2);
+
+                $prem = $this->creditPremiumForProjectInWindow($tenantId, (string) $project->id, $monthFrom, $monthTo, $cropCycleId);
+
+                $plannedByMonth[$m['month']]['inputs'] += $pPlannedPerMonth['inputs'];
+                $plannedByMonth[$m['month']]['labour'] += $pPlannedPerMonth['labour'];
+                $plannedByMonth[$m['month']]['machinery'] += $pPlannedPerMonth['machinery'];
+                $plannedByMonth[$m['month']]['total_cost'] += $pPlannedPerMonth['total_cost'];
+                $plannedByMonth[$m['month']]['yield_qty'] += $pPlannedPerMonth['yield_qty'];
+                $plannedByMonth[$m['month']]['yield_value'] += $pPlannedPerMonth['yield_value'];
+
+                $actualByMonth[$m['month']]['inputs'] += $actInputs;
+                $actualByMonth[$m['month']]['labour'] += $actLabour;
+                $actualByMonth[$m['month']]['machinery'] += $actMachinery;
+                $actualByMonth[$m['month']]['total_cost_ex_premium'] += $actTotalExPremium;
+                $premiumByMonth[$m['month']] += $prem;
+
+                $pActualInputs += $actInputs;
+                $pActualLabour += $actLabour;
+                $pActualMachinery += $actMachinery;
+                $pActualPremium += $prem;
+            }
+
+            $pActualTotalExPremium = round($pActualInputs + $pActualLabour + $pActualMachinery, 2);
+            $pActualTotal = round($pActualTotalExPremium + $pActualPremium, 2);
+
+            $actualTotals['inputs'] += $pActualInputs;
+            $actualTotals['labour'] += $pActualLabour;
+            $actualTotals['machinery'] += $pActualMachinery;
+            $actualTotals['total_cost_ex_premium'] += $pActualTotalExPremium;
+            $actualTotals['credit_premium'] += $pActualPremium;
+
+            $pRow = $this->formatPlannedActualVarianceRow([
+                'inputs' => $pTotals['inputs'],
+                'labour' => $pTotals['labour'],
+                'machinery' => $pTotals['machinery'],
+                'total_cost' => $pTotals['total_cost'],
+                'credit_premium' => 0.0,
+                'yield_qty' => $pTotals['yield_qty'],
+                'yield_value' => $pTotals['yield_value'],
+            ], [
+                'inputs' => $pActualInputs,
+                'labour' => $pActualLabour,
+                'machinery' => $pActualMachinery,
+                'total_cost' => $pActualTotalExPremium,
+                'credit_premium' => $pActualPremium,
+                'yield_qty' => null,
+                'yield_value' => null,
+            ]);
+            $pRow['actual']['actual_total_cost'] = number_format($pActualTotal, 2, '.', '');
+            $pRow['variance']['variance_total_cost'] = number_format($pActualTotal - (float) $pRow['planned']['planned_total_cost'], 2, '.', '');
+
+            $pYieldAgg = $this->harvestEconomicsService->monthlyActualYieldByScope($tenantId, [
+                'from' => $from,
+                'to' => $to,
+                'project_id' => (string) $project->id,
+                'crop_cycle_id' => $cropCycleId,
+            ]);
+            $pYieldTotals = $pYieldAgg['totals'] ?? ['actual_yield_qty' => 0.0, 'actual_yield_value' => 0.0];
+            $pHasYield = ((float) ($pYieldTotals['actual_yield_qty'] ?? 0)) > 0.000001 || ((float) ($pYieldTotals['actual_yield_value'] ?? 0)) > 0.000001;
+            $pRow['actual']['actual_yield_qty'] = $pHasYield ? number_format((float) ($pYieldTotals['actual_yield_qty'] ?? 0), 3, '.', '') : null;
+            $pRow['actual']['actual_yield_value'] = $pHasYield ? number_format((float) ($pYieldTotals['actual_yield_value'] ?? 0), 2, '.', '') : null;
+            $pRow['variance']['variance_yield_qty'] = ($pHasYield && $pRow['planned']['planned_yield_qty'] !== null)
+                ? number_format(((float) ($pYieldTotals['actual_yield_qty'] ?? 0)) - (float) $pRow['planned']['planned_yield_qty'], 3, '.', '')
+                : null;
+            $pRow['variance']['variance_yield_value'] = ($pHasYield && $pRow['planned']['planned_yield_value'] !== null)
+                ? number_format(((float) ($pYieldTotals['actual_yield_value'] ?? 0)) - (float) $pRow['planned']['planned_yield_value'], 2, '.', '')
+                : null;
+
+            $projectTotals[] = array_merge([
+                'project_id' => (string) $project->id,
+                'project_name' => (string) $project->name,
+                'plan' => $plan ? [
+                    'plan_id' => $plan->id,
+                    'plan_name' => $plan->name,
+                    'status' => $plan->status,
+                    'updated_at' => $plan->updated_at?->toIso8601String(),
+                ] : null,
+            ], $pRow);
+        }
+
+        $series = [];
+        foreach ($months as $m) {
+            $monthKey = $m['month'];
+            $p = $plannedByMonth[$monthKey];
+            $a = $actualByMonth[$monthKey];
+            $prem = $premiumByMonth[$monthKey];
+            $actTotal = round((float) $a['total_cost_ex_premium'] + (float) $prem, 2);
+
+            $row = $this->formatPlannedActualVarianceRow([
+                'inputs' => round((float) $p['inputs'], 2),
+                'labour' => round((float) $p['labour'], 2),
+                'machinery' => round((float) $p['machinery'], 2),
+                'total_cost' => round((float) $p['total_cost'], 2),
+                'credit_premium' => 0.0,
+                'yield_qty' => round((float) $p['yield_qty'], 3),
+                'yield_value' => round((float) $p['yield_value'], 2),
+            ], [
+                'inputs' => round((float) $a['inputs'], 2),
+                'labour' => round((float) $a['labour'], 2),
+                'machinery' => round((float) $a['machinery'], 2),
+                'total_cost' => round((float) $a['total_cost_ex_premium'], 2),
+                'credit_premium' => round((float) $prem, 2),
+                'yield_qty' => null,
+                'yield_value' => null,
+            ]);
+            $row['actual']['actual_total_cost'] = number_format($actTotal, 2, '.', '');
+            $row['variance']['variance_total_cost'] = number_format($actTotal - (float) $row['planned']['planned_total_cost'], 2, '.', '');
+
+            $mYieldAgg = $this->harvestEconomicsService->monthlyActualYieldByScope($tenantId, [
+                'from' => max($from, $m['from']),
+                'to' => min($to, $m['to']),
+                'crop_cycle_id' => $cropCycleId,
+            ]);
+            $mYieldTotals = $mYieldAgg['totals'] ?? ['actual_yield_qty' => 0.0, 'actual_yield_value' => 0.0];
+            $mHasYield = ((float) ($mYieldTotals['actual_yield_qty'] ?? 0)) > 0.000001 || ((float) ($mYieldTotals['actual_yield_value'] ?? 0)) > 0.000001;
+            $row['actual']['actual_yield_qty'] = $mHasYield ? number_format((float) ($mYieldTotals['actual_yield_qty'] ?? 0), 3, '.', '') : null;
+            $row['actual']['actual_yield_value'] = $mHasYield ? number_format((float) ($mYieldTotals['actual_yield_value'] ?? 0), 2, '.', '') : null;
+            $row['variance']['variance_yield_qty'] = ($mHasYield && $row['planned']['planned_yield_qty'] !== null)
+                ? number_format(((float) ($mYieldTotals['actual_yield_qty'] ?? 0)) - (float) $row['planned']['planned_yield_qty'], 3, '.', '')
+                : null;
+            $row['variance']['variance_yield_value'] = ($mHasYield && $row['planned']['planned_yield_value'] !== null)
+                ? number_format(((float) ($mYieldTotals['actual_yield_value'] ?? 0)) - (float) $row['planned']['planned_yield_value'], 2, '.', '')
+                : null;
+
+            $series[] = array_merge(['month' => $monthKey], $row);
+        }
+
+        $plannedTotals['inputs'] = round($plannedTotals['inputs'], 2);
+        $plannedTotals['labour'] = round($plannedTotals['labour'], 2);
+        $plannedTotals['machinery'] = round($plannedTotals['machinery'], 2);
+        $plannedTotals['total_cost'] = round($plannedTotals['total_cost'], 2);
+        $plannedTotals['yield_value'] = round($plannedTotals['yield_value'], 2);
+
+        $actualTotals['inputs'] = round($actualTotals['inputs'], 2);
+        $actualTotals['labour'] = round($actualTotals['labour'], 2);
+        $actualTotals['machinery'] = round($actualTotals['machinery'], 2);
+        $actualTotals['total_cost_ex_premium'] = round($actualTotals['total_cost_ex_premium'], 2);
+        $actualTotals['credit_premium'] = round($actualTotals['credit_premium'], 2);
+        $actualTotal = round($actualTotals['total_cost_ex_premium'] + $actualTotals['credit_premium'], 2);
+
+        $totals = $this->formatPlannedActualVarianceRow([
+            'inputs' => $plannedTotals['inputs'],
+            'labour' => $plannedTotals['labour'],
+            'machinery' => $plannedTotals['machinery'],
+            'total_cost' => $plannedTotals['total_cost'],
+            'credit_premium' => 0.0,
+            'yield_qty' => $plannedTotals['yield_qty'],
+            'yield_value' => $plannedTotals['yield_value'],
+        ], [
+            'inputs' => $actualTotals['inputs'],
+            'labour' => $actualTotals['labour'],
+            'machinery' => $actualTotals['machinery'],
+            'total_cost' => $actualTotals['total_cost_ex_premium'],
+            'credit_premium' => $actualTotals['credit_premium'],
+            'yield_qty' => null,
+            'yield_value' => null,
+        ]);
+        $totals['actual']['actual_total_cost'] = number_format($actualTotal, 2, '.', '');
+        $totals['variance']['variance_total_cost'] = number_format($actualTotal - (float) $totals['planned']['planned_total_cost'], 2, '.', '');
+
+        $yieldAggAll = $this->harvestEconomicsService->monthlyActualYieldByScope($tenantId, [
+            'from' => $from,
+            'to' => $to,
+            'crop_cycle_id' => $cropCycleId,
+        ]);
+        $yieldAllTotals = $yieldAggAll['totals'] ?? ['actual_yield_qty' => 0.0, 'actual_yield_value' => 0.0];
+        $hasYieldAll = ((float) ($yieldAllTotals['actual_yield_qty'] ?? 0)) > 0.000001 || ((float) ($yieldAllTotals['actual_yield_value'] ?? 0)) > 0.000001;
+        $totals['actual']['actual_yield_qty'] = $hasYieldAll ? number_format((float) ($yieldAllTotals['actual_yield_qty'] ?? 0), 3, '.', '') : null;
+        $totals['actual']['actual_yield_value'] = $hasYieldAll ? number_format((float) ($yieldAllTotals['actual_yield_value'] ?? 0), 2, '.', '') : null;
+        $totals['variance']['variance_yield_qty'] = ($hasYieldAll && $totals['planned']['planned_yield_qty'] !== null)
+            ? number_format(((float) ($yieldAllTotals['actual_yield_qty'] ?? 0)) - (float) $totals['planned']['planned_yield_qty'], 3, '.', '')
+            : null;
+        $totals['variance']['variance_yield_value'] = ($hasYieldAll && $totals['planned']['planned_yield_value'] !== null)
+            ? number_format(((float) ($yieldAllTotals['actual_yield_value'] ?? 0)) - (float) $totals['planned']['planned_yield_value'], 2, '.', '')
+            : null;
+
+        return response()->json([
+            'scope' => [
+                'tenant_id' => $tenantId,
+                'crop_cycle_id' => $cropCycleId,
+            ],
+            'currency_code' => strtoupper($currencyCode),
+            'period' => [
+                'from' => $from,
+                'to' => $to,
+                'bucket' => 'month',
+            ],
+            'series' => $series,
+            'totals' => $totals,
+            'projects' => $projectTotals,
+            '_meta' => [
+                'planned_monthly_distribution' => 'even_by_month',
+                'planned_yield_distribution' => 'even_by_month',
+                'actual_yield_basis' => 'HarvestEconomicsService::monthlyActualYieldByScope (HARVEST_PRODUCTION allocation snapshots; posting_date axis)',
+                'actual_cost_basis' => 'ProjectProfitabilityService (ledger-backed eligible posting groups via allocation_rows)',
+            ],
+        ]);
+    }
+
+    /**
      * Shared validation for project-forecast and project-projected-profit (tenant-safe project scope).
      *
      * @return JsonResponse|true JsonResponse on error, true when OK
@@ -299,6 +807,217 @@ class ReportController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * Validation for GET /api/reports/budget-vs-actual/project
+     *
+     * @return JsonResponse|true
+     */
+    private function validateProjectBudgetVsActualScope(Request $request, string $tenantId): JsonResponse|bool
+    {
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|uuid',
+            'from' => 'required|date|date_format:Y-m-d',
+            'to' => 'required|date|date_format:Y-m-d|after_or_equal:from',
+            'bucket' => 'required|string|in:month',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $project = Project::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $request->input('project_id'))
+            ->first();
+        if (! $project) {
+            return response()->json(['errors' => ['project_id' => ['Invalid project.']]], 422);
+        }
+
+        return true;
+    }
+
+    /**
+     * Validation for GET /api/reports/budget-vs-actual/crop-cycle
+     *
+     * @return JsonResponse|true
+     */
+    private function validateCropCycleBudgetVsActualScope(Request $request, string $tenantId): JsonResponse|bool
+    {
+        $validator = Validator::make($request->all(), [
+            'crop_cycle_id' => 'required|uuid',
+            'from' => 'nullable|date|date_format:Y-m-d',
+            'to' => 'nullable|date|date_format:Y-m-d',
+            'bucket' => 'nullable|string|in:month',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if ($request->filled('from') && $request->filled('to') && $request->input('to') < $request->input('from')) {
+            return response()->json(['errors' => ['to' => ['to must be on or after from.']]], 422);
+        }
+
+        $cycle = CropCycle::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $request->input('crop_cycle_id'))
+            ->first();
+        if (! $cycle) {
+            return response()->json(['errors' => ['crop_cycle_id' => ['Invalid crop cycle.']]], 422);
+        }
+
+        return true;
+    }
+
+    /**
+     * @return list<array{month: string, from: string, to: string}>
+     */
+    private function monthsInRange(string $from, string $to): array
+    {
+        $start = Carbon::parse($from)->startOfMonth();
+        $end = Carbon::parse($to)->startOfMonth();
+
+        $out = [];
+        $cur = $start->copy();
+        while ($cur <= $end) {
+            $month = $cur->format('Y-m');
+            $mFrom = $cur->copy()->startOfMonth()->toDateString();
+            $mTo = $cur->copy()->endOfMonth()->toDateString();
+            $out[] = ['month' => $month, 'from' => $mFrom, 'to' => $mTo];
+            $cur->addMonth();
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{inputs: float, labour: float, machinery: float, total_cost: float, yield_qty: float, yield_value: float}
+     */
+    private function plannedTotalsForPlan(?ProjectPlan $plan): array
+    {
+        if ($plan === null) {
+            return ['inputs' => 0.0, 'labour' => 0.0, 'machinery' => 0.0, 'total_cost' => 0.0, 'yield_qty' => 0.0, 'yield_value' => 0.0];
+        }
+
+        $plan->loadMissing(['costs', 'yields']);
+
+        $inputs = 0.0;
+        $labour = 0.0;
+        $machinery = 0.0;
+
+        foreach ($plan->costs as $c) {
+            $amt = (float) ($c->expected_cost ?? 0);
+            if ($c->cost_type === ProjectPlanCost::COST_TYPE_INPUT) {
+                $inputs += $amt;
+            } elseif ($c->cost_type === ProjectPlanCost::COST_TYPE_LABOUR) {
+                $labour += $amt;
+            } elseif ($c->cost_type === ProjectPlanCost::COST_TYPE_MACHINERY) {
+                $machinery += $amt;
+            }
+        }
+
+        $yieldQty = 0.0;
+        $yieldValue = 0.0;
+        foreach ($plan->yields as $y) {
+            $q = $y->expected_quantity;
+            $unit = $y->expected_unit_value;
+            if ($q !== null) {
+                $yieldQty += (float) $q;
+            }
+            if ($q !== null && $unit !== null) {
+                $yieldValue += (float) $q * (float) $unit;
+            }
+        }
+
+        $inputs = round($inputs, 2);
+        $labour = round($labour, 2);
+        $machinery = round($machinery, 2);
+        $total = round($inputs + $labour + $machinery, 2);
+
+        return [
+            'inputs' => $inputs,
+            'labour' => $labour,
+            'machinery' => $machinery,
+            'total_cost' => $total,
+            'yield_qty' => $yieldQty,
+            'yield_value' => round($yieldValue, 2),
+        ];
+    }
+
+    private function creditPremiumForProjectInWindow(string $tenantId, string $projectId, string $from, string $to, string $cropCycleId): float
+    {
+        $row = DB::table('allocation_rows as ar')
+            ->join('posting_groups as pg', 'pg.id', '=', 'ar.posting_group_id')
+            ->join('supplier_invoices as si', function ($join) {
+                $join->on('si.id', '=', 'pg.source_id')
+                    ->where('pg.source_type', '=', 'SUPPLIER_INVOICE');
+            })
+            ->where('ar.tenant_id', $tenantId)
+            ->where('pg.tenant_id', $tenantId)
+            ->where('ar.project_id', $projectId)
+            ->where('pg.crop_cycle_id', $cropCycleId)
+            ->where('ar.allocation_type', 'SUPPLIER_INVOICE_CREDIT_PREMIUM')
+            ->whereIn('si.status', ['POSTED', 'PAID'])
+            ->where('pg.posting_date', '>=', $from)
+            ->where('pg.posting_date', '<=', $to)
+            ->selectRaw('COALESCE(SUM(ar.amount::numeric), 0) as prem')
+            ->first();
+
+        return round((float) ($row->prem ?? 0), 2);
+    }
+
+    /**
+     * Build nested planned/actual/variance objects with formatted strings.
+     *
+     * @param  array{inputs: float, labour: float, machinery: float, total_cost: float, credit_premium: float, yield_qty: float|null, yield_value: float|null}  $planned
+     * @param  array{inputs: float, labour: float, machinery: float, total_cost: float, credit_premium: float, yield_qty: float|null, yield_value: float|null}|null  $actual
+     * @return array{planned: array<string, string|null>, actual: array<string, string|null>, variance: array<string, string|null>}
+     */
+    private function formatPlannedActualVarianceRow(array $planned, ?array $actual = null): array
+    {
+        $actual = $actual ?? ['inputs' => 0.0, 'labour' => 0.0, 'machinery' => 0.0, 'total_cost' => 0.0, 'credit_premium' => 0.0, 'yield_qty' => null, 'yield_value' => null];
+
+        $varInputs = ($actual['inputs'] ?? 0) - ($planned['inputs'] ?? 0);
+        $varLabour = ($actual['labour'] ?? 0) - ($planned['labour'] ?? 0);
+        $varMachinery = ($actual['machinery'] ?? 0) - ($planned['machinery'] ?? 0);
+        $varTotal = ($actual['total_cost'] ?? 0) - ($planned['total_cost'] ?? 0);
+        $varPremium = ($actual['credit_premium'] ?? 0) - ($planned['credit_premium'] ?? 0);
+        $varYieldQty = null;
+        $varYieldVal = null;
+        if ($planned['yield_qty'] !== null && $actual['yield_qty'] !== null) {
+            $varYieldQty = (float) $actual['yield_qty'] - (float) $planned['yield_qty'];
+        }
+        if ($planned['yield_value'] !== null && $actual['yield_value'] !== null) {
+            $varYieldVal = (float) $actual['yield_value'] - (float) $planned['yield_value'];
+        }
+
+        return [
+            'planned' => [
+                'planned_input_cost' => number_format((float) $planned['inputs'], 2, '.', ''),
+                'planned_labour_cost' => number_format((float) $planned['labour'], 2, '.', ''),
+                'planned_machinery_cost' => number_format((float) $planned['machinery'], 2, '.', ''),
+                'planned_total_cost' => number_format((float) $planned['total_cost'], 2, '.', ''),
+                'planned_yield_qty' => $planned['yield_qty'] === null ? null : number_format((float) $planned['yield_qty'], 3, '.', ''),
+                'planned_yield_value' => $planned['yield_value'] === null ? null : number_format((float) $planned['yield_value'], 2, '.', ''),
+            ],
+            'actual' => [
+                'actual_input_cost' => number_format((float) ($actual['inputs'] ?? 0), 2, '.', ''),
+                'actual_labour_cost' => number_format((float) ($actual['labour'] ?? 0), 2, '.', ''),
+                'actual_machinery_cost' => number_format((float) ($actual['machinery'] ?? 0), 2, '.', ''),
+                'actual_total_cost' => number_format((float) ($actual['total_cost'] ?? 0), 2, '.', ''),
+                'actual_credit_premium_cost' => number_format((float) ($actual['credit_premium'] ?? 0), 2, '.', ''),
+                'actual_yield_qty' => $actual['yield_qty'] === null ? null : number_format((float) $actual['yield_qty'], 3, '.', ''),
+                'actual_yield_value' => $actual['yield_value'] === null ? null : number_format((float) $actual['yield_value'], 2, '.', ''),
+            ],
+            'variance' => [
+                'variance_input_cost' => number_format((float) $varInputs, 2, '.', ''),
+                'variance_labour_cost' => number_format((float) $varLabour, 2, '.', ''),
+                'variance_machinery_cost' => number_format((float) $varMachinery, 2, '.', ''),
+                'variance_total_cost' => number_format((float) $varTotal, 2, '.', ''),
+                'variance_credit_premium_cost' => number_format((float) $varPremium, 2, '.', ''),
+                'variance_yield_qty' => $varYieldQty === null ? null : number_format((float) $varYieldQty, 3, '.', ''),
+                'variance_yield_value' => $varYieldVal === null ? null : number_format((float) $varYieldVal, 2, '.', ''),
+            ],
+        ];
     }
 
     /**

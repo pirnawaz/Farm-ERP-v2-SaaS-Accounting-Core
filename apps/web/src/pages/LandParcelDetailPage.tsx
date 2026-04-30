@@ -4,6 +4,8 @@ import { useLandParcel, useUpdateLandParcel, useLandParcelAudit } from '../hooks
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
+import { SetupStatusBadge } from '../components/SetupStatusBadge';
+import { isSetupComplete } from '../components/setupSemantics';
 import { useRole } from '../hooks/useRole';
 import { useFormatting } from '../hooks/useFormatting';
 import toast from 'react-hot-toast';
@@ -220,15 +222,46 @@ export default function LandParcelDetailPage() {
                 <ul className="space-y-1">
                   {group.allocations.map((alloc) => (
                     <li key={alloc.id} className="text-sm text-gray-700">
-                      {alloc.allocated_acres} acres to {alloc.party?.name || 'Owner-operated'} 
-                      {alloc.project && (
-                        <Link
-                          to={`/app/projects/${alloc.project.id}`}
-                          className="ml-2 text-[#1F6F5C] hover:text-[#1a5a4a]"
-                        >
-                          (Project: {alloc.project.name})
-                        </Link>
-                      )}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>
+                          <span className="tabular-nums font-medium text-gray-900">{alloc.allocated_acres}</span> acres to{' '}
+                          {alloc.party?.name || 'Owner-operated'}
+                        </span>
+                        {alloc.project ? (
+                          <Link
+                            to={`/app/projects/${alloc.project.id}`}
+                            className="text-[#1F6F5C] hover:text-[#1a5a4a] font-medium"
+                          >
+                            {alloc.project.name}
+                          </Link>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-gray-500">No field cycle</span>
+                            <Link
+                              to={`/app/projects/setup?allocation_id=${encodeURIComponent(alloc.id)}&crop_cycle_id=${encodeURIComponent(group.crop_cycle.id)}&parcel_id=${encodeURIComponent(parcel.id)}`}
+                              className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+                            >
+                              Create field cycle
+                            </Link>
+                          </div>
+                        )}
+                        {alloc.project && (
+                          !isSetupComplete(alloc.project as any) ? (
+                            <Link
+                              to={`/app/projects/setup?project_id=${encodeURIComponent(alloc.project.id)}&allocation_id=${encodeURIComponent(alloc.id)}&crop_cycle_id=${encodeURIComponent(group.crop_cycle.id)}&parcel_id=${encodeURIComponent(parcel.id)}`}
+                              className="text-sm font-medium text-[#1F6F5C] hover:text-[#1a5a4a]"
+                            >
+                              Complete setup
+                            </Link>
+                          ) : null
+                        )}
+                        <SetupStatusBadge
+                          present={!!(alloc.project?.agreement_allocation_id || alloc.project?.agreement_allocation)}
+                          presentLabel="Agreement allocation"
+                          missingLabel="No agreement allocation"
+                          size="sm"
+                        />
+                      </div>
                     </li>
                   ))}
                 </ul>

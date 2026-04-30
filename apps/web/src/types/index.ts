@@ -2377,6 +2377,7 @@ export interface SupplierInvoiceListItem {
   invoice_date: string | null;
   due_date?: string | null;
   currency_code: string;
+  payment_terms?: 'CASH' | 'CREDIT' | null;
   subtotal_amount: string | null;
   tax_amount: string | null;
   total_amount: string | null;
@@ -2400,6 +2401,11 @@ export interface SupplierInvoiceDetail extends SupplierInvoiceListItem {
     description: string | null;
     qty: string | null;
     unit_price: string | null;
+    cash_unit_price?: string | null;
+    credit_unit_price?: string | null;
+    selected_unit_price?: string | null;
+    base_cash_amount?: string | null;
+    credit_premium_amount?: string | null;
     line_total: string | null;
     tax_amount: string | null;
   }>;
@@ -2917,6 +2923,17 @@ export interface CreateProjectFromAgreementAllocationPayload {
   party_id: string;
   crop_cycle_id: string;
   name?: string;
+}
+
+export interface FieldCycleSetupPayload {
+  crop_cycle_id: string;
+  land_parcel_id: string;
+  allocated_acres: number | string;
+  project_name: string;
+  field_block_name?: string | null;
+  agreement_id?: string | null;
+  agreement_allocation_id?: string | null;
+  project_id?: string | null;
 }
 
 export interface UpdateProjectRulePayload {

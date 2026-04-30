@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useCropCycle, useCloseCropCycle, useReopenCropCycle } from '../hooks/useCropCycles';
+import { useProjects } from '../hooks/useProjects';
+import { useLandAllocations } from '../hooks/useLandAllocations';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { FormField } from '../components/FormField';
@@ -8,10 +10,18 @@ import { useRole } from '../hooks/useRole';
 import toast from 'react-hot-toast';
 import { cropCyclesApi } from '../api/cropCycles';
 import type { CropCycleClosePreview } from '../types';
+import { SetupCompletenessBadge, type SetupCompleteness } from '../components/SetupStatusBadge';
+import { getSetupCompleteness } from '../components/setupSemantics';
+
+function setupCompleteness(project: any): SetupCompleteness {
+  return getSetupCompleteness(project);
+}
 
 export default function CropCycleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: cycle, isLoading } = useCropCycle(id || '');
+  const { data: projects } = useProjects(id || undefined);
+  const { data: allocations } = useLandAllocations(id || undefined);
   const closeMutation = useCloseCropCycle();
   const reopenMutation = useReopenCropCycle();
   const { canCloseCropCycle } = useRole();
@@ -74,6 +84,24 @@ export default function CropCycleDetailPage() {
     return <div>Crop cycle not found</div>;
   }
 
+  const allocationRows = allocations ?? [];
+  const projectRows = projects ?? [];
+  const incompleteProjects = projectRows.filter((p) => setupCompleteness(p) !== 'COMPLETE');
+  const parcelsAssigned = new Set(allocationRows.map((a) => a.land_parcel_id)).size;
+  const totals = projectRows.reduce(
+    (acc, p) => {
+      const c = setupCompleteness(p);
+      acc.total += 1;
+      if (c === 'COMPLETE') acc.complete += 1;
+      if (c === 'PARTIAL') acc.partial += 1;
+      if (c === 'NOT_SET') acc.notSet += 1;
+      if (!p.agreement_id) acc.missingAgreement += 1;
+      if (!p.land_allocation_id) acc.missingAllocationLink += 1;
+      return acc;
+    },
+    { total: 0, complete: 0, partial: 0, notSet: 0, missingAgreement: 0, missingAllocationLink: 0 },
+  );
+
   const hasBlockingReasons = preview && preview.blocking_reasons.length > 0;
   const reconSummary = preview?.reconciliation_summary;
   const reconciliation = preview?.reconciliation;
@@ -108,6 +136,66 @@ export default function CropCycleDetailPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
+          <h2 className="text-lg font-medium text-gray-900 mb-1">Field Cycle setup progress</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Track how far this crop cycle is configured across parcels → allocations → field cycles → agreements.
+          </p>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Link
+              to={`/app/projects/setup?crop_cycle_id=${encodeURIComponent(cycle.id)}`}
+              className="inline-flex items-center justify-center rounded-md bg-[#1F6F5C] px-3 py-2 text-sm font-medium text-white hover:bg-[#1a5a4a]"
+            >
+              Add field cycle
+            </Link>
+            {incompleteProjects.length > 0 && (
+              <a
+                href="#missing-setups"
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+              >
+                Complete missing setups ({incompleteProjects.length})
+              </a>
+            )}
+          </div>
+          <dl className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="rounded-md border border-gray-100 bg-gray-50/50 p-3">
+              <dt className="text-xs font-medium text-gray-500">Total parcels assigned</dt>
+              <dd className="text-xl font-semibold text-gray-900 tabular-nums">{parcelsAssigned}</dd>
+            </div>
+            <div className="rounded-md border border-gray-100 bg-gray-50/50 p-3">
+              <dt className="text-xs font-medium text-gray-500">Total allocations</dt>
+              <dd className="text-xl font-semibold text-gray-900 tabular-nums">{allocationRows.length}</dd>
+            </div>
+            <div className="rounded-md border border-gray-100 bg-gray-50/50 p-3">
+              <dt className="text-xs font-medium text-gray-500">Total field cycles</dt>
+              <dd className="text-xl font-semibold text-gray-900 tabular-nums">{projectRows.length}</dd>
+            </div>
+            <div className="rounded-md border border-gray-100 bg-gray-50/50 p-3">
+              <dt className="text-xs font-medium text-gray-500">Fully configured</dt>
+              <dd className="text-xl font-semibold text-gray-900 tabular-nums">{totals.complete}</dd>
+            </div>
+          </dl>
+          <div className="mt-4 flex flex-wrap gap-2 items-center text-sm text-gray-700">
+            <span className="font-medium text-gray-900">Setup:</span>
+            <span className="inline-flex items-center gap-2">
+              <SetupCompletenessBadge completeness="COMPLETE" size="sm" /> <span className="tabular-nums">{totals.complete}</span>
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <SetupCompletenessBadge completeness="PARTIAL" size="sm" /> <span className="tabular-nums">{totals.partial}</span>
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <SetupCompletenessBadge completeness="NOT_SET" size="sm" /> <span className="tabular-nums">{totals.notSet}</span>
+            </span>
+            <span className="text-gray-400">|</span>
+            <span>
+              Missing agreement: <span className="tabular-nums font-medium text-gray-900">{totals.missingAgreement}</span>
+            </span>
+            <span>
+              Missing allocation link: <span className="tabular-nums font-medium text-gray-900">{totals.missingAllocationLink}</span>
+            </span>
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Cycle Information</h2>
           <dl className="space-y-2">
@@ -165,6 +253,38 @@ export default function CropCycleDetailPage() {
           </div>
         </div>
       </div>
+
+      {incompleteProjects.length > 0 && (
+        <div id="missing-setups" className="mt-6 bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-1">Complete missing setups</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Jump directly into completion for field cycles that are not fully linked yet.
+          </p>
+          <ul className="space-y-2">
+            {incompleteProjects.slice(0, 20).map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-100 px-3 py-2">
+                <div className="min-w-0">
+                  <Link to={`/app/projects/${p.id}`} className="font-medium text-gray-900 hover:underline">
+                    {p.name}
+                  </Link>
+                  <div className="mt-0.5 text-xs text-gray-500">
+                    <SetupCompletenessBadge completeness={setupCompleteness(p)} size="sm" />
+                  </div>
+                </div>
+                <Link
+                  to={`/app/projects/setup?project_id=${encodeURIComponent(p.id)}&crop_cycle_id=${encodeURIComponent(cycle.id)}`}
+                  className="inline-flex items-center justify-center rounded-md bg-[#1F6F5C] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#1a5a4a]"
+                >
+                  Complete setup
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {incompleteProjects.length > 20 && (
+            <p className="mt-3 text-xs text-gray-500">Showing first 20. Use the Projects list to find the rest.</p>
+          )}
+        </div>
+      )}
 
       <Modal
         isOpen={showCloseModal}

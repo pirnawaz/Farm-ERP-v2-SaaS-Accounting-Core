@@ -6,6 +6,7 @@ use App\Models\AllocationRow;
 use App\Models\Harvest;
 use App\Models\HarvestShareLine;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -183,6 +184,89 @@ class HarvestEconomicsService
             'project_id' => $h->project_id,
             'crop_cycle_id' => $h->crop_cycle_id,
             'economics' => $this->getHarvestEconomics($h->id, $tenantId),
+        ];
+    }
+
+    /**
+     * Monthly actual yield (qty/value) from posted Harvest Economics snapshots.
+     *
+     * Source: allocation_rows where allocation_type = HARVEST_PRODUCTION, joined to posted harvests and posting_groups
+     * for scope and posting date.
+     *
+     * @param  array{
+     *   from: string,
+     *   to: string,
+     *   project_id?: string|null,
+     *   crop_cycle_id?: string|null
+     * }  $filters
+     * @return array{
+     *   by_month: array<string, array{actual_yield_qty: float, actual_yield_value: float}>,
+     *   totals: array{actual_yield_qty: float, actual_yield_value: float}
+     * }
+     */
+    public function monthlyActualYieldByScope(string $tenantId, array $filters): array
+    {
+        $from = (string) $filters['from'];
+        $to = (string) $filters['to'];
+        $projectId = isset($filters['project_id']) ? (string) $filters['project_id'] : null;
+        if ($projectId === '') {
+            $projectId = null;
+        }
+        $cropCycleId = isset($filters['crop_cycle_id']) ? (string) $filters['crop_cycle_id'] : null;
+        if ($cropCycleId === '') {
+            $cropCycleId = null;
+        }
+
+        $q = DB::table('allocation_rows as ar')
+            ->join('posting_groups as pg', function ($join) use ($tenantId) {
+                $join->on('pg.id', '=', 'ar.posting_group_id')
+                    ->where('pg.tenant_id', '=', $tenantId);
+            })
+            ->join('harvests as h', function ($join) use ($tenantId) {
+                $join->on('h.posting_group_id', '=', 'pg.id')
+                    ->where('h.tenant_id', '=', $tenantId)
+                    ->where('h.status', '=', 'POSTED')
+                    ->whereNotNull('h.posting_group_id');
+            })
+            ->where('ar.tenant_id', $tenantId)
+            ->where('ar.allocation_type', 'HARVEST_PRODUCTION')
+            ->whereBetween('pg.posting_date', [$from, $to]);
+
+        if ($projectId !== null) {
+            $q->where('h.project_id', $projectId);
+        }
+        if ($cropCycleId !== null) {
+            $q->where('h.crop_cycle_id', $cropCycleId);
+        }
+
+        $rows = $q->selectRaw("
+                to_char(pg.posting_date, 'YYYY-MM') as month,
+                COALESCE(SUM(ar.quantity::numeric), 0) as qty,
+                COALESCE(SUM(COALESCE(ar.amount_base, ar.amount)::numeric), 0) as val
+            ")
+            ->groupByRaw("to_char(pg.posting_date, 'YYYY-MM')")
+            ->orderByRaw("to_char(pg.posting_date, 'YYYY-MM')")
+            ->get();
+
+        $byMonth = [];
+        $totQty = 0.0;
+        $totVal = 0.0;
+
+        foreach ($rows as $r) {
+            $m = (string) $r->month;
+            $qty = round((float) ($r->qty ?? 0), 3);
+            $val = round((float) ($r->val ?? 0), 2);
+            $byMonth[$m] = ['actual_yield_qty' => $qty, 'actual_yield_value' => $val];
+            $totQty += $qty;
+            $totVal += $val;
+        }
+
+        return [
+            'by_month' => $byMonth,
+            'totals' => [
+                'actual_yield_qty' => round($totQty, 3),
+                'actual_yield_value' => round($totVal, 2),
+            ],
         ];
     }
 }
